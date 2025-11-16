@@ -8,7 +8,7 @@ use super::evolution::EvolutionManager;
 use super::replication::{ReplicationManager, ModelUpdate};
 use super::versioning::VersioningManager;
 use std::sync::Arc;
-use std::time::Duration;
+use tokio::sync::Mutex;
 
 pub struct NervConfig {
     pub sync_interval_ms: u64,
@@ -42,14 +42,14 @@ pub struct NervRuntime {
     evolution: EvolutionManager,
     replication: ReplicationManager,
     versioning: VersioningManager,
-    shard_manager: Arc<ShardManager>,
+    shard_manager: Arc<Mutex<ShardManager>>,
 }
 
 impl NervRuntime {
     pub fn new(
-        config: NervConfig, 
+        config: NervConfig,
         metrics: Arc<Metrics>,
-        shard_manager: Arc<ShardManager>
+        shard_manager: Arc<Mutex<ShardManager>>
     ) -> Self {
         let circuit_breaker = CircuitBreaker::new();
         
@@ -176,9 +176,10 @@ impl NervRuntime {
         self.evolution.sync_state().await?;
         self.replication.sync_state().await?;
         self.versioning.sync_state().await?;
-        
+
         // Sync shards through the shard manager
-        self.shard_manager.sync_shards().await?;
+        let mut shard_manager = self.shard_manager.lock().await;
+        shard_manager.sync_shards().await?;
         
         self.metrics.end_operation("nerv_sync_state");
         
