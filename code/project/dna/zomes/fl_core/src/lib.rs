@@ -83,7 +83,7 @@ pub fn aggregate_model_updates(updates: Vec<ModelUpdate>) -> ExternResult<Aggreg
         bias: 0.0,
         version: updates.iter().map(|u| u.version).max().unwrap_or(0),
         metadata: ModelMetadata {
-            timestamp: sys_time()?,
+            timestamp: sys_time()?.as_millis() as u64,
             metrics: ModelMetrics {
                 loss: updates.iter().map(|u| u.metadata.metrics.loss).sum::<f32>() / updates.len() as f32,
                 accuracy: updates.iter().map(|u| u.metadata.metrics.accuracy).sum::<f32>() / updates.len() as f32,
