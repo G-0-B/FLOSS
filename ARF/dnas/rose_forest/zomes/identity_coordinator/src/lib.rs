@@ -56,6 +56,18 @@ pub fn register_aid(aid_input: RegisterAIDInput) -> ExternResult<ActionHash> {
         (),
     )?;
 
+    // Create anchor path for AID lookup
+    let aid_anchor = Path::from(format!("aid:{}", aid_input.aid));
+    aid_anchor.ensure()?;
+
+    // Link from anchor to AID entry for efficient lookup
+    create_link(
+        aid_anchor.path_entry_hash()?,
+        aid_hash.clone(),
+        LinkTypes::AIDPathToEntry,
+        (),
+    )?;
+
     Ok(aid_hash)
 }
 
@@ -273,15 +285,26 @@ pub fn rotate_key(rotation_input: RotateKeyInput) -> ExternResult<ActionHash> {
 // Helper functions
 
 fn get_aid_hash(aid: &str) -> ExternResult<ActionHash> {
-    // Search for AID by iterating through entries
-    // In production, would use a more efficient indexing strategy
+    // Use Path anchor to find AID entry
     let aid_anchor = Path::from(format!("aid:{}", aid));
 
-    // For now, return error if not found
-    // TODO: Implement proper AID lookup
-    Err(wasm_error!(WasmErrorInner::Guest(
-        "AID lookup not fully implemented".to_string()
-    )))
+    // Get links from anchor to AID entry
+    let links = get_links(
+        GetLinksInputBuilder::try_new(
+            aid_anchor.path_entry_hash()?,
+            LinkTypes::AIDPathToEntry
+        )?.build(),
+    )?;
+
+    // Should only be one AID entry per anchor
+    if links.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("AID not found: {}", aid)
+        )));
+    }
+
+    // Return the first link target (the AID entry hash)
+    Ok(links[0].target.clone().into())
 }
 
 fn compute_event_digest(event: &KeyEvent) -> String {

@@ -232,6 +232,8 @@ pub enum LinkTypes {
     AIDToKEL,
     /// Link from IdentitySeal to AutonomousIdentifier
     SealToAID,
+    /// Link from AID anchor path to AutonomousIdentifier entry
+    AIDPathToEntry,
 }
 
 /// Validation callback

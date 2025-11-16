@@ -89,8 +89,10 @@ pub fn record_economic_event(input: RecordEventInput) -> ExternResult<ActionHash
 #[hdk_extern]
 pub fn create_value_flow(input: CreateFlowInput) -> ExternResult<ActionHash> {
     // Verify both events exist
-    let input_event = get_economic_event(input.input_event.clone())?;
-    let output_event = get_economic_event(input.output_event.clone())?;
+    let input_event = get_economic_event(input.input_event.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Input event not found".to_string())))?;
+    let output_event = get_economic_event(input.output_event.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Output event not found".to_string())))?;
 
     // Verify resource compatibility
     verify_resource_compatibility(&input_event, &output_event)?;
@@ -128,7 +130,7 @@ pub fn create_value_flow(input: CreateFlowInput) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn calculate_contribution_value(input: CalculateContributionInput) -> ExternResult<Vec<ContributionValue>> {
     // Get all economic events for the resource within time window
-    let events = get_events_for_resource(input.resource.clone(), input.time_window.clone())?;
+    let events = get_events_for_resource_in_window(input.resource.clone(), input.time_window.clone())?;
 
     if events.is_empty() {
         return Ok(vec![]);
@@ -258,7 +260,7 @@ fn get_contribution_value(contribution_hash: ActionHash) -> ExternResult<Option<
     }
 }
 
-fn get_events_for_resource(
+fn get_events_for_resource_in_window(
     resource: ActionHash,
     time_window: TimeWindow,
 ) -> ExternResult<Vec<(ActionHash, EconomicEvent)>> {
