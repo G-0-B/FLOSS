@@ -153,9 +153,9 @@ impl ShardManager {
         // In a real implementation, this would query vectors from the DHT
         // For now, we'll return a dummy list
         Ok(vec![
-            Vector::new(vec![0.1, 0.2, 0.3], AgentPubKey::from_raw_32(vec![0; 32].try_into().unwrap())),
-            Vector::new(vec![0.4, 0.5, 0.6], AgentPubKey::from_raw_32(vec![1; 32].try_into().unwrap())),
-            Vector::new(vec![0.7, 0.8, 0.9], AgentPubKey::from_raw_32(vec![2; 32].try_into().unwrap())),
+            Vector::new(vec![0.1, 0.2, 0.3], Self::dummy_agent_key(0)?),
+            Vector::new(vec![0.4, 0.5, 0.6], Self::dummy_agent_key(1)?),
+            Vector::new(vec![0.7, 0.8, 0.9], Self::dummy_agent_key(2)?),
         ])
     }
     
@@ -216,5 +216,12 @@ impl ShardManager {
         self.metrics.record("neurosynchrony_latency", 100); // Example value in ms
         
         Ok(())
+    }
+
+    fn dummy_agent_key(seed: u8) -> Result<AgentPubKey, ShardError> {
+        AgentPubKey::from_raw_39(vec![seed; 39]).map_err(|e| ShardError::MigrationFailed {
+            context: "Failed to create dummy agent key".to_string(),
+            source: Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", e))),
+        })
     }
 }
