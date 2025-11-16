@@ -26,6 +26,10 @@ pub enum LinkTypes {
     TripleToUnderstanding,
     ADRToUnderstanding,
     AgentBudget,
+    /// Link from AD4M perspective to understanding
+    PerspectiveToUnderstanding,
+    /// Link from semantic context to understanding
+    SemanticContextToUnderstanding,
 }
 
 /// An understanding transmitted by an agent
@@ -49,6 +53,68 @@ pub struct Understanding {
 
     /// Content hash for deduplication
     pub content_hash: String,
+
+    // === AD4M SEMANTIC LAYER ===
+    /// Links to AD4M perspectives for semantic interoperability
+    pub perspectives: Vec<PerspectiveHash>,
+
+    /// Shared semantic context for interpretation
+    pub semantic_context: Option<SemanticContext>,
+
+    /// Which AD4M language this understanding uses
+    pub language_address: Option<LanguageAddress>,
+}
+
+/// AD4M Perspective Hash
+///
+/// References an AD4M Perspective (agent's semantic view)
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct PerspectiveHash {
+    /// Hash/ID of the perspective
+    pub hash: String,
+
+    /// Optional human-readable name
+    pub name: Option<String>,
+}
+
+/// AD4M Language Address
+///
+/// Points to an AD4M Language for semantic interoperability
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct LanguageAddress {
+    /// DNA hash of the AD4M language
+    pub dna_hash: String,
+
+    /// Specific expression hash within that language
+    pub expression_hash: String,
+}
+
+/// Semantic Context for AD4M integration
+///
+/// Defines how to interpret metadata and establish shared meaning
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct SemanticContext {
+    /// Schema definition (RDF, JSON-LD, SHACL, etc.)
+    pub schema: String,
+
+    /// References to shared ontologies
+    pub ontology_refs: Vec<String>,
+
+    /// Interpretation rules (how to parse metadata)
+    pub interpretation_rules: Vec<InterpretationRule>,
+}
+
+/// Rule for interpreting semantic data
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct InterpretationRule {
+    /// Rule identifier
+    pub id: String,
+
+    /// Rule type (validation, transformation, inference)
+    pub rule_type: String,
+
+    /// Rule content (executable or declarative)
+    pub content: String,
 }
 
 /// Architecture Decision Record
@@ -103,6 +169,11 @@ pub struct CompositionStats {
 pub struct UnderstandingInput {
     pub content: String,
     pub context: Option<String>,
+
+    // AD4M semantic layer fields
+    pub perspectives: Option<Vec<PerspectiveHash>>,
+    pub semantic_context: Option<SemanticContext>,
+    pub language_address: Option<LanguageAddress>,
 }
 
 /// Query for recalling understandings
@@ -155,6 +226,10 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
         created_at: sys_time()?,
         agent: agent_key.clone(),
         content_hash: hash_content(&input.content),
+        // AD4M semantic layer
+        perspectives: input.perspectives.unwrap_or_default(),
+        semantic_context: input.semantic_context,
+        language_address: input.language_address,
     };
 
     // Commit Understanding to DHT
@@ -179,8 +254,37 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
         ()
     )?;
 
-    debug!("Transmitted understanding with triple: subject={}, predicate={}, object={}",
-           triple.subject, triple.predicate, triple.object);
+    // Create links from AD4M perspectives to understanding (if provided)
+    for perspective in &understanding.perspectives {
+        // Use Path as anchor for perspective hash
+        let perspective_anchor = Path::from(format!("perspective:{}", perspective.hash));
+        perspective_anchor.ensure()?;
+
+        create_link(
+            perspective_anchor.path_entry_hash()?,
+            understanding_hash.clone(),
+            LinkTypes::PerspectiveToUnderstanding,
+            ()
+        )?;
+    }
+
+    // Create link from semantic context to understanding (if provided)
+    if let Some(ref context) = understanding.semantic_context {
+        let context_anchor = Path::from(format!("context:{}", context.schema));
+        context_anchor.ensure()?;
+
+        create_link(
+            context_anchor.path_entry_hash()?,
+            understanding_hash.clone(),
+            LinkTypes::SemanticContextToUnderstanding,
+            ()
+        )?;
+    }
+
+    debug!("Transmitted understanding with triple: subject={}, predicate={}, object={}, perspectives={}, semantic_context={}",
+           triple.subject, triple.predicate, triple.object,
+           understanding.perspectives.len(),
+           understanding.semantic_context.is_some());
 
     Ok(understanding_hash)
 }
@@ -298,6 +402,10 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
                 created_at: sys_time()?,
                 agent: my_agent.clone(),
                 content_hash: understanding.content_hash.clone(),
+                // Preserve AD4M semantic layer
+                perspectives: understanding.perspectives.clone(),
+                semantic_context: understanding.semantic_context.clone(),
+                language_address: understanding.language_address.clone(),
             };
 
             let hash = create_entry(EntryTypes::Understanding(new_understanding))?;
@@ -381,6 +489,136 @@ pub fn get_adr(hash: ActionHash) -> ExternResult<Option<ADR>> {
         }
         None => Ok(None),
     }
+}
+
+// ===== AD4M Semantic Query Functions =====
+
+/// Query understandings by AD4M perspective
+///
+/// Enables semantic interoperability by finding all understandings
+/// that share a common perspective (semantic view)
+#[hdk_extern]
+pub fn query_by_perspective(perspective_hash: String) -> ExternResult<Vec<Understanding>> {
+    let agent = agent_info()?.agent_latest_pubkey;
+
+    // Use Path anchor for perspective
+    let perspective_anchor = Path::from(format!("perspective:{}", perspective_hash));
+
+    // Get links from perspective to understandings
+    let links = get_links(
+        GetLinksInputBuilder::try_new(
+            perspective_anchor.path_entry_hash()?,
+            LinkTypes::PerspectiveToUnderstanding
+        )?.build()
+    )?;
+
+    let mut understandings = Vec::new();
+
+    for link in links {
+        if let Some(understanding) = get_understanding(link.target.into())? {
+            understandings.push(understanding);
+        }
+    }
+
+    // Charge budget based on results (0.1 RU per result)
+    let cost = COST_RECALL_UNDERSTANDINGS * understandings.len() as f32;
+    consume_budget(&agent, cost)?;
+
+    Ok(understandings)
+}
+
+/// Query understandings by semantic context
+///
+/// Find understandings that share a semantic schema or ontology
+#[hdk_extern]
+pub fn query_by_semantic_context(schema: String) -> ExternResult<Vec<Understanding>> {
+    let agent = agent_info()?.agent_latest_pubkey;
+
+    // Use Path anchor for semantic context
+    let context_anchor = Path::from(format!("context:{}", schema));
+
+    // Get links from context to understandings
+    let links = get_links(
+        GetLinksInputBuilder::try_new(
+            context_anchor.path_entry_hash()?,
+            LinkTypes::SemanticContextToUnderstanding
+        )?.build()
+    )?;
+
+    let mut understandings = Vec::new();
+
+    for link in links {
+        if let Some(understanding) = get_understanding(link.target.into())? {
+            understandings.push(understanding);
+        }
+    }
+
+    // Charge budget
+    let cost = COST_RECALL_UNDERSTANDINGS * understandings.len() as f32;
+    consume_budget(&agent, cost)?;
+
+    Ok(understandings)
+}
+
+/// Query understandings by AD4M language
+///
+/// Find understandings expressed in a specific AD4M language
+#[hdk_extern]
+pub fn query_by_language(language_dna_hash: String) -> ExternResult<Vec<Understanding>> {
+    let agent = agent_info()?.agent_latest_pubkey;
+
+    // Get all understandings for current agent and filter by language
+    let all_understandings = recall_understandings(RecallQuery {
+        agent: Some(agent.clone()),
+        content_contains: None,
+        after_timestamp: None,
+        limit: None,
+    })?;
+
+    // Filter by language address
+    let filtered: Vec<Understanding> = all_understandings
+        .into_iter()
+        .filter(|u| {
+            if let Some(ref lang) = u.language_address {
+                lang.dna_hash == language_dna_hash
+            } else {
+                false
+            }
+        })
+        .collect();
+
+    // Note: Budget already charged by recall_understandings
+
+    Ok(filtered)
+}
+
+/// Publish understanding with AD4M perspective
+///
+/// Convenience function that combines transmit_understanding with perspective linking
+/// as described in the AD4M-hREA integration spec
+#[hdk_extern]
+pub fn publish_with_perspective(input: PublishWithPerspectiveInput) -> ExternResult<ActionHash> {
+    // Create the understanding with AD4M fields
+    let understanding_input = UnderstandingInput {
+        content: input.content,
+        context: input.context,
+        perspectives: Some(vec![input.perspective]),
+        semantic_context: input.semantic_context,
+        language_address: input.language_address,
+    };
+
+    // Transmit the understanding (this creates all the links)
+    transmit_understanding(understanding_input)
+}
+
+/// Input for publishing with perspective
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PublishWithPerspectiveInput {
+    pub content: String,
+    pub context: Option<String>,
+    pub perspective: PerspectiveHash,
+    pub semantic_context: Option<SemanticContext>,
+    pub language_address: Option<LanguageAddress>,
 }
 
 // ===== Helper Functions =====
