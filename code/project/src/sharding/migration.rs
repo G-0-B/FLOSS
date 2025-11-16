@@ -73,7 +73,7 @@ impl MigrationPlan {
         let now = sys_time()
             .expect("Could not get system time")
             .as_millis() as u64;
-        now - self.updated_at > timeout_millis
+        now.saturating_sub(self.updated_at) > timeout_millis
     }
     
     pub fn to_entry(&self) -> ExternResult<Entry> {

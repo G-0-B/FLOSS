@@ -78,7 +78,6 @@ impl Vector {
         new_vector.timestamp = sys_time()
             .expect("Could not get system time")
             .as_millis() as u64;
-
         new_vector
     }
     

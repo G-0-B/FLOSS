@@ -88,13 +88,8 @@ class BridgeStream:
         try:
             # Read packet header (simplified protocol)
             # Format: [timestamp:8][sample_rate:4][data_len:4][data:N]
-            header = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self.socket.recv,
-                16
-            )
-
-            if len(header) < 16:
+            header = await self._recv_exact(16)
+            if header is None:
                 return None
 
             timestamp_ns = struct.unpack("<Q", header[0:8])[0]
@@ -102,11 +97,9 @@ class BridgeStream:
             data_len = struct.unpack("<I", header[12:16])[0]
 
             # Read data payload
-            data = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self.socket.recv,
-                data_len
-            )
+            data = await self._recv_exact(data_len)
+            if data is None:
+                return None
 
             # Parse frequency spectrum (array of f32)
             num_freqs = data_len // 4
@@ -129,6 +122,34 @@ class BridgeStream:
         except Exception as e:
             print(f"[BridgeStream] Read error: {e}")
             return None
+
+    async def _recv_exact(self, num_bytes: int) -> Optional[bytes]:
+        """Receive exactly `num_bytes` bytes from the socket.
+
+        Returns None if the connection is closed before the requested
+        bytes are received.
+        """
+        if not self.socket:
+            return None
+
+        loop = asyncio.get_event_loop()
+        chunks = bytearray()
+
+        while len(chunks) < num_bytes:
+            remaining = num_bytes - len(chunks)
+            try:
+                chunk = await loop.run_in_executor(None, self.socket.recv, remaining)
+            except Exception as e:
+                print(f"[BridgeStream] Socket recv error: {e}")
+                return None
+
+            if not chunk:
+                # Connection closed
+                return None
+
+            chunks.extend(chunk)
+
+        return bytes(chunks)
 
     async def read_n(self, n: int, timeout: float = 10.0) -> List[StreamSample]:
         """
