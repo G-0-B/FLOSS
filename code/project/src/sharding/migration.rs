@@ -27,7 +27,9 @@ pub enum MigrationStatus {
 
 impl MigrationPlan {
     pub fn new(source_shard: String, target_shard: String, vectors: Vec<Vector>, centroids: Vec<CentroidCRDT>) -> Self {
-        let now = sys_time().expect("Could not get system time");
+        let now = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
         Self {
             id: nanoid::nanoid!(),
             source_shard,
@@ -45,7 +47,9 @@ impl MigrationPlan {
             completed,
             total: self.vectors.len(),
         };
-        self.updated_at = sys_time().expect("Could not get system time");
+        self.updated_at = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
 
     pub fn complete(&mut self, success_count: usize, failure_count: usize) {
@@ -53,17 +57,23 @@ impl MigrationPlan {
             success_count,
             failure_count,
         };
-        self.updated_at = sys_time().expect("Could not get system time");
+        self.updated_at = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
 
     pub fn fail(&mut self, error: String) {
         self.status = MigrationStatus::Failed { error };
-        self.updated_at = sys_time().expect("Could not get system time");
+        self.updated_at = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
     
     pub fn is_stale(&self, timeout_millis: u64) -> bool {
-        let now = sys_time().expect("Could not get system time");
-        now - self.updated_at > timeout_millis
+        let now = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
+        now.saturating_sub(self.updated_at) > timeout_millis
     }
     
     pub fn to_entry(&self) -> ExternResult<Entry> {
@@ -95,28 +105,38 @@ impl ShardStatus {
             id,
             vector_count: 0,
             centroids,
-            last_update: sys_time().expect("Could not get system time"),
+            last_update: sys_time()
+                .expect("Could not get system time")
+                .as_millis() as u64,
             active_migrations: HashMap::new(),
         }
     }
     
     pub fn add_migration(&mut self, migration_id: String, target_shard: String) {
         self.active_migrations.insert(migration_id, target_shard);
-        self.last_update = sys_time().expect("Could not get system time");
+        self.last_update = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
     
     pub fn remove_migration(&mut self, migration_id: &str) {
         self.active_migrations.remove(migration_id);
-        self.last_update = sys_time().expect("Could not get system time");
+        self.last_update = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
     
     pub fn update_vector_count(&mut self, count: usize) {
         self.vector_count = count;
-        self.last_update = sys_time().expect("Could not get system time");
+        self.last_update = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
     
     pub fn update_centroids(&mut self, centroids: Vec<CentroidCRDT>) {
         self.centroids = centroids;
-        self.last_update = sys_time().expect("Could not get system time");
+        self.last_update = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
     }
 }

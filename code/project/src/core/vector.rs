@@ -28,7 +28,9 @@ impl Vector {
                 cluster_id: None,
                 owner,
             },
-            timestamp: sys_time().expect("Could not get system time"),
+            timestamp: sys_time()
+                .expect("Could not get system time")
+                .as_millis() as u64,
         }
     }
 
@@ -73,7 +75,9 @@ impl Vector {
         let mut new_vector = self.clone();
         new_vector.data = merged_data;
         new_vector.id = nanoid::nanoid!();
-        new_vector.timestamp = sys_time().expect("Could not get system time");
+        new_vector.timestamp = sys_time()
+            .expect("Could not get system time")
+            .as_millis() as u64;
         
         new_vector
     }
