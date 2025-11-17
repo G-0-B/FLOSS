@@ -191,6 +191,15 @@ pub struct EvidenceItem {
 - Mathematical proof (+0.2)
 - Replicated across diverse contexts (+0.1)
 
+**Important**: After applying all modifiers, **clamp confidence to [0.0, 1.0]**:
+
+```rust
+fn apply_modifiers(base_confidence: f32, modifiers: &[f32]) -> f32 {
+    let adjusted = base_confidence + modifiers.iter().sum::<f32>();
+    adjusted.clamp(0.0, 1.0)  // Ensure bounds are respected
+}
+```
+
 ### Example Calibrations
 
 **Example 1: Code Pattern**
@@ -387,8 +396,20 @@ Proposals with low epistemic status require higher consensus:
 Voters with high confidence in their expertise get higher weight:
 
 ```rust
-weighted_vote = vote.decision * vote.confidence * voter.domain_expertise
+// Map VoteDecision to numeric value
+fn vote_to_numeric(decision: &VoteDecision) -> f32 {
+    match decision {
+        VoteDecision::Approve => 1.0,
+        VoteDecision::Reject => -1.0,
+        VoteDecision::Abstain => 0.0,
+    }
+}
+
+// Calculate weighted vote
+let weighted_vote = vote_to_numeric(&vote.decision) * vote.confidence * voter.domain_expertise;
 ```
+
+**Note**: `voter.domain_expertise` is a future feature requiring reputation system integration.
 
 ---
 

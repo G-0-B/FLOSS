@@ -129,6 +129,14 @@ pub enum CritiqueSeverity {
     Major,      // Significant concerns
     Blocking,   // Must be addressed before approval
 }
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum CritiqueTargetType {
+    Plan,         // Critiquing a PlanVersion
+    Proposal,     // Critiquing a Proposal
+    Distillation, // Critiquing a Distillation
+    Experiment,   // Critiquing an Experiment
+}
 ```
 
 **Validation Rules**:
@@ -221,6 +229,14 @@ pub struct Proposal {
 pub struct PlanDelta {
     pub delta_type: DeltaType,        // Add, Modify, Remove, Meta
     pub changes: Vec<ChangeSpec>,     // Structured change specification
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeSpec {
+    pub field_name: String,           // Field being changed (e.g., "objective", "success_criteria")
+    pub old_value: Option<String>,    // Previous value (None for Add operations)
+    pub new_value: String,            // New value
+    pub justification: String,        // Why this change
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -349,6 +365,36 @@ pub enum EpistemicTag {
 - `Working`: confidence 0.6-0.8
 - `Robust`: confidence 0.8-0.9
 - `Validated`: confidence > 0.9
+
+### ProposalOutcome
+
+```rust
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProposalOutcome {
+    pub accepted: bool,                // Did proposal pass threshold?
+    pub final_votes: Vec<Vote>,        // All votes cast
+    pub approve_count: u32,            // Number of Approve votes
+    pub reject_count: u32,             // Number of Reject votes
+    pub abstain_count: u32,            // Number of Abstain votes
+    pub approval_ratio: f32,           // approve / (approve + reject)
+    pub confidence: f32,               // Mean confidence of Approve votes
+    pub threshold_met: bool,           // Did it meet required threshold?
+    pub minimum_voters_met: bool,      // Did it meet minimum voter count?
+}
+```
+
+### ExperimentResults
+
+```rust
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExperimentResults {
+    pub results: String,               // What actually happened
+    pub success: bool,                 // Did it work as expected?
+    pub learnings: Vec<String>,        // What we learned
+    pub failures: Vec<String>,         // What broke or surprised us
+    pub metrics: Option<String>,       // Optional: performance metrics (JSON)
+}
+```
 
 ---
 
