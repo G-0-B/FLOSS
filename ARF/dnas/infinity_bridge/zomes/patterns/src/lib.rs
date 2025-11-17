@@ -1,6 +1,13 @@
 use hdk::prelude::*;
 
-/// Validation criterion for mixing patterns
+/// Represents a validation criterion for a `MixingPattern`.
+///
+/// Each criterion defines a specific condition that a mixing operation should
+/// satisfy to be considered meaningful. This is a key component of the system's
+/// "Reality Validation" framework, ensuring that data fusion is based on sound
+/// physical and informational principles.
+///
+/// TODO: Needs refinement by a human expert.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct Criterion {
     pub name: String,
@@ -8,7 +15,12 @@ pub struct Criterion {
     pub applies: bool,
 }
 
-/// Example use case for a mixing pattern
+/// Provides a concrete example of a `MixingPattern` in action.
+///
+/// Examples are crucial for "Specification-Driven Development" (SDD), as they
+/// provide clear, testable use cases for each pattern.
+///
+/// TODO: Needs refinement by a human expert.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct Example {
     pub description: String,
@@ -17,7 +29,15 @@ pub struct Example {
     pub expected_result: String,
 }
 
-/// Mixing pattern entry - defines meaningful ways to combine sensor data
+/// Defines a meaningful way to combine different types of sensor data.
+///
+/// A `MixingPattern` is a foundational element of the "Federated Reasoning"
+/// system. It encapsulates the knowledge of how to fuse data from different
+/// sources to produce a more complete understanding of the environment. Each
+/// pattern is a verifiable, citable, and community-contributed piece of
+/// knowledge.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct MixingPattern {
@@ -31,7 +51,14 @@ pub struct MixingPattern {
     pub timestamp: Timestamp,
 }
 
-/// Validation result for a mixing attempt
+/// Represents the result of a validation attempt for a mixing operation.
+///
+/// This struct provides a detailed summary of a validation check, including whether
+/// the operation was valid, how many criteria it met, and which patterns it
+/// matched. This aligns with the "Light" principle by making the validation
+/// process transparent and auditable.
+///
+/// TODO: Needs refinement by a human expert.
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
 pub struct ValidationResult {
     pub is_valid: bool,
@@ -53,13 +80,24 @@ pub enum EntryTypes {
     MixingPattern(MixingPattern),
 }
 
-/// Initialize the pattern library with validated patterns
+/// Initializes the zome.
+///
+/// This function is called by the Holochain conductor when the DNA is installed.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }
 
-/// Add a new mixing pattern to the library
+/// Adds a new `MixingPattern` to the distributed knowledge base.
+///
+/// This function allows agents to contribute new patterns to the shared ontology.
+/// The pattern is stored as an entry in the DHT and linked from various anchor
+/// points (all patterns, input types, operation) to facilitate discovery. This
+/// embodies the principle of "Federated Knowledge Commons."
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn add_pattern(pattern: MixingPattern) -> ExternResult<ActionHash> {
     // Create entry
@@ -100,7 +138,12 @@ pub fn add_pattern(pattern: MixingPattern) -> ExternResult<ActionHash> {
     Ok(hash)
 }
 
-/// Get all patterns in the library
+/// Retrieves all `MixingPattern` entries from the DHT.
+///
+/// This function provides a way to query the complete, shared library of mixing
+/// patterns that has been contributed by the community of agents.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn get_all_patterns(_: ()) -> ExternResult<Vec<MixingPattern>> {
     let path = Path::from("all_patterns");
@@ -118,7 +161,12 @@ pub fn get_all_patterns(_: ()) -> ExternResult<Vec<MixingPattern>> {
     Ok(patterns)
 }
 
-/// Get patterns for specific input types
+/// Retrieves `MixingPattern` entries that are relevant to a given set of input types.
+///
+/// This function allows agents to discover patterns that are applicable to the
+/// specific types of data they are working with (e.g., "acoustic", "vibration").
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn get_patterns_for_types(types: Vec<String>) -> ExternResult<Vec<MixingPattern>> {
     let mut patterns = Vec::new();
@@ -145,7 +193,14 @@ pub fn get_patterns_for_types(types: Vec<String>) -> ExternResult<Vec<MixingPatt
     Ok(patterns)
 }
 
-/// Validate a mixing operation between two signal types
+/// Validates a proposed mixing operation against the known patterns and criteria.
+///
+/// This is a core function for "Reality Validation." It checks if the proposed
+/// combination of signals is meaningful by:
+/// 1. Finding relevant `MixingPattern`s from the shared knowledge base.
+/// 2. Evaluating the operation against a set of physical and informational criteria.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn validate_mixing(request: MixingRequest) -> ExternResult<ValidationResult> {
     // Get patterns that match both input types

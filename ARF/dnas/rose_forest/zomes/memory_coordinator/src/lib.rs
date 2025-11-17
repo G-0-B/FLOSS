@@ -28,7 +28,14 @@ pub enum LinkTypes {
     AgentBudget,
 }
 
-/// An understanding transmitted by an agent
+/// Represents a moment of coherent understanding transmitted by an agent.
+///
+/// This is the atomic unit of memory in the FLOSSI0ULLK coordination system.
+/// It contains the content of the understanding, its context, and a structured
+/// `KnowledgeTriple` that has been extracted and validated against the shared
+/// ontology.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Understanding {
@@ -51,7 +58,13 @@ pub struct Understanding {
     pub content_hash: String,
 }
 
-/// Architecture Decision Record
+/// Represents an Architecture Decision Record (ADR).
+///
+/// ADRs are a key component of "Specification-Driven Development" (SDD),
+/// providing a verifiable and auditable history of the system's design
+/// decisions.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ADR {
@@ -74,7 +87,13 @@ pub struct ADR {
     pub decided_by: AgentPubKey,
 }
 
-/// Result of memory composition
+/// Records the event of composing memories from multiple agents.
+///
+/// This entry provides a verifiable record of "Federated Reasoning" in action,
+/// capturing which agents' memories were composed, what strategy was used, and
+_summary_of_the_outcome />
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct MemoryComposition {
@@ -122,14 +141,17 @@ pub struct ValidationStats {
     pub invalid_triples: usize,
 }
 
-/// Transmit an understanding to the DHT
+/// Transmits a new `Understanding` to the DHT.
 ///
-/// This function:
-/// 1. Extracts a knowledge triple from the content
-/// 2. Validates the triple against the ontology
-/// 3. Creates an Understanding entry
-/// 4. Creates links for efficient queries
-/// 5. Returns the hash of the Understanding entry
+/// This is the core "write" operation for an agent's memory. It performs several
+/// key steps to ensure the integrity and verifiability of the knowledge:
+/// 1.  Checks and consumes the agent's computational budget.
+/// 2.  Extracts a structured `KnowledgeTriple` from the unstructured content.
+/// 3.  Validates the triple against the shared ontology.
+/// 4.  Creates and stores the `Understanding` entry.
+/// 5.  Creates links to enable efficient querying by agent and by semantic triple.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionHash> {
     // Get agent info early for budget check
@@ -185,13 +207,14 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
     Ok(understanding_hash)
 }
 
-/// Recall understandings from the DHT based on query criteria
+/// Recalls `Understanding`s from the DHT based on a set of query criteria.
 ///
-/// This function:
-/// 1. Queries the DHT for links from agent to understandings
-/// 2. Applies filters (content search, timestamp, etc.)
-/// 3. Returns matching understandings
-/// 4. Charges budget based on number of results returned
+/// This is the core "read" operation for an agent's memory. It allows for the
+/// retrieval of past knowledge by agent, content, or time. The function also
+/// consumes the agent's computational budget based on the number of results
+/// returned, creating an economic incentive for precise queries.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn recall_understandings(query: RecallQuery) -> ExternResult<Vec<Understanding>> {
     // Get agent info for budget check
@@ -243,14 +266,14 @@ pub fn recall_understandings(query: RecallQuery) -> ExternResult<Vec<Understandi
     Ok(results)
 }
 
-/// Compose memories from another agent
+/// Composes the memories of two agents.
 ///
-/// This function:
-/// 1. Gets all understandings from the other agent
-/// 2. Merges them with the current agent's understandings
-/// 3. Deduplicates based on content hash
-/// 4. Creates a MemoryComposition entry to track the composition
-/// 5. Charges budget for the composition operation
+/// This function implements the "Federated Reasoning" principle by merging the
+/// `Understanding`s from another agent into the current agent's memory. It
+/// deduplicates the knowledge based on content hashes and records the
+/// composition event in a `MemoryComposition` entry for auditability.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposition> {
     let agent_info = agent_info()?;
@@ -333,14 +356,21 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
     Ok(composition)
 }
 
-/// Get current budget status for the calling agent
+/// Retrieves the current computational budget status for the calling agent.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn budget_status(_: ()) -> ExternResult<BudgetState> {
     let agent_key = agent_info()?.agent_latest_pubkey;
     get_budget_state(&agent_key)
 }
 
-/// Get validation statistics for all understandings
+/// Retrieves statistics on the validation of knowledge triples.
+///
+/// This function provides insight into the quality and coherence of the knowledge
+/// being transmitted into the system, aligning with the "Light" principle.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn get_validation_stats(_: ()) -> ExternResult<ValidationStats> {
     let agent_info = agent_info()?;
@@ -363,14 +393,18 @@ pub fn get_validation_stats(_: ()) -> ExternResult<ValidationStats> {
     })
 }
 
-/// Create an ADR (Architecture Decision Record)
+/// Creates a new Architecture Decision Record (ADR) in the DHT.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn create_adr(adr: ADR) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::ADR(adr))?;
     Ok(hash)
 }
 
-/// Get an ADR by hash
+/// Retrieves an ADR by its `ActionHash`.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn get_adr(hash: ActionHash) -> ExternResult<Option<ADR>> {
     let record = get(hash, GetOptions::default())?;

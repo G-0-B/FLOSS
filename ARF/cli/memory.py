@@ -41,13 +41,13 @@ def transmit(
     backend: str = typer.Option("file", "--backend", "-b", help="Backend: file or holochain"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Transmit understanding to conversation memory
+    """Transmits a moment of understanding to an agent's conversation memory.
 
-    Examples:
-        arf memory transmit "GPT-4 is a large language model"
-        arf memory transmit "Claude improves upon previous versions" --agent claude --decision
-        arf memory transmit "Test understanding" --json
+    This command is the primary interface for adding new knowledge to the system.
+    It allows for the creation of new `Understanding` objects, which can be
+    optionally marked as architectural decisions (ADRs) and validated against
+    the shared ontology. This command is a direct implementation of the "memetic
+    transmission" concept central to the FLOSSI0ULLK ecosystem.
     """
     try:
         # Initialize memory
@@ -108,13 +108,12 @@ def recall(
     backend: str = typer.Option("file", "--backend", "-b", help="Backend: file or holochain"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Recall understandings from conversation memory
+    """Recalls relevant understandings from an agent's conversation memory.
 
-    Examples:
-        arf memory recall "LLM"
-        arf memory recall "what is GPT-4" --agent alice --top-k 3
-        arf memory recall "language model" --json | jq '.results[0].content'
+    This command provides a way to search and retrieve knowledge that has been
+    previously transmitted. It uses the multi-scale semantic search capabilities
+    of the `ConversationMemory` to find the most relevant `Understanding` objects,
+    helping to reduce "Cognitive Debt" by making past knowledge easily accessible.
     """
     try:
         # Initialize memory
@@ -163,12 +162,13 @@ def compose(
     backend: str = typer.Option("file", "--backend", "-b", help="Backend: file or holochain"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Compose memories from multiple agents
+    """Composes the memories from multiple source agents into a target agent.
 
-    Examples:
-        arf memory compose --agent alice --with bob --with carol
-        arf memory compose --agent main --with agent1 --with agent2 --json
+    This command is a practical implementation of the "Federated Reasoning"
+    principle. It allows for the creation of a collective intelligence by
+    merging the knowledge of individual agents into a unified, more comprehensive
+    memory. This is a key mechanism for building a shared understanding across
+    the swarm.
     """
     try:
         if not with_agents:
@@ -217,12 +217,12 @@ def stats(
     backend: str = typer.Option("file", "--backend", "-b", help="Backend: file or holochain"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Show statistics for an agent's memory
+    """Displays statistics about an agent's conversation memory.
 
-    Examples:
-        arf memory stats --agent alice
-        arf memory stats --json | jq '.validation_stats'
+    This command provides observability into the state of an agent's memory,
+    including the number of understandings, ADRs, and the results of validation
+    attempts. This aligns with the "Light" principle of ULLK by making the
+    internal state of the system transparent and auditable.
     """
     try:
         # Initialize memory
@@ -271,12 +271,12 @@ def export(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file (default: stdout)"),
     backend: str = typer.Option("file", "--backend", "-b", help="Backend: file or holochain"),
 ):
-    """
-    Export agent memory for composition
+    """Exports an agent's entire conversation memory to a JSON format.
 
-    Examples:
-        arf memory export --agent alice
-        arf memory export --agent bob --output bob_memory.json
+    This command serializes the state of an agent's memory, including all
+    understandings and the multi-scale embedding structure. The resulting output
+    can be used for backup, analysis, or as the input for the `compose` command,
+    enabling the sharing and merging of knowledge between agents.
     """
     try:
         # Initialize memory

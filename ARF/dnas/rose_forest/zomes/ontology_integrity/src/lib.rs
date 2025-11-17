@@ -4,7 +4,13 @@ use thiserror::Error;
 
 pub mod inference;
 
-/// Errors that can occur during ontology validation
+/// Defines the set of errors that can occur during ontology validation.
+///
+/// This enum provides a structured way to report errors when a `KnowledgeTriple`
+/// violates the constraints of the ontology, such as type mismatches or unknown
+/// relations.
+///
+/// TODO: Needs refinement by a human expert.
 #[derive(Error, Debug, Clone, Serialize, Deserialize)]
 pub enum OntologyError {
     #[error("Type mismatch: expected {expected}, got {actual}")]
@@ -34,7 +40,12 @@ pub enum OntologyError {
     ValidationError(String),
 }
 
-/// Represents a type in the ontology
+/// Represents a type definition in the ontology.
+///
+/// Each `OntologyType` defines a class of entities in the knowledge graph,
+/// forming a hierarchical structure through the `parent` field.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct OntologyType {
@@ -54,7 +65,13 @@ pub struct OntologyType {
     pub created_at: Timestamp,
 }
 
-/// Represents a relation in the ontology
+/// Represents a relation definition in the ontology.
+///
+/// Each `OntologyRelation` defines a type of link that can exist between
+/// `OntologyType`s, including constraints on the types of subjects (domain) and
+/// objects (range) that the relation can connect.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct OntologyRelation {
@@ -82,7 +99,13 @@ pub struct OntologyRelation {
     pub created_at: Timestamp,
 }
 
-/// A knowledge triple to be validated
+/// Represents a (subject, predicate, object) knowledge triple.
+///
+/// This is the fundamental unit of knowledge in the system. Each triple is a
+/// verifiable, sourced, and timestamped assertion about the relationship
+/// between two entities.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct KnowledgeTriple {
@@ -105,7 +128,12 @@ pub struct KnowledgeTriple {
     pub created_at: Timestamp,
 }
 
-/// Type assertion for runtime type checking
+/// Represents an assertion that a given entity belongs to a specific type.
+///
+/// In a fully dynamic ontology, these assertions would be stored on the DHT,
+/// allowing the system to learn and infer the types of new entities at runtime.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct TypeAssertion {
@@ -126,7 +154,16 @@ pub struct TypeAssertion {
 // in the main DNA's integrity zome, not in this library zome.
 // This zome provides validation logic that can be used by other zomes.
 
-/// Validate a knowledge triple against ontology constraints
+/// Validates a `KnowledgeTriple` against the defined ontology constraints.
+///
+/// This is a critical function for maintaining the integrity and coherence of the
+/// knowledge graph. It performs a series of checks, including:
+/// 1. Verifying that the relation exists.
+/// 2. Inferring the types of the subject and object.
+/// 3. Checking for violations of domain and range constraints.
+/// 4. Ensuring that the confidence score is within the valid range [0.0, 1.0].
+///
+/// TODO: Needs refinement by a human expert.
 pub fn validate_triple(triple: &KnowledgeTriple) -> Result<(), OntologyError> {
     // 1. Check that relation exists
     let relation = get_relation(&triple.predicate)?;
@@ -195,7 +232,15 @@ fn is_subtype_of(type_id: &str, target_types: &[String]) -> Result<bool, Ontolog
     }
 }
 
-/// Infer the type of an entity
+/// Infers the ontological type of an entity based on heuristics.
+///
+/// In a fully realized system, this function would query the DHT for explicit
+/// `TypeAssertion`s. In the current bootstrap phase, it uses a set of predefined
+/// patterns and keywords to make a best-effort inference. This is a pragmatic
+/// approach to enabling "Federated Reasoning" before the knowledge graph is
+/// fully populated.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn infer_type(entity_id: &str) -> Result<String, OntologyError> {
     // In a full implementation, this would query the DHT for type assertions
     // For bootstrap phase, we use simple heuristics
@@ -239,7 +284,10 @@ pub fn infer_type(entity_id: &str) -> Result<String, OntologyError> {
     }
 }
 
-/// Check domain and range constraints for a relation
+/// Checks if a given subject and object type satisfy the domain and range
+/// constraints of a relation.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn check_domain_range(
     relation: &OntologyRelation,
     subject_type: &str,
@@ -468,8 +516,12 @@ fn query_type_assertion(_entity_id: &str) -> Option<String> {
     None
 }
 
-/// Bootstrap AI/ML domain ontology
-/// Returns the list of AI/ML types and relations that were bootstrapped
+/// Bootstraps the AI/ML domain-specific ontology.
+///
+/// This function defines and returns the set of core types and relations needed
+/// to represent knowledge about AI models, datasets, and benchmarks.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn bootstrap_ai_ml_ontology() -> (Vec<OntologyType>, Vec<OntologyRelation>) {
     let timestamp = Timestamp::from_micros(0);
 
@@ -528,8 +580,12 @@ pub fn bootstrap_ai_ml_ontology() -> (Vec<OntologyType>, Vec<OntologyRelation>) 
     (ai_ml_types, ai_ml_relations)
 }
 
-/// Bootstrap with real AI/ML examples
-/// Returns example triples demonstrating the ontology
+/// Provides a set of example `KnowledgeTriple`s for the AI/ML domain.
+///
+/// These examples serve as a concrete specification for how to represent
+/// common knowledge about AI models and their capabilities.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn bootstrap_ai_examples() -> Vec<(String, String, String)> {
     vec![
         // GPT models
@@ -565,8 +621,9 @@ pub fn bootstrap_ai_examples() -> Vec<(String, String, String)> {
     ]
 }
 
-/// Bootstrap base ontology with minimal types and relations
-/// Returns the list of base types and relations that were bootstrapped
+/// Bootstraps the base ontology with a minimal set of core types and relations.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn bootstrap_base_ontology() -> (Vec<OntologyType>, Vec<OntologyRelation>) {
     // Use a fixed timestamp for bootstrap definitions
     let timestamp = Timestamp::from_micros(0);
@@ -634,7 +691,9 @@ pub fn bootstrap_base_ontology() -> (Vec<OntologyType>, Vec<OntologyRelation>) {
     (base_types, base_relations)
 }
 
-/// Validate an ontology type definition
+/// Validates the structure of an `OntologyType` definition.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn validate_ontology_type(ont_type: &OntologyType) -> Result<(), String> {
     // Type ID must not be empty
     if ont_type.type_id.is_empty() {
@@ -656,7 +715,9 @@ pub fn validate_ontology_type(ont_type: &OntologyType) -> Result<(), String> {
     Ok(())
 }
 
-/// Validate an ontology relation definition
+/// Validates the structure of an `OntologyRelation` definition.
+///
+/// TODO: Needs refinement by a human expert.
 pub fn validate_ontology_relation(relation: &OntologyRelation) -> Result<(), String> {
     // Relation ID must not be empty
     if relation.relation_id.is_empty() {

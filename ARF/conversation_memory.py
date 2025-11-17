@@ -67,10 +67,26 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Understanding:
-    """
-    A moment of coherent understanding between agents.
-    
-    This is the atomic unit of memory in FLOSSI0ULLK coordination.
+    """A moment of coherent understanding, representing an atomic unit of memory.
+
+    This data class captures the essence of a memetic transmission between agents. It serves
+    as the fundamental building block for the collective intelligence of the FLOSSI0ULLK
+    ecosystem. Each `Understanding` is a verifiable, timestamped record of a specific
+    insight or decision, contributing to the "Light" principle of ULLK by making
+    knowledge explicit and traceable.
+
+    Attributes:
+        content: The core textual representation of the understanding.
+        agent_id: The identifier of the agent that transmitted this understanding.
+        timestamp: The ISO 8601 timestamp of when the understanding was transmitted.
+        context: Optional textual context that informed this understanding.
+        is_decision: A boolean flag indicating if this understanding represents a formal
+            Architecture Decision Record (ADR).
+        coherence_score: A float between 0.0 and 1.0 representing the agent's confidence
+            in the coherence of this understanding.
+        metadata: A flexible dictionary for any additional, unstructured information.
+        embedding_ref: A hash of the embedding vector, used for cross-referencing and
+            deduplication.
     """
     content: str  # The actual understanding (text, for now)
     agent_id: str  # Who transmitted this
@@ -82,43 +98,61 @@ class Understanding:
     embedding_ref: Optional[str] = None  # Hash of the embedding vector
     
     def to_dict(self) -> Dict:
+        """Serializes the Understanding object to a dictionary."""
         return asdict(self)
     
     def hash(self) -> str:
-        """Cryptographic hash for reference and deduplication"""
+        """Computes a cryptographic hash for reference and deduplication.
+
+        This hash provides a unique, verifiable identifier for the understanding,
+        ensuring the integrity of the agent's memory and the broader knowledge commons.
+
+        Returns:
+            A SHA-256 hash of the serialized Understanding object.
+        """
         content_str = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()
 
 
 class ConversationMemory:
-    """
-    Holochain-inspired local-first memory for cross-AI coordination.
+    """A local-first, verifiable memory substrate for multi-agent coordination.
 
-    Each agent maintains their own memory, but memories can be:
-    - Composed (via MultiScaleEmbedding aggregation)
-    - Shared (via export/import)
-    - Verified (via cryptographic hashes)
+    This class provides the core functionality for an agent's memory, inspired by
+    Holochain's agent-centric, local-first principles. It is the computational
+    foundation for "Cognitive Liberation," allowing agents (both human and AI) to
+    capture, persist, and share knowledge in a decentralized and verifiable manner.
 
-    This is the computational substrate for distributed intelligence coordination.
+    Each agent maintains its own `ConversationMemory`, but these memories can be
+    composed and verified, forming a federated knowledge commons. This enables the
+    emergence of collective intelligence without relying on a central authority.
 
-    Supports two backends:
-    - 'file': Local file-based storage (default)
-    - 'holochain': Distributed storage via Holochain DNA
+    Key functionalities include:
+    - **Transmit:** Capturing and validating moments of understanding.
+    - **Recall:** Searching for relevant memories using fractal, multi-scale embeddings.
+    - **Compose:** Merging memories from different agents to build a shared context.
+
+    The memory can operate with a local file-based backend or a distributed
+    Holochain backend, providing flexibility for different deployment scenarios.
     """
 
     def __init__(self, agent_id: str, storage_path: Optional[str] = None,
                  validate_ontology: bool = True, backend: str = 'file',
                  use_committee_validation: bool = False, committee_use_mock: bool = True):
-        """
-        Initialize memory for a specific agent.
+        """Initializes the ConversationMemory for a specific agent.
 
         Args:
-            agent_id: Identifier for this agent (e.g., "claude-sonnet-4.5", "human-primary")
-            storage_path: Where to persist memory (default: ./memory/{agent_id}/)
-            validate_ontology: Whether to validate against ontology (default: True)
-            backend: Storage backend - 'file' (default) or 'holochain'
-            use_committee_validation: Use LLM committee for validation (default: False)
-            committee_use_mock: Use mock LLM for committee (default: True)
+            agent_id: A unique identifier for the agent owning this memory
+                (e.g., "claude-sonnet-4.5", "human-primary").
+            storage_path: The file system path for persisting memory. Defaults to
+                `./memory/{agent_id}/`.
+            validate_ontology: If True, validates new understandings against a defined
+                ontology to ensure coherence.
+            backend: The storage backend to use. Can be 'file' (default) for local
+                storage or 'holochain' for distributed storage.
+            use_committee_validation: If True, uses a committee of LLM agents to
+                validate new understandings, enhancing robustness.
+            committee_use_mock: If True, uses a mock LLM committee for testing and
+                development.
         """
         self.agent_id = agent_id
         self.validate_ontology = validate_ontology
@@ -177,28 +211,27 @@ class ConversationMemory:
         logger.info(f"Initialized ConversationMemory for agent: {agent_id} (backend: {backend})")
     
     def transmit(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """
-        Capture a moment of coherent understanding.
+        """Captures, validates, and stores a moment of coherent understanding.
 
-        This is the core operation: taking what exists in one mind
-        and encoding it in a form that can be transmitted to another.
-
-        The understanding must pass ontology validation before being stored.
+        This is the core "write" operation of the memory substrate. It takes an
+        agent's insight, validates it against the shared ontology, embeds it for
+        semantic recall, and persists it. This process is a fundamental act of
+        "memetic transmission" in the FLOSSI0ULLK ecosystem.
 
         Args:
-            understanding_dict: Dict with keys:
-                - content (required): The understanding itself
-                - context (optional): What led to this
-                - is_decision (optional): Is this ADR-worthy?
-                - coherence (optional): Confidence score [0, 1]
-                - metadata (optional): Additional info
-            skip_validation: Skip ontology validation (use with caution)
+            understanding_dict: A dictionary containing the details of the
+                understanding. Expected keys include 'content', 'context',
+                'is_decision', 'coherence', and 'metadata'.
+            skip_validation: If True, bypasses the ontology validation process. This
+                should be used with caution as it can lead to incoherent memory.
 
         Returns:
-            Hash reference for later recall, or None if validation failed
+            The unique hash reference of the stored understanding if successful,
+            otherwise None.
 
         Raises:
-            ValueError: If understanding is malformed
+            ValueError: If the `understanding_dict` is malformed (e.g., missing
+                the 'content' field).
         """
         # Route to appropriate backend
         if self.backend == 'holochain':
@@ -207,7 +240,19 @@ class ConversationMemory:
             return self._transmit_file(understanding_dict, skip_validation)
 
     def _transmit_holochain(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """Transmit via Holochain backend."""
+        """Transmits an understanding via the Holochain backend.
+
+        This method interfaces with the Holochain zome to store the understanding
+        on the distributed ledger, ensuring that it becomes part of the shared,
+        verifiable knowledge commons.
+
+        Args:
+            understanding_dict: The dictionary representing the understanding.
+            skip_validation: A boolean flag to skip validation (passed to the zome).
+
+        Returns:
+            The ActionHash of the created entry in Holochain, or None on failure.
+        """
         if 'content' not in understanding_dict:
             raise ValueError("Understanding must have 'content' field")
 
@@ -236,7 +281,18 @@ class ConversationMemory:
             return None
 
     def _transmit_file(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """Transmit via file backend (original implementation)."""
+        """Transmits an understanding via the local file backend.
+
+        This is the default implementation that stores the understanding on the
+        local filesystem. It performs validation, embedding, and persistence.
+
+        Args:
+            understanding_dict: The dictionary representing the understanding.
+            skip_validation: A boolean flag to skip validation.
+
+        Returns:
+            The hash of the created `Understanding` object, or None on failure.
+        """
         # Track validation attempt
         self.validation_stats['total_attempts'] += 1
 
@@ -332,24 +388,19 @@ class ConversationMemory:
         return understanding.hash()
 
     def _extract_triple(self, understanding_dict: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
-        """
-        Extract a (subject, predicate, object) triple from understanding content.
+        """Extracts a semantic (subject, predicate, object) triple from content.
 
-        Uses simple heuristics to identify semantic structure. For production,
-        this could use LLM-based extraction with committee validation.
+        This method attempts to distill the core semantic meaning of an understanding
+        into a structured triple. This is a crucial step for building a verifiable,
+        machine-readable knowledge graph from unstructured text, turning raw data
+        into coherent knowledge.
 
         Args:
-            understanding_dict: The understanding dict to extract from
+            understanding_dict: The dictionary containing the 'content' to parse.
 
         Returns:
-            (subject, predicate, object) tuple, or None if extraction fails
-
-        Examples:
-            >>> memory._extract_triple({'content': 'Claude Sonnet 4.5 improves upon Sonnet 4'})
-            ('Claude-Sonnet-4.5', 'improves_upon', 'Sonnet-4')
-
-            >>> memory._extract_triple({'content': 'GPT-4 is a large language model'})
-            ('GPT-4', 'is_a', 'large-language-model')
+            A (subject, predicate, object) tuple if extraction is successful,
+            otherwise None.
         """
         content = understanding_dict.get('content', '')
 
@@ -382,16 +433,23 @@ class ConversationMemory:
         return (self.agent_id, 'stated', f"understanding_{content_hash}")
 
     def _validate_triple(self, triple: Tuple[str, str, str], context: str = "") -> Tuple[bool, Optional[str], Optional[Dict]]:
-        """
-        Validate a triple against the ontology.
+        """Validates a semantic triple against the shared ontology.
+
+        This function acts as a gatekeeper, ensuring that only coherent and
+        well-formed knowledge is admitted into the agent's memory. It embodies the
+        "Light" principle by enforcing transparency and consistency. It can use a
+        simple rules-based approach or a more sophisticated committee of LLMs.
 
         Args:
-            triple: (subject, predicate, object) tuple
-            context: Context text from which triple was extracted
+            triple: The (subject, predicate, object) tuple to validate.
+            context: The original text from which the triple was extracted, providing
+                context for the validation process.
 
         Returns:
-            (is_valid, error_message, committee_result) tuple
-            committee_result is None if committee validation not used
+            A tuple containing:
+            - A boolean indicating if the triple is valid.
+            - An optional error message if validation fails.
+            - An optional dictionary with results from the validation committee.
         """
         if not self.validate_ontology:
             return (True, None, None)
@@ -462,23 +520,31 @@ class ConversationMemory:
         return (True, None, None)
 
     def get_validation_stats(self) -> Dict[str, int]:
-        """Get validation statistics."""
+        """Retrieves statistics on validation attempts.
+
+        Returns:
+            A dictionary with counts of total, passed, failed, and skipped
+            validation attempts.
+        """
         return self.validation_stats.copy()
 
     def recall(self, query: str, across_scales: bool = True, top_k: int = 5) -> List[Dict]:
-        """
-        Find relevant prior understanding.
+        """Finds and retrieves relevant prior understandings from memory.
 
-        This is where the magic happens: searching across nested reference frames
-        to find understanding that's relevant to the current query.
+        This is the core "read" operation, enabling an agent to access its stored
+        knowledge. It uses a powerful multi-scale semantic search ("fractal memory")
+        to find relevant information even if the query uses different wording. This
+        capability is essential for reducing "Cognitive Debt" by making past
+        knowledge easily accessible.
 
         Args:
-            query: What are we looking for?
-            across_scales: Search at multiple levels of composition?
-            top_k: How many results to return?
+            query: The natural language query for searching memory.
+            across_scales: If True, searches across multiple levels of embedding
+                granularity (the "fractal" part).
+            top_k: The maximum number of results to return.
 
         Returns:
-            List of Understanding dicts, ranked by relevance
+            A list of `Understanding` dictionaries, ranked by relevance to the query.
         """
         # Route to appropriate backend
         if self.backend == 'holochain':
@@ -508,14 +574,15 @@ class ConversationMemory:
         return results
     
     def export_for_composition(self) -> Dict:
-        """
-        Export this agent's memory in a form that can be composed with others.
-        
-        This enables the "7 AI systems" use case: each system exports its understanding,
-        then we compose them into a coherent whole.
-        
+        """Exports the agent's memory for sharing and composition.
+
+        This function serializes the agent's entire memory state, including all
+        understandings and the embedding structure. The resulting dictionary can be
+        shared with other agents, allowing for the construction of a collective,
+        "federated consciousness."
+
         Returns:
-            Dict containing all understandings, ADRs, and embedding state
+            A dictionary representing the complete state of the agent's memory.
         """
         return {
             'agent_id': self.agent_id,
@@ -526,14 +593,16 @@ class ConversationMemory:
         }
     
     def import_and_compose(self, other_memory_export: Dict) -> None:
-        """
-        Import another agent's memory and compose it with ours.
-        
-        This is the key to multi-agent coordination: taking understanding from
-        different substrates and composing them into a shared reference frame.
-        
+        """Imports and merges another agent's memory into this one.
+
+        This is the mechanism for building collective intelligence. It takes the
+        exported memory from another agent and intelligently merges it, composing
+        their knowledge and semantic embeddings. This allows for the creation of a
+        richer, more comprehensive shared understanding.
+
         Args:
-            other_memory_export: Output from another agent's export_for_composition()
+            other_memory_export: A dictionary produced by another agent's
+                `export_for_composition` method.
         """
         other_agent = other_memory_export['agent_id']
         logger.info(f"Composing memory from {other_agent} with {self.agent_id}")
@@ -581,18 +650,24 @@ class ConversationMemory:
         logger.info(f"Composition complete. Total understandings: {len(self.understandings)}")
     
     def get_adr_history(self) -> List[Dict]:
-        """Get all Architecture Decision Records in chronological order"""
+        """Retrieves the history of all Architecture Decision Records (ADRs).
+
+        Returns:
+            A list of ADRs, sorted chronologically.
+        """
         return sorted(self.adrs, key=lambda x: x['id'])
     
     def _encode_text(self, text: str) -> np.ndarray:
-        """
-        Encode text using sentence-transformers for semantic embeddings.
+        """Encodes text into a semantic vector using a sentence-transformer model.
+
+        This internal method is responsible for converting raw text into a numerical
+        representation that captures its meaning, enabling semantic search.
 
         Args:
-            text: Input text to encode
+            text: The input text to encode.
 
         Returns:
-            384-dimensional normalized embedding vector
+            A 384-dimensional, normalized numpy array representing the embedding.
         """
         # Lazy load model on first use
         if not hasattr(self, '_embedding_model'):
@@ -610,7 +685,16 @@ class ConversationMemory:
         return embedding
     
     def _search_at_level(self, query_vector: np.ndarray, level: int, top_k: int) -> List[Dict]:
-        """Search at a specific granularity level"""
+        """Performs a semantic search at a specific granularity level.
+
+        Args:
+            query_vector: The embedding of the search query.
+            level: The granularity level of the embedding space to search.
+            top_k: The maximum number of results to return.
+
+        Returns:
+            A list of relevant `Understanding` dictionaries found at this level.
+        """
         # Get embeddings at this level
         level_embeddings = self.embeddings.get_embeddings_at_level(level)
         
@@ -639,7 +723,15 @@ class ConversationMemory:
         return results
     
     def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
-        """Remove duplicates and re-rank by relevance"""
+        """Removes duplicate results from a multi-level search and re-ranks them.
+
+        Args:
+            results: A list of search results from multiple levels.
+            top_k: The final number of results to return.
+
+        Returns:
+            A deduplicated and re-ranked list of the top `k` results.
+        """
         seen_hashes = set()
         deduped = []
         
@@ -655,7 +747,15 @@ class ConversationMemory:
         return deduped[:top_k]
     
     def _text_search(self, query: str, top_k: int) -> List[Dict]:
-        """Fallback text-only search if embeddings unavailable"""
+        """A fallback keyword-based search for when embeddings are not available.
+
+        Args:
+            query: The text query.
+            top_k: The maximum number of results.
+
+        Returns:
+            A list of matching `Understanding` dictionaries.
+        """
         # Simple keyword matching
         query_terms = set(query.lower().split())
         
@@ -671,7 +771,7 @@ class ConversationMemory:
         return [u.to_dict() for u, _ in scored[:top_k]]
     
     def _save(self):
-        """Persist memory to disk"""
+        """Persists the current memory state to the filesystem."""
         # Save understandings
         understandings_file = self.storage_path / "understandings.json"
         with open(understandings_file, 'w') as f:
@@ -691,7 +791,7 @@ class ConversationMemory:
         logger.debug(f"Memory saved to {self.storage_path}")
     
     def _load(self):
-        """Load existing memory from disk"""
+        """Loads a previously saved memory state from the filesystem."""
         # Load understandings
         understandings_file = self.storage_path / "understandings.json"
         if understandings_file.exists():
@@ -722,7 +822,15 @@ class ConversationMemory:
                     self.embeddings = MultiScaleEmbedding()
 
     def _recall_holochain(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Recall via Holochain backend."""
+        """Recalls understandings from the Holochain backend.
+
+        Args:
+            query: The search query.
+            top_k: The maximum number of results.
+
+        Returns:
+            A list of `Understanding` dictionaries from the Holochain DHT.
+        """
         try:
             # Call Holochain zome with query
             results = self.hc_client.call_zome(
@@ -744,7 +852,14 @@ class ConversationMemory:
             return []
 
     def _holochain_understanding_to_dict(self, understanding: Dict) -> Dict:
-        """Convert Holochain Understanding to our dict format."""
+        """Converts an `Understanding` object from Holochain to a standard dictionary.
+
+        Args:
+            understanding: The raw `Understanding` object from the zome call.
+
+        Returns:
+            A standardized dictionary representation.
+        """
         return {
             'content': understanding['content'],
             'agent_id': str(understanding['agent']),
@@ -760,39 +875,45 @@ class ConversationMemory:
 
 
 class HolochainClient:
-    """
-    Simple Holochain client for calling zome functions.
+    """A simple client for interacting with Holochain zomes via subprocess calls.
 
-    This provides a bridge between Python and Holochain DNA via subprocess calls.
-    In production, this could use websocket connections or the conductor API.
+    This class provides a bridge between the Python application and a running
+    Holochain conductor. It abstracts the details of calling zome functions,
+    allowing the `ConversationMemory` to use Holochain as a backend.
+
+    Note: This is a simplified implementation for demonstration purposes. A
+    production environment would likely use a more robust solution like websockets.
     """
 
     def __init__(self, app_port: int = 8888, app_id: str = "rose-forest"):
-        """
-        Initialize Holochain client.
+        """Initializes the Holochain client.
 
         Args:
-            app_port: Port where Holochain conductor is running (default: 8888)
-            app_id: Application ID (default: rose-forest)
+            app_port: The port on which the Holochain conductor's app interface
+                is running.
+            app_id: The installed application ID to interact with.
         """
         self.app_port = app_port
         self.app_id = app_id
         logger.info(f"Initialized HolochainClient for app '{app_id}' on port {app_port}")
 
     def call_zome(self, zome: str, function: str, payload: Dict) -> Any:
-        """
-        Call a zome function via subprocess.
+        """Calls a zome function and returns the result.
+
+        This method constructs and executes a `hc call` command to interact with
+        the Holochain conductor.
 
         Args:
-            zome: Zome name (e.g., 'memory_coordinator')
-            function: Function name (e.g., 'transmit_understanding')
-            payload: Function arguments as dict
+            zome: The name of the zome to call (e.g., 'memory_coordinator').
+            function: The name of the function to call within the zome.
+            payload: A dictionary of arguments to pass to the zome function.
 
         Returns:
-            Result from the zome function
+            The deserialized JSON response from the zome function.
 
         Raises:
-            RuntimeError: If the call fails
+            RuntimeError: If the `hc call` fails, times out, or returns a
+                non-JSON response.
         """
         import subprocess
 

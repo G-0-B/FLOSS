@@ -16,6 +16,20 @@ from conversation_memory import ConversationMemory
 
 
 def run_benchmark():
+    """Runs a series of benchmarks to test the performance and correctness of the text embedding model.
+
+    This function serves as a diagnostic tool to ensure that the embedding model, a key component
+    of the AI's cognitive architecture, meets the performance and semantic accuracy requirements
+    for the FLOSSIOULLK ecosystem. By verifying the speed and quality of text encoding, this
+    benchmark helps to prevent the accumulation of "Cognitive Debt" and ensures that the system
+    can process information efficiently and accurately.
+
+    The benchmark performs the following checks:
+    1.  **Model Loading Time:** Measures the time it takes to load the embedding model.
+    2.  **Encoding Speed:** Measures the time it takes to encode texts of varying lengths.
+    3.  **Semantic Similarity:** Verifies that the embeddings correctly capture the semantic
+        relationship between words (e.g., "dog" is more similar to "puppy" than to "car").
+    """
     print("=== Embedding Performance Benchmark ===\n")
 
     # Initialize memory

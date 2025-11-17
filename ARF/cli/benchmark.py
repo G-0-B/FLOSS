@@ -43,18 +43,13 @@ def run(
     iterations: int = typer.Option(10, "--iterations", "-i", help="Number of iterations"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Run benchmark suite
+    """Runs a specified benchmark suite to test the performance of the ARF.
 
-    Available suites:
-        - memory: Test conversation memory operations
-        - swarm: Test pony swarm performance
-        - all: Run all benchmark suites
-
-    Examples:
-        arf benchmark run --suite memory --iterations 10
-        arf benchmark run --suite swarm --iterations 5
-        arf benchmark run --suite all --json
+    This command is a key tool for "Reality Validation," providing a way to
+    empirically measure the performance of the system's core components, such as
+    the `ConversationMemory` and the `PonySwarm`. The results of these benchmarks
+    are essential for identifying performance bottlenecks, tracking improvements,
+    and ensuring that the system meets its operational requirements.
     """
     try:
         results = {}
@@ -263,11 +258,11 @@ def _benchmark_swarm(iterations: int, json_output: bool) -> dict:
 
 @app.command(name="list-suites")
 def list_suites():
-    """
-    List available benchmark suites
+    """Lists the available benchmark suites.
 
-    Examples:
-        arf benchmark list-suites
+    This command provides a simple way to discover the available benchmark suites
+    and their current status, promoting transparency and ease of use for developers
+    and testers.
     """
     suites = [
         ("memory", "Conversation memory operations", "Available"),
