@@ -145,7 +145,11 @@
 - Automatic value attribution
 - Future-proof architecture
 
+<<<<<<< Updated upstream
 **Cons**:  
+=======
+**Cons**:
+>>>>>>> Stashed changes
 - Takes longer (+8 weeks)
 - More complex implementation
 - Requires AD4M/hREA understanding

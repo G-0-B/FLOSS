@@ -21,7 +21,8 @@ target
 #.idea/
 
 #my untracked local working files
-.untracked
+.untracked/
+
 # Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -73,4 +74,4 @@ env/
 
 # Memory storage for conversation_memory.py
 memory/
-.untracked
+memory_backup/
