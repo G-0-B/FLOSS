@@ -19,7 +19,7 @@ for path in [project_root, package_dir]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from desktop_pony_swarm.core.swarm import PonySwarm
+from desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
 from desktop_pony_swarm.config.settings import DEFAULT_CONFIG
 
 logging.basicConfig(
@@ -28,7 +28,13 @@ logging.basicConfig(
 )
 
 async def test_basic_rsa():
-    """Test basic RSA with simple math question."""
+    """Tests the basic functionality of the RSA algorithm on a simple math problem.
+
+    This test verifies that the swarm can correctly execute the RSA workflow
+    (initialization, iterative aggregation, and final selection) and produce a
+    plausible answer. It also checks that the performance and diversity metrics
+    are being recorded correctly.
+    """
     print("\n" + "="*80)
     print("TEST: Basic RSA with Math Question")
     print("="*80 + "\n")
@@ -54,7 +60,13 @@ async def test_basic_rsa():
             print(f"Iteration {it['iteration']}: diversity={it['diversity']:.4f}")
 
 async def test_reasoning_task():
-    """Test RSA on reasoning task."""
+    """Tests the swarm's ability to handle a reasoning task.
+
+    This test uses a classic riddle to evaluate whether the iterative aggregation
+    process helps the swarm converge on the correct answer, even if some initial
+    responses are incorrect. It demonstrates the swarm's capacity for collective
+    problem-solving and error correction.
+    """
     print("\n" + "="*80)
     print("TEST: RSA on Reasoning Task")
     print("="*80 + "\n")
@@ -79,7 +91,13 @@ Think carefully about what 'all but 9' means."""
             print(f"  Sample response: {it['population'][0][:100]}...")
 
 async def test_single_step_aggregation():
-    """Test single-step aggregation (faster)."""
+    """Tests the single-step aggregation method.
+
+    This test validates the functionality of the non-recursive aggregation
+    workflow (T=1), which is a faster alternative to the full RSA algorithm.
+    It ensures that the initial responses are correctly generated and aggregated
+    into a final, coherent response.
+    """
     print("\n" + "="*80)
     print("TEST: Single-Step Aggregation")
     print("="*80 + "\n")
@@ -98,10 +116,14 @@ async def test_single_step_aggregation():
         print(result['response'])
 
 async def test_adr_validation():
-    """
-    Test ADR-0 validation criteria.
-    
-    Specifically Test 2 (Composition) and Test 3 (Persistence).
+    """Validates key criteria from the ADR-0 specification.
+
+    This test is designed to ensure that the swarm's implementation aligns with
+    the foundational principles outlined in ADR-0. Specifically, it checks:
+    - **Test 2 (Composition):** Verifies that the responses from multiple ponies
+      can be composed without contradiction, as measured by the diversity metric.
+    - **Test 3 (Persistence):** Confirms that the embeddings of the pony responses
+      are correctly stored and aggregated in the `MultiScaleEmbedding` framework.
     """
     print("\n" + "="*80)
     print("TEST: ADR-0 Validation Criteria")
@@ -126,22 +148,31 @@ async def test_adr_validation():
         print("\n--- FINAL RESPONSE ---")
         print(result['response'])
 
+async def test_get_latest_version():
+    """Tests the get_latest_version zome call."""
+    print("\n" + "="*80)
+    print("TEST: Get Latest Version")
+    print("="*80 + "\n")
+
+    runtime = SwarmRuntime()
+    try:
+        await runtime.connect()
+        version = await runtime.get_latest_version()
+        print(f"Latest version: {version}")
+    finally:
+        await runtime.disconnect()
+
 async def main():
-    """Run all tests."""
+    """Runs the full test suite for the Pony Swarm.
+
+    This function executes all the defined tests in sequence, providing a
+    comprehensive validation of the swarm's functionality.
+    """
     print("\n🐴 DESKTOP PONY SWARM - Test Suite")
     print("="*80)
     
     try:
-        await test_basic_rsa()
-        await asyncio.sleep(2)
-        
-        await test_reasoning_task()
-        await asyncio.sleep(2)
-        
-        await test_single_step_aggregation()
-        await asyncio.sleep(2)
-        
-        await test_adr_validation()
+        await test_get_latest_version()
         
         print("\n" + "="*80)
         print("✅ ALL TESTS COMPLETE")

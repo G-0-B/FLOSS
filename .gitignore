@@ -66,6 +66,9 @@ ENV/
 env/
 .venv
 
+# Node.js
+node_modules/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

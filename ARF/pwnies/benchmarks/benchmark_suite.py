@@ -28,7 +28,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BenchmarkQuery:
-    """Single benchmark query with expected characteristics."""
+    """Represents a single benchmark query with its expected characteristics.
+
+    Attributes:
+        query: The text of the query.
+        complexity: The complexity level ("micro", "medium", "large").
+        expected_latency: The target latency in seconds for this query.
+        description: A brief description of the query's purpose.
+        expected_keywords: A list of keywords expected in a high-quality response.
+    """
 
     query: str
     complexity: str  # "micro", "medium", "large"
@@ -39,7 +47,18 @@ class BenchmarkQuery:
 
 @dataclass
 class BenchmarkResult:
-    """Results from a single benchmark run."""
+    """Stores the results from a single benchmark run.
+
+    Attributes:
+        query: The query that was run.
+        complexity: The complexity level of the query.
+        latency: The time taken to generate the response, in seconds.
+        response: The final response from the swarm.
+        diversity: The average semantic diversity of the responses.
+        num_generations: The total number of language model generations.
+        params: The RSA parameters (N, K, T) used for the run.
+        timestamp: The time the benchmark was completed.
+    """
 
     query: str
     complexity: str
@@ -51,11 +70,25 @@ class BenchmarkResult:
     timestamp: float = field(default_factory=time.time)
 
     def meets_target(self, target_latency: float) -> bool:
-        """Check if latency meets target."""
+        """Checks if the measured latency meets the target latency.
+
+        Args:
+            target_latency: The target latency to compare against.
+
+        Returns:
+            True if the latency is within the target, False otherwise.
+        """
         return self.latency <= target_latency
 
     def quality_score(self, expected_keywords: List[str]) -> float:
-        """Simple quality metric based on keyword presence."""
+        """Calculates a simple quality score based on the presence of expected keywords.
+
+        Args:
+            expected_keywords: A list of keywords to check for in the response.
+
+        Returns:
+            A float between 0.0 and 1.0 representing the quality score.
+        """
         if not expected_keywords:
             return 1.0
 
@@ -65,8 +98,17 @@ class BenchmarkResult:
 
 
 class BenchmarkSuite:
-    """
-    Comprehensive benchmark suite for Pony Swarm performance testing.
+    """Provides a comprehensive suite for testing the performance of the Pony Swarm.
+
+    This class is a cornerstone of the project's "Specification-Driven Development"
+    (SDD) and "Reality Validation" methodologies. It contains a curated set of
+    benchmark queries across different complexity levels, allowing for rigorous
+    and repeatable testing of the swarm's performance, quality, and efficiency.
+
+    The suite can be used to:
+    - Validate that the swarm meets its performance targets.
+    - Compare the effectiveness of different RSA parameter configurations.
+    - Track performance improvements or regressions over time.
     """
 
     # Benchmark queries organized by complexity
@@ -150,23 +192,31 @@ class BenchmarkSuite:
     ]
 
     def __init__(self, use_mock: bool = True):
-        """
-        Initialize benchmark suite.
+        """Initializes the BenchmarkSuite.
 
         Args:
-            use_mock: If True, use mock inference (fast, for testing).
-                     If False, use real Horde.AI (slow, for actual benchmarks)
+            use_mock: If True, the suite will use mock pony agents for fast
+                execution, which is useful for testing the benchmark logic
+                itself. If False, it will use real inference, which is necessary
+                for accurate performance measurement.
         """
         self.use_mock = use_mock
         self.results: List[BenchmarkResult] = []
         logger.info(f"Initialized BenchmarkSuite [{'MOCK' if use_mock else 'REAL'} mode]")
 
     def get_all_queries(self) -> List[BenchmarkQuery]:
-        """Get all benchmark queries."""
+        """Returns a list of all benchmark queries in the suite."""
         return self.MICRO_QUERIES + self.MEDIUM_QUERIES + self.LARGE_QUERIES
 
     def get_queries_by_complexity(self, complexity: str) -> List[BenchmarkQuery]:
-        """Get queries filtered by complexity level."""
+        """Returns a list of benchmark queries for a specific complexity level.
+
+        Args:
+            complexity: The complexity level to filter by ("micro", "medium", or "large").
+
+        Returns:
+            A list of `BenchmarkQuery` objects for the specified complexity level.
+        """
         complexity = complexity.lower()
         if complexity == "micro":
             return self.MICRO_QUERIES
@@ -184,17 +234,17 @@ class BenchmarkSuite:
         K: int = 2,
         T: int = 3
     ) -> BenchmarkResult:
-        """
-        Run a single benchmark query with specified parameters.
+        """Runs a single benchmark query with a given set of RSA parameters.
 
         Args:
-            query: BenchmarkQuery to run
-            N: Number of ponies
-            K: Aggregation size
-            T: Number of iterations
+            query: The `BenchmarkQuery` to run.
+            N: The number of pony agents to use.
+            K: The aggregation size.
+            T: The number of refinement iterations.
 
         Returns:
-            BenchmarkResult with timing and quality metrics
+            A `BenchmarkResult` object containing the performance and quality
+            metrics for the run.
         """
         logger.info(f"Running benchmark: {query.description} (N={N}, K={K}, T={T})")
 
@@ -241,15 +291,21 @@ class BenchmarkSuite:
         K: int = 2,
         T: int = 3
     ) -> Dict[str, Any]:
-        """
-        Run full benchmark suite or filtered subset.
+        """Runs the full benchmark suite or a filtered subset.
+
+        This method orchestrates the execution of multiple benchmark queries and
+        compiles the results into a summary dictionary.
 
         Args:
-            complexity_filter: If specified, only run queries of this complexity
-            N, K, T: RSA parameters
+            complexity_filter: If provided, only runs queries of this complexity
+                level.
+            N: The number of pony agents to use for the suite.
+            K: The aggregation size to use for the suite.
+            T: The number of refinement iterations to use for the suite.
 
         Returns:
-            Dictionary with aggregate metrics and results
+            A dictionary containing aggregated metrics and a list of the
+            individual `BenchmarkResult` objects.
         """
         logger.info(f"Running benchmark suite (complexity={complexity_filter or 'all'})")
 
@@ -299,11 +355,20 @@ class BenchmarkSuite:
         baseline_results: List[BenchmarkResult],
         current_results: List[BenchmarkResult]
     ) -> Dict[str, Any]:
-        """
-        Compare current results against baseline.
+        """Compares a set of current benchmark results against a baseline set.
+
+        This is useful for tracking performance changes over time and verifying
+        that optimizations have had the intended effect.
+
+        Args:
+            baseline_results: A list of `BenchmarkResult` objects from a previous
+                run to serve as the baseline.
+            current_results: A list of `BenchmarkResult` objects from the current
+                run.
 
         Returns:
-            Dictionary with improvement metrics
+            A dictionary containing the comparison metrics, including the
+            percentage improvement in latency.
         """
         baseline_latencies = [r.latency for r in baseline_results]
         current_latencies = [r.latency for r in current_results]
@@ -322,7 +387,14 @@ class BenchmarkSuite:
         }
 
     def generate_report(self, summary: Dict[str, Any]) -> str:
-        """Generate human-readable benchmark report."""
+        """Generates a human-readable report from a benchmark summary.
+
+        Args:
+            summary: A summary dictionary produced by the `run_suite` method.
+
+        Returns:
+            A formatted string containing the benchmark report.
+        """
         report = []
         report.append("\n" + "="*80)
         report.append("PONY SWARM BENCHMARK REPORT")
@@ -353,7 +425,7 @@ class BenchmarkSuite:
 
 
 async def main():
-    """Run benchmark suite from command line."""
+    """Defines the command-line interface for running the benchmark suite."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Run Pony Swarm benchmarks")

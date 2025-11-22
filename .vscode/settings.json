@@ -1,0 +1,17 @@
+{
+    "application.experimental.rendererProfiling": true,
+    "workbench.experimental.cloudChanges.autoStore": "onShutdown",
+    "workbench.experimental.cloudChanges.partialMatches.enabled": true,
+    "workbench.experimental.share.enabled": true,
+    "workbench.externalBrowser": "firefox",
+    "workbench.list.smoothScrolling": true,
+    "workbench.reduceMotion": "on",
+    "workbench.sideBar.location": "left",
+    "editor.allowVariableFontsInAccessibilityMode": false,
+    "editor.experimentalGpuAcceleration": "on",
+    "extensions.experimental.deferredStartupFinishedActivation": true,
+    "diffEditor.useInlineViewWhenSpaceIsLimited": true,
+    "diffEditor.wordWrap": "on",
+    "merge-conflict.diffViewPosition": "Beside",
+    "diffEditor.renderSideBySide": true
+}

@@ -22,13 +22,25 @@ from .adaptive_params import AdaptiveParameterSelector, RSAParams
 logger = logging.getLogger(__name__)
 
 class PonySwarm:
-    """
-    RSA-based pony swarm coordinator.
-    
-    Parameters match paper recommendations:
-    - N=4 ponies (population size)
-    - K=2 aggregation size
-    - T=3 iterations
+    """Orchestrates a swarm of Desktop Pony agents using Recursive Self-Aggregation.
+
+    This class implements the core logic for the Recursive Self-Aggregation (RSA)
+    algorithm, a method for enhancing the collective intelligence of a group of
+    language model agents. By iteratively generating, subsampling, and aggregating
+    responses, the swarm can produce more robust and accurate solutions than a
+    single agent.
+
+    This implementation reflects the principles of "Federated Reasoning" and
+    "Evolution," where diverse agents collaborate and refine their understanding
+    over multiple iterations. It is a key component of the "AGI@Home" vision,
+    enabling powerful, decentralized computation.
+
+    Attributes:
+        num_ponies: The number of pony agents in the swarm (N).
+        ponies: A list of `DesktopPonyAgent` instances.
+        embedding_manager: Manages the semantic embeddings of pony responses.
+        param_selector: An optional component for adaptively selecting RSA parameters.
+        metrics: A dictionary for tracking performance and diversity metrics.
     """
     
     def __init__(
@@ -38,6 +50,15 @@ class PonySwarm:
         use_mock: bool = True,
         use_adaptive_params: bool = True
     ):
+        """Initializes the PonySwarm.
+
+        Args:
+            num_ponies: The total number of pony agents in the swarm (N).
+            pony_names: An optional list of names for the ponies.
+            use_mock: If True, uses mock pony agents for testing and development.
+            use_adaptive_params: If True, enables adaptive selection of RSA
+                parameters (K and T).
+        """
         self.num_ponies = num_ponies
         self.use_mock = use_mock
         self.use_adaptive_params = use_adaptive_params
@@ -77,13 +98,13 @@ class PonySwarm:
         logger.info(f"Initialized swarm with {num_ponies} ponies [{mode}{adaptive} inference]")
     
     async def __aenter__(self):
-        """Async context manager entry."""
+        """Enters the asynchronous context, initializing pony agents."""
         for pony in self.ponies:
             await pony.__aenter__()
         return self
     
     async def __aexit__(self, *args):
-        """Async context manager exit."""
+        """Exits the asynchronous context, cleaning up pony agents."""
         for pony in self.ponies:
             await pony.__aexit__(*args)
     
@@ -98,17 +119,24 @@ class PonySwarm:
         T: Optional[int] = None,
         user_state: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Recursive Self-Aggregation (RSA) - Algorithm 1 from paper.
+        """Executes the Recursive Self-Aggregation (RSA) algorithm.
+
+        This is the primary method of the `PonySwarm`, implementing the iterative
+        process of response generation, subsampling, and aggregation to arrive at a
+        final, high-quality response.
 
         Args:
-            query: User question/task
-            K: Aggregation size (None for adaptive selection)
-            T: Number of refinement iterations (None for adaptive selection)
-            user_state: User context for wellbeing checks
+            query: The user's question or task for the swarm to address.
+            K: The aggregation size (number of responses to sample and aggregate).
+                If None, this may be selected adaptively.
+            T: The number of refinement iterations. If None, this may be selected
+                adaptively.
+            user_state: Optional context about the user's state, used for
+                well-being and crisis checks.
 
         Returns:
-            Dict with final response, metrics, and iteration history
+            A dictionary containing the final response, performance metrics, and a
+            history of the iterations.
         """
         N = self.num_ponies
         user_state = user_state or {}
@@ -294,10 +322,19 @@ class PonySwarm:
         candidates: List[str],
         K: int
     ) -> str:
-        """
-        Build aggregation prompt following paper's template (Appendix F).
-        
-        Different prompts for K=1 (self-refinement) vs K>1 (aggregation).
+        """Constructs the prompt for the aggregation step of the RSA algorithm.
+
+        This method generates a prompt that instructs a pony agent to either
+        self-refine its own response (if K=1) or to aggregate multiple candidate
+        responses into a single, improved solution.
+
+        Args:
+            query: The original user query.
+            candidates: A list of candidate responses to be refined or aggregated.
+            K: The number of candidates, which determines the type of prompt.
+
+        Returns:
+            A string containing the formatted prompt for the language model.
         """
         if K == 1:
             # Self-refinement prompt
@@ -340,10 +377,19 @@ Now write a single improved solution with clear reasoning:"""
         query: str,
         user_state: Dict[str, Any]
     ) -> Optional[str]:
-        """
-        Priority 1: Check all ponies for crisis indicators.
-        
-        Returns alert if any pony detects crisis.
+        """Performs a safety check across all ponies for crisis indicators.
+
+        This method queries each pony agent to determine if the user's query or
+        state indicates a potential crisis (e.g., self-harm, distress). It is a
+        critical safety feature that aligns with the "Unconditional Love" principle
+        of ULLK.
+
+        Args:
+            query: The user's query.
+            user_state: The user's context.
+
+        Returns:
+            A crisis alert message string if a crisis is detected, otherwise None.
         """
         for pony in self.ponies:
             alert = pony.check_crisis_indicators(query, user_state)
@@ -360,11 +406,19 @@ Now write a single improved solution with clear reasoning:"""
         query: str,
         K: int = 4
     ) -> Dict[str, Any]:
-        """
-        Single-step aggregation (RSA with T=1).
-        
-        Equivalent to Best-of-N with aggregation instead of selection.
-        Useful for quick queries without full RSA overhead.
+        """Performs a single-step aggregation of multiple pony responses.
+
+        This method is a simplified version of the RSA algorithm with only one
+        iteration (T=1). It is useful for scenarios where a quick, aggregated
+        response is needed without the full overhead of the recursive process.
+
+        Args:
+            query: The user's query.
+            K: The number of initial responses to generate and aggregate.
+
+        Returns:
+            A dictionary containing the final aggregated response and the initial
+            candidate responses.
         """
         logger.info(f"Single-step aggregation: K={K}")
         

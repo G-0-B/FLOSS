@@ -16,26 +16,34 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RSAParams:
-    """RSA algorithm parameters."""
+    """A data class for storing the parameters of the RSA algorithm.
+
+    Attributes:
+        N: The number of pony agents in the swarm.
+        K: The aggregation size (how many responses to sample).
+        T: The number of refinement iterations.
+    """
     N: int  # Number of ponies
     K: int  # Aggregation size
     T: int  # Number of iterations
 
     def __str__(self):
+        """Provides a string representation of the parameters."""
         return f"RSAParams(N={self.N}, K={self.K}, T={self.T})"
 
 
 class ComplexityEstimator:
-    """
-    Estimates query complexity for adaptive parameter selection.
+    """Estimates the complexity of a user query to inform parameter selection.
 
-    Uses multiple heuristics:
-    - Query length
-    - Word count
-    - Sentence count
-    - Presence of mathematical operations
-    - Presence of reasoning keywords
-    - Presence of creative keywords
+    This class uses a set of heuristics to analyze a query and assign it a
+    complexity score. This score is then used to select the most appropriate
+    (and resource-efficient) parameters for the RSA algorithm. This process
+    contributes to "Cognitive Liberation" by avoiding unnecessary computation
+    for simple queries, while dedicating more resources to complex ones.
+
+    Heuristics include:
+    - Query length and structure.
+    - Presence of keywords indicating mathematical, reasoning, or creative tasks.
     """
 
     # Keyword patterns for different complexity levels
@@ -61,7 +69,7 @@ class ComplexityEstimator:
     ]
 
     def __init__(self):
-        """Initialize complexity estimator."""
+        """Initializes the ComplexityEstimator."""
         self.compiled_patterns = {
             'math': [re.compile(p, re.IGNORECASE) for p in self.MATH_KEYWORDS],
             'reasoning': [re.compile(p, re.IGNORECASE) for p in self.REASONING_KEYWORDS],
@@ -69,18 +77,17 @@ class ComplexityEstimator:
         }
 
     def estimate_complexity(self, query: str) -> float:
-        """
-        Estimate query complexity on a scale of 0-100.
+        """Estimates the complexity of a query on a scale from 0 to 100.
 
-        Low complexity (0-20): Simple arithmetic, factual questions
-        Medium complexity (20-60): Reasoning, explanation, analysis
-        High complexity (60-100): Creative tasks, multi-step problems
+        The scoring is based on a combination of query length, sentence
+        structure, and the presence of keywords that suggest different types
+        of cognitive tasks.
 
         Args:
-            query: User query string
+            query: The user's query string.
 
         Returns:
-            Complexity score (0-100)
+            A float representing the estimated complexity score (0-100).
         """
         score = 0.0
 
@@ -156,10 +163,14 @@ class ComplexityEstimator:
 
 
 class AdaptiveParameterSelector:
-    """
-    Selects optimal RSA parameters based on query complexity.
+    """Selects optimal RSA parameters based on estimated query complexity.
 
-    Based on parameter sweep results and complexity heuristics.
+    This class acts as a meta-controller for the RSA algorithm, dynamically
+    adjusting its parameters (N, K, T) to match the difficulty of the task at
+    hand. This ensures that the swarm operates efficiently, dedicating more
+    computational resources to complex problems and fewer to simple ones.
+    This adaptive capability is a key feature of the "Evolution" principle,
+    allowing the system to intelligently allocate its resources.
     """
 
     # Default parameter configurations for different complexity levels
@@ -175,12 +186,14 @@ class AdaptiveParameterSelector:
         configs: Optional[Dict[str, RSAParams]] = None,
         complexity_thresholds: Optional[Dict[str, float]] = None
     ):
-        """
-        Initialize adaptive parameter selector.
+        """Initializes the AdaptiveParameterSelector.
 
         Args:
-            configs: Custom parameter configurations (optional)
-            complexity_thresholds: Custom thresholds for complexity levels (optional)
+            configs: An optional dictionary to override the default parameter
+                configurations for each complexity level.
+            complexity_thresholds: An optional dictionary to override the default
+                thresholds for classifying a query as 'simple', 'medium', or
+                'complex'.
         """
         self.estimator = ComplexityEstimator()
 
@@ -197,14 +210,16 @@ class AdaptiveParameterSelector:
         logger.info(f"Initialized AdaptiveParameterSelector with configs: {self.configs}")
 
     def select_parameters(self, query: str) -> RSAParams:
-        """
-        Select optimal parameters for a query.
+        """Selects the optimal RSA parameters for a given query.
+
+        This method first estimates the query's complexity and then selects the
+        pre-configured set of parameters that best matches that complexity level.
 
         Args:
-            query: User query string
+            query: The user's query string.
 
         Returns:
-            RSAParams with optimal N, K, T values
+            An `RSAParams` object containing the selected N, K, and T values.
         """
         # Estimate complexity
         complexity = self.estimator.estimate_complexity(query)
@@ -226,14 +241,14 @@ class AdaptiveParameterSelector:
         return params
 
     def update_config(self, level: str, params: RSAParams):
-        """
-        Update configuration for a specific complexity level.
+        """Updates the parameter configuration for a specific complexity level.
 
-        Useful for incorporating parameter sweep results.
+        This allows for the dynamic tuning of the selector, for example, based on
+        the results of automated parameter sweeps.
 
         Args:
-            level: "simple", "medium", or "complex"
-            params: New RSAParams to use for this level
+            level: The complexity level to update ('simple', 'medium', or 'complex').
+            params: The new `RSAParams` to use for this level.
         """
         if level not in self.configs:
             raise ValueError(f"Unknown complexity level: {level}")
@@ -244,7 +259,11 @@ class AdaptiveParameterSelector:
         logger.info(f"Updated {level} config: {old_params} -> {params}")
 
     def get_config_summary(self) -> Dict[str, Any]:
-        """Get summary of current configurations."""
+        """Retrieves a summary of the current parameter configurations and thresholds.
+
+        Returns:
+            A dictionary summarizing the selector's current settings.
+        """
         return {
             'configs': {
                 level: {'N': p.N, 'K': p.K, 'T': p.T}
@@ -259,7 +278,11 @@ _default_selector = None
 
 
 def get_default_selector() -> AdaptiveParameterSelector:
-    """Get or create default parameter selector instance."""
+    """Gets the default, singleton instance of the AdaptiveParameterSelector.
+
+    Returns:
+        The singleton `AdaptiveParameterSelector` instance.
+    """
     global _default_selector
     if _default_selector is None:
         _default_selector = AdaptiveParameterSelector()
@@ -267,16 +290,16 @@ def get_default_selector() -> AdaptiveParameterSelector:
 
 
 def select_parameters_for_query(query: str) -> RSAParams:
-    """
-    Convenience function to select parameters for a query.
+    """A convenience function to select RSA parameters for a query.
 
-    Uses the default selector instance.
+    This function uses the default singleton selector to estimate the query's
+    complexity and return the appropriate parameters.
 
     Args:
-        query: User query string
+        query: The user's query string.
 
     Returns:
-        RSAParams with optimal N, K, T values
+        An `RSAParams` object with the selected N, K, and T values.
     """
     selector = get_default_selector()
     return selector.select_parameters(query)

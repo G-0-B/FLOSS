@@ -55,7 +55,12 @@ console = Console()
 
 @app.command()
 def version():
-    """Show ARF CLI version information"""
+    """Displays the version information for the ARF CLI and its dependencies.
+
+    This command provides a quick way to check the installed version of the CLI,
+    ensuring that the correct version is in use and aiding in debugging and
+    reproducibility.
+    """
     from cli import __version__
 
     table = Table(title="ARF CLI Version")
@@ -71,7 +76,13 @@ def version():
 
 @app.command()
 def info():
-    """Show system information and status"""
+    """Displays system information and the status of key dependencies.
+
+    This command provides an overview of the ARF environment, including the
+    installation path, available commands, and the status of critical libraries
+    like `numpy` and `sentence-transformers`. It serves as a diagnostic tool
+    to quickly assess the health and configuration of the system.
+    """
     import json
     from pathlib import Path
 
@@ -114,13 +125,17 @@ def main(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress output except errors"),
 ):
-    """
-    ARF CLI - FLOSSI0ULLK Agent Runtime Framework
+    """The main callback for the ARF CLI application.
 
-    A unified command-line interface for conversation memory, swarm intelligence,
-    ontology management, and benchmarking.
+    This function is executed before any subcommand is run. It sets up the global
+    context, including flags for verbosity and quiet mode, which can be used by
+    the subcommands to control their output. This centralized setup ensures a
+    consistent user experience across all CLI operations.
 
-    Every operation supports JSON output mode for scripting and automation.
+    Args:
+        ctx: The Typer context, used to pass state to subcommands.
+        verbose: If True, enables detailed, verbose output.
+        quiet: If True, suppresses all output except for errors.
     """
     # Store in context for subcommands
     ctx.obj = {
@@ -130,7 +145,13 @@ def main(
 
 
 def cli_main():
-    """Entry point for the CLI"""
+    """The main entry point for the ARF CLI application.
+
+    This function wraps the Typer application, providing centralized error
+    handling for common issues like keyboard interrupts and other exceptions.
+    It ensures that the CLI exits with the appropriate Unix exit codes,
+    facilitating its use in scripting and automated workflows.
+    """
     try:
         app()
     except KeyboardInterrupt:

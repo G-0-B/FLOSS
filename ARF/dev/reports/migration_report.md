@@ -3,12 +3,14 @@
 
 ## Summary Statistics
 
-- **Total Agents**: 1
-- **Total Understandings**: 3
+- **Total Agents**: 3
+- **Total Understandings**: 0
 - **Already Migrated**: 0
-- **Successfully Migrated**: 3
+- **Successfully Migrated**: 0
+- **Holochain Synced**: 0
 - **Migration Failed**: 0
-- **Success Rate**: 100.0%
+- **Success Rate**: 0.0%
+
 
 ## Failure Breakdown
 

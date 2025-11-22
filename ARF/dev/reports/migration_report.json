@@ -1,12 +1,15 @@
 {
   "stats": {
-    "total_agents": 1,
-    "total_understandings": 3,
+    "total_agents": 3,
+    "total_understandings": 0,
     "already_migrated": 0,
-    "successfully_migrated": 3,
+    "successfully_migrated": 0,
     "migration_failed": 0,
     "no_triple_extracted": 0,
-    "validation_failed": 0
+    "validation_failed": 0,
+    "committee_validations": 0,
+    "committee_rejections": 0,
+    "holochain_synced": 0
   },
   "failed_migrations": []
 }

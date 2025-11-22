@@ -18,15 +18,29 @@ from embedding_frames_of_scale import MultiScaleEmbedding
 logger = logging.getLogger(__name__)
 
 class SwarmEmbeddingManager:
-    """
-    Manages pony swarm embeddings using hierarchical MultiScaleEmbedding.
-    
-    Levels:
-    - 'fine': Individual pony responses
-    - 'community': Aggregated swarm knowledge
+    """Manages the hierarchical embeddings for the pony swarm.
+
+    This class provides a specialized interface to the `MultiScaleEmbedding`
+    framework, tailored for the needs of the Recursive Self-Aggregation (RSA)
+    algorithm. It organizes embeddings into two primary levels:
+    - **'fine'**: Represents the individual responses of each pony agent.
+    - **'community'**: Represents the aggregated, collective knowledge of the swarm
+      at each iteration.
+
+    This hierarchical structure is a direct implementation of the "fractal memory"
+    concept, allowing for the analysis of both individual contributions and the
+    emergent, collective intelligence of the swarm. It is essential for tracking
+    provenance, measuring diversity, and enabling "Federated Reasoning."
+
+    Attributes:
+        embeddings: An instance of `MultiScaleEmbedding` to store the hierarchical
+            embedding data.
+        iteration_history: A dictionary that tracks the responses generated at
+            each iteration of the RSA algorithm.
     """
     
     def __init__(self):
+        """Initializes the SwarmEmbeddingManager."""
         self.embeddings = MultiScaleEmbedding()
         self.iteration_history: Dict[int, List[Dict[str, Any]]] = {}
         
@@ -40,7 +54,19 @@ class SwarmEmbeddingManager:
         vector: np.ndarray | list,
         metadata: Dict[str, Any] = None
     ):
-        """Store individual pony response at fine level."""
+        """Stores the embedding of an individual pony's response.
+
+        This method adds a new embedding to the 'fine' level of the hierarchical
+        structure, representing a single pony's contribution at a specific
+        iteration.
+
+        Args:
+            pony_id: The unique identifier of the pony agent.
+            iteration: The RSA iteration number.
+            response: The textual response from the pony.
+            vector: The embedding vector of the response.
+            metadata: Optional dictionary for additional provenance information.
+        """
         # Convert list to numpy array if needed
         if isinstance(vector, list):
             vector = np.array(vector)
@@ -71,11 +97,16 @@ class SwarmEmbeddingManager:
         })
     
     def aggregate_to_community(self, iteration: int, pony_ids: List[str]):
-        """
-        Aggregate pony embeddings to community level.
-        
-        Creates coarse-level embedding representing
-        collective knowledge at this iteration.
+        """Aggregates individual pony embeddings into a community-level embedding.
+
+        This method creates a coarse-grained embedding that represents the
+        collective knowledge of the swarm at a given iteration. It does this by
+        summing the 'fine'-level embeddings of the participating ponies, in
+        accordance with the principles of multi-scale embedding.
+
+        Args:
+            iteration: The RSA iteration number to aggregate.
+            pony_ids: A list of the pony IDs that contributed to this iteration.
         """
         community_id = f'community_t{iteration}'
         
@@ -128,11 +159,20 @@ class SwarmEmbeddingManager:
                 )
     
     def get_diversity_metric(self, iteration: int) -> float:
-        """
-        Calculate diversity of population at iteration.
-        
-        Higher diversity = more varied responses.
-        Matches paper's diversity analysis (Appendix C).
+        """Calculates the semantic diversity of the pony responses at a given iteration.
+
+        This metric is crucial for understanding the health and exploratory
+        capacity of the swarm. Higher diversity indicates that the ponies are
+        generating a wider range of ideas, which can lead to more creative and
+        robust solutions. The calculation is based on the average pairwise
+        cosine distance between the response embeddings.
+
+        Args:
+            iteration: The RSA iteration number to analyze.
+
+        Returns:
+            A float between 0.0 and 1.0, where higher values indicate greater
+            diversity.
         """
         if iteration not in self.iteration_history:
             return 0.0
@@ -176,10 +216,19 @@ class SwarmEmbeddingManager:
         level: str = 'fine',
         top_k: int = 3
     ) -> List[Dict[str, Any]]:
-        """
-        Find most similar embeddings to query.
-        
-        Enables ponies to reference past knowledge.
+        """Finds the most semantically similar responses to a given query vector.
+
+        This function enables the swarm to reference its past knowledge, a key
+        capability for reducing "Cognitive Debt" and building upon prior work.
+
+        Args:
+            query_vector: The embedding vector of the query.
+            level: The embedding level to search within ('fine' or 'community').
+            top_k: The number of similar responses to return.
+
+        Returns:
+            A list of dictionaries, each containing a similar response and its
+            metadata, sorted by similarity.
         """
         # Get all embeddings at level
         try:

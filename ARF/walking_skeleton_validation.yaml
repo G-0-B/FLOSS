@@ -1,0 +1,23 @@
+# walking_skeleton_validation.yaml
+name: Walking Skeleton Validation
+version: 0.1.0
+evidence_required: ADR-0 Test 2 & Test 3 passing
+
+test_2_composition:
+  criteria: "Can insights from 2+ AI systems compose without contradiction?"
+  implementation:
+    - Load 4-Pony RSA swarm
+    - Execute query about FLOSSI0ULLK
+    - Capture all 4 responses
+    - Verify: No contradictions in aggregated result
+    - Verify: Diversity metric > 0 (shows different perspectives)
+  success_metric: "Aggregated response contains coherent synthesis"
+
+test_3_persistence:
+  criteria: "Can understanding survive conversation boundaries?"
+  implementation:
+    - Conversation 1: Create knowledge via RSA
+    - Store in MultiScaleEmbedding
+    - Conversation 2: Query similar embeddings
+    - Verify: Can retrieve prior knowledge
+  success_metric: "Semantic similarity > 0.7 to original"

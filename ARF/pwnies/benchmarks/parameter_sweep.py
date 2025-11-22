@@ -26,16 +26,23 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ParameterConfig:
-    """Single parameter configuration to test."""
+    """Represents a single configuration of RSA parameters for testing.
+
+    Attributes:
+        N: The number of pony agents in the swarm.
+        K: The aggregation size (how many responses to sample).
+        T: The number of refinement iterations.
+    """
     N: int  # Number of ponies
     K: int  # Aggregation size
     T: int  # Number of iterations
 
     def __str__(self):
+        """Provides a string representation of the configuration."""
         return f"N={self.N},K={self.K},T={self.T}"
 
     def is_valid(self) -> bool:
-        """Check if parameter combination is valid."""
+        """Checks if the parameter combination is valid (K <= N)."""
         # K must be <= N
         if self.K > self.N:
             return False
@@ -47,7 +54,17 @@ class ParameterConfig:
 
 @dataclass
 class SweepResult:
-    """Results from testing a single parameter configuration."""
+    """Stores the aggregated results from testing a single parameter configuration.
+
+    Attributes:
+        config: The `ParameterConfig` that was tested.
+        complexity: The complexity level of the queries used for the test.
+        avg_latency: The average time taken to get a response.
+        avg_diversity: The average semantic diversity of the responses.
+        avg_quality: The average quality score of the responses.
+        total_time: The total time taken for the test run.
+        num_queries: The number of queries used in the test.
+    """
     config: ParameterConfig
     complexity: str
     avg_latency: float
@@ -57,7 +74,7 @@ class SweepResult:
     num_queries: int
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """Serializes the sweep result to a dictionary."""
         return {
             'N': self.config.N,
             'K': self.config.K,
@@ -72,16 +89,22 @@ class SweepResult:
 
 
 class ParameterSweep:
-    """
-    Grid search over RSA parameters to find optimal configurations.
+    """Performs a grid search over RSA parameters to find optimal configurations.
+
+    This class is a key tool for the "Evolution" and "Specification-Driven
+    Development" (SDD) principles of the project. It systematically benchmarks
+    different combinations of the RSA parameters (N, K, T) to identify the
+    most effective and efficient configurations for various types of tasks.
+    The results of this sweep can be used to inform the `AdaptiveParameterSelector`,
+    ensuring that the swarm operates optimally.
     """
 
     def __init__(self, use_mock: bool = True):
-        """
-        Initialize parameter sweep.
+        """Initializes the ParameterSweep.
 
         Args:
-            use_mock: If True, use mock inference for fast testing
+            use_mock: If True, uses mock inference for fast testing. Using real
+                inference is significantly slower and more costly.
         """
         self.use_mock = use_mock
         self.suite = BenchmarkSuite(use_mock=use_mock)
@@ -94,21 +117,18 @@ class ParameterSweep:
         K_values: List[int] = None,
         T_values: List[int] = None
     ) -> List[ParameterConfig]:
-        """
-        Generate all valid parameter combinations.
+        """Generates a list of all valid parameter combinations for the sweep.
 
-        Default values from roadmap:
-        - N ∈ {2,4,6,8}
-        - K ∈ {1,2,3}
-        - T ∈ {1,2,3,4}
+        The method filters out invalid combinations where the aggregation size (K)
+        is greater than the number of ponies (N).
 
         Args:
-            N_values: List of N values to test (default: [2,4,6,8])
-            K_values: List of K values to test (default: [1,2,3])
-            T_values: List of T values to test (default: [1,2,3,4])
+            N_values: A list of N values to test. Defaults to [2, 4, 6, 8].
+            K_values: A list of K values to test. Defaults to [1, 2, 3].
+            T_values: A list of T values to test. Defaults to [1, 2, 3, 4].
 
         Returns:
-            List of valid ParameterConfig objects
+            A list of valid `ParameterConfig` objects to be tested.
         """
         if N_values is None:
             N_values = [2, 4, 6, 8]
@@ -135,15 +155,19 @@ class ParameterSweep:
         config: ParameterConfig,
         queries: List[BenchmarkQuery]
     ) -> SweepResult:
-        """
-        Test a single parameter configuration on a set of queries.
+        """Tests a single parameter configuration against a set of benchmark queries.
+
+        This method runs a given `ParameterConfig` through a list of queries of the
+        same complexity, and then aggregates the performance metrics (latency,
+        diversity, quality) into a `SweepResult`.
 
         Args:
-            config: ParameterConfig to test
-            queries: List of benchmark queries to run
+            config: The `ParameterConfig` to test.
+            queries: A list of `BenchmarkQuery` objects to run the test against.
 
         Returns:
-            SweepResult with aggregate metrics
+            A `SweepResult` object containing the aggregated metrics for the
+            tested configuration.
         """
         logger.info(f"Testing config: {config}")
 
@@ -202,16 +226,23 @@ class ParameterSweep:
         T_values: List[int] = None,
         max_configs: int = None
     ) -> List[SweepResult]:
-        """
-        Run full parameter sweep for a specific complexity level.
+        """Runs a full parameter sweep for a specific query complexity level.
+
+        This method orchestrates the entire sweep process: it generates a set of
+        parameter configurations, runs tests for each one against a benchmark
+        suite of a given complexity, and collects the results.
 
         Args:
-            complexity: "micro", "medium", or "large"
-            N_values, K_values, T_values: Parameter ranges to test
-            max_configs: Maximum number of configs to test (for quick testing)
+            complexity: The complexity level of queries to test against
+                ("micro", "medium", or "large").
+            N_values: A list of N values to test.
+            K_values: A list of K values to test.
+            T_values: A list of T values to test.
+            max_configs: An optional limit on the number of configurations to test,
+                useful for quick checks.
 
         Returns:
-            List of SweepResult objects
+            A list of `SweepResult` objects, one for each tested configuration.
         """
         logger.info(f"Starting parameter sweep for {complexity} queries")
 
@@ -239,17 +270,19 @@ class ParameterSweep:
         self,
         results: List[SweepResult] = None
     ) -> List[SweepResult]:
-        """
-        Find Pareto-optimal configurations (best trade-off between latency and quality).
+        """Identifies the Pareto-optimal configurations from a set of sweep results.
 
-        A configuration is Pareto-optimal if no other configuration is better
-        in both latency (lower is better) and quality (higher is better).
+        A configuration is considered Pareto-optimal if there is no other
+        configuration that is better in terms of both latency (lower is better)
+        and quality (higher is better). This helps to identify the set of
+        most efficient configurations that represent the best trade-offs.
 
         Args:
-            results: List of SweepResult to analyze (default: self.results)
+            results: A list of `SweepResult` objects to analyze. If not provided,
+                the instance's own results are used.
 
         Returns:
-            List of Pareto-optimal configurations
+            A list of `SweepResult` objects that are on the Pareto frontier.
         """
         if results is None:
             results = self.results
@@ -283,15 +316,15 @@ class ParameterSweep:
         metric: str = "latency",
         results: List[SweepResult] = None
     ) -> SweepResult:
-        """
-        Find best configuration by a specific metric.
+        """Finds the single best configuration based on a specific metric.
 
         Args:
-            metric: "latency", "diversity", or "quality"
-            results: List of SweepResult to analyze (default: self.results)
+            metric: The metric to optimize for ("latency", "diversity", or "quality").
+            results: A list of `SweepResult` objects to analyze.
 
         Returns:
-            Best SweepResult by the specified metric
+            The `SweepResult` for the configuration that performs best on the
+            specified metric.
         """
         if results is None:
             results = self.results
@@ -309,7 +342,11 @@ class ParameterSweep:
             raise ValueError(f"Unknown metric: {metric}")
 
     def save_results(self, filename: str = "sweep_results.json"):
-        """Save sweep results to JSON file."""
+        """Saves the sweep results to a JSON file.
+
+        Args:
+            filename: The name of the file to save the results to.
+        """
         output_path = Path(__file__).parent / filename
 
         data = {
@@ -326,7 +363,17 @@ class ParameterSweep:
         return output_path
 
     def generate_report(self, results: List[SweepResult] = None) -> str:
-        """Generate human-readable sweep report."""
+        """Generates a human-readable report summarizing the sweep results.
+
+        The report includes the best configurations for latency and quality, as
+        well as the full list of Pareto-optimal configurations.
+
+        Args:
+            results: A list of `SweepResult` objects to include in the report.
+
+        Returns:
+            A string containing the formatted report.
+        """
         if results is None:
             results = self.results
 
@@ -370,7 +417,7 @@ class ParameterSweep:
 
 
 async def main():
-    """Run parameter sweep from command line."""
+    """Defines the command-line interface for running the parameter sweep."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Run parameter sweep for Pony Swarm")

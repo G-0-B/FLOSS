@@ -40,6 +40,7 @@ class MigrationStats:
     validation_failed: int = 0
     committee_validations: int = 0  # New: count of committee validations used
     committee_rejections: int = 0   # New: count of committee rejections
+    holochain_synced: int = 0       # New: count of items synced to Holochain
 
     def success_rate(self) -> float:
         """Calculate migration success rate."""
@@ -126,6 +127,7 @@ def migrate_understanding(
 def migrate_memory_store(
     store_path: Path,
     stats: MigrationStats,
+    backend: str = 'file',
     use_committee: bool = False,
     committee_use_mock: bool = True
 ) -> List[Dict]:
@@ -135,11 +137,9 @@ def migrate_memory_store(
     Args:
         store_path: Path to memory store
         stats: MigrationStats to update
+        backend: Target backend ('file' or 'holochain')
         use_committee: Use committee validation (default: False)
         committee_use_mock: Use mock LLM for committee (default: True)
-
-    Returns:
-        List of failed migrations for manual review
     """
     agent_id = store_path.name
     logger.info(f"Migrating memory store for agent: {agent_id}")
@@ -162,6 +162,7 @@ def migrate_memory_store(
         agent_id=agent_id,
         storage_path=store_path,
         validate_ontology=True,
+        backend=backend,
         use_committee_validation=use_committee,
         committee_use_mock=committee_use_mock
     )
@@ -173,8 +174,33 @@ def migrate_memory_store(
 
         success, message = migrate_understanding(understanding_dict, memory)
 
+        # Extra step for Holochain backend
+        if success and backend == 'holochain':
+            if not understanding_dict.get('synced_to_holochain'):
+                try:
+                    # Transmit to Holochain
+                    action_hash = memory.transmit(understanding_dict)
+                    
+                    if action_hash:
+                        understanding_dict['synced_to_holochain'] = True
+                        understanding_dict['holochain_action_hash'] = action_hash
+                        stats.holochain_synced += 1
+                        if message == "Already migrated":
+                            message = "Locally migrated, now synced to Holochain"
+                            # Move from already_migrated to successfully_migrated if we just did work?
+                            # Or just track holochain_synced separately.
+                    else:
+                        success = False
+                        message = "Holochain transmission failed (returned None)"
+                except Exception as e:
+                    success = False
+                    message = f"Holochain transmission error: {e}"
+            else:
+                if message == "Already migrated":
+                    message = "Already migrated and synced"
+
         if success:
-            if message == "Already migrated":
+            if message == "Already migrated" or message == "Already migrated and synced":
                 stats.already_migrated += 1
             else:
                 stats.successfully_migrated += 1
@@ -237,6 +263,7 @@ def generate_migration_report(stats: MigrationStats, failed: List[Dict], output_
 - **Total Understandings**: {stats.total_understandings}
 - **Already Migrated**: {stats.already_migrated}
 - **Successfully Migrated**: {stats.successfully_migrated}
+- **Holochain Synced**: {stats.holochain_synced}
 - **Migration Failed**: {stats.migration_failed}
 - **Success Rate**: {stats.success_rate()*100:.1f}%
 
@@ -296,6 +323,12 @@ def main():
         action='store_true',
         help='Use real LLM for committee validation (default: mock)'
     )
+    parser.add_argument(
+        '--backend',
+        choices=['file', 'holochain'],
+        default='file',
+        help='Storage backend to migrate to (default: file)'
+    )
     args = parser.parse_args()
 
     start_time = time.time()
@@ -305,6 +338,7 @@ def main():
     if args.committee:
         logger.info("Committee Validation: ENABLED")
         logger.info(f"LLM Mode: {'REAL' if args.real_llm else 'MOCK'}")
+    logger.info(f"Target Backend: {args.backend.upper()}")
     logger.info("=" * 60)
 
     stats = MigrationStats()
@@ -332,6 +366,7 @@ def main():
             failed = migrate_memory_store(
                 store_path,
                 stats,
+                backend=args.backend,
                 use_committee=args.committee,
                 committee_use_mock=not args.real_llm
             )

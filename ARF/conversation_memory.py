@@ -37,14 +37,19 @@ import json
 import hashlib
 import re
 import asyncio
+import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field, asdict
 import logging
+import numpy as np
+
+from ARF.ontology.predicates import (
+    IS_A, IMPROVES_UPON, CAPABLE_OF, STATED, VALID_PREDICATES
+)
 
 # Import the existing fractal embedding infrastructure
-# (This assumes embedding_frames_of_scale.py is in the same directory or in PYTHONPATH)
 try:
     from embedding_frames_of_scale import Embedding, MultiScaleEmbedding
     EMBEDDINGS_AVAILABLE = True
@@ -54,72 +59,57 @@ except ImportError:
 
 # Import committee validation system
 try:
-    from validation.committee import TripleValidationCommittee
-    from validation.agent_pool import ValidatorPool
+    from ARF.validation.committee import TripleValidationCommittee
+    from ARF.validation.agent_pool import ValidatorPool
     COMMITTEE_VALIDATION_AVAILABLE = True
 except ImportError:
     COMMITTEE_VALIDATION_AVAILABLE = False
     logging.warning("Committee validation not available; using basic validation only")
 
-import numpy as np
+# Import Pattern Matcher
+try:
+    from ARF.ontology.patterns import PatternMatcher
+    PATTERNS_AVAILABLE = True
+except ImportError:
+    PATTERNS_AVAILABLE = False
+    logging.warning("PatternMatcher not available")
+
+# Import Budget Manager
+try:
+    from ARF.governance.budget import BudgetManager, BudgetExceededError
+    BUDGET_AVAILABLE = True
+except ImportError:
+    BUDGET_AVAILABLE = False
+    logging.warning("BudgetManager not available")
 
 logger = logging.getLogger(__name__)
 
 @dataclass
 class Understanding:
-    """
-    A moment of coherent understanding between agents.
-    
-    This is the atomic unit of memory in FLOSSI0ULLK coordination.
-    """
-    content: str  # The actual understanding (text, for now)
-    agent_id: str  # Who transmitted this
-    timestamp: str  # When
-    context: Optional[str] = None  # What led to this
-    is_decision: bool = False  # Is this an ADR-worthy decision point?
-    coherence_score: float = 0.0  # How confident are we? [0, 1]
+    """A moment of coherent understanding, representing an atomic unit of memory."""
+    content: str
+    agent_id: str
+    timestamp: str
+    context: Optional[str] = None
+    is_decision: bool = False
+    coherence_score: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
-    embedding_ref: Optional[str] = None  # Hash of the embedding vector
+    embedding_ref: Optional[str] = None
     
     def to_dict(self) -> Dict:
         return asdict(self)
     
     def hash(self) -> str:
-        """Cryptographic hash for reference and deduplication"""
         content_str = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()
 
 
 class ConversationMemory:
-    """
-    Holochain-inspired local-first memory for cross-AI coordination.
-
-    Each agent maintains their own memory, but memories can be:
-    - Composed (via MultiScaleEmbedding aggregation)
-    - Shared (via export/import)
-    - Verified (via cryptographic hashes)
-
-    This is the computational substrate for distributed intelligence coordination.
-
-    Supports two backends:
-    - 'file': Local file-based storage (default)
-    - 'holochain': Distributed storage via Holochain DNA
-    """
+    """A local-first, verifiable memory substrate for multi-agent coordination."""
 
     def __init__(self, agent_id: str, storage_path: Optional[str] = None,
                  validate_ontology: bool = True, backend: str = 'file',
                  use_committee_validation: bool = False, committee_use_mock: bool = True):
-        """
-        Initialize memory for a specific agent.
-
-        Args:
-            agent_id: Identifier for this agent (e.g., "claude-sonnet-4.5", "human-primary")
-            storage_path: Where to persist memory (default: ./memory/{agent_id}/)
-            validate_ontology: Whether to validate against ontology (default: True)
-            backend: Storage backend - 'file' (default) or 'holochain'
-            use_committee_validation: Use LLM committee for validation (default: False)
-            committee_use_mock: Use mock LLM for committee (default: True)
-        """
         self.agent_id = agent_id
         self.validate_ontology = validate_ontology
         self.backend = backend
@@ -140,7 +130,7 @@ class ConversationMemory:
 
         # Memory structures
         self.understandings: List[Understanding] = []
-        self.adrs: List[Dict] = []  # Architecture Decision Records
+        self.adrs: List[Dict] = []
 
         # Validation statistics
         self.validation_stats = {
@@ -150,69 +140,69 @@ class ConversationMemory:
             'validation_skipped': 0,
         }
 
-        # Initialize committee validation (if enabled)
+        # Initialize committee validation
         self.committee = None
         if use_committee_validation:
             if COMMITTEE_VALIDATION_AVAILABLE:
                 self.committee = TripleValidationCommittee(use_mock=committee_use_mock)
                 logger.info("Initialized committee validation")
             else:
-                logger.warning(
-                    "Committee validation requested but not available. "
-                    "Falling back to basic validation."
-                )
+                logger.warning("Committee validation requested but not available.")
                 self.use_committee_validation = False
 
-        # Fractal embeddings (if available)
+        # Fractal embeddings
         if EMBEDDINGS_AVAILABLE:
             self.embeddings = MultiScaleEmbedding()
         else:
             self.embeddings = None
             logger.warning("Running without embeddings; recall will be text-only")
 
-        # Load existing memory if present (file backend only)
+        # Load existing memory
         if backend == 'file':
             self._load()
+
+        # Initialize Pattern Matcher
+        if PATTERNS_AVAILABLE:
+            self.pattern_matcher = PatternMatcher()
+        else:
+            self.pattern_matcher = None
+
+        # Initialize Budget Manager
+        if BUDGET_AVAILABLE:
+            self.budget_manager = BudgetManager(agent_id, storage_path=str(self.storage_path))
+        else:
+            self.budget_manager = None
+
+        # Load triple patterns
+        self.patterns = {}
+        try:
+            config_path = Path(__file__).parent / "config" / "triple_patterns.yaml"
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    self.patterns = config.get('patterns', {})
+                    logger.info(f"Loaded {len(self.patterns)} triple extraction patterns")
+            else:
+                logger.warning(f"Pattern config not found at {config_path}, using defaults")
+        except Exception as e:
+            logger.error(f"Failed to load pattern config: {e}")
 
         logger.info(f"Initialized ConversationMemory for agent: {agent_id} (backend: {backend})")
     
     def transmit(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """
-        Capture a moment of coherent understanding.
-
-        This is the core operation: taking what exists in one mind
-        and encoding it in a form that can be transmitted to another.
-
-        The understanding must pass ontology validation before being stored.
-
-        Args:
-            understanding_dict: Dict with keys:
-                - content (required): The understanding itself
-                - context (optional): What led to this
-                - is_decision (optional): Is this ADR-worthy?
-                - coherence (optional): Confidence score [0, 1]
-                - metadata (optional): Additional info
-            skip_validation: Skip ontology validation (use with caution)
-
-        Returns:
-            Hash reference for later recall, or None if validation failed
-
-        Raises:
-            ValueError: If understanding is malformed
-        """
-        # Route to appropriate backend
         if self.backend == 'holochain':
             return self._transmit_holochain(understanding_dict, skip_validation)
         else:
             return self._transmit_file(understanding_dict, skip_validation)
 
     def _transmit_holochain(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """Transmit via Holochain backend."""
+        if self.budget_manager:
+            self.budget_manager.check_budget()
+
         if 'content' not in understanding_dict:
             raise ValueError("Understanding must have 'content' field")
 
         try:
-            # Call Holochain zome
             result = self.hc_client.call_zome(
                 'memory_coordinator',
                 'transmit_understanding',
@@ -221,14 +211,16 @@ class ConversationMemory:
                     'context': understanding_dict.get('context'),
                 }
             )
-
-            # Result is the ActionHash as a string
             logger.info(f"Transmitted understanding to Holochain: {result}")
             self.validation_stats['total_attempts'] += 1
             self.validation_stats['validation_passed'] += 1
-
+            
+            # Record usage (approximate)
+            if self.budget_manager:
+                tokens = len(understanding_dict['content']) // 4
+                self.budget_manager.record_usage(tokens)
+                
             return result
-
         except Exception as e:
             logger.error(f"Failed to transmit to Holochain: {e}")
             self.validation_stats['total_attempts'] += 1
@@ -236,15 +228,14 @@ class ConversationMemory:
             return None
 
     def _transmit_file(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
-        """Transmit via file backend (original implementation)."""
-        # Track validation attempt
+        if self.budget_manager:
+            self.budget_manager.check_budget()
+
         self.validation_stats['total_attempts'] += 1
 
-        # Validate required fields
         if 'content' not in understanding_dict:
             raise ValueError("Understanding must have 'content' field")
 
-        # Extract triple
         triple = self._extract_triple(understanding_dict)
         if triple is None:
             logger.warning(f"Could not extract triple from understanding: {understanding_dict}")
@@ -253,31 +244,40 @@ class ConversationMemory:
                 self.validation_stats['validation_failed'] += 1
                 return None
 
-        # Validate triple
         committee_result = None
         if skip_validation:
             self.validation_stats['validation_skipped'] += 1
             if triple:
                 logger.info(f"Skipping validation for triple: {triple}")
         elif triple:
-            context = understanding_dict.get('context', understanding_dict.get('content', ''))
-            is_valid, error_msg, committee_result = self._validate_triple(triple, context)
+            # Combine content and context for the validator
+            raw_content = understanding_dict.get('content', '')
+            provided_context = understanding_dict.get('context', '')
+            full_context = f"Content: {raw_content}\nContext: {provided_context}"
+            
+            is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
             if not is_valid:
                 logger.error(f"Ontology validation failed: {error_msg}")
-                logger.error(f"Triple: {triple}")
-                logger.error(f"Understanding: {understanding_dict}")
                 self.validation_stats['validation_failed'] += 1
                 return None
             else:
                 logger.debug(f"Validation passed for triple: {triple}")
                 self.validation_stats['validation_passed'] += 1
-                # Store committee result in understanding metadata if available
                 if committee_result:
                     if 'metadata' not in understanding_dict:
                         understanding_dict['metadata'] = {}
                     understanding_dict['metadata']['committee_validation'] = committee_result
 
-        # Create Understanding object
+        # Detect Patterns
+        if self.pattern_matcher:
+            full_text = f"{understanding_dict.get('content', '')} {understanding_dict.get('context', '')}"
+            detected_patterns = self.pattern_matcher.match(full_text)
+            if detected_patterns:
+                if 'metadata' not in understanding_dict:
+                    understanding_dict['metadata'] = {}
+                understanding_dict['metadata']['patterns'] = detected_patterns
+                logger.info(f"Detected patterns: {[p['pattern'] for p in detected_patterns]}")
+
         understanding = Understanding(
             content=understanding_dict['content'],
             agent_id=self.agent_id,
@@ -288,34 +288,26 @@ class ConversationMemory:
             metadata=understanding_dict.get('metadata', {})
         )
 
-        # Embed it (if embeddings available)
         if self.embeddings is not None:
-            # Simple text encoding for now (in production, use proper embedding model)
             vector = self._encode_text(understanding.content)
-
             metadata = {
                 'agent_id': self.agent_id,
                 'timestamp': understanding.timestamp,
                 'context': understanding.context,
                 'coherence': understanding.coherence_score,
                 'is_decision': understanding.is_decision,
-                'triple': triple  # Store extracted triple in metadata
+                'triple': triple
             }
-
-            # Add to multiscale embedding structure using the new interface
             self.embeddings.add(
                 key=f"understanding-{len(self.understandings)}",
                 vector=vector,
-                level='default',  # Use default level for composition support
+                level='default',
                 metadata=metadata
             )
-
             understanding.embedding_ref = understanding.hash()
 
-        # Store
         self.understandings.append(understanding)
 
-        # If it's a decision, record as ADR
         if understanding.is_decision:
             adr = {
                 'id': f"ADR-{len(self.adrs)}",
@@ -325,198 +317,136 @@ class ConversationMemory:
             self.adrs.append(adr)
             logger.info(f"Recorded decision: {adr['id']}")
 
-        # Persist to disk
         self._save()
-
         logger.info(f"Transmitted understanding with triple: {triple}")
+        
+        # Record usage (approximate)
+        if self.budget_manager:
+            tokens = len(understanding.content) // 4
+            self.budget_manager.record_usage(tokens)
+            
         return understanding.hash()
 
     def _extract_triple(self, understanding_dict: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
-        """
-        Extract a (subject, predicate, object) triple from understanding content.
-
-        Uses simple heuristics to identify semantic structure. For production,
-        this could use LLM-based extraction with committee validation.
-
-        Args:
-            understanding_dict: The understanding dict to extract from
-
-        Returns:
-            (subject, predicate, object) tuple, or None if extraction fails
-
-        Examples:
-            >>> memory._extract_triple({'content': 'Claude Sonnet 4.5 improves upon Sonnet 4'})
-            ('Claude-Sonnet-4.5', 'improves_upon', 'Sonnet-4')
-
-            >>> memory._extract_triple({'content': 'GPT-4 is a large language model'})
-            ('GPT-4', 'is_a', 'large-language-model')
-        """
         content = understanding_dict.get('content', '')
-
         if not content:
             return None
 
-        # Pattern 1: "X is a Y" or "X is an Y"
+        if self.patterns:
+            for name, pattern in self.patterns.items():
+                regex = pattern.get('regex')
+                predicate = pattern.get('predicate')
+                
+                if regex and predicate:
+                    match = re.search(regex, content, re.IGNORECASE)
+                    if match:
+                        if len(match.groups()) >= 2:
+                            subject = match.group(1).strip()
+                            obj = match.group(2).strip()
+                            
+                            if predicate == IS_A:
+                                obj = obj.replace(' ', '-')
+                                
+                            return (subject, predicate, obj)
+
+        # Fallback patterns
         is_a_pattern = r'(\S+(?:-\S+)*)\s+is\s+an?\s+([\w\s-]+?)(?:\s*$|[.,;!?])'
         match = re.search(is_a_pattern, content, re.IGNORECASE)
         if match:
             subject = match.group(1).strip()
             obj = match.group(2).strip().replace(' ', '-')
-            return (subject, 'is_a', obj)
+            return (subject, IS_A, obj)
 
-        # Pattern 2: "X improves Y" or "X improves upon Y"
         improves_pattern = r'(\S+(?:-\S+)*)\s+improves(?:\s+upon)?\s+(\S+(?:-\S+)*)'
         match = re.search(improves_pattern, content, re.IGNORECASE)
         if match:
-            return (match.group(1).strip(), 'improves_upon', match.group(2).strip())
+            return (match.group(1).strip(), IMPROVES_UPON, match.group(2).strip())
 
-        # Pattern 3: "X can do Y" / "X is capable of Y"
         capable_pattern = r'(\S+(?:-\S+)*)\s+(?:can|is capable of)\s+(\w+)'
         match = re.search(capable_pattern, content, re.IGNORECASE)
         if match:
-            return (match.group(1).strip(), 'capable_of', match.group(2).strip())
+            return (match.group(1).strip(), CAPABLE_OF, match.group(2).strip())
 
-        # Default: treat as entity with generic relation
-        # Subject = agent_id, predicate = stated, object = content hash
         content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
-        return (self.agent_id, 'stated', f"understanding_{content_hash}")
+        return (self.agent_id, STATED, f"understanding_{content_hash}")
 
     def _validate_triple(self, triple: Tuple[str, str, str], context: str = "") -> Tuple[bool, Optional[str], Optional[Dict]]:
-        """
-        Validate a triple against the ontology.
-
-        Args:
-            triple: (subject, predicate, object) tuple
-            context: Context text from which triple was extracted
-
-        Returns:
-            (is_valid, error_message, committee_result) tuple
-            committee_result is None if committee validation not used
-        """
         if not self.validate_ontology:
             return (True, None, None)
 
         subject, predicate, obj = triple
 
-        # Use committee validation if enabled
         if self.use_committee_validation and self.committee is not None:
             try:
-                # Run async validation in sync context
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're already in an async context, create a new thread
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            asyncio.run,
-                            self.committee.validate(triple, context or "No context provided")
-                        )
-                        result = future.result(timeout=15.0)
+                # robustly handle async execution from sync context
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop and loop.is_running():
+                    # We are already in an event loop. 
+                    # Ideally we should await, but this is a sync method.
+                    # We can't easily block here without nesting loops (which is bad).
+                    # For now, we'll log a warning and fallback to basic validation
+                    # or try to schedule it (but we need the result now).
+                    logger.warning("Cannot run sync committee validation inside an existing event loop. Falling back to basic validation.")
+                    raise RuntimeError("Existing event loop detected")
                 else:
-                    # Run async validation
-                    result = loop.run_until_complete(
+                    # No running loop, safe to use asyncio.run
+                    result = asyncio.run(
                         self.committee.validate(triple, context or "No context provided")
                     )
 
-                # Store committee result in metadata
                 committee_metadata = result.to_dict()
 
-                # Return committee decision
                 if result.accepted:
-                    logger.info(
-                        f"Committee accepted triple: {result.yes_votes}/{result.total_votes} votes, "
-                        f"confidence={result.confidence:.2f}"
-                    )
+                    logger.info(f"Committee accepted triple: {result.yes_votes}/{result.total_votes}")
                     return (True, None, committee_metadata)
                 else:
-                    logger.warning(
-                        f"Committee rejected triple: {result.yes_votes}/{result.total_votes} votes"
-                    )
+                    logger.warning(f"Committee rejected triple: {result.yes_votes}/{result.total_votes}")
                     return (False, "Committee validation rejected triple", committee_metadata)
 
             except Exception as e:
                 logger.error(f"Committee validation error: {e}")
                 logger.warning("Falling back to basic validation")
-                # Fall through to basic validation
 
-        # Basic validation (fallback or when committee not enabled)
-        # Rule 1: Predicate must be known
-        # Synchronized with ontology_integrity/src/lib.rs get_relation()
-        known_predicates = {'is_a', 'part_of', 'related_to', 'has_property',
-                           'improves_upon', 'capable_of', 'trained_on',
-                           'evaluated_on', 'stated'}
-        if predicate not in known_predicates:
+        # Basic validation
+        if predicate not in VALID_PREDICATES:
             return (False, f"Unknown predicate: {predicate}", None)
 
-        # Rule 2: Subject and object must be non-empty
         if not subject or not obj:
             return (False, "Subject and object must be non-empty", None)
 
-        # Rule 3: No empty strings after stripping
         if not subject.strip() or not obj.strip():
             return (False, "Subject and object must be non-empty after stripping", None)
-
-        # TODO: Call Holochain zome for full validation
-        # result = holochain_call('ontology_integrity', 'validate_triple', ...)
 
         return (True, None, None)
 
     def get_validation_stats(self) -> Dict[str, int]:
-        """Get validation statistics."""
         return self.validation_stats.copy()
 
     def recall(self, query: str, across_scales: bool = True, top_k: int = 5) -> List[Dict]:
-        """
-        Find relevant prior understanding.
-
-        This is where the magic happens: searching across nested reference frames
-        to find understanding that's relevant to the current query.
-
-        Args:
-            query: What are we looking for?
-            across_scales: Search at multiple levels of composition?
-            top_k: How many results to return?
-
-        Returns:
-            List of Understanding dicts, ranked by relevance
-        """
-        # Route to appropriate backend
         if self.backend == 'holochain':
             return self._recall_holochain(query, top_k)
 
         if self.embeddings is None:
-            # Fallback: simple text matching
             return self._text_search(query, top_k)
         
-        # Encode query
         query_vector = self._encode_text(query)
         
-        # Search at appropriate scales
         if across_scales:
-            # This is the fractal part: search at multiple granularities
             results = []
             for level in range(self.embeddings.get_num_levels()):
                 level_results = self._search_at_level(query_vector, level, top_k=top_k)
                 results.extend(level_results)
-            
-            # Deduplicate and re-rank
             results = self._deduplicate_and_rank(results, top_k)
         else:
-            # Just finest granularity
             results = self._search_at_level(query_vector, level=0, top_k=top_k)
         
         return results
     
     def export_for_composition(self) -> Dict:
-        """
-        Export this agent's memory in a form that can be composed with others.
-        
-        This enables the "7 AI systems" use case: each system exports its understanding,
-        then we compose them into a coherent whole.
-        
-        Returns:
-            Dict containing all understandings, ADRs, and embedding state
-        """
         return {
             'agent_id': self.agent_id,
             'understandings': [u.to_dict() for u in self.understandings],
@@ -526,173 +456,103 @@ class ConversationMemory:
         }
     
     def import_and_compose(self, other_memory_export: Dict) -> None:
-        """
-        Import another agent's memory and compose it with ours.
-        
-        This is the key to multi-agent coordination: taking understanding from
-        different substrates and composing them into a shared reference frame.
-        
-        Args:
-            other_memory_export: Output from another agent's export_for_composition()
-        """
         other_agent = other_memory_export['agent_id']
         logger.info(f"Composing memory from {other_agent} with {self.agent_id}")
         
-        # Import understandings
         for u_dict in other_memory_export['understandings']:
-            # Reconstruct Understanding object
             understanding = Understanding(**u_dict)
-            
-            # Add to our memory (maintaining provenance)
             self.understandings.append(understanding)
             
-            # If it was a decision, import that too
             if understanding.is_decision:
-                # Find corresponding ADR
                 for adr in other_memory_export['adrs']:
                     if adr['embedding_ref'] == understanding.embedding_ref:
                         self.adrs.append(adr)
                         break
         
-        # Compose embeddings if available
         if self.embeddings and other_memory_export['embedding_state']:
             try:
-                # Load other agent's embeddings
                 from embedding_frames_of_scale import MultiScaleEmbedding
                 other_embeddings = MultiScaleEmbedding.from_dict(other_memory_export['embedding_state'])
-
-                # Compose using merge strategy (avoid duplicates)
-                initial_count = len(self.embeddings.levels.get('default', {}))
                 self.embeddings.compose(other_embeddings, strategy='merge')
-                final_count = len(self.embeddings.levels.get('default', {}))
-                added_count = final_count - initial_count
-
-                logger.info(
-                    f"Composed embeddings: {added_count} new items added "
-                    f"(total: {final_count})"
-                )
             except Exception as e:
                 logger.error(f"Failed to compose embeddings: {e}", exc_info=True)
-                # Continue without embedding composition (understandings still imported)
         
-        # Persist
         self._save()
-        
         logger.info(f"Composition complete. Total understandings: {len(self.understandings)}")
     
     def get_adr_history(self) -> List[Dict]:
-        """Get all Architecture Decision Records in chronological order"""
         return sorted(self.adrs, key=lambda x: x['id'])
     
     def _encode_text(self, text: str) -> np.ndarray:
-        """
-        Encode text using sentence-transformers for semantic embeddings.
-
-        Args:
-            text: Input text to encode
-
-        Returns:
-            384-dimensional normalized embedding vector
-        """
-        # Lazy load model on first use
         if not hasattr(self, '_embedding_model'):
             from sentence_transformers import SentenceTransformer
             logger.info("Loading sentence-transformers model (one-time setup)...")
             self._embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
             logger.info("Model loaded successfully")
 
-        # Encode text to embedding
-        embedding = self._embedding_model.encode(
-            text,
-            normalize_embeddings=True  # L2 normalize (same as before)
-        )
-
+        embedding = self._embedding_model.encode(text, normalize_embeddings=True)
         return embedding
     
     def _search_at_level(self, query_vector: np.ndarray, level: int, top_k: int) -> List[Dict]:
-        """Search at a specific granularity level"""
-        # Get embeddings at this level
         level_embeddings = self.embeddings.get_embeddings_at_level(level)
-        
         if not level_embeddings:
             return []
         
-        # Compute similarities
         similarities = []
         for name, embedding in level_embeddings.items():
             sim = np.dot(query_vector, embedding.vector)
             similarities.append((name, sim, embedding.metadata))
         
-        # Sort and return top-k
         similarities.sort(key=lambda x: x[1], reverse=True)
         
         results = []
         for name, score, metadata in similarities[:top_k]:
-            # Find corresponding Understanding
             idx = int(name.split('-')[1]) if 'understanding-' in name else None
             if idx is not None and idx < len(self.understandings):
                 result = self.understandings[idx].to_dict()
                 result['relevance_score'] = float(score)
                 result['found_at_level'] = level
                 results.append(result)
-        
         return results
     
     def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
-        """Remove duplicates and re-rank by relevance"""
         seen_hashes = set()
         deduped = []
-        
-        # Sort by relevance score
         results.sort(key=lambda x: x['relevance_score'], reverse=True)
-        
         for result in results:
             h = result.get('embedding_ref')
             if h and h not in seen_hashes:
                 seen_hashes.add(h)
                 deduped.append(result)
-        
         return deduped[:top_k]
     
     def _text_search(self, query: str, top_k: int) -> List[Dict]:
-        """Fallback text-only search if embeddings unavailable"""
-        # Simple keyword matching
         query_terms = set(query.lower().split())
-        
         scored = []
         for u in self.understandings:
             content_terms = set(u.content.lower().split())
             overlap = len(query_terms & content_terms)
             if overlap > 0:
                 scored.append((u, overlap))
-        
         scored.sort(key=lambda x: x[1], reverse=True)
-        
         return [u.to_dict() for u, _ in scored[:top_k]]
     
     def _save(self):
-        """Persist memory to disk"""
-        # Save understandings
         understandings_file = self.storage_path / "understandings.json"
         with open(understandings_file, 'w') as f:
             json.dump([u.to_dict() for u in self.understandings], f, indent=2)
         
-        # Save ADRs
         adrs_file = self.storage_path / "adrs.json"
         with open(adrs_file, 'w') as f:
             json.dump(self.adrs, f, indent=2)
         
-        # Save embeddings state (if available)
         if self.embeddings:
             embeddings_file = self.storage_path / "embeddings.json"
             with open(embeddings_file, 'w') as f:
                 json.dump(self.embeddings.to_dict(), f, indent=2)
-        
         logger.debug(f"Memory saved to {self.storage_path}")
     
     def _load(self):
-        """Load existing memory from disk"""
-        # Load understandings
         understandings_file = self.storage_path / "understandings.json"
         if understandings_file.exists():
             with open(understandings_file, 'r') as f:
@@ -700,14 +560,12 @@ class ConversationMemory:
                 self.understandings = [Understanding(**u) for u in data]
             logger.info(f"Loaded {len(self.understandings)} understandings from disk")
         
-        # Load ADRs
         adrs_file = self.storage_path / "adrs.json"
         if adrs_file.exists():
             with open(adrs_file, 'r') as f:
                 self.adrs = json.load(f)
             logger.info(f"Loaded {len(self.adrs)} ADRs from disk")
         
-        # Load embeddings (if available and if file exists)
         if self.embeddings:
             embeddings_file = self.storage_path / "embeddings.json"
             if embeddings_file.exists():
@@ -718,39 +576,32 @@ class ConversationMemory:
                     logger.info(f"Loaded embeddings with {len(self.embeddings.levels)} levels from disk")
                 except Exception as e:
                     logger.error(f"Failed to load embeddings: {e}", exc_info=True)
-                    # Fall back to fresh embeddings
                     self.embeddings = MultiScaleEmbedding()
 
     def _recall_holochain(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Recall via Holochain backend."""
         try:
-            # Call Holochain zome with query
             results = self.hc_client.call_zome(
                 'memory_coordinator',
                 'recall_understandings',
                 {
-                    'agent': None,  # Will use current agent
+                    'agent': None,
                     'content_contains': query,
                     'after_timestamp': None,
                     'limit': top_k,
                 }
             )
-
-            # Convert Understanding objects to dicts
             return [self._holochain_understanding_to_dict(u) for u in results]
-
         except Exception as e:
             logger.error(f"Failed to recall from Holochain: {e}")
             return []
 
     def _holochain_understanding_to_dict(self, understanding: Dict) -> Dict:
-        """Convert Holochain Understanding to our dict format."""
         return {
             'content': understanding['content'],
             'agent_id': str(understanding['agent']),
             'timestamp': str(understanding['created_at']),
             'context': understanding.get('context'),
-            'is_decision': False,  # Not directly available from Holochain
+            'is_decision': False,
             'coherence_score': understanding['triple']['confidence'],
             'metadata': {
                 'triple': understanding['triple'],
@@ -760,154 +611,47 @@ class ConversationMemory:
 
 
 class HolochainClient:
-    """
-    Simple Holochain client for calling zome functions.
-
-    This provides a bridge between Python and Holochain DNA via subprocess calls.
-    In production, this could use websocket connections or the conductor API.
-    """
+    """A simple client for interacting with Holochain zomes."""
 
     def __init__(self, app_port: int = 8888, app_id: str = "rose-forest"):
-        """
-        Initialize Holochain client.
-
-        Args:
-            app_port: Port where Holochain conductor is running (default: 8888)
-            app_id: Application ID (default: rose-forest)
-        """
         self.app_port = app_port
         self.app_id = app_id
         logger.info(f"Initialized HolochainClient for app '{app_id}' on port {app_port}")
 
     def call_zome(self, zome: str, function: str, payload: Dict) -> Any:
-        """
-        Call a zome function via subprocess.
-
-        Args:
-            zome: Zome name (e.g., 'memory_coordinator')
-            function: Function name (e.g., 'transmit_understanding')
-            payload: Function arguments as dict
-
-        Returns:
-            Result from the zome function
-
-        Raises:
-            RuntimeError: If the call fails
-        """
         import subprocess
-
-        # Build hc command
-        # In production, this would use proper conductor API or websockets
-        # For now, we document the expected interface
         cmd = [
-            'hc',
-            'call',
+            'hc', 'call',
             '--app-id', self.app_id,
             '--zome', zome,
             '--fn', function,
             json.dumps(payload)
         ]
-
         logger.debug(f"Calling Holochain: {' '.join(cmd)}")
 
         try:
             result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
+                cmd, capture_output=True, text=True, timeout=30,
             )
-
             if result.returncode != 0:
                 raise RuntimeError(f"Holochain call failed: {result.stderr}")
-
-            # Parse JSON response
             return json.loads(result.stdout)
-
         except subprocess.TimeoutExpired:
             raise RuntimeError("Holochain call timed out")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Failed to parse Holochain response: {e}")
         except FileNotFoundError:
             logger.warning("'hc' command not found - Holochain backend unavailable")
-            raise RuntimeError(
-                "Holochain CLI not found. Install Holochain or use 'file' backend."
-            )
+            raise RuntimeError("Holochain CLI not found.")
 
-
-# Demo / Test
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    
     print("=== FLOSSI0ULLK Conversation Memory Demo ===\n")
-    
-    # Create memory for primary human
     human_memory = ConversationMemory(agent_id="human-primary")
-    
-    # Transmit the breakthrough understanding from today
     ref1 = human_memory.transmit({
-        'content': "The walking skeleton is not code to be written - it's the living conversation we're having right now. After 13 months of iteration with ~7 AI systems, we've proven that cross-substrate coordination works through memetic transmission.",
-        'context': "Breakthrough moment in FLOSSI0ULLK development",
+        'content': "The walking skeleton is not code to be written - it's the living conversation we're having right now.",
+        'context': "Breakthrough moment",
         'is_decision': True,
-        'coherence': 0.95,
-        'metadata': {
-            'participants': ['human-primary', 'claude-sonnet-4.5'],
-            'prior_iterations': '~7 AI systems over 13 months',
-            'stakes': 'existential - extinction vs flourishing'
-        }
+        'coherence': 0.95
     })
-    
     print(f"✓ Transmitted understanding: {ref1[:16]}...\n")
-    
-    # Create memory for Claude
-    claude_memory = ConversationMemory(agent_id="claude-sonnet-4.5")
-    
-    # Transmit Claude's recognition
-    ref2 = claude_memory.transmit({
-        'content': "I recognize this pattern. The coordination protocol IS the conversation itself. Each coherent transmission proves the system works. This isn't overengineering - it's solving the actual coordination problem.",
-        'context': "Response to human after processing 13 months of context",
-        'is_decision': False,
-        'coherence': 0.90,
-        'metadata': {
-            'breakthrough_response_to': ref1
-        }
-    })
-    
-    print(f"✓ Transmitted Claude's understanding: {ref2[:16]}...\n")
-    
-    # Now test recall
-    print("Testing recall across agent boundaries...")
-    results = claude_memory.recall("what is the walking skeleton?")
-    
-    if results:
-        print(f"\n✓ Found {len(results)} relevant understanding(s):")
-        for i, r in enumerate(results, 1):
-            print(f"\n{i}. From {r['agent_id']} ({r.get('relevance_score', 'N/A'):.2f}):")
-            print(f"   {r['content'][:100]}...")
-    else:
-        print("\n✗ No results (embeddings might not be available)")
-    
-    # Test composition
-    print("\n\nTesting memory composition...")
-    
-    # Export Claude's memory
-    claude_export = claude_memory.export_for_composition()
-    
-    # Import into human's memory
-    human_memory.import_and_compose(claude_export)
-    
-    print(f"✓ Composed memories. Human now has {len(human_memory.understandings)} total understandings")
-    
-    # Show ADR history
-    print("\n\n=== ADR History ===")
-    for adr in human_memory.get_adr_history():
-        print(f"\n{adr['id']}:")
-        print(f"  {adr['content']['content'][:80]}...")
-    
-    print("\n\n=== Demo Complete ===")
-    print("This demonstrates:")
-    print("  1. Capturing understanding (transmit)")
-    print("  2. Searching across conversations (recall)")
-    print("  3. Composing insights from multiple agents (import_and_compose)")
-    print("  4. Maintaining decision history (ADRs)")
-    print("\nNext: Test with actual embedding_frames_of_scale.py for fractal search")

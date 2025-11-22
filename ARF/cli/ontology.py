@@ -30,14 +30,20 @@ console = Console()
 
 
 def parse_triple(triple_str: str) -> Tuple[str, str, str]:
-    """
-    Parse a triple string like "(subject, predicate, object)"
+    """Parses a string representation of a knowledge triple.
+
+    This utility function is used by the CLI commands to convert a user-provided
+    string in the format "(subject, predicate, object)" into a tuple of three
+    strings.
+
+    Args:
+        triple_str: The string to parse.
 
     Returns:
-        Tuple of (subject, predicate, object)
+        A tuple containing the subject, predicate, and object.
 
     Raises:
-        ValueError if parsing fails
+        ValueError: If the string is not in the expected format.
     """
     # Match pattern: (subject, predicate, object)
     pattern = r'\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)'
@@ -58,15 +64,13 @@ def validate(
     triple: str = typer.Argument(..., help="Triple to validate: (subject, predicate, object)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Validate a knowledge triple against the ontology
+    """Validates a knowledge triple against the shared ontology.
 
-    The triple format is: (subject, predicate, object)
-
-    Examples:
-        arf ontology validate "(GPT-4, is_a, LLM)"
-        arf ontology validate "(Claude-4, improves_upon, Claude-3.5)"
-        arf ontology validate "(AI, has_property, reasoning)" --json
+    This command provides a direct way to check if a semantic statement in the
+    form of a (subject, predicate, object) triple is consistent with the
+    project's defined ontology. It is a key tool for ensuring the coherence and
+    integrity of the knowledge base, in line with the "Light" and "Knowledge"
+    principles.
     """
     try:
         # Parse triple
@@ -115,15 +119,13 @@ def infer(
     triple: str = typer.Argument(..., help="Triple for inference: (subject, predicate, object)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    Perform inference on a knowledge triple
+    """Performs inference based on a given knowledge triple.
 
-    Note: Full inference engine implementation is planned for Phase 7.
-    This command currently validates and stores the triple.
-
-    Examples:
-        arf ontology infer "(GPT-4.5, improves_upon, GPT-4)"
-        arf ontology infer "(Claude-4, is_a, LLM)" --json
+    This command is a placeholder for the future symbolic reasoning capabilities
+    of the ARF. Currently, it validates the provided triple and, if valid,
+    stores it in the conversation memory for later processing by a full-fledged
+    inference engine. This serves as a forward-looking interface for the project's
+    long-term "Knowledge" and "Federated Reasoning" goals.
     """
     try:
         # Parse triple
@@ -178,12 +180,11 @@ def infer(
 def list_predicates(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """
-    List all known predicates in the ontology
+    """Lists all the known predicates in the shared ontology.
 
-    Examples:
-        arf ontology list-predicates
-        arf ontology list-predicates --json | jq '.predicates[]'
+    This command provides a simple way to discover the valid relationships that can
+    be used in knowledge triples. It is a practical tool for developers and users
+    who are working with the ontology, promoting transparency and ease of use.
     """
     # Known predicates (synchronized with ontology_integrity/src/lib.rs)
     predicates = [
@@ -219,11 +220,12 @@ def list_predicates(
 
 @app.command()
 def info():
-    """
-    Show ontology information
+    """Displays high-level information about the ontology system.
 
-    Examples:
-        arf ontology info
+    This command provides a status overview of the ontology system, including the
+    backend in use, the number of known predicates, and the status of the
+    inference engine. It is a convenient way to get a quick snapshot of the
+    ontology's configuration.
     """
     table = Table(title="Ontology System Information")
     table.add_column("Property", style="cyan")

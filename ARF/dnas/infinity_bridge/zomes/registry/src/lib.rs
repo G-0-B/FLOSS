@@ -1,6 +1,13 @@
 use hdk::prelude::*;
 
-/// Bridge registration entry
+/// Represents the registration of a "bridge" in the decentralized network.
+///
+/// A bridge is a hardware or software component that provides sensory data or
+/// computational capabilities to the multi-agent system. This entry in the DHT
+/// makes the bridge discoverable by other agents, enabling the "AGI@Home" vision
+/// of a distributed, democratized compute and sensor network.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct BridgeRegistration {
@@ -12,7 +19,12 @@ pub struct BridgeRegistration {
     pub timestamp: Timestamp,
 }
 
-/// Stream metadata
+/// Defines the metadata for a specific data stream provided by a bridge.
+///
+/// This entry provides the necessary technical details for an agent to connect
+/// to and interpret a data stream, such as its type, sample rate, and data format.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct StreamMetadata {
@@ -37,7 +49,13 @@ pub enum EntryTypes {
     StreamMetadata(StreamMetadata),
 }
 
-/// Register a new bridge
+/// Registers a new bridge, making it discoverable to other agents in the network.
+///
+/// This function creates a `BridgeRegistration` entry in the DHT and links it
+/// from a global anchor ("all_bridges") as well as from capability-specific
+/// anchors. This allows for efficient discovery of bridges by their capabilities.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn register_bridge(registration: BridgeRegistration) -> ExternResult<ActionHash> {
     // Validate signature (simplified for now)
@@ -75,7 +93,12 @@ pub fn register_bridge(registration: BridgeRegistration) -> ExternResult<ActionH
     Ok(hash)
 }
 
-/// Discover all registered bridges
+/// Discovers all registered bridges in the network.
+///
+/// This function queries the "all_bridges" anchor in the DHT to retrieve a list
+/// of all `BridgeRegistration` entries.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn discover_bridges(_: ()) -> ExternResult<Vec<BridgeRegistration>> {
     let path = Path::from("all_bridges");
@@ -91,7 +114,13 @@ pub fn discover_bridges(_: ()) -> ExternResult<Vec<BridgeRegistration>> {
     Ok(bridges)
 }
 
-/// Discover bridges by capability
+/// Discovers registered bridges that provide a specific capability.
+///
+/// This function allows agents to find bridges that are relevant to their
+/// current task, for example, by querying for "acoustic" or "vibration"
+/// capabilities.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn discover_by_capability(capability: String) -> ExternResult<Vec<BridgeRegistration>> {
     let cap_path = Path::from(format!("capability:{}", capability));
@@ -107,7 +136,13 @@ pub fn discover_by_capability(capability: String) -> ExternResult<Vec<BridgeRegi
     Ok(bridges)
 }
 
-/// Register a stream
+/// Registers a new data stream provided by a bridge.
+///
+/// This function creates a `StreamMetadata` entry in the DHT and links it to the
+/// specified `bridge_id`. This allows other agents to discover the data streams
+/// that a particular bridge offers.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn register_stream(stream: StreamMetadata) -> ExternResult<ActionHash> {
     let hash = create_entry(&EntryTypes::StreamMetadata(stream.clone()))?;
@@ -125,7 +160,12 @@ pub fn register_stream(stream: StreamMetadata) -> ExternResult<ActionHash> {
     Ok(hash)
 }
 
-/// Get streams for a bridge
+/// Retrieves the list of data streams for a specific bridge.
+///
+/// This function queries the DHT for `StreamMetadata` entries that are linked to
+/// the given `bridge_id`.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn get_bridge_streams(bridge_id: String) -> ExternResult<Vec<StreamMetadata>> {
     let bridge_path = Path::from(format!("bridge:{}", bridge_id));
@@ -143,7 +183,12 @@ pub fn get_bridge_streams(bridge_id: String) -> ExternResult<Vec<StreamMetadata>
     Ok(streams)
 }
 
-/// Unregister a bridge
+/// Unregisters a bridge from the network.
+///
+/// This function removes the links that make a bridge discoverable, effectively
+/// taking it offline from the perspective of the multi-agent system.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn unregister_bridge(bridge_id: String) -> ExternResult<()> {
     let path = Path::from("all_bridges");
