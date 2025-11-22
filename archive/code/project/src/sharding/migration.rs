@@ -68,7 +68,7 @@ impl MigrationPlan {
             .expect("Could not get system time")
             .as_millis() as u64;
     }
-    
+
     pub fn is_stale(&self, timeout_millis: u64) -> bool {
         let now = sys_time()
             .expect("Could not get system time")
@@ -118,21 +118,21 @@ impl ShardStatus {
             .expect("Could not get system time")
             .as_millis() as u64;
     }
-    
+
     pub fn remove_migration(&mut self, migration_id: &str) {
         self.active_migrations.remove(migration_id);
         self.last_update = sys_time()
             .expect("Could not get system time")
             .as_millis() as u64;
     }
-    
+
     pub fn update_vector_count(&mut self, count: usize) {
         self.vector_count = count;
         self.last_update = sys_time()
             .expect("Could not get system time")
             .as_millis() as u64;
     }
-    
+
     pub fn update_centroids(&mut self, centroids: Vec<CentroidCRDT>) {
         self.centroids = centroids;
         self.last_update = sys_time()
