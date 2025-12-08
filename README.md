@@ -1,5 +1,7 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kalisam/FLOSS)
 # FLOSS
 Free Libre Open Source Singularity
+
 The ARF FLOSSIOULLK ecosystem:
  iterative development architecture for the architectural design record for the **Decentralized Knowledge Verification Protocol (DKVP)**. The DKVP is envisioned as a pilot project for an agent-centric, verifiable knowledge system, embodying core principles such as Unconditional Love, Light, and Knowledge (ULLK). Its primary applications focus on accelerating scientific discovery, ensuring ethical AI alignment, and reducing cognitive debt for researchers, collaborative groups, and AI developers. The architecture prioritizes a plausibly simple yet powerful design, directly informed by scenario analysis and grounded in a robust, iterative development methodology.
 
