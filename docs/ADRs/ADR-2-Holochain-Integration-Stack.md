@@ -1,4 +1,6 @@
-# ADR-1: Holochain Integration Stack (KERI, AD4M, hREA)
+# ADR-2: Holochain Integration Stack (KERI, AD4M, hREA)
+
+> **Note**: This was originally numbered ADR-1 but was renumbered to ADR-2 to resolve a conflict with `ARF/ADR-1.md` which documents "Python Module Extraction and Validation Strategy".
 
 **Status**: ACCEPTED (retroactively documented)
 **Date**: 2025-11-17
