@@ -263,5 +263,57 @@ class MultiScaleEmbedding:
             raise KeyError(f"Level '{level}' does not exist")
         return self.levels[level].copy()
 
+    def get_num_levels(self) -> int:
+        """Return the number of levels currently defined."""
+        return len(self.levels)
+
+    def get_level_names(self) -> List[str]:
+        """Return all level names in insertion order."""
+        return list(self.levels.keys())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the multi-scale embedding structure to a dictionary.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Nested dictionary mapping level names to embedding ID dicts,
+            each containing ``'vector'`` (as list) and ``'metadata'``.
+        """
+        result: Dict[str, Any] = {}
+        for level_name, embeddings in self.levels.items():
+            result[level_name] = {}
+            for emb_id, emb in embeddings.items():
+                result[level_name][emb_id] = {
+                    'vector': emb.vector.tolist(),
+                    'metadata': emb.metadata,
+                }
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], aggregator: Callable[[Iterable[np.ndarray]], np.ndarray] | None = None) -> 'MultiScaleEmbedding':
+        """Deserialize a MultiScaleEmbedding from a dictionary.
+
+        Parameters
+        ----------
+        data:
+            Dictionary produced by :meth:`to_dict`.
+        aggregator:
+            Optional aggregator callable.  Defaults to sum.
+
+        Returns
+        -------
+        MultiScaleEmbedding
+            Reconstructed instance with all levels and embeddings restored.
+        """
+        mse = cls(aggregator=aggregator)
+        for level_name, embeddings in data.items():
+            mse.levels[level_name] = {}
+            for emb_id, emb_data in embeddings.items():
+                vector = np.array(emb_data['vector'])
+                metadata = emb_data.get('metadata', {})
+                mse.levels[level_name][emb_id] = Embedding(vector=vector, metadata=metadata)
+        return mse
+
     def __repr__(self) -> str:
         return f"MultiScaleEmbedding(levels={list(self.levels.keys())})"

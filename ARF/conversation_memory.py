@@ -170,9 +170,10 @@ class ConversationMemory:
             
             # Add to multiscale embedding structure
             self.embeddings.add_embedding(
-                embedding=embedding,
-                level=0,  # Start at finest granularity
-                name=f"understanding-{len(self.understandings)}"
+                level="level_0",
+                embedding_id=f"understanding-{len(self.understandings)}",
+                vector=vector,
+                metadata=embedding.metadata
             )
             
             understanding.embedding_ref = understanding.hash()
@@ -221,15 +222,15 @@ class ConversationMemory:
         if across_scales:
             # This is the fractal part: search at multiple granularities
             results = []
-            for level in range(self.embeddings.get_num_levels()):
-                level_results = self._search_at_level(query_vector, level, top_k=top_k)
+            for level_name in self.embeddings.get_level_names():
+                level_results = self._search_at_level(query_vector, level_name, top_k=top_k)
                 results.extend(level_results)
-            
+
             # Deduplicate and re-rank
             results = self._deduplicate_and_rank(results, top_k)
         else:
             # Just finest granularity
-            results = self._search_at_level(query_vector, level=0, top_k=top_k)
+            results = self._search_at_level(query_vector, level="level_0", top_k=top_k)
         
         return results
     
@@ -312,23 +313,26 @@ class ConversationMemory:
         
         return vector
     
-    def _search_at_level(self, query_vector: np.ndarray, level: int, top_k: int) -> List[Dict]:
+    def _search_at_level(self, query_vector: np.ndarray, level: str, top_k: int) -> List[Dict]:
         """Search at a specific granularity level"""
         # Get embeddings at this level
-        level_embeddings = self.embeddings.get_embeddings_at_level(level)
-        
+        try:
+            level_embeddings = self.embeddings.get_all_embeddings(level)
+        except KeyError:
+            return []
+
         if not level_embeddings:
             return []
-        
+
         # Compute similarities
         similarities = []
         for name, embedding in level_embeddings.items():
             sim = np.dot(query_vector, embedding.vector)
             similarities.append((name, sim, embedding.metadata))
-        
+
         # Sort and return top-k
         similarities.sort(key=lambda x: x[1], reverse=True)
-        
+
         results = []
         for name, score, metadata in similarities[:top_k]:
             # Find corresponding Understanding
@@ -338,7 +342,7 @@ class ConversationMemory:
                 result['relevance_score'] = float(score)
                 result['found_at_level'] = level
                 results.append(result)
-        
+
         return results
     
     def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
@@ -411,13 +415,13 @@ class ConversationMemory:
             logger.info(f"Loaded {len(self.adrs)} ADRs from disk")
         
         # Load embeddings (if available and if file exists)
-        if self.embeddings:
+        if self.embeddings is not None:
             embeddings_file = self.storage_path / "embeddings.json"
             if embeddings_file.exists():
                 with open(embeddings_file, 'r') as f:
                     state = json.load(f)
-                    # TODO: Implement from_dict() in MultiScaleEmbedding
-                    logger.warning("Embedding state found but reload not yet implemented")
+                    self.embeddings = MultiScaleEmbedding.from_dict(state)
+                    logger.info(f"Loaded embedding state with {self.embeddings.get_num_levels()} level(s)")
 
 
 # Demo / Test

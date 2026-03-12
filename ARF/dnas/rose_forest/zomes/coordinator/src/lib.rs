@@ -21,12 +21,11 @@ pub struct AddEdgeInput { pub from: ActionHash, pub to: ActionHash, pub relation
 #[hdk_extern]
 pub fn add_knowledge(input: AddNodeInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    consume_budget(&agent, COST_ADD_KNOWLEDGE)?; // Consume budget for cognitive output
+    consume_budget(&agent, COST_ADD_KNOWLEDGE)?;
     let node = RoseNode { content: input.content.clone(), embedding: input.embedding, license: input.license, metadata: input.metadata };
-    let hash = create_entry(&node)?;
+    let hash = create_entry(EntryTypes::RoseNode(node))?;
     let all_nodes_path = Path::from("all_nodes");
     create_link(all_nodes_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
-    // Sharding based on the first byte of the ActionHash for distributed storage
     let shard_key = format!("{:x}", hash.get_raw_36()[0]);
     let shard_path = Path::from(format!("shard.{}", shard_key));
     create_link(shard_path.path_entry_hash()?, hash.clone(), LinkTypes::ShardMember, ())?;
@@ -40,11 +39,16 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
     let links = get_links(GetLinksInputBuilder::try_new(all_nodes_path.path_entry_hash()?, LinkTypes::AllNodes)?.build())?;
     let mut results: Vec<SearchResult> = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target.clone(), GetOptions::default())? {
-            if let Some(node) = record.entry().to_app_option::<RoseNode>()? {
+        let target_hash = link.target.into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        if let Some(record) = get(target_hash.clone(), GetOptions::default())? {
+            if let Some(node) = record.entry()
+                .to_app_option::<RoseNode>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
                 let node_vec = Vector::new(node.embedding);
                 let score = query.cosine_similarity(&node_vec);
-                results.push(SearchResult { hash: link.target.into_action_hash().ok_or(wasm_error!(WasmErrorInner::Guest("Invalid hash".into())))?, score, content: node.content });
+                results.push(SearchResult { hash: target_hash, score, content: node.content });
             }
         }
     }
@@ -56,9 +60,9 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
 #[hdk_extern]
 pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    consume_budget(&agent, COST_LINK_EDGE)?; // Consume budget for cognitive linking
+    consume_budget(&agent, COST_LINK_EDGE)?;
     let edge = KnowledgeEdge { from: input.from.clone(), to: input.to.clone(), relationship: input.relationship, confidence: input.confidence };
-    let hash = create_entry(&edge)?;
+    let hash = create_entry(EntryTypes::KnowledgeEdge(edge))?;
     create_link(input.from, hash.clone(), LinkTypes::Edge, ())?;
     Ok(hash)
 }
@@ -66,22 +70,18 @@ pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn budget_status(_: ()) -> ExternResult<BudgetState> { get_budget_state(&agent_info()?.agent_latest_pubkey) }
 
-
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateThoughtCredentialInput {
-    pub content: Vec<f32>, // SemanticVector
-    pub connotation: i8, // TernaryScore: -1, 0, 1
-    pub resonance: Vec<AgentPubKey>, // AgentEndorsement
-    pub impact: f32, // WisdomMetric
+    pub content: Vec<f32>,
+    pub connotation: i8,
+    pub resonance: Vec<AgentPubKey>,
+    pub impact: f32,
 }
 
 #[hdk_extern]
 pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    // Define a cost for creating a ThoughtCredential, reflecting its significance
-    let cost_create_thought_credential: f32 = COST_CREATE_THOUGHT_CREDENTIAL;
-    consume_budget(&agent, cost_create_thought_credential)?; // Consume budget for creating a thoughtform
+    consume_budget(&agent, COST_CREATE_THOUGHT_CREDENTIAL)?;
 
     let thought_credential = ThoughtCredential {
         content: input.content,
@@ -91,10 +91,9 @@ pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternR
         impact: input.impact,
     };
 
-    let hash = create_entry(&thought_credential)?;
-    // Link the thought credential to the agent's path or a general thoughtforms path
+    let hash = create_entry(EntryTypes::ThoughtCredential(thought_credential))?;
     let thoughtforms_path = Path::from("all_thought_credentials");
-    create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?; // Using AllNodes for now, could be a specific LinkType
+    create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
 
     Ok(hash)
 }
