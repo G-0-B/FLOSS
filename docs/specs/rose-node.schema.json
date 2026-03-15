@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossioullk.org/specs/rose-node/1.0.0",
+  "title": "RoseNode",
+  "description": "Atomic unit of knowledge in the Rose Forest knowledge commons. A signed, embedded piece of content with mandatory provenance metadata.",
+  "type": "object",
+  "required": ["content", "embedding", "license", "metadata"],
+  "properties": {
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The knowledge content (text)"
+    },
+    "embedding": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 32,
+      "maxItems": 4096,
+      "description": "Vector embedding of the content, dimension in [32, 4096]"
+    },
+    "license": {
+      "type": "string",
+      "enum": ["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0", "CC-BY-4.0"],
+      "description": "OSI license identifier or CC-BY-4.0"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["model_id", "model_card_hash"],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Identifier of the embedding model"
+        },
+        "model_card_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]+$",
+          "description": "SHA-256 hash of the model card, prefixed with sha256:"
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Key-value metadata. Must include model_id and model_card_hash."
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Invariants: INV-RN-001 (license enum), INV-RN-002 (embedding dim), INV-RN-003 (model_id required), INV-RN-004 (model_card_hash sha256: prefix)"
+}

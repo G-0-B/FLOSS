@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossioullk.org/specs/budget-entry/1.0.0",
+  "title": "BudgetEntry",
+  "description": "Agent-local cognitive budget tracking entry. Enforces the bio-aware 100 RU/24h resource budget.",
+  "type": "object",
+  "required": ["agent", "remaining_ru", "window_start"],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "AgentPubKey of the budget owner"
+    },
+    "remaining_ru": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "description": "Remaining Resource Units in the current window (max 100 RU)"
+    },
+    "window_start": {
+      "description": "Holochain Timestamp marking the start of the current 24-hour budget window",
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "description": "seconds since Unix epoch" },
+        { "type": "integer", "description": "nanoseconds" }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Budget costs: add_knowledge=33 RU, link_edge=3 RU, create_thought_credential=10 RU. Window=86400s (24h)."
+}

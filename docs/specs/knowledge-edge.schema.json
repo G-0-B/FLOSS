@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossioullk.org/specs/knowledge-edge/1.0.0",
+  "title": "KnowledgeEdge",
+  "description": "A directed, typed relationship between two RoseNodes in the knowledge graph.",
+  "type": "object",
+  "required": ["from", "to", "relationship", "confidence"],
+  "properties": {
+    "from": {
+      "type": "string",
+      "description": "ActionHash of the source RoseNode (base39 encoded)"
+    },
+    "to": {
+      "type": "string",
+      "description": "ActionHash of the target RoseNode (base39 encoded)"
+    },
+    "relationship": {
+      "type": "string",
+      "enum": ["relates_to", "supports", "contradicts", "heals", "releases", "neutralizes", "recalibrates"],
+      "description": "Semantic relationship type from the manifesto ontology"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score in [0.0, 1.0]"
+    }
+  },
+  "additionalProperties": false
+}

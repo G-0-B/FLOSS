@@ -3,7 +3,7 @@
 
   inputs = {
     holonix = {
-      url = "github:holochain/holonix?ref=main";
+      url = "github:holochain/holonix?ref=main-0.4";
       flake = true;
     };
     nixpkgs.follows = "holonix/nixpkgs";

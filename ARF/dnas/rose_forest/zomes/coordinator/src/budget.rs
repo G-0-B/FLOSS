@@ -22,7 +22,7 @@ pub fn consume_budget(agent: &AgentPubKey, cost: f32) -> ExternResult<()> {
     }
 
     budget_state.remaining_ru -= cost;
-    update_budget_entry(agent, budget_state.remaining_ru, budget_state.window_start)?;
+    save_budget_entry(agent, budget_state.remaining_ru, budget_state.window_start)?;
     Ok(())
 }
 
@@ -30,24 +30,25 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     let now = sys_time()?;
     let agent_address = agent.clone();
 
-    let path = Path::from(format!("agent_budget.{}", agent_address));
-    let links = get_links(GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AgentBudget)?.build())?;
+    // Query local source chain for the latest BudgetEntry.
+    // This is correct for agent-local state: source chain order guarantees
+    // the last BudgetEntry is the most recent, avoiding the bug where
+    // DHT-based get_links returned multiple entries with the same window_start
+    // and non-deterministic ordering.
+    let filter = ChainQueryFilter::new().include_entries(true);
+    let records = query(filter)?;
 
     let mut latest_budget: Option<BudgetEntry> = None;
-    let mut latest_timestamp: Option<Timestamp> = None;
-
-    for link in links {
-        let target_hash = link.target.into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid action hash in budget link".into())))?;
-        if let Some(record) = get(target_hash, GetOptions::default())? {
-            if let Some(budget_entry) = record.entry()
-                .to_app_option::<BudgetEntry>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            {
-                if latest_timestamp.is_none() || budget_entry.window_start > latest_timestamp.unwrap() {
-                    latest_timestamp = Some(budget_entry.window_start);
-                    latest_budget = Some(budget_entry);
-                }
+    // Iterate in reverse (most recent source chain action first)
+    for record in records.iter().rev() {
+        if let Some(budget_entry) = record.entry()
+            .to_app_option::<BudgetEntry>()
+            .ok()       // treat deserialization errors (non-BudgetEntry types) as None
+            .flatten()
+        {
+            if budget_entry.agent == agent_address {
+                latest_budget = Some(budget_entry);
+                break;
             }
         }
     }
@@ -59,23 +60,16 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
             Ok(BudgetState { agent: agent_address, remaining_ru: budget.remaining_ru, window_start: budget.window_start })
         },
         _ => {
-            // Initialize or reset budget
-            let new_budget = BudgetState { agent: agent_address, remaining_ru: MAX_RU_PER_WINDOW, window_start: now };
-            create_budget_entry(agent, new_budget.remaining_ru, new_budget.window_start)?;
-            Ok(new_budget)
+            // Fresh or expired budget — no entry created until actually consumed.
+            // This avoids the previous bug where get_budget_state created a 100 RU
+            // entry that competed with the real consumed-budget entry.
+            Ok(BudgetState { agent: agent_address, remaining_ru: MAX_RU_PER_WINDOW, window_start: now })
         }
     }
 }
 
-fn create_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
-    let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
-    let hash = create_entry(EntryTypes::BudgetEntry(budget_entry))?;
-    let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
-    Ok(hash)
-}
-
-fn update_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
+/// Persist a budget snapshot to the source chain (and link for future cross-agent queries).
+fn save_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
     let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
     let hash = create_entry(EntryTypes::BudgetEntry(budget_entry))?;
     let path = Path::from(format!("agent_budget.{}", agent.clone()));
