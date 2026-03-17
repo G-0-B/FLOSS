@@ -25,3 +25,10 @@ target
 *.zip
 *Key_Recovery_File*
 /media
+__pycache__/
+*.pyc
+.claude/worktrees/
+node_modules/
+*.stackdump
+nul
+trajectory*.json

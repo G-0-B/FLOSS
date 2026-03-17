@@ -1,0 +1,3736 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
+use uuid::Uuid;
+
+use crate::core::metrics::MetricsCollector;
+use crate::core::vector::Vector;
+use crate::sharding::hilbert::HilbertCurve;
+
+/// Vector index entry that maps a vector to its ID and metadata
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VectorEntry {
+    /// Unique ID for this vector
+    pub id: Uuid,
+
+    /// The vector data
+    pub vector: Vector,
+
+    /// Optional metadata
+    pub metadata: Option<HashMap<String, String>>,
+
+    /// When this vector was added to the index
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Search results returned from the index
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SearchResult {
+    /// ID of the found vector
+    pub id: Uuid,
+
+    /// The vector itself
+    pub vector: Vector,
+
+    /// Optional metadata
+    pub metadata: Option<HashMap<String, String>>,
+
+    /// Similarity or distance score
+    pub score: f32,
+}
+
+/// Type of distance metric to use for search
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum DistanceMetric {
+    Euclidean,
+    Cosine,
+    Manhattan,
+    Hamming,
+}
+
+impl DistanceMetric {
+    /// Calculate distance between two vectors using the specified metric
+    pub fn calculate(&self, a: &Vector, b: &Vector) -> f32 {
+        match self {
+            Self::Euclidean => a.euclidean_distance(b),
+            Self::Cosine => 1.0 - a.cosine_similarity(b), // Convert similarity to distance
+            Self::Manhattan => a.manhattan_distance(b),
+            Self::Hamming => a.hamming_distance(b) as f32,
+        }
+    }
+
+    /// Check if lower scores are better (true for distances, false for similarities)
+    pub fn is_lower_better(&self) -> bool {
+        match self {
+            Self::Euclidean | Self::Manhattan | Self::Hamming => true,
+            Self::Cosine => true, // Since we convert similarity to distance
+        }
+    }
+}
+
+/// Hilbert curve-based vector index for efficient similarity search
+#[derive(Debug)]
+pub struct VectorIndex {
+    /// Name of the index
+    name: String,
+
+    /// Mapping of vector IDs to vector entries
+    vectors: RwLock<HashMap<Uuid, VectorEntry>>,
+
+    /// Hilbert curve used for mapping vectors to 1D space
+    hilbert_curve: HilbertCurve,
+
+    /// Mapping of Hilbert indices to vector IDs
+    hilbert_map: RwLock<HashMap<u64, Vec<Uuid>>>,
+
+    /// Dimensions of vectors in this index
+    dimensions: usize,
+
+    /// Distance metric used for similarity search
+    distance_metric: DistanceMetric,
+
+    /// Metrics collector
+    metrics: Option<Arc<MetricsCollector>>,
+}
+
+impl VectorIndex {
+    /// Create a new vector index
+    pub fn new(
+        name: &str,
+        dimensions: usize,
+        distance_metric: DistanceMetric,
+        metrics: Option<Arc<MetricsCollector>>,
+    ) -> Result<Self, String> {
+        let max_total_bits = 60;
+
+        if dimensions == 0 {
+            return Err("dimensions must be greater than zero".to_string());
+        }
+        if dimensions > max_total_bits {
+            return Err(format!(
+                "dimensions ({}) exceed maximum supported {}",
+                dimensions, max_total_bits
+            ));
+        }
+
+        let bits_per_dimension = std::cmp::min(10, max_total_bits / dimensions);
+        if bits_per_dimension == 0 {
+            return Err(format!(
+                "calculated bits_per_dimension is zero for {} dimensions",
+                dimensions
+            ));
+        }
+
+        let hilbert_curve = HilbertCurve::new(dimensions, bits_per_dimension);
+
+        Ok(Self {
+            name: name.to_string(),
+            vectors: RwLock::new(HashMap::new()),
+            hilbert_curve,
+            hilbert_map: RwLock::new(HashMap::new()),
+            dimensions,
+            distance_metric,
+            metrics,
+        })
+    }
+
+    /// Convert a vector to a Hilbert index
+    fn vector_to_hilbert_index(&self, vector: &Vector) -> u64 {
+        // Normalize the vector components to fit within our bit range
+
+        let max_value = (1 << self.hilbert_curve.bits_per_dimension()) - 1;
+        let point: Vec<u64> = vector
+            .values
+            .iter()
+            .map(|&v| {
+                // Map from [-1.0, 1.0] to [0, max_value]
+                // First clamp the value to ensure it's in range
+                let normalized = v.max(-1.0).min(1.0);
+                let scaled = ((normalized + 1.0) / 2.0) * (max_value as f32);
+                scaled.round() as u64
+            })
+            .collect();
+
+        self.hilbert_curve.point_to_index(&point)
+    }
+
+    /// Add a vector to the index
+    pub async fn add(
+        &self,
+        vector: Vector,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<Uuid, String> {
+        // Validate dimensions
+        if vector.dimensions != self.dimensions {
+            return Err(format!(
+                "Vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, vector.dimensions
+            ));
+        }
+
+        let id = Uuid::new_v4();
+        let now = chrono::Utc::now();
+
+        let entry = VectorEntry {
+            id,
+            vector: vector.clone(),
+            metadata,
+            created_at: now,
+        };
+
+        // Calculate Hilbert index
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+
+        // Add to vectors map
+        {
+            let mut vectors = self.vectors.write().await;
+            vectors.insert(id, entry);
+        }
+
+        // Add to Hilbert map
+        {
+            let mut hilbert_map = self.hilbert_map.write().await;
+            hilbert_map
+                .entry(hilbert_index)
+                .or_insert_with(Vec::new)
+                .push(id);
+        }
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.vectors_added", self.name), 1)
+                .await;
+            metrics
+                .set_gauge(
+                    &format!("vector_index.{}.vector_count", self.name),
+                    self.count().await as u64,
+                )
+                .await;
+        }
+
+        debug!("Added vector to index '{}' with ID: {}", self.name, id);
+
+        Ok(id)
+    }
+
+    /// Remove a vector from the index
+    pub async fn remove(&self, id: Uuid) -> Result<(), String> {
+        // Get the vector to calculate its Hilbert index
+        let vector = {
+            let vectors = self.vectors.read().await;
+            match vectors.get(&id) {
+                Some(entry) => entry.vector.clone(),
+                None => return Err(format!("Vector with ID {} not found", id)),
+            }
+        };
+
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+
+        // Remove from vectors map
+        {
+            let mut vectors = self.vectors.write().await;
+            vectors.remove(&id);
+        }
+
+        // Remove from Hilbert map
+        {
+            let mut hilbert_map = self.hilbert_map.write().await;
+            if let Some(ids) = hilbert_map.get_mut(&hilbert_index) {
+                ids.retain(|&x| x != id);
+
+                // Remove the entire entry if there are no more vectors at this index
+                if ids.is_empty() {
+                    hilbert_map.remove(&hilbert_index);
+                }
+            }
+        }
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.vectors_removed", self.name), 1)
+                .await;
+            metrics
+                .set_gauge(
+                    &format!("vector_index.{}.vector_count", self.name),
+                    self.count().await as u64,
+                )
+                .await;
+        }
+
+        debug!("Removed vector from index '{}' with ID: {}", self.name, id);
+
+        Ok(())
+    }
+
+    /// Find nearest vectors using the index
+    pub async fn search(&self, query: &Vector, limit: usize) -> Result<Vec<SearchResult>, String> {
+        let start = std::time::Instant::now();
+
+        // Validate dimensions
+        if query.dimensions != self.dimensions {
+            return Err(format!(
+                "Query vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, query.dimensions
+            ));
+        }
+
+        // Calculate Hilbert index of the query
+        let query_hilbert_index = self.vector_to_hilbert_index(query);
+
+        // Get nearby indices in Hilbert space
+        // This is a simplified implementation - a more sophisticated version would
+        // explore the Hilbert space more intelligently
+        let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
+
+        // Collect candidate vectors
+
+        let mut candidates: Vec<(Uuid, VectorEntry)> = Vec::new();
+
+        {
+            let vectors = self.vectors.read().await;
+            let hilbert_map = self.hilbert_map.read().await;
+
+            for &index in &nearby_indices {
+                if let Some(ids) = hilbert_map.get(&index) {
+                    for &id in ids {
+                        if let Some(entry) = vectors.get(&id) {
+                            candidates.push((id, entry.clone()));
+                        }
+                    }
+                }
+            }
+
+            // If we have too few candidates, fall back to linear search
+            if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
+                debug!("Falling back to linear search for index '{}'", self.name);
+
+                candidates = vectors
+                    .iter()
+                    .map(|(&id, entry)| (id, entry.clone()))
+                    .collect();
+            }
+        }
+
+        // Calculate distances
+        let mut results: Vec<SearchResult> = candidates
+            .into_iter()
+            .map(|(id, entry)| {
+                let score = self.distance_metric.calculate(query, &entry.vector);
+                SearchResult {
+                    id,
+                    vector: entry.vector,
+                    metadata: entry.metadata,
+                    score,
+                }
+            })
+            .collect();
+
+        // Sort by score
+        results.sort_by(|a, b| {
+            if self.distance_metric.is_lower_better() {
+                a.score.partial_cmp(&b.score).unwrap()
+            } else {
+                b.score.partial_cmp(&a.score).unwrap()
+            }
+        });
+
+        // Limit results
+        results.truncate(limit);
+
+        let elapsed = start.elapsed();
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.searches", self.name), 1)
+                .await;
+            metrics
+                .record_histogram(
+                    &format!("vector_index.{}.search_time_ms", self.name),
+                    elapsed.as_millis() as u64,
+                )
+                .await;
+        }
+
+        debug!(
+            "Search in index '{}' found {} results in {:?}",
+            self.name,
+            results.len(),
+            elapsed
+        );
+
+        Ok(results)
+    }
+
+    /// Get nearby indices in Hilbert space
+    async fn get_nearby_indices(&self, center_index: u64) -> Vec<u64> {
+        // Start with the exact index
+        let mut indices = vec![center_index];
+
+        // Add some nearby indices (this is a simple implementation)
+        // In a more sophisticated version, we would explore the Hilbert curve more intelligently
+        let window_size = 5;
+        for i in 1..=window_size {
+            // Add indices before
+            if center_index >= i {
+                indices.push(center_index - i);
+            }
+
+            // Add indices after
+            indices.push(center_index + i);
+        }
+
+        // Check if these indices exist in our map
+        let hilbert_map = self.hilbert_map.read().await;
+        indices.retain(|&idx| hilbert_map.contains_key(&idx));
+
+        indices
+    }
+
+    /// Get the number of vectors in the index
+    pub async fn count(&self) -> usize {
+        self.vectors.read().await.len()
+    }
+
+    /// Get detailed statistics about the index
+    pub async fn stats(&self) -> IndexStats {
+        let vectors = self.vectors.read().await;
+        let hilbert_map = self.hilbert_map.read().await;
+
+        let mut bucket_sizes = Vec::new();
+        for (_, ids) in hilbert_map.iter() {
+            bucket_sizes.push(ids.len());
+        }
+
+        bucket_sizes.sort_unstable();
+
+        let bucket_count = bucket_sizes.len();
+        let total_vectors = vectors.len();
+
+        let min_bucket = bucket_sizes.first().cloned().unwrap_or(0);
+        let max_bucket = bucket_sizes.last().cloned().unwrap_or(0);
+
+        let avg_bucket = if !bucket_sizes.is_empty() {
+            bucket_sizes.iter().sum::<usize>() as f32 / bucket_sizes.len() as f32
+        } else {
+            0.0
+        };
+
+        let median_bucket = if !bucket_sizes.is_empty() {
+            if bucket_sizes.len() % 2 == 0 {
+                (bucket_sizes[bucket_sizes.len() / 2 - 1] + bucket_sizes[bucket_sizes.len() / 2])
+                    as f32
+                    / 2.0
+            } else {
+                bucket_sizes[bucket_sizes.len() / 2] as f32
+            }
+        } else {
+            0.0
+        };
+
+        IndexStats {
+            name: self.name.clone(),
+            vector_count: total_vectors,
+            dimensions: self.dimensions,
+            distance_metric: self.distance_metric,
+            bucket_count,
+            min_bucket_size: min_bucket,
+            max_bucket_size: max_bucket,
+            avg_bucket_size: avg_bucket,
+            median_bucket_size: median_bucket,
+        }
+    }
+}
+
+/// Statistics about the vector index
+#[derive(Debug, Clone)]
+pub struct IndexStats {
+    /// Name of the index
+    pub name: String,
+
+    /// Number of vectors in the index
+    pub vector_count: usize,
+
+    /// Dimensions of vectors in this index
+    pub dimensions: usize,
+
+    /// Distance metric used for similarity search
+    pub distance_metric: DistanceMetric,
+
+    /// Number of Hilbert space buckets
+    pub bucket_count: usize,
+
+    /// Minimum bucket size
+    pub min_bucket_size: usize,
+
+    /// Maximum bucket size
+    pub max_bucket_size: usize,
+
+    /// Average bucket size
+    pub avg_bucket_si
+[... Observation truncated due to length ...]
+u64
+            })
+            .collect();
+
+        self.hilbert_curve.point_to_index(&point)
+    }
+
+    /// Add a vector to the index
+    pub async fn add(
+        &self,
+        vector: Vector,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<Uuid, String> {
+        // Validate dimensions
+        if vector.dimensions != self.dimensions {
+            return Err(format!(
+                "Vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, vector.dimensions
+            ));
+        }
+
+        let id = Uuid::new_v4();
+        let now = chrono::Utc::now();
+
+        let entry = VectorEntry {
+            id,
+            vector: vector.clone(),
+            metadata,
+            created_at: now,
+        };
+
+        // Calculate Hilbert index
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+
+        // Add to vectors map
+        {
+            let mut vectors = self.vectors.write().await;
+            vectors.insert(id, entry);
+        }
+
+        // Add to Hilbert map
+        {
+            let mut hilbert_map = self.hilbert_map.write().await;
+            hilbert_map
+                .entry(hilbert_index)
+                .or_insert_with(Vec::new)
+                .push(id);
+        }
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.vectors_added", self.name), 1)
+                .await;
+            metrics
+                .set_gauge(
+                    &format!("vector_index.{}.vector_count", self.name),
+                    self.count().await as u64,
+                )
+                .await;
+        }
+
+        debug!("Added vector to index '{}' with ID: {}", self.name, id);
+
+        Ok(id)
+    }
+
+    /// Remove a vector from the index
+    pub async fn remove(&self, id: Uuid) -> Result<(), String> {
+        // Get the vector to calculate its Hilbert index
+        let vector = {
+            let vectors = self.vectors.read().await;
+            match vectors.get(&id) {
+                Some(entry) => entry.vector.clone(),
+                None => return Err(format!("Vector with ID {} not found", id)),
+            }
+        };
+
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+
+        // Remove from vectors map
+        {
+            let mut vectors = self.vectors.write().await;
+            vectors.remove(&id);
+        }
+
+        // Remove from Hilbert map
+        {
+            let mut hilbert_map = self.hilbert_map.write().await;
+            if let Some(ids) = hilbert_map.get_mut(&hilbert_index) {
+                ids.retain(|&x| x != id);
+
+                // Remove the entire entry if there are no more vectors at this index
+                if ids.is_empty() {
+                    hilbert_map.remove(&hilbert_index);
+                }
+            }
+        }
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.vectors_removed", self.name), 1)
+                .await;
+            metrics
+                .set_gauge(
+                    &format!("vector_index.{}.vector_count", self.name),
+                    self.count().await as u64,
+                )
+                .await;
+        }
+
+        debug!("Removed vector from index '{}' with ID: {}", self.name, id);
+
+        Ok(())
+    }
+
+    /// Find nearest vectors using the index
+    pub async fn search(&self, query: &Vector, limit: usize) -> Result<Vec<SearchResult>, String> {
+        let start = std::time::Instant::now();
+
+        // Validate dimensions
+        if query.dimensions != self.dimensions {
+            return Err(format!(
+                "Query vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, query.dimensions
+            ));
+        }
+
+        // Calculate Hilbert index of the query
+        let query_hilbert_index = self.vector_to_hilbert_index(query);
+
+        // Get nearby indices in Hilbert space
+        // This is a simplified implementation - a more sophisticated version would
+        // explore the Hilbert space more intelligently
+        let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
+
+        // Collect candidate vectors
+
+        let mut candidates: Vec<(Uuid, VectorEntry)> = Vec::new();
+
+        {
+            let vectors = self.vectors.read().await;
+            let hilbert_map = self.hilbert_map.read().await;
+
+            for &index in &nearby_indices {
+                if let Some(ids) = hilbert_map.get(&index) {
+                    for &id in ids {
+                        if let Some(entry) = vectors.get(&id) {
+                            candidates.push((id, entry.clone()));
+                        }
+                    }
+                }
+            }
+
+            // If we have too few candidates, fall back to linear search
+            if candidates.len() < limit * 4 && candidates.len() < vectors.len() / 2 {
+                debug!("Falling back to linear search for index '{}'", self.name);
+
+                candidates = vectors
+                    .iter()
+                    .map(|(&id, entry)| (id, entry.clone()))
+                    .collect();
+            }
+        }
+
+        // Calculate distances
+        let mut results: Vec<SearchResult> = candidates
+            .into_iter()
+            .map(|(id, entry)| {
+                let score = self.distance_metric.calculate(query, &entry.vector);
+                SearchResult {
+                    id,
+                    vector: entry.vector,
+                    metadata: entry.metadata,
+                    score,
+                }
+            })
+            .collect();
+
+        // Sort by score
+        results.sort_by(|a, b| {
+            if self.distance_metric.is_lower_better() {
+                a.score.partial_cmp(&b.score).unwrap()
+            } else {
+                b.score.partial_cmp(&a.score).unwrap()
+            }
+        });
+
+        // Limit results
+        results.truncate(limit);
+
+        let elapsed = start.elapsed();
+
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("vector_index.{}.searches", self.name), 1)
+                .await;
+            metrics
+                .record_histogram(
+                    &format!("vector_index.{}.search_time_ms", self.name),
+                    elapsed.as_millis() as u64,
+                )
+                .await;
+        }
+
+        debug!(
+            "Search in index '{}' found {} results in {:?}",
+            self.name,
+            results.len(),
+            elapsed
+        );
+
+        Ok(results)
+    }
+
+    /// Get nearby indices in Hilbert space
+    async fn get_nearby_indices(&self, center_index: u64) -> Vec<u64> {
+        // Start with the exact index
+        let mut indices = vec![center_index];
+
+        // Add some nearby indices (this is a simple implementation)
+        // In a more sophisticated version, we would explore the Hilbert curve more intelligently
+        let window_size = 5;
+        for i in 1..=window_size {
+            // Add indices before
+            if center_index >= i {
+                indices.push(center_index - i);
+            }
+
+            // Add indices after
+            indices.push(center_index + i);
+        }
+
+        // Check if these indices exist in our map
+        let hilbert_map = self.hilbert_map.read().await;
+        indices.retain(|&idx| hilbert_map.contains_key(&idx));
+
+        indices
+    }
+
+    /// Get the number of vectors in the index
+    pub async fn count(&self) -> usize {
+        self.vectors.read().await.len()
+    }
+
+    /// Get detailed statistics about the index
+    pub async fn stats(&self) -> IndexStats {
+        let vectors = self.vectors.read().await;
+        let hilbert_map = self.hilbert_map.read().await;
+
+        let mut bucket_sizes = Vec::new();
+        for (_, ids) in hilbert_map.iter() {
+            bucket_sizes.push(ids.len());
+        }
+
+        bucket_sizes.sort_unstable();
+
+        let bucket_count = bucket_sizes.len();
+        let total_vectors = vectors.len();
+
+        let min_bucket = bucket_sizes.first().cloned().unwrap_or(0);
+        let max_bucket = bucket_sizes.last().cloned().unwrap_or(0);
+
+        let avg_bucket = if !bucket_sizes.is_empty() {
+            bucket_sizes.iter().sum::<usize>() as f32 / bucket_sizes.len() as f32
+        } else {
+            0.0
+        };
+
+        let median_bucket = if !bucket_sizes.is_empty() {
+            if bucket_sizes.len() % 2 == 0 {
+                (bucket_sizes[bucket_sizes.len() / 2 - 1] + bucket_sizes[bucket_sizes.len() / 2])
+                    as f32
+                    / 2.0
+            } else {
+                bucket_sizes[bucket_sizes.len() / 2] as f32
+            }
+        } else {
+            0.0
+        };
+
+        IndexStats {
+            name: self.name.clone(),
+            vector_count: total_vectors,
+            dimensions: self.dimensions,
+            distance_metric: self.distance_metric,
+            bucket_count,
+            min_bucket_size: min_bucket,
+            max_bucket_size: max_bucket,
+            avg_bucket_size: avg_bucket,
+            median_bucket_size: median_bucket,
+        }
+    }
+}
+
+/// Statistics about the vector index
+#[derive(Debug, Clone)]
+pub struct IndexStats {
+    /// Name of the index
+    pub name: String,
+
+    /// Number of vectors in the index
+    pub vector_count: usize,
+
+    /// Dimensions of vectors in this index
+    pub dimensions: usize,
+
+    /// Distance metric used for similarity search
+    pub distance_metric: DistanceMetric,
+
+    /// Number of Hilbert space buckets
+    pub bucket_count: usize,
+
+    /// Minimum bucket size
+    pub min_bucket_size: usize,
+
+    /// Maximum bucket size
+    pub max_bucket_size: usize,
+
+    /// Average bucket size
+    pub avg_bucket_size: f32,
+
+    /// Median bucket size
+    pub median_bucket_size: f32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::Rng;
+
+    async fn create_test_index(vector_count: usize, dimensions: usize) -> VectorIndex {
+        let index =
+            VectorIndex::new("test_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
+
+        // Add random vectors
+        for _ in 0..vector_count {
+            let vector = Vector::random(dimensions);
+            let mut metadata = HashMap::new();
+            metadata.insert("test".to_string(), "value".to_string());
+
+            index.add(vector, Some(metadata)).await.unwrap();
+        }
+
+        index
+    }
+
+    #[tokio::test]
+    async fn test_add_and_count() {
+        let index = create_test_index(10, 3).await;
+        assert_eq!(index.count().await, 10);
+    }
+
+    #[tokio::test]
+    async fn test_remove() {
+        let index = VectorIndex::new("test_remove", 3, DistanceMetric::Euclidean, None).unwrap();
+
+        // Add a vector
+        let vector = Vector::random(3);
+        let id = index.add(vector.clone(), None).await.unwrap();
+        assert_eq!(index.count().await, 1);
+
+        // Remove it
+        index.remove(id).await.unwrap();
+        assert_eq!(index.count().await, 0);
+
+        // Try to remove it again (should fail)
+        assert!(index.remove(id).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_search() {
+        let dimensions = 10;
+        let vector_count = 100;
+
+        let index = create_test_index(vector_count, dimensions).await;
+
+        // Create a query vector
+        let query = Vector::random(dimensions);
+
+        // Search for nearest vectors
+        let results = index.search(&query, 5).await.unwrap();
+
+        // We should get 5 results
+        assert_eq!(results.len(), 5);
+
+        // Scores should be sorted
+        for i in 1..results.len() {
+            assert!(results[i - 1].score <= results[i].score);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_different_metrics() {
+        // Test with different distance metrics
+        let dimensions = 8;
+        let vector_count = 50;
+
+        // Create some vectors with a known pattern
+        let mut vectors = Vec::new();
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..vector_count {
+            let values: Vec<f32> = (0..dimensions).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            vectors.push(Vector::new(values));
+        }
+
+        // Create query vector
+        let query = Vector::random(dimensions);
+
+        // Test each metric
+        for metric in [
+            DistanceMetric::Euclidean,
+            DistanceMetric::Cosine,
+            DistanceMetric::Manhattan,
+            DistanceMetric::Hamming,
+        ]
+        .iter()
+        {
+            let index = VectorIndex::new("test_metric", dimensions, *metric, None).unwrap();
+
+            // Add all vectors
+            for v in &vectors {
+                index.add(v.clone(), None).await.unwrap();
+            }
+
+            // Search
+            let results = index.search(&query, 5).await.unwrap();
+            assert_eq!(results.len(), 5);
+
+            // Scores should be in ascending order for distance metrics
+            if metric.is_lower_better() {
+                for i in 1..results.len() {
+                    assert!(results[i - 1].score <= results[i].score);
+                }
+            } else {
+                // Or descending order for similarity metrics
+                for i in 1..results.len() {
+                    assert!(results[i - 1].score >= results[i].score);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_stats() {
+        // Build a small index with known vectors so we can predict stats
+        let dimensions = 3;
+        let index =
+            VectorIndex::new("stats_index", dimensions, DistanceMetric::Euclidean, None).unwrap();
+
+        let vectors = vec![
+            Vector::new(vec![0.1, 0.2, 0.3]),
+            Vector::new(vec![-0.4, 0.5, -0.6]),
+            Vector::new(vec![0.7, -0.8, 0.9]),
+        ];
+
+        use std::collections::HashSet;
+        let mut buckets = HashSet::new();
+        for v in &vectors {
+            // Track expected bucket count by using the same mapping as the index
+            buckets.insert(index.vector_to_hilbert_index(v));
+            index.add(v.clone(), None).await.unwrap();
+        }
+
+        let stats = index.stats().await;
+        assert_eq!(stats.vector_count, vectors.len());
+        assert_eq!(stats.dimensions, dimensions);
+        assert_eq!(stats.bucket_count, buckets.len());
+    }
+}
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use crate::core::metrics::MetricsCollector;
+use crate::core::vector::Vector;
+use crate::persistence::recovery::{RecoveryManager, RecoveryStats};
+use crate::persistence::snapshot::{CompressionType, SnapshotManager, SnapshotMetadata};
+use crate::persistence::storage::{FileBackend, StorageEngine};
+use crate::persistence::wal::{WriteAheadLog, WalOperation};
+use crate::sharding::hilbert::HilbertCurve;
+use crate::sharding::vector_index::{DistanceMetric, SearchResult, VectorEntry};
+
+#[derive(Error, Debug)]
+pub enum PersistentIndexError {
+    #[error("Storage error: {0}")]
+    Storage(String),
+    #[error("WAL error: {0}")]
+    Wal(#[from] crate::persistence::wal::WalError),
+    #[error("Recovery error: {0}")]
+    Recovery(#[from] crate::persistence::recovery::RecoveryError),
+    #[error("Snapshot error: {0}")]
+    Snapshot(#[from] crate::persistence::snapshot::SnapshotError),
+    #[error("Index error: {0}")]
+    Index(String),
+}
+
+/// Configuration for persistent vector index
+#[derive(Debug, Clone)]
+pub struct PersistentIndexConfig {
+    pub name: String,
+    pub dimensions: usize,
+    pub distance_metric: DistanceMetric,
+    pub data_dir: String,
+    pub wal_sync_on_write: bool,
+    pub snapshot_interval_ops: u64,
+    pub max_snapshots_to_keep: usize,
+    pub ipfs_api_url: Option<String>,
+    pub s3_bucket: Option<String>,
+    pub compression: CompressionType,
+}
+
+impl Default for PersistentIndexConfig {
+    fn default() -> Self {
+        Self {
+            name: "default".to_string(),
+            dimensions: 128,
+            distance_metric: DistanceMetric::Euclidean,
+            data_dir: "./data".to_string(),
+            wal_sync_on_write: true,
+            snapshot_interval_ops: 10000,
+            max_snapshots_to_keep: 5,
+            ipfs_api_url: None,
+            s3_bucket: None,
+            compression: CompressionType::Gzip,
+        }
+    }
+}
+
+/// Persistent vector index with WAL, snapshots, and recovery
+pub struct PersistentVectorIndex {
+    name: String,
+    dimensions: usize,
+    distance_metric: DistanceMetric,
+    
+    // Core components
+    recovery_manager: RecoveryManager,
+    
+    // Spatial indexing
+    hilbert_curve: HilbertCurve,
+    
+    // In-memory cache for performance
+    vector_cache: RwLock<HashMap<Uuid, VectorEntry>>,
+    hilbert_cache: RwLock<HashMap<u64, Vec<Uuid>>>,
+    cache_size_limit: usize,
+    
+    // Operational state
+    operations_since_snapshot: RwLock<u64>,
+    snapshot_interval_ops: u64,
+    max_snapshots_to_keep: usize,
+    
+    // Metrics
+    metrics: Option<Arc<MetricsCollector>>,
+}
+
+impl PersistentVectorIndex {
+    /// Create a new persistent vector index
+    pub async fn new(
+        config: PersistentIndexConfig,
+        metrics: Option<Arc<MetricsCollector>>,
+    ) -> Result<Self, PersistentIndexError> {
+        let data_dir = Path::new(&config.data_dir);
+        tokio::fs::create_dir_all(data_dir).await
+            .map_err(|e| PersistentIndexError::Storage(format!("Failed to create data directory: {}", e)))?;
+        
+        // Initialize storage backend (using FileBackend for demo)
+        let db_path = data_dir.join(format!("{}.db", config.name));
+        let backend = Box::new(FileBackend::new(&db_path)
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?);
+        let storage_engine = StorageEngine::new(backend);
+        
+        // Initialize WAL
+        let wal_path = data_dir.join(format!("{}.wal", config.name));
+        let wal = WriteAheadLog::new(&wal_path, config.wal_sync_on_write).await?;
+        
+        // Initialize snapshot manager
+        let snapshots_dir = data_dir.join("snapshots");
+        let snapshot_manager = SnapshotManager::new(
+            &snapshots_dir,
+            config.ipfs_api_url.as_deref(),
+            config.s3_bucket.clone(),
+            config.compression,
+        ).await?;
+        
+        // Initialize recovery manager
+        let recovery_manager = RecoveryManager::new(
+            storage_engine,
+            wal,
+            snapshot_manager,
+        );
+        
+        // Initialize Hilbert curve
+        let max_total_bits = 60;
+        if config.dimensions == 0 {
+            return Err(PersistentIndexError::Index("dimensions must be greater than zero".to_string()));
+        }
+        if config.dimensions > max_total_bits {
+            return Err(PersistentIndexError::Index(format!(
+                "dimensions ({}) exceed maximum supported {}",
+                config.dimensions, max_total_bits
+            )));
+        }
+        
+        let bits_per_dimension = std::cmp::min(10, max_total_bits / config.dimensions);
+        if bits_per_dimension == 0 {
+            return Err(PersistentIndexError::Index(format!(
+                "calculated bits_per_dimension is zero for {} dimensions",
+                config.dimensions
+            )));
+        }
+        
+        let hilbert_curve = HilbertCurve::new(config.dimensions, bits_per_dimension);
+        
+        let index = Self {
+            name: config.name.clone(),
+            dimensions: config.dimensions,
+            distance_metric: config.distance_metric,
+            recovery_manager,
+            hilbert_curve,
+            vector_cache: RwLock::new(HashMap::new()),
+            hilbert_cache: RwLock::new(HashMap::new()),
+            cache_size_limit: 10000, // Configurable cache size
+            operations_since_snapshot: RwLock::new(0),
+            snapshot_interval_ops: config.snapshot_interval_ops,
+            max_snapshots_to_keep: config.max_snapshots_to_keep,
+            metrics,
+        };
+        
+        // Perform recovery on startup
+        info!("Starting recovery for index '{}'", config.name);
+        let recovery_stats = index.recovery_manager.recover().await?;
+        info!("Recovery completed for index '{}': {:?}", config.name, recovery_stats);
+        
+        // Load cache from storage
+        index.load_cache().await?;
+        
+        Ok(index)
+    }
+
+    /// Load cache from persistent storage
+    async fn load_cache(&self) -> Result<(), PersistentIndexError> {
+        info!("Loading cache for index '{}'", self.name);
+        
+        // Load vectors into cache
+        let vectors = self.recovery_manager.storage_engine.scan_all_vectors().await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        let mut vector_cache = self.vector_cache.write().await;
+        for (id, entry) in vectors {
+            if vector_cache.len() < self.cache_size_limit {
+                vector_cache.insert(id, entry);
+            } else {
+                break; // Cache is full
+            }
+        }
+        
+        // Load hilbert mappings into cache
+        let hilbert_mappings = self.recovery_manager.storage_engine.scan_all_hilbert_mappings().await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        let mut hilbert_cache = self.hilbert_cache.write().await;
+        for (index, ids) in hilbert_mappings {
+            if hilbert_cache.len() < self.cache_size_limit {
+                hilbert_cache.insert(index, ids);
+            } else {
+                break; // Cache is full
+            }
+        }
+        
+        info!("Loaded {} vectors and {} hilbert mappings into cache", 
+              vector_cache.len(), hilbert_cache.len());
+        
+        Ok(())
+    }
+
+    /// Add a vector to the index
+    pub async fn add(
+        &self,
+        vector: Vector,
+        metadata: Option<HashMap<String, String>>,
+    ) -> Result<Uuid, PersistentIndexError> {
+        // Validate dimensions
+        if vector.dimensions != self.dimensions {
+            return Err(PersistentIndexError::Index(format!(
+                "Vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, vector.dimensions
+            )));
+        }
+        
+        let id = Uuid::new_v4();
+        let now = chrono::Utc::now();
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+        
+        // Create vector entry
+        let entry = VectorEntry {
+            id,
+            vector: vector.clone(),
+            metadata: metadata.clone(),
+            created_at: now,
+        };
+        
+        // Write to WAL first (for durability)
+        let wal_op = WalOperation::AddVector {
+            id,
+            vector,
+            metadata,
+            hilbert_index,
+        };
+        self.recovery_manager.wal.append(wal_op).await?;
+        
+        // Write to persistent storage
+        self.recovery_manager.storage_engine.put_vector(id, &entry).await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        // Update hilbert mapping in storage
+        let mut current_ids = self.recovery_manager.storage_engine.get_hilbert_mapping(hilbert_index).await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?
+            .unwrap_or_default();
+        current_ids.push(id);
+        self.recovery_manager.storage_engine.put_hilbert_mapping(hilbert_index, &current_ids).await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        // Update cache
+        {
+            let mut vector_cache = self.vector_cache.write().await;
+            if vector_cache.len() < self.cache_size_limit {
+                vector_cache.insert(id, entry);
+            }
+        }
+        
+        {
+            let mut hilbert_cache = self.hilbert_cache.write().await;
+            hilbert_cache.insert(hilbert_index, current_ids);
+        }
+        
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("persistent_index.{}.vectors_added", self.name), 1)
+                .await;
+        }
+        
+        // Check if we need to create a snapshot
+        {
+            let mut ops_count = self.operations_since_snapshot.write().await;
+            *ops_count += 1;
+            
+            if *ops_count >= self.snapshot_interval_ops {
+                *ops_count = 0;
+                
+                // Create snapshot synchronously for demo
+                match self.recovery_manager.create_snapshot_checkpoint().await {
+                    Ok((snapshot_metadata, _)) => {
+                        info!("Created automatic snapshot: {}", snapshot_metadata.id);
+                        
+                        // Clean up old snapshots
+                        if let Err(e) = self.recovery_manager.snapshot_manager.cleanup_old_snapshots(self.max_snapshots_to_keep).await {
+                            warn!("Failed to cleanup old snapshots: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to create automatic snapshot: {}", e);
+                    }
+                }
+            }
+        }
+        
+        debug!("Added vector to persistent index '{}' with ID: {}", self.name, id);
+        
+        Ok(id)
+    }
+
+    /// Remove a vector from the index
+    pub async fn remove(&self, id: Uuid) -> Result<(), PersistentIndexError> {
+        // Get the vector to calculate its Hilbert index
+        let vector = match self.get_vector_entry(id).await? {
+            Some(entry) => entry.vector,
+            None => return Err(PersistentIndexError::Index(format!("Vector with ID {} not found", id))),
+        };
+        
+        let hilbert_index = self.vector_to_hilbert_index(&vector);
+        
+        // Write to WAL first
+        let wal_op = WalOperation::RemoveVector { id, hilbert_index };
+        self.recovery_manager.wal.append(wal_op).await?;
+        
+        // Remove from persistent storage
+        self.recovery_manager.storage_engine.delete_vector(id).await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        // Update hilbert mapping in storage
+        if let Ok(Some(mut current_ids)) = self.recovery_manager.storage_engine.get_hilbert_mapping(hilbert_index).await {
+            current_ids.retain(|&x| x != id);
+            
+            if current_ids.is_empty() {
+                self.recovery_manager.storage_engine.delete_hilbert_mapping(hilbert_index).await
+                    .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+            } else {
+                self.recovery_manager.storage_engine.put_hilbert_mapping(hilbert_index, &current_ids).await
+                    .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+            }
+            
+            // Update cache
+            {
+                let mut hilbert_cache = self.hilbert_cache.write().await;
+                if current_ids.is_empty() {
+                    hilbert_cache.remove(&hilbert_index);
+                } else {
+                    hilbert_cache.insert(hilbert_index, current_ids);
+                }
+            }
+        }
+        
+        // Remove from cache
+        {
+            let mut vector_cache = self.vector_cache.write().await;
+            vector_cache.remove(&id);
+        }
+        
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("persistent_index.{}.vectors_removed", self.name), 1)
+                .await;
+        }
+        
+        // Increment operations counter
+        {
+            let mut ops_count = self.operations_since_snapshot.write().await;
+            *ops_count += 1;
+        }
+        
+        debug!("Removed vector from persistent index '{}' with ID: {}", self.name, id);
+        
+        Ok(())
+    }
+
+    /// Search for nearest vectors
+    pub async fn search(&self, query: &Vector, limit: usize) -> Result<Vec<SearchResult>, PersistentIndexError> {
+        let start = std::time::Instant::now();
+        
+        // Validate dimensions
+        if query.dimensions != self.dimensions {
+            return Err(PersistentIndexError::Index(format!(
+                "Query vector dimensions mismatch: expected {}, got {}",
+                self.dimensions, query.dimensions
+            )));
+        }
+        
+        // Calculate Hilbert index of the query
+        let query_hilbert_index = self.vector_to_hilbert_index(query);
+        
+        // Get nearby indices in Hilbert space
+        let nearby_indices = self.get_nearby_indices(query_hilbert_index).await;
+        
+        // Collect candidate vectors from cache and storage
+        let mut candidates: Vec<(Uuid, VectorEntry)> = Vec::new();
+        
+        // First, try to get candidates from cache
+        {
+            let vector_cache = self.vector_cache.read().await;
+            let hilbert_cache = self.hilbert_cache.read().await;
+            
+            for &index in &nearby_indices {
+                if let Some(ids) = hilbert_cache.get(&index) {
+                    for &id in ids {
+                        if let Some(entry) = vector_cache.get(&id) {
+                            candidates.push((id, entry.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If we don't have enough candidates from cache, query storage
+        if candidates.len() < limit * 4 {
+            for &index in &nearby_indices {
+                if let Ok(Some(ids)) = self.recovery_manager.storage_engine.get_hilbert_mapping(index).await {
+                    for id in ids {
+                        if !candidates.iter().any(|(candidate_id, _)| *candidate_id == id) {
+                            if let Ok(Some(entry)) = self.recovery_manager.storage_engine.get_vector(id).await {
+                                candidates.push((id, entry));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If still not enough candidates, fall back to scanning storage
+        if candidates.len() < limit * 2 {
+            debug!("Falling back to storage scan for index '{}'", self.name);
+            
+            let all_vectors = self.recovery_manager.storage_engine.scan_all_vectors().await
+                .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+            
+            for (id, entry) in all_vectors {
+                if !candidates.iter().any(|(candidate_id, _)| *candidate_id == id) {
+                    candidates.push((id, entry));
+                }
+            }
+        }
+        
+        // Calculate distances and sort
+        let mut results: Vec<SearchResult> = candidates
+            .into_iter()
+            .map(|(id, entry)| {
+                let score = self.distance_metric.calculate(query, &entry.vector);
+                SearchResult {
+                    id,
+                    vector: entry.vector,
+                    metadata: entry.metadata,
+                    score,
+                }
+            })
+            .collect();
+        
+        results.sort_by(|a, b| {
+            if self.distance_metric.is_lower_better() {
+                a.score.partial_cmp(&b.score).unwrap()
+            } else {
+                b.score.partial_cmp(&a.score).unwrap()
+            }
+        });
+        
+        results.truncate(limit);
+        
+        let elapsed = start.elapsed();
+        
+        // Update metrics
+        if let Some(metrics) = &self.metrics {
+            metrics
+                .increment_counter(&format!("persistent_index.{}.searches", self.name), 1)
+                .await;
+            metrics
+                .record_histogram(
+                    &format!("persistent_index.{}.search_time_ms", self.name),
+                    elapsed.as_millis() as u64,
+                )
+                .await;
+        }
+        
+        debug!(
+            "Search in persistent index '{}' found {} results in {:?}",
+            self.name,
+            results.len(),
+            elapsed
+        );
+        
+        Ok(results)
+    }
+
+    /// Get vector entry by ID (from cache or storage)
+    async fn get_vector_entry(&self, id: Uuid) -> Result<Option<VectorEntry>, PersistentIndexError> {
+        // Try cache first
+        {
+            let vector_cache = self.vector_cache.read().await;
+            if let Some(entry) = vector_cache.get(&id) {
+                return Ok(Some(entry.clone()));
+            }
+        }
+        
+        // Fall back to storage
+        self.recovery_manager.storage_engine.get_vector(id).await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))
+    }
+
+    /// Get nearby indices in Hilbert space
+    async fn get_nearby_indices(&self, center_index: u64) -> Vec<u64> {
+        let mut indices = vec![center_index];
+        
+        let window_size = 5;
+        for i in 1..=window_size {
+            if center_index >= i {
+                indices.push(center_index - i);
+            }
+            indices.push(center_index + i);
+        }
+        
+        // Check which indices exist in cache
+        let hilbert_cache = self.hilbert_cache.read().await;
+        indices.retain(|&idx| hilbert_cache.contains_key(&idx));
+        
+        indices
+    }
+
+    /// Convert a vector to a Hilbert index
+    fn vector_to_hilbert_index(&self, vector: &Vector) -> u64 {
+        let max_value = (1 << self.hilbert_curve.bits_per_dimension()) - 1;
+        let point: Vec<u64> = vector
+            .values
+            .iter()
+            .map(|&v| {
+                let normalized = v.max(-1.0).min(1.0);
+                let scaled = ((normalized + 1.0) / 2.0) * (max_value as f32);
+                scaled.round() as u64
+            })
+            .collect();
+        
+        self.hilbert_curve.point_to_index(&point)
+    }
+
+    /// Get the number of vectors in the index
+    pub async fn count(&self) -> Result<usize, PersistentIndexError> {
+        let vectors = self.recovery_manager.storage_engine.scan_all_vectors().await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        Ok(vectors.len())
+    }
+
+    /// Create a manual snapshot
+    pub async fn create_snapshot(&self) -> Result<SnapshotMetadata, PersistentIndexError> {
+        let (snapshot_metadata, _) = self.recovery_manager.create_snapshot_checkpoint().await?;
+        
+        // Reset operations counter
+        {
+            let mut ops_count = self.operations_since_snapshot.write().await;
+            *ops_count = 0;
+        }
+        
+        info!("Created manual snapshot for index '{}': {}", self.name, snapshot_metadata.id);
+        
+        Ok(snapshot_metadata)
+    }
+
+    /// Flush all pending operations
+    pub async fn flush(&self) -> Result<(), PersistentIndexError> {
+        self.recovery_manager.wal.sync().await?;
+        self.recovery_manager.storage_engine.flush().await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Close the index
+    pub async fn close(&self) -> Result<(), PersistentIndexError> {
+        info!("Closing persistent index '{}'", self.name);
+        
+        // Flush all pending operations
+        self.flush().await?;
+        
+        // Close storage
+        self.recovery_manager.storage_engine.close().await
+            .map_err(|e| PersistentIndexError::Storage(e.to_string()))?;
+        
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_persistent_index_basic_operations() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        let config = PersistentIndexConfig {
+            name: "test_index".to_string(),
+            dimensions: 3,
+            data_dir: temp_dir.path().to_string_lossy().to_string(),
+            snapshot_interval_ops: 5, // Small interval for testing
+            ..Default::default()
+        };
+        
+        let index = PersistentVectorIndex::new(config, None).await.unwrap();
+        
+        // Add vectors
+        let vector1 = Vector::random(3);
+        let vector2 = Vector::random(3);
+        
+        let id1 = index.add(vector1.clone(), None).await.unwrap();
+        let id2 = index.add(vector2.clone(), None).await.unwrap();
+        
+        // Search
+        let results = index.search(&vector1, 10).await.unwrap();
+        assert!(!results.is_empty());
+        
+        // Remove
+        index.remove(id1).await.unwrap();
+        
+        // Verify removal
+        let results = index.search(&vector1, 10).await.unwrap();
+        assert!(!results.iter().any(|r| r.id == id1));
+        
+        // Close
+        index.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_persistent_index_recovery() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        let config = PersistentIndexConfig {
+            name: "test_recovery".to_string(),
+            dimensions: 3,
+            data_dir: temp_dir.path().to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        
+        let vector = Vector::random(3);
+        let id;
+        
+        // Create index and add data
+        {
+            let index = PersistentVectorIndex::new(config.clone(), None).await.unwrap();
+            id = index.add(vector.clone(), None).await.unwrap();
+            index.close().await.unwrap();
+        }
+        
+        // Reopen index (simulates restart)
+        {
+            let index = PersistentVectorIndex::new(config, None).await.unwrap();
+            
+            // Verify data was recovered
+            let results = index.search(&vector, 10).await.unwrap();
+            assert!(!results.is_empty());
+            assert!(results.iter().any(|r| r.id == id));
+            
+            index.close().await.unwrap();
+        }
+    }
+}
+
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::sync::Mutex;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use crate::core::vector::Vector;
+use crate::sharding::vector_index::VectorEntry;
+
+#[derive(Error, Debug)]
+pub enum WalError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] bincode::Error),
+    #[error("Corruption detected: {0}")]
+    Corruption(String),
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+}
+
+/// Write-ahead log operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WalOperation {
+    AddVector {
+        id: Uuid,
+        vector: Vector,
+        metadata: Option<HashMap<String, String>>,
+        hilbert_index: u64,
+    },
+    RemoveVector {
+        id: Uuid,
+        hilbert_index: u64,
+    },
+    UpdateHilbertMapping {
+        hilbert_index: u64,
+        vector_ids: Vec<Uuid>,
+    },
+    Checkpoint {
+        sequence: u64,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
+}
+
+/// WAL entry with metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalEntry {
+    pub sequence: u64,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub operation: WalOperation,
+    pub checksum: u32,
+}
+
+impl WalEntry {
+    pub fn new(sequence: u64, operation: WalOperation) -> Self {
+        let timestamp = chrono::Utc::now();
+        let mut entry = Self {
+            sequence,
+            timestamp,
+            operation,
+            checksum: 0,
+        };
+        entry.checksum = entry.calculate_checksum();
+        entry
+    }
+
+    fn calculate_checksum(&self) -> u32 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        self.sequence.hash(&mut hasher);
+        self.timestamp.hash(&mut hasher);
+        
+        // Hash the operation (simplified)
+        match &self.operation {
+            WalOperation::AddVector { id, .. } => {
+                "AddVector".hash(&mut hasher);
+                id.hash(&mut hasher);
+            }
+            WalOperation::RemoveVector { id, .. } => {
+                "RemoveVector".hash(&mut hasher);
+                id.hash(&mut hasher);
+            }
+            WalOperation::UpdateHilbertMapping { hilbert_index, .. } => {
+                "UpdateHilbertMapping".hash(&mut hasher);
+                hilbert_index.hash(&mut hasher);
+            }
+            WalOperation::Checkpoint { sequence, .. } => {
+                "Checkpoint".hash(&mut hasher);
+                sequence.hash(&mut hasher);
+            }
+        }
+        
+        hasher.finish() as u32
+    }
+
+    pub fn verify_checksum(&self) -> bool {
+        let mut temp = self.clone();
+        temp.checksum = 0;
+        temp.calculate_checksum() == self.checksum
+    }
+}
+
+/// Write-ahead log for durability
+pub struct WriteAheadLog {
+    file: Arc<Mutex<File>>,
+    path: PathBuf,
+    sequence: Arc<Mutex<u64>>,
+    sync_on_write: bool,
+}
+
+impl WriteAheadLog {
+    pub async fn new<P: AsRef<Path>>(path: P, sync_on_write: bool) -> Result<Self, WalError> {
+        let path = path.as_ref().to_path_buf();
+        
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .read(true)
+            .open(&path)
+            .await?;
+            
+        // Read existing entries to determine next sequence number
+        let sequence = Self::read_last_sequence(&path).await?;
+        
+        info!("Opened WAL at: {} (next sequence: {})", path.display(), sequence + 1);
+        
+        Ok(Self {
+            file: Arc::new(Mutex::new(file)),
+            path,
+            sequence: Arc::new(Mutex::new(sequence)),
+            sync_on_write,
+        })
+    }
+
+    async fn read_last_sequence(path: &Path) -> Result<u64, WalError> {
+        let mut file = match File::open(path).await {
+            Ok(f) => f,
+            Err(_) => return Ok(0), // File doesn't exist yet
+        };
+        
+        let mut last_sequence = 0u64;
+        let mut buffer = Vec::new();
+        
+        // Read the entire file to find the last valid entry
+        file.read_to_end(&mut buffer).await?;
+        
+        let mut offset = 0;
+        while offset < buffer.len() {
+            // Try to read entry length
+            if offset + 8 > buffer.len() {
+                break;
+            }
+            
+            let length_bytes = &buffer[offset..offset + 8];
+            let length = u64::from_be_bytes(length_bytes.try_into().unwrap()) as usize;
+            
+            if offset + 8 + length > buffer.len() {
+                warn!("Truncated WAL entry detected, stopping at sequence {}", last_sequence);
+                break;
+            }
+            
+            let entry_bytes = &buffer[offset + 8..offset + 8 + length];
+            
+            match bincode::deserialize::<WalEntry>(entry_bytes) {
+                Ok(entry) => {
+                    if entry.verify_checksum() {
+                        last_sequence = entry.sequence;
+                    } else {
+                        warn!("Corrupted WAL entry at sequence {}, stopping recovery", entry.sequence);
+                        break;
+                    }
+                }
+                Err(_) => {
+                    warn!("Failed to deserialize WAL entry, stopping at sequence {}", last_sequence);
+                    break;
+                }
+            }
+            
+            offset += 8 + length;
+        }
+        
+        Ok(last_sequence)
+    }
+
+    pub async fn append(&self, operation: WalOperation) -> Result<u64, WalError> {
+        let sequence = {
+            let mut seq = self.sequence.lock().await;
+            *seq += 1;
+            *seq
+        };
+        
+        let entry = WalEntry::new(sequence, operation);
+        let serialized = bincode::serialize(&entry)?;
+        
+        let mut file = self.file.lock().await;
+        
+        // Write length prefix (8 bytes) followed by serialized entry
+        file.write_all(&(serialized.len() as u64).to_be_bytes()).await?;
+        file.write_all(&serialized).await?;
+        
+        if self.sync_on_write {
+            file.sync_all().await?;
+        }
+        
+        debug!("WAL: Appended entry {} with operation: {:?}", sequence, entry.operation);
+        
+        Ok(sequence)
+    }
+
+    pub async fn read_from_sequence(&self, start_sequence: u64) -> Result<Vec<WalEntry>, WalError> {
+        let mut file = File::open(&self.path).await?;
+        let mut entries = Vec::new();
+        let mut buffer = Vec::new();
+        
+        // Read entire file
+        file.read_to_end(&mut buffer).await?;
+        
+        let mut offset = 0;
+        while offset < buffer.len() {
+            // Read entry length
+            if offset + 8 > buffer.len() {
+                break;
+            }
+            
+            let length_bytes = &buffer[offset..offset + 8];
+            let length = u64::from_be_bytes(length_bytes.try_into().unwrap()) as usize;
+            
+            if offset + 8 + length > buffer.len() {
+                warn!("Truncated WAL entry detected during read");
+                break;
+            }
+            
+            let entry_bytes = &buffer[offset + 8..offset + 8 + length];
+            
+            match bincode::deserialize::<WalEntry>(entry_bytes) {
+                Ok(entry) => {
+                    if entry.verify_checksum() && entry.sequence >= start_sequence {
+                        entries.push(entry);
+                    } else if !entry.verify_checksum() {
+                        error!("Corrupted WAL entry at sequence {}", entry.sequence);
+                        return Err(WalError::Corruption(format!("Entry at sequence {}", entry.sequence)));
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to deserialize WAL entry: {}", e);
+                    break;
+                }
+            }
+            
+            offset += 8 + length;
+        }
+        
+        Ok(entries)
+    }
+
+    pub async fn truncate_after(&self, sequence: u64) -> Result<(), WalError> {
+        // Read all entries up to the sequence
+        let entries = self.read_from_sequence(0).await?;
+        let keep_entries: Vec<_> = entries.into_iter()
+            .filter(|e| e.sequence <= sequence)
+            .collect();
+        
+        // Rewrite the file with only the entries we want to keep
+        let temp_path = self.path.with_extension("tmp");
+        let mut temp_file = File::create(&temp_path).await?;
+        
+        for entry in keep_entries {
+            let serialized = bincode::serialize(&entry)?;
+            temp_file.write_all(&(serialized.len() as u64).to_be_bytes()).await?;
+            temp_file.write_all(&serialized).await?;
+        }
+        
+        temp_file.sync_all().await?;
+        drop(temp_file);
+        
+        // Replace original file
+        tokio::fs::rename(&temp_path, &self.path).await?;
+        
+        // Reopen the file
+        let new_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .read(true)
+            .open(&self.path)
+            .await?;
+            
+        *self.file.lock().await = new_file;
+        
+        // Update sequence counter
+        *self.sequence.lock().await = sequence;
+        
+        info!("WAL truncated after sequence {}", sequence);
+        
+        Ok(())
+    }
+
+    pub async fn sync(&self) -> Result<(), WalError> {
+        let mut file = self.file.lock().await;
+        file.sync_all().await?;
+        Ok(())
+    }
+
+    pub async fn current_sequence(&self) -> u64 {
+        *self.sequence.lock().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_wal_basic_operations() {
+        let temp_dir = TempDir::new().unwrap();
+        let wal_path = temp_dir.path().join("test.wal");
+        
+        let wal = WriteAheadLog::new(&wal_path, true).await.unwrap();
+        
+        // Test append
+        let op = WalOperation::Checkpoint {
+            sequence: 1,
+            timestamp: chrono::Utc::now(),
+        };
+        
+        let seq = wal.append(op).await.unwrap();
+        assert_eq!(seq, 1);
+        
+        // Test read
+        let entries = wal.read_from_sequence(0).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].sequence, 1);
+    }
+
+    #[tokio::test]
+    async fn test_wal_recovery() {
+        let temp_dir = TempDir::new().unwrap();
+        let wal_path = temp_dir.path().join("test.wal");
+        
+        // Write some entries
+        {
+            let wal = WriteAheadLog::new(&wal_path, true).await.unwrap();
+            
+            for i in 1..=5 {
+                let op = WalOperation::Checkpoint {
+                    sequence: i,
+                    timestamp: chrono::Utc::now(),
+                };
+                wal.append(op).await.unwrap();
+            }
+        }
+        
+        // Reopen and verify recovery
+        let wal = WriteAheadLog::new(&wal_path, true).await.unwrap();
+        assert_eq!(wal.current_sequence().await, 5);
+        
+        let entries = wal.read_from_sequence(0).await.unwrap();
+        assert_eq!(entries.len(), 5);
+    }
+}
+
+use async_trait::async_trait;
+use bytes::Bytes;
+// use rocksdb::{DB, Options, WriteBatch}; // Commented out for simplified demo
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use crate::sharding::vector_index::VectorEntry;
+
+#[derive(Error, Debug)]
+pub enum StorageError {
+    #[error("Database error: {0}")]
+    Database(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] bincode::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Key not found: {0}")]
+    KeyNotFound(String),
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+}
+
+/// Storage backend trait for pluggable persistence
+#[async_trait]
+pub trait StorageBackend: Send + Sync {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError>;
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError>;
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError>;
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError>;
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError>;
+    async fn flush(&self) -> Result<(), StorageError>;
+    async fn compact(&self) -> Result<(), StorageError>;
+    async fn close(&self) -> Result<(), StorageError>;
+}
+
+#[derive(Debug, Clone)]
+pub enum BatchOperation {
+    Put { key: Bytes, value: Bytes },
+    Delete { key: Bytes },
+}
+
+/// File-based storage backend (simplified demo version)
+pub struct FileBackend {
+    base_path: std::path::PathBuf,
+}
+
+impl FileBackend {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
+        let base_path = path.as_ref().to_path_buf();
+        
+        std::fs::create_dir_all(&base_path)
+            .map_err(|e| StorageError::Database(format!("Failed to create directory: {}", e)))?;
+            
+        info!("Opened FileBackend at: {}", base_path.display());
+        
+        Ok(Self { base_path })
+    }
+    
+    fn key_to_path(&self, key: &[u8]) -> std::path::PathBuf {
+        let key_hex = hex::encode(key);
+        self.base_path.join(format!("{}.dat", key_hex))
+    }
+}
+
+#[async_trait]
+impl StorageBackend for FileBackend {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError> {
+        let path = self.key_to_path(key);
+        
+        match tokio::fs::read(&path).await {
+            Ok(data) => Ok(Some(Bytes::from(data))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(StorageError::Io(e)),
+        }
+    }
+
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
+        let path = self.key_to_path(key);
+        tokio::fs::write(&path, value).await?;
+        Ok(())
+    }
+
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError> {
+        let path = self.key_to_path(key);
+        match tokio::fs::remove_file(&path).await {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(StorageError::Io(e)),
+        }
+    }
+
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError> {
+        for op in operations {
+            match op {
+                BatchOperation::Put { key, value } => {
+                    self.put(&key, &value).await?;
+                }
+                BatchOperation::Delete { key } => {
+                    self.delete(&key).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError> {
+        let prefix_hex = hex::encode(prefix);
+        let mut results = Vec::new();
+        
+        let mut entries = tokio::fs::read_dir(&self.base_path).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy();
+            
+            if file_name_str.starts_with(&prefix_hex) && file_name_str.ends_with(".dat") {
+                let key_hex = &file_name_str[..file_name_str.len() - 4]; // Remove .dat
+                if let Ok(key) = hex::decode(key_hex) {
+                    if let Ok(value) = tokio::fs::read(entry.path()).await {
+                        results.push((Bytes::from(key), Bytes::from(value)));
+                    }
+                }
+            }
+        }
+        
+        Ok(results)
+    }
+
+    async fn flush(&self) -> Result<(), StorageError> {
+        // File system handles flushing
+        Ok(())
+    }
+
+    async fn compact(&self) -> Result<(), StorageError> {
+        // No compaction needed for file backend
+        Ok(())
+    }
+
+    async fn close(&self) -> Result<(), StorageError> {
+        info!("Closing FileBackend at: {}", self.base_path.display());
+        Ok(())
+    }
+}
+
+/// In-memory storage backend for testing and development
+pub struct MemoryBackend {
+    data: RwLock<HashMap<Bytes, Bytes>>,
+}
+
+impl MemoryBackend {
+    pub fn new() -> Self {
+        Self {
+            data: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl StorageBackend for MemoryBackend {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError> {
+        let data = self.data.read().await;
+        Ok(data.get(key).cloned())
+    }
+
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        data.insert(Bytes::copy_from_slice(key), Bytes::copy_from_slice(value));
+        Ok(())
+    }
+
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        data.remove(key);
+        Ok(())
+    }
+
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        
+        for op in operations {
+            match op {
+                BatchOperation::Put { key, value } => {
+                    data.insert(key, value);
+                }
+                BatchOperation::Delete { key } => {
+                    data.remove(&key);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError> {
+        let data = self.data.read().await;
+        let mut results = Vec::new();
+        
+        for (key, value) in data.iter() {
+            if key.starts_with(prefix) {
+                results.push((key.clone(), value.clone()));
+            }
+        }
+        
+        Ok(results)
+    }
+
+    async fn flush(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+
+    async fn compact(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+
+    async fn close(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+}
+
+/// High-level storage engine that combines backend with key management
+pub struct StorageEngine {
+    backend: Box<dyn StorageBackend>,
+    vector_prefix: &'static [u8],
+    hilbert_prefix: &'static [u8],
+    metadata_prefix: &'static [u8],
+}
+
+impl StorageEngine {
+    pub fn new(backend: Box<dyn StorageBackend>) -> Self {
+        Self {
+            backend,
+            vector_prefix: b"v:",
+            hilbert_prefix: b"h:",
+            metadata_prefix: b"m:",
+        }
+    }
+
+    pub async fn put_vector(&self, id: Uuid, entry: &VectorEntry) -> Result<(), StorageError> {
+        let key = self.vector_key(id);
+        let value = bincode::serialize(entry)?;
+        self.backend.put(&key, &value).await
+    }
+
+    pub async fn get_vector(&self, id: Uuid) -> Result<Option<VectorEntry>, StorageError> {
+        let key = self.vector_key(id);
+        match self.backend.get(&key).await? {
+            Some(data) => {
+                let entry: VectorEntry = bincode::deserialize(&data)?;
+                Ok(Some(entry))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub async fn delete_vector(&self, id: Uuid) -> Result<(), StorageError> {
+        let key = self.vector_key(id);
+        self.backend.delete(&key).await
+    }
+
+    pub async fn put_hilbert_mapping(&self, hilbert_index: u64, vector_ids: &[Uuid]) -> Result<(), StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        let value = bincode::serialize(vector_ids)?;
+        self.backend.put(&key, &value).await
+    }
+
+    pub async fn get_hilbert_mapping(&self, hilbert_index: u64) -> Result<Option<Vec<Uuid>>, StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        match self.backend.get(&key).await? {
+            Some(data) => {
+                let ids: Vec<Uuid> = bincode::deserialize(&data)?;
+                Ok(Some(ids))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub async fn delete_hilbert_mapping(&self, hilbert_index: u64) -> Result<(), StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        self.backend.delete(&key).await
+    }
+
+    pub async fn scan_all_vectors(&self) -> Result<Vec<(Uuid, VectorEntry)>, StorageError> {
+        let results = self.backend.scan_prefix(self.vector_prefix).await?;
+        let mut vectors = Vec::new();
+        
+        for (key, value) in results {
+            if let Ok(id) = self.parse_vector_key(&key) {
+                if let Ok(entry) = bincode::deserialize::<VectorEntry>(&value) {
+                    vectors.push((id, entry));
+                }
+            }
+        }
+        
+        Ok(vectors)
+    }
+
+    pub async fn scan_all_hilbert_mappings(&self) -> Result<Vec<(u64, Vec<Uuid>)>, StorageError> {
+        let results = self.backend.scan_prefix(self.hilbert_prefix).await?;
+        let mut mappings = Vec::new();
+        
+        for (key, value) in results {
+            if let Ok(index) = self.parse_hilbert_key(&key) {
+                if let Ok(ids) = bincode::deserialize::<Vec<Uuid>>(&value) {
+                    mappings.push((index, ids));
+                }
+            }
+        }
+        
+        Ok(mappings)
+    }
+
+    pub async fn flush(&self) -> Result<(), StorageError> {
+        self.backend.flush().await
+    }
+
+    pub async fn compact(&self) -> Result<(), StorageError> {
+        self.backend.compact().await
+    }
+
+    pub async fn close(&self) -> Result<(), StorageError> {
+        self.backend.close().await
+    }
+
+    /// Get all vectors (for snapshots)
+    pub async fn get_all_vectors(&self) -> Result<Vec<(Uuid, VectorEntry)>, StorageError> {
+        let results = self.backend.scan_prefix(self.vector_prefix).await?;
+        
+        let mut vectors = Vec::new();
+        for (key, value) in results {
+            if key.len() >= self.vector_prefix.len() + 16 {
+                let id_bytes = &key[self.vector_prefix.len()..];
+                if let Ok(id) = Uuid::from_slice(id_bytes) {
+                    if let Ok(entry) = bincode::deserialize::<VectorEntry>(&value) {
+                        vectors.push((id, entry));
+                    }
+                }
+            }
+        }
+        
+        Ok(vectors)
+    }
+
+    /// Get all hilbert mappings (for snapshots)
+    pub async fn get_all_hilbert_mappings(&self) -> Result<Vec<(u64, Vec<Uuid>)>, StorageError> {
+        let results = self.backend.scan_prefix(self.hilbert_prefix).await?;
+        
+        let mut mappings = Vec::new();
+        for (key, value) in results {
+            if key.len() >= self.hilbert_prefix.len() + 8 {
+                let index_bytes = &key[self.hilbert_prefix.len()..];
+                if index_bytes.len() == 8 {
+                    let index = u64::from_be_bytes([
+                        index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3],
+                        index_bytes[4], index_bytes[5], index_bytes[6], index_bytes[7],
+                    ]);
+                    if let Ok(vector_ids) = bincode::deserialize::<Vec<Uuid>>(&value) {
+                        mappings.push((index, vector_ids));
+                    }
+                }
+            }
+        }
+        
+        Ok(mappings)
+    }
+
+    fn vector_key(&self, id: Uuid) -> Vec<u8> {
+        let mut key = Vec::with_capacity(self.vector_prefix.len() + 16);
+        key.extend_from_slice(self.vector_prefix);
+        key.extend_from_slice(id.as_bytes());
+        key
+    }
+
+    fn hilbert_key(&self, index: u64) -> Vec<u8> {
+        let mut key = Vec::with_capacity(self.hilbert_prefix.len() + 8);
+        key.extend_from_slice(self.hilbert_prefix);
+        key.extend_from_slice(&index.to_be_bytes());
+        key
+    }
+
+    fn parse_vector_key(&self, key: &[u8]) -> Result<Uuid, StorageError> {
+        if key.len() != self.vector_prefix.len() + 16 {
+            return Err(StorageError::InvalidOperation("Invalid vector key length".to_string()));
+        }
+        
+        let uuid_bytes = &key[self.vector_prefix.len()..];
+        Uuid::from_slice(uuid_bytes)
+            .map_err(|e| StorageError::InvalidOperation(format!("Invalid UUID: {}", e)))
+    }
+
+    fn parse_hilbert_key(&self, key: &[u8]) -> Result<u64, StorageError> {
+        if key.len() != self.hilbert_prefix.len() + 8 {
+            return Err(StorageError::InvalidOperation("Invalid hilbert key length".to_string()));
+        }
+        
+        let index_bytes = &key[self.hilbert_prefix.len()..];
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(index_bytes);
+        Ok(u64::from_be_bytes(bytes))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::vector::Vector;
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_memory_backend() {
+        let backend = MemoryBackend::new();
+        
+        // Test put/get
+        backend.put(b"key1", b"value1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, Some(Bytes::from("value1")));
+        
+        // Test delete
+        backend.delete(b"key1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn test_file_backend() {
+        let temp_dir = TempDir::new().unwrap();
+        let backend = FileBackend::new(temp_dir.path()).unwrap();
+        
+        // Test put/get
+        backend.put(b"key1", b"value1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, Some(Bytes::from("value1")));
+        
+        // Test delete
+        backend.delete(b"key1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn test_storage_engine() {
+        let backend = Box::new(MemoryBackend::new());
+        let engine = StorageEngine::new(backend);
+        
+        // Create test vector entry
+        let id = Uuid::new_v4();
+        let vector = Vector::random(3);
+        let mut metadata = HashMap::new();
+        metadata.insert("test".to_string(), "value".to_string());
+        
+        let entry = VectorEntry {
+            id,
+            vector,
+            metadata: Some(metadata),
+            created_at: chrono::Utc::now(),
+        };
+        
+        // Test put/get vector
+        engine.put_vector(id, &entry).await.unwrap();
+        let retrieved = engine.get_vector(id).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().id, id);
+        
+        // Test delete vector
+        engine.delete_vector(id).await.unwrap();
+        let retrieved = engine.get_vector(id).await.unwrap();
+        assert!(retrieved.is_none());
+    }
+}
+
+use async_trait::async_trait;
+use bytes::Bytes;
+// use rocksdb::{DB, Options, WriteBatch}; // Commented out for simplified demo
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use crate::sharding::vector_index::VectorEntry;
+
+#[derive(Error, Debug)]
+pub enum StorageError {
+    #[error("Database error: {0}")]
+    Database(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] bincode::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Key not found: {0}")]
+    KeyNotFound(String),
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
+}
+
+/// Storage backend trait for pluggable persistence
+#[async_trait]
+pub trait StorageBackend: Send + Sync {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError>;
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError>;
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError>;
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError>;
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError>;
+    async fn flush(&self) -> Result<(), StorageError>;
+    async fn compact(&self) -> Result<(), StorageError>;
+    async fn close(&self) -> Result<(), StorageError>;
+}
+
+#[derive(Debug, Clone)]
+pub enum BatchOperation {
+    Put { key: Bytes, value: Bytes },
+    Delete { key: Bytes },
+}
+
+/// File-based storage backend (simplified demo version)
+pub struct FileBackend {
+    base_path: std::path::PathBuf,
+}
+
+impl FileBackend {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
+        let base_path = path.as_ref().to_path_buf();
+        
+        std::fs::create_dir_all(&base_path)
+            .map_err(|e| StorageError::Database(format!("Failed to create directory: {}", e)))?;
+            
+        info!("Opened FileBackend at: {}", base_path.display());
+        
+        Ok(Self { base_path })
+    }
+    
+    fn key_to_path(&self, key: &[u8]) -> std::path::PathBuf {
+        let key_hex = hex::encode(key);
+        self.base_path.join(format!("{}.dat", key_hex))
+    }
+}
+
+#[async_trait]
+impl StorageBackend for FileBackend {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError> {
+        let path = self.key_to_path(key);
+        
+        match tokio::fs::read(&path).await {
+            Ok(data) => Ok(Some(Bytes::from(data))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(StorageError::Io(e)),
+        }
+    }
+
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
+        let path = self.key_to_path(key);
+        tokio::fs::write(&path, value).await?;
+        Ok(())
+    }
+
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError> {
+        let path = self.key_to_path(key);
+        match tokio::fs::remove_file(&path).await {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(StorageError::Io(e)),
+        }
+    }
+
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError> {
+        for op in operations {
+            match op {
+                BatchOperation::Put { key, value } => {
+                    self.put(&key, &value).await?;
+                }
+                BatchOperation::Delete { key } => {
+                    self.delete(&key).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError> {
+        let prefix_hex = hex::encode(prefix);
+        let mut results = Vec::new();
+        
+        let mut entries = tokio::fs::read_dir(&self.base_path).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy();
+            
+            if file_name_str.starts_with(&prefix_hex) && file_name_str.ends_with(".dat") {
+                let key_hex = &file_name_str[..file_name_str.len() - 4]; // Remove .dat
+                if let Ok(key) = hex::decode(key_hex) {
+                    if let Ok(value) = tokio::fs::read(entry.path()).await {
+                        results.push((Bytes::from(key), Bytes::from(value)));
+                    }
+                }
+            }
+        }
+        
+        Ok(results)
+    }
+
+    async fn flush(&self) -> Result<(), StorageError> {
+        // File system handles flushing
+        Ok(())
+    }
+
+    async fn compact(&self) -> Result<(), StorageError> {
+        // No compaction needed for file backend
+        Ok(())
+    }
+
+    async fn close(&self) -> Result<(), StorageError> {
+        info!("Closing FileBackend at: {}", self.base_path.display());
+        Ok(())
+    }
+}
+
+/// In-memory storage backend for testing and development
+pub struct MemoryBackend {
+    data: RwLock<HashMap<Bytes, Bytes>>,
+}
+
+impl MemoryBackend {
+    pub fn new() -> Self {
+        Self {
+            data: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl StorageBackend for MemoryBackend {
+    async fn get(&self, key: &[u8]) -> Result<Option<Bytes>, StorageError> {
+        let data = self.data.read().await;
+        Ok(data.get(key).cloned())
+    }
+
+    async fn put(&self, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        data.insert(Bytes::copy_from_slice(key), Bytes::copy_from_slice(value));
+        Ok(())
+    }
+
+    async fn delete(&self, key: &[u8]) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        data.remove(key);
+        Ok(())
+    }
+
+    async fn batch_write(&self, operations: Vec<BatchOperation>) -> Result<(), StorageError> {
+        let mut data = self.data.write().await;
+        
+        for op in operations {
+            match op {
+                BatchOperation::Put { key, value } => {
+                    data.insert(key, value);
+                }
+                BatchOperation::Delete { key } => {
+                    data.remove(&key);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes)>, StorageError> {
+        let data = self.data.read().await;
+        let mut results = Vec::new();
+        
+        for (key, value) in data.iter() {
+            if key.starts_with(prefix) {
+                results.push((key.clone(), value.clone()));
+            }
+        }
+        
+        Ok(results)
+    }
+
+    async fn flush(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+
+    async fn compact(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+
+    async fn close(&self) -> Result<(), StorageError> {
+        // No-op for memory backend
+        Ok(())
+    }
+}
+
+/// High-level storage engine that combines backend with key management
+pub struct StorageEngine {
+    backend: Box<dyn StorageBackend>,
+    vector_prefix: &'static [u8],
+    hilbert_prefix: &'static [u8],
+    metadata_prefix: &'static [u8],
+}
+
+impl StorageEngine {
+    pub fn new(backend: Box<dyn StorageBackend>) -> Self {
+        Self {
+            backend,
+            vector_prefix: b"v:",
+            hilbert_prefix: b"h:",
+            metadata_prefix: b"m:",
+        }
+    }
+
+    pub async fn put_vector(&self, id: Uuid, entry: &VectorEntry) -> Result<(), StorageError> {
+        let key = self.vector_key(id);
+        let value = bincode::serialize(entry)?;
+        self.backend.put(&key, &value).await
+    }
+
+    pub async fn get_vector(&self, id: Uuid) -> Result<Option<VectorEntry>, StorageError> {
+        let key = self.vector_key(id);
+        match self.backend.get(&key).await? {
+            Some(data) => {
+                let entry: VectorEntry = bincode::deserialize(&data)?;
+                Ok(Some(entry))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub async fn delete_vector(&self, id: Uuid) -> Result<(), StorageError> {
+        let key = self.vector_key(id);
+        self.backend.delete(&key).await
+    }
+
+    pub async fn put_hilbert_mapping(&self, hilbert_index: u64, vector_ids: &[Uuid]) -> Result<(), StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        let value = bincode::serialize(vector_ids)?;
+        self.backend.put(&key, &value).await
+    }
+
+    pub async fn get_hilbert_mapping(&self, hilbert_index: u64) -> Result<Option<Vec<Uuid>>, StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        match self.backend.get(&key).await? {
+            Some(data) => {
+                let ids: Vec<Uuid> = bincode::deserialize(&data)?;
+                Ok(Some(ids))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub async fn delete_hilbert_mapping(&self, hilbert_index: u64) -> Result<(), StorageError> {
+        let key = self.hilbert_key(hilbert_index);
+        self.backend.delete(&key).await
+    }
+
+    pub async fn scan_all_vectors(&self) -> Result<Vec<(Uuid, VectorEntry)>, StorageError> {
+        let results = self.backend.scan_prefix(self.vector_prefix).await?;
+        let mut vectors = Vec::new();
+        
+        for (key, value) in results {
+            if let Ok(id) = self.parse_vector_key(&key) {
+                if let Ok(entry) = bincode::deserialize::<VectorEntry>(&value) {
+                    vectors.push((id, entry));
+                }
+            }
+        }
+        
+        Ok(vectors)
+    }
+
+    pub async fn scan_all_hilbert_mappings(&self) -> Result<Vec<(u64, Vec<Uuid>)>, StorageError> {
+        let results = self.backend.scan_prefix(self.hilbert_prefix).await?;
+        let mut mappings = Vec::new();
+        
+        for (key, value) in results {
+            if let Ok(index) = self.parse_hilbert_key(&key) {
+                if let Ok(ids) = bincode::deserialize::<Vec<Uuid>>(&value) {
+                    mappings.push((index, ids));
+                }
+            }
+        }
+        
+        Ok(mappings)
+    }
+
+    pub async fn flush(&self) -> Result<(), StorageError> {
+        self.backend.flush().await
+    }
+
+    pub async fn compact(&self) -> Result<(), StorageError> {
+        self.backend.compact().await
+    }
+
+    pub async fn close(&self) -> Result<(), StorageError> {
+        self.backend.close().await
+    }
+
+    /// Get all vectors (for snapshots)
+    pub async fn get_all_vectors(&self) -> Result<Vec<(Uuid, VectorEntry)>, StorageError> {
+        let results = self.backend.scan_prefix(self.vector_prefix).await?;
+        
+        let mut vectors = Vec::new();
+        for (key, value) in results {
+            if key.len() >= self.vector_prefix.len() + 16 {
+                let id_bytes = &key[self.vector_prefix.len()..];
+                if let Ok(id) = Uuid::from_slice(id_bytes) {
+                    if let Ok(entry) = bincode::deserialize::<VectorEntry>(&value) {
+                        vectors.push((id, entry));
+                    }
+                }
+            }
+        }
+        
+        Ok(vectors)
+    }
+
+    /// Get all hilbert mappings (for snapshots)
+    pub async fn get_all_hilbert_mappings(&self) -> Result<Vec<(u64, Vec<Uuid>)>, StorageError> {
+        let results = self.backend.scan_prefix(self.hilbert_prefix).await?;
+        
+        let mut mappings = Vec::new();
+        for (key, value) in results {
+            if key.len() >= self.hilbert_prefix.len() + 8 {
+                let index_bytes = &key[self.hilbert_prefix.len()..];
+                if index_bytes.len() == 8 {
+                    let index = u64::from_be_bytes([
+                        index_bytes[0], index_bytes[1], index_bytes[2], index_bytes[3],
+                        index_bytes[4], index_bytes[5], index_bytes[6], index_bytes[7],
+                    ]);
+                    if let Ok(vector_ids) = bincode::deserialize::<Vec<Uuid>>(&value) {
+                        mappings.push((index, vector_ids));
+                    }
+                }
+            }
+        }
+        
+        Ok(mappings)
+    }
+
+    fn vector_key(&self, id: Uuid) -> Vec<u8> {
+        let mut key = Vec::with_capacity(self.vector_prefix.len() + 16);
+        key.extend_from_slice(self.vector_prefix);
+        key.extend_from_slice(id.as_bytes());
+        key
+    }
+
+    fn hilbert_key(&self, index: u64) -> Vec<u8> {
+        let mut key = Vec::with_capacity(self.hilbert_prefix.len() + 8);
+        key.extend_from_slice(self.hilbert_prefix);
+        key.extend_from_slice(&index.to_be_bytes());
+        key
+    }
+
+    fn parse_vector_key(&self, key: &[u8]) -> Result<Uuid, StorageError> {
+        if key.len() != self.vector_prefix.len() + 16 {
+            return Err(StorageError::InvalidOperation("Invalid vector key length".to_string()));
+        }
+        
+        let uuid_bytes = &key[self.vector_prefix.len()..];
+        Uuid::from_slice(uuid_bytes)
+            .map_err(|e| StorageError::InvalidOperation(format!("Invalid UUID: {}", e)))
+    }
+
+    fn parse_hilbert_key(&self, key: &[u8]) -> Result<u64, StorageError> {
+        if key.len() != self.hilbert_prefix.len() + 8 {
+            return Err(StorageError::InvalidOperation("Invalid hilbert key length".to_string()));
+        }
+        
+        let index_bytes = &key[self.hilbert_prefix.len()..];
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(index_bytes);
+        Ok(u64::from_be_bytes(bytes))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::vector::Vector;
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_memory_backend() {
+        let backend = MemoryBackend::new();
+        
+        // Test put/get
+        backend.put(b"key1", b"value1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, Some(Bytes::from("value1")));
+        
+        // Test delete
+        backend.delete(b"key1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn test_file_backend() {
+        let temp_dir = TempDir::new().unwrap();
+        let backend = FileBackend::new(temp_dir.path()).unwrap();
+        
+        // Test put/get
+        backend.put(b"key1", b"value1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, Some(Bytes::from("value1")));
+        
+        // Test delete
+        backend.delete(b"key1").await.unwrap();
+        let result = backend.get(b"key1").await.unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn test_storage_engine() {
+        let backend = Box::new(MemoryBackend::new());
+        let engine = StorageEngine::new(backend);
+        
+        // Create test vector entry
+        let id = Uuid::new_v4();
+        let vector = Vector::random(3);
+        let mut metadata = HashMap::new();
+        metadata.insert("test".to_string(), "value".to_string());
+        
+        let entry = VectorEntry {
+            id,
+            vector,
+            metadata: Some(metadata),
+            created_at: chrono::Utc::now(),
+        };
+        
+        // Test put/get vector
+        engine.put_vector(id, &entry).await.unwrap();
+        let retrieved = engine.get_vector(id).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().id, id);
+        
+        // Test delete vector
+        engine.delete_vector(id).await.unwrap();
+        let retrieved = engine.get_vector(id).await.unwrap();
+        assert!(retrieved.is_none());
+    }
+}
+
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{error, info, warn};
+use uuid::Uuid;
+
+use crate::persistence::storage::StorageEngine;
+use crate::sharding::vector_index::VectorEntry;
+
+/// Compression types for snapshots
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum CompressionType {
+    None,
+    Gzip,
+    Lz4,
+}
+
+/// Snapshot data structure
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SnapshotData {
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub wal_sequence: u64,
+    pub vectors: Vec<(Uuid, VectorEntry)>,
+    pub hilbert_mappings: Vec<(u64, Vec<Uuid>)>,
+}
+
+/// Metadata about a snapshot
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SnapshotMetadata {
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub wal_sequence: u64,
+    pub vector_count: usize,
+    pub hilbert_mapping_count: usize,
+    pub storage_locations: Vec<String>,
+    pub checksum: String,
+    pub compressed_size: u64,
+    pub uncompressed_size: u64,
+}
+
+/// Manages snapshots for persistence
+pub struct SnapshotManager {
+    snapshots_dir: PathBuf,
+    compression: CompressionType,
+}
+
+impl SnapshotManager {
+    pub async fn new<P: AsRef<Path>>(
+        snapshots_dir: P,
+        _ipfs_api_url: Option<&str>, // Ignored for simplified demo
+        _s3_bucket: Option<String>,  // Ignored for simplified demo
+        compression: CompressionType,
+    ) -> Result<Self, SnapshotError> {
+        let snapshots_dir = snapshots_dir.as_ref().to_path_buf();
+        
+        tokio::fs::create_dir_all(&snapshots_dir).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        
+        info!("Initialized SnapshotManager at: {}", snapshots_dir.display());
+        
+        Ok(Self {
+            snapshots_dir,
+            compression,
+        })
+    }
+
+    pub async fn create_snapshot(
+        &self,
+        storage_engine: &StorageEngine,
+        wal_sequence: u64,
+    ) -> Result<SnapshotMetadata, SnapshotError> {
+        let snapshot_id = Uuid::new_v4().to_string();
+        let timestamp = Utc::now();
+        
+        info!("Creating snapshot {} at WAL sequence {}", snapshot_id, wal_sequence);
+        
+        // Collect all vectors
+        let vectors = storage_engine.get_all_vectors().await
+            .map_err(|e| SnapshotError::Storage(e.to_string()))?;
+        
+        // Collect all hilbert mappings
+        let hilbert_mappings = storage_engine.get_all_hilbert_mappings().await
+            .map_err(|e| SnapshotError::Storage(e.to_string()))?;
+        
+        let snapshot_data = SnapshotData {
+            id: snapshot_id.clone(),
+            timestamp,
+            wal_sequence,
+            vectors: vectors.clone(),
+            hilbert_mappings: hilbert_mappings.clone(),
+        };
+        
+        // Serialize the snapshot
+        let serialized = bincode::serialize(&snapshot_data)
+            .map_err(|e| SnapshotError::Serialization(e.to_string()))?;
+        
+        let uncompressed_size = serialized.len() as u64;
+        
+        // Compress if needed
+        let compressed_data = match self.compression {
+            CompressionType::None => serialized,
+            CompressionType::Gzip => {
+                use flate2::write::GzEncoder;
+                use flate2::Compression;
+                use std::io::Write;
+                
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+                encoder.write_all(&serialized)
+                    .map_err(|e| SnapshotError::Compression(e.to_string()))?;
+                encoder.finish()
+                    .map_err(|e| SnapshotError::Compression(e.to_string()))?
+            }
+            CompressionType::Lz4 => {
+                // For demo, just use the uncompressed data
+                warn!("LZ4 compression not implemented, using uncompressed data");
+                serialized
+            }
+        };
+        
+        let compressed_size = compressed_data.len() as u64;
+        
+        // Calculate checksum
+        let checksum = {
+            use sha2::{Digest, Sha256};
+            let mut hasher = Sha256::new();
+            hasher.update(&compressed_data);
+            hex::encode(hasher.finalize())
+        };
+        
+        // Save to local file
+        let snapshot_path = self.snapshots_dir.join(format!("{}.snapshot", snapshot_id));
+        let mut file = File::create(&snapshot_path).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        file.write_all(&compressed_data).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        file.sync_all().await
+            .map_err(|e| SnapshotError::Io(e))?;
+        
+        let metadata = SnapshotMetadata {
+            id: snapshot_id,
+            timestamp,
+            wal_sequence,
+            vector_count: vectors.len(),
+            hilbert_mapping_count: hilbert_mappings.len(),
+            storage_locations: vec![snapshot_path.to_string_lossy().to_string()],
+            checksum,
+            compressed_size,
+            uncompressed_size,
+        };
+        
+        // Save metadata
+        let metadata_path = self.snapshots_dir.join(format!("{}.metadata", metadata.id));
+        let metadata_json = serde_json::to_string_pretty(&metadata)
+            .map_err(|e| SnapshotError::Serialization(e.to_string()))?;
+        tokio::fs::write(&metadata_path, metadata_json).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        
+        info!("Created snapshot {} with {} vectors and {} hilbert mappings", 
+              metadata.id, metadata.vector_count, metadata.hilbert_mapping_count);
+        
+        Ok(metadata)
+    }
+
+    pub async fn restore_snapshot(
+        &self,
+        snapshot_id: &str,
+        storage_engine: &StorageEngine,
+    ) -> Result<SnapshotData, SnapshotError> {
+        info!("Restoring snapshot {}", snapshot_id);
+        
+        // Load metadata
+        let metadata_path = self.snapshots_dir.join(format!("{}.metadata", snapshot_id));
+        let metadata_json = tokio::fs::read_to_string(&metadata_path).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        let metadata: SnapshotMetadata = serde_json::from_str(&metadata_json)
+            .map_err(|e| SnapshotError::Serialization(e.to_string()))?;
+        
+        // Load snapshot data
+        let snapshot_path = self.snapshots_dir.join(format!("{}.snapshot", snapshot_id));
+        let compressed_data = tokio::fs::read(&snapshot_path).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        
+        // Verify checksum
+        let checksum = {
+            use sha2::{Digest, Sha256};
+            let mut hasher = Sha256::new();
+            hasher.update(&compressed_data);
+            hex::encode(hasher.finalize())
+        };
+        
+        if checksum != metadata.checksum {
+            return Err(SnapshotError::Corruption(format!(
+                "Checksum mismatch: expected {}, got {}", metadata.checksum, checksum
+            )));
+        }
+        
+        // Decompress if needed
+        let serialized_data = match self.compression {
+            CompressionType::None => compressed_data,
+            CompressionType::Gzip => {
+                use flate2::read::GzDecoder;
+                use std::io::Read;
+                
+                let mut decoder = GzDecoder::new(&compressed_data[..]);
+                let mut decompressed = Vec::new();
+                decoder.read_to_end(&mut decompressed)
+                    .map_err(|e| SnapshotError::Compression(e.to_string()))?;
+                decompressed
+            }
+            CompressionType::Lz4 => {
+                // For demo, assume it's uncompressed
+                compressed_data
+            }
+        };
+        
+        // Deserialize
+        let snapshot_data: SnapshotData = bincode::deserialize(&serialized_data)
+            .map_err(|e| SnapshotError::Serialization(e.to_string()))?;
+        
+        // Restore to storage engine
+        for (id, entry) in &snapshot_data.vectors {
+            storage_engine.put_vector(*id, entry).await
+                .map_err(|e| SnapshotError::Storage(e.to_string()))?;
+        }
+        
+        for (hilbert_index, vector_ids) in &snapshot_data.hilbert_mappings {
+            storage_engine.put_hilbert_mapping(*hilbert_index, vector_ids).await
+                .map_err(|e| SnapshotError::Storage(e.to_string()))?;
+        }
+        
+        info!("Restored snapshot {} with {} vectors and {} hilbert mappings",
+              snapshot_id, snapshot_data.vectors.len(), snapshot_data.hilbert_mappings.len());
+        
+        Ok(snapshot_data)
+    }
+
+    pub async fn list_snapshots(&self) -> Result<Vec<SnapshotMetadata>, SnapshotError> {
+        let mut snapshots = Vec::new();
+        
+        let mut entries = tokio::fs::read_dir(&self.snapshots_dir).await
+            .map_err(|e| SnapshotError::Io(e))?;
+        
+        while let Some(entry) = entries.next_entry().await
+            .map_err(|e| SnapshotError::Io(e))? {
+            let path = entry.path();
+            if let Some(extension) = path.extension() {
+                if extension == "metadata" {
+                    let metadata_json = tokio::fs::read_to_string(&path).await
+                        .map_err(|e| SnapshotError::Io(e))?;
+                    let metadata: SnapshotMetadata = serde_json::from_str(&metadata_json)
+                        .map_err(|e| SnapshotError::Serialization(e.to_string()))?;
+                    snapshots.push(metadata);
+                }
+            }
+        }
+        
+        // Sort by timestamp, newest first
+        snapshots.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        
+        Ok(snapshots)
+    }
+
+    pub async fn cleanup_old_snapshots(&self, max_snapshots: usize) -> Result<(), SnapshotError> {
+        let snapshots = self.list_snapshots().await?;
+        
+        if snapshots.len() <= max_snapshots {
+            return Ok(());
+        }
+        
+        let to_delete = &snapshots[max_snapshots..];
+        
+        for snapshot in to_delete {
+            info!("Cleaning up old snapshot {}", snapshot.id);
+            
+            // Delete snapshot file
+            let snapshot_path = self.snapshots_dir.join(format!("{}.snapshot", snapshot.id));
+            if let Err(e) = tokio::fs::remove_file(&snapshot_path).await {
+                warn!("Failed to delete snapshot file {}: {}", snapshot_path.display(), e);
+            }
+            
+            // Delete metadata file
+            let metadata_path = self.snapshots_dir.join(format!("{}.metadata", snapshot.id));
+            if let Err(e) = tokio::fs::remove_file(&metadata_path).await {
+                warn!("Failed to delete metadata file {}: {}", metadata_path.display(), e);
+            }
+        }
+        
+        info!("Cleaned up {} old snapshots", to_delete.len());
+        
+        Ok(())
+    }
+
+    pub async fn get_latest_snapshot(&self) -> Result<Option<SnapshotMetadata>, SnapshotError> {
+        let snapshots = self.list_snapshots().await?;
+        Ok(snapshots.into_iter().next())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SnapshotError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    
+    #[error("Storage error: {0}")]
+    Storage(String),
+    
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+    
+    #[error("Compression error: {0}")]
+    Compression(String),
+    
+    #[error("Data corruption: {0}")]
+    Corruption(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::persistence::storage::{MemoryBackend, StorageEngine};
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_snapshot_creation_and_restoration() {
+        let temp_dir = TempDir::new().unwrap();
+        let snapshot_manager = SnapshotManager::new(
+            temp_dir.path(),
+            None,
+            None,
+            CompressionType::None,
+        ).await.unwrap();
+        
+        let backend = Box::new(MemoryBackend::new());
+        let storage_engine = StorageEngine::new(backend);
+        
+        // Add some test data
+        let vector = crate::core::vector::Vector::new(vec![1.0, 2.0, 3.0]);
+        let entry = VectorEntry {
+            id: Uuid::new_v4(),
+            vector,
+            metadata: None,
+            created_at: Utc::now(),
+        };
+        
+        storage_engine.put_vector(entry.id, &entry).await.unwrap();
+        
+        // Create snapshot
+        let metadata = snapshot_manager.create_snapshot(&storage_engine, 123).await.unwrap();
+        assert_eq!(metadata.vector_count, 1);
+        assert_eq!(metadata.wal_sequence, 123);
+        
+        // Create new storage engine and restore
+        let backend2 = Box::new(MemoryBackend::new());
+        let storage_engine2 = StorageEngine::new(backend2);
+        
+        let restored_data = snapshot_manager.restore_snapshot(&metadata.id, &storage_engine2).await.unwrap();
+        assert_eq!(restored_data.vectors.len(), 1);
+        assert_eq!(restored_data.wal_sequence, 123);
+        
+        // Verify data was restored
+        let restored_entry = storage_engine2.get_vector(entry.id).await.unwrap().unwrap();
+        assert_eq!(restored_entry.id, entry.id);
+    }
+}
+
+se std::collections::HashMap;
+use std::path::Path;
+use thiserror::Error;
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
+
+use crate::persistence::snapshot::{SnapshotManager, SnapshotMetadata};
+use crate::persistence::storage::StorageEngine;
+use crate::persistence::wal::{WriteAheadLog, WalEntry, WalOperation};
+use crate::sharding::vector_index::VectorEntry;
+
+#[derive(Error, Debug)]
+pub enum RecoveryError {
+    #[error("WAL error: {0}")]
+    Wal(#[from] crate::persistence::wal::WalError),
+    #[error("Snapshot error: {0}")]
+    Snapshot(#[from] crate::persistence::snapshot::SnapshotError),
+    #[error("Storage error: {0}")]
+    Storage(String),
+    #[error("Recovery failed: {0}")]
+    RecoveryFailed(String),
+}
+
+/// Recovery manager for crash recovery and data consistency
+pub struct RecoveryManager {
+    pub storage_engine: StorageEngine,
+    pub wal: WriteAheadLog,
+    pub snapshot_manager: SnapshotManager,
+}
+
+impl RecoveryManager {
+    pub fn new(
+        storage_engine: StorageEngine,
+        wal: WriteAheadLog,
+        snapshot_manager: SnapshotManager,
+    ) -> Self {
+        Self {
+            storage_engine,
+            wal,
+            snapshot_manager,
+        }
+    }
+
+    /// Perform full recovery from snapshots and WAL
+    pub async fn recover(&self) -> Result<RecoveryStats, RecoveryError> {
+        info!("Starting recovery process");
+        
+        let mut stats = RecoveryStats::default();
+        
+        // Step 1: Find the latest snapshot
+        let snapshots = self.snapshot_manager.list_snapshots().await?;
+        
+        let latest_snapshot = snapshots.first();
+        let start_wal_sequence = if let Some(snapshot) = latest_snapshot {
+            info!("Found latest snapshot: {} at WAL sequence {}", 
+                  snapshot.id, snapshot.wal_sequence);
+            
+            // Restore from snapshot
+            let snapshot_data = self.snapshot_manager.restore_snapshot(
+                &snapshot.id,
+                &self.storage_engine,
+            ).await?;
+            
+            stats.snapshot_restored = true;
+            stats.vectors_from_snapshot = snapshot.vector_count;
+            stats.hilbert_mappings_from_snapshot = snapshot.hilbert_mapping_count;
+            
+            snapshot_data.wal_sequence + 1 // Start from next sequence after snapshot
+        } else {
+            info!("No snapshots found, starting from beginning of WAL");
+            0
+        };
+        
+        // Step 2: Replay WAL entries from the snapshot point
+        let wal_entries = self.wal.read_from_sequence(start_wal_sequence).await?;
+        
+        info!("Replaying {} WAL entries from sequence {}", 
+              wal_entries.len(), start_wal_sequence);
+        
+        for entry in wal_entries {
+            match self.replay_wal_entry(&entry).await {
+                Ok(()) => {
+                    stats.wal_entries_replayed += 1;
+                    debug!("Replayed WAL entry {}: {:?}", entry.sequence, entry.operation);
+                }
+                Err(e) => {
+                    error!("Failed to replay WAL entry {}: {}", entry.sequence, e);
+                    stats.wal_entries_failed += 1;
+                    
+                    // Decide whether to continue or fail
+                    if self.should_continue_on_error(&entry, &e) {
+                        warn!("Continuing recovery despite error in entry {}", entry.sequence);
+                        continue;
+                    } else {
+                        return Err(RecoveryError::RecoveryFailed(
+                            format!("Critical error in WAL entry {}: {}", entry.sequence, e)
+                        ));
+                    }
+                }
+            }
+        }
+        
+        // Step 3: Verify data consistency
+        self.verify_consistency().await?;
+        
+        info!("Recovery completed successfully: {:?}", stats);
+        
+        Ok(stats)
+    }
+
+    /// Replay a single WAL entry
+    async fn replay_wal_entry(&self, entry: &WalEntry) -> Result<(), RecoveryError> {
+        // Verify checksum
+        if !entry.verify_checksum() {
+            return Err(RecoveryError::RecoveryFailed(
+                format!("Corrupted WAL entry at sequence {}", entry.sequence)
+            ));
+        }
+        
+        match &entry.operation {
+            WalOperation::AddVector { id, vector, metadata, hilbert_index } => {
+                // Create vector entry
+                let vector_entry = VectorEntry {
+                    id: *id,
+                    vector: vector.clone(),
+                    metadata: metadata.clone(),
+                    created_at: entry.timestamp,
+                };
+                
+                // Store vector
+                self.storage_engine.put_vector(*id, &vector_entry).await
+                    .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+                
+                // Update hilbert mapping
+                let mut current_ids = self.storage_engine.get_hilbert_mapping(*hilbert_index).await
+                    .map_err(|e| RecoveryError::Storage(e.to_string()))?
+                    .unwrap_or_default();
+                
+                if !current_ids.contains(id) {
+                    current_ids.push(*id);
+                    self.storage_engine.put_hilbert_mapping(*hilbert_index, &current_ids).await
+                        .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+                }
+            }
+            
+            WalOperation::RemoveVector { id, hilbert_index } => {
+                // Remove vector
+                self.storage_engine.delete_vector(*id).await
+                    .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+                
+                // Update hilbert mapping
+                if let Ok(Some(mut current_ids)) = self.storage_engine.get_hilbert_mapping(*hilbert_index).await {
+                    current_ids.retain(|&x| x != *id);
+                    
+                    if current_ids.is_empty() {
+                        self.storage_engine.delete_hilbert_mapping(*hilbert_index).await
+                            .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+                    } else {
+                        self.storage_engine.put_hilbert_mapping(*hilbert_index, &current_ids).await
+                            .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+                    }
+                }
+            }
+            
+            WalOperation::UpdateHilbertMapping { hilbert_index, vector_ids } => {
+                self.storage_engine.put_hilbert_mapping(*hilbert_index, vector_ids).await
+                    .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+            }
+            
+            WalOperation::Checkpoint { .. } => {
+                // Checkpoints are informational, no action needed during recovery
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Verify data consistency after recovery
+    async fn verify_consistency(&self) -> Result<(), RecoveryError> {
+        info!("Verifying data consistency");
+        
+        // Get all vectors and hilbert mappings
+        let vectors = self.storage_engine.scan_all_vectors().await
+            .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+        let hilbert_mappings = self.storage_engine.scan_all_hilbert_mappings().await
+            .map_err(|e| RecoveryError::Storage(e.to_string()))?;
+        
+        // Build reverse mapping from vector ID to hilbert indices
+        let mut vector_to_hilbert: HashMap<Uuid, Vec<u64>> = HashMap::new();
+        for (hilbert_index, vector_ids) in &hilbert_mappings {
+            for &vector_id in vector_ids {
+                vector_to_hilbert.entry(vector_id)
+                    .or_insert_with(Vec::new)
+                    .push(*hilbert_index);
+            }
+        }
+        
+        // Check that all vectors referenced in hilbert mappings exist
+        let vector_ids: HashMap<Uuid, _> = vectors.iter().map(|(id, entry)| (*id, entry)).collect();
+        
+        for (hilbert_index, vector_ids_in_mapping) in &hilbert_mappings {
+            for &vector_id in vector_ids_in_mapping {
+                if !vector_ids.contains_key(&vector_id) {
+                    warn!("Hilbert mapping {} references non-existent vector {}", 
+                          hilbert_index, vector_id);
+                    // This is a warning, not a fatal error
+                }
+            }
+        }
+        
+        // Check for orphaned vectors (vectors not in any hilbert mapping)
+        let mut orphaned_count = 0;
+        for (vector_id, _) in &vectors {
+            if !vector_to_hilbert.contains_key(vector_id) {
+                orphaned_count += 1;
+                debug!("Found orphaned vector: {}", vector_id);
+            }
+        }
+        
+        if orphaned_count > 0 {
+            warn!("Found {} orphaned vectors (not in any hilbert mapping)", orphaned_count);
+        }
+        
+        info!("Consistency check completed: {} vectors, {} hilbert mappings, {} orphaned vectors",
+              vectors.len(), hilbert_mappings.len(), orphaned_count);
+        
+        Ok(())
+    }
+
+    /// Determine if recovery should continue after an error
+    fn should_continue_on_error(&self, entry: &WalEntry, error: &RecoveryError) -> bool {
+        match &entry.operation {
+            // Critical operations - don't continue on error
+            WalOperation::Checkpoint { .. } => false,
+            
+            // Data operations - continue on error but log
+            WalOperation::AddVector { .. } |
+            WalOperation::RemoveVector { .. } |
+            WalOperation::UpdateHilbertMapping { .. } => {
+                // Continue for storage errors, but not for corruption
+                matches!(error, RecoveryError::Storage(_))
+            }
+        }
+    }
+
+    /// Create a checkpoint in the WAL
+    pub async fn create_checkpoint(&self) -> Result<u64, RecoveryError> {
+        let current_sequence = self.wal.current_sequence().await;
+        
+        let checkpoint_op = WalOperation::Checkpoint {
+            sequence: current_sequence,
+            timestamp: chrono::Utc::now(),
+        };
+        
+        let sequence = self.wal.append(checkpoint_op).await?;
+        
+        info!("Created checkpoint at WAL sequence {}", sequence);
+        
+        Ok(sequence)
+    }
+
+    /// Create a snapshot and checkpoint
+    pub async fn create_snapshot_checkpoint(&self) -> Result<(SnapshotMetadata, u64), RecoveryError> {
+        // Create checkpoint first
+        let checkpoint_sequence = self.create_checkpoint().await?;
+        
+        // Create snapshot at the checkpoint
+        let snapshot_metadata = self.snapshot_manager.create_snapshot(
+            &self.storage_engine,
+            checkpoint_sequence,
+        ).await?;
+        
+        info!("Created snapshot {} at checkpoint sequence {}", 
+              snapshot_metadata.id, checkpoint_sequence);
+        
+        Ok((snapshot_metadata, checkpoint_sequence))
+    }
+
+    /// Truncate WAL after successful snapshot
+    pub async fn truncate_wal_after_snapshot(&self, snapshot_metadata: &SnapshotMetadata) -> Result<(), RecoveryError> {
+        self.wal.truncate_after(snapshot_metadata.wal_sequence).await?;
+        
+        info!("Truncated WAL after sequence {} (snapshot {})", 
+              snapshot_metadata.wal_sequence, snapshot_metadata.id);
+        
+        Ok(())
+    }
+}
+
+/// Statistics from recovery process
+#[derive(Debug, Default)]
+pub struct RecoveryStats {
+    pub snapshot_restored: bool,
+    pub vectors_from_snapshot: usize,
+    pub hilbert_mappings_from_snapshot: usize,
+    pub wal_entries_replayed: usize,
+    pub wal_entries_failed: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::vector::Vector;
+    use crate::persistence::snapshot::{CompressionType, SnapshotManager};
+    use crate::persistence::storage::{MemoryBackend, StorageEngine};
+    use crate::persistence::wal::WriteAheadLog;
+    use std::collections::HashMap;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_recovery_from_wal_only() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create components
+        let backend = Box::new(MemoryBackend::new());
+        let storage_engine = StorageEngine::new(backend);
+        
+        let wal_path = temp_dir.path().join("test.wal");
+        let wal = WriteAheadLog::new(&wal_path, true).await.unwrap();
+        
+        let snapshot_manager = SnapshotManager::new(
+            temp_dir.path().join("snapshots"),
+            None,
+            None,
+            CompressionType::None,
+        ).await.unwrap();
+        
+        let recovery_manager = RecoveryManager::new(storage_engine, wal, snapshot_manager);
+        
+        // Add some WAL entries
+        let vector_id = Uuid::new_v4();
+        let vector = Vector::random(3);
+        let hilbert_index = 123u64;
+        
+        let add_op = WalOperation::AddVector {
+            id: vector_id,
+            vector: vector.clone(),
+            metadata: Some(HashMap::new()),
+            hilbert_index,
+        };
+        
+        recovery_manager.wal.append(add_op).await.unwrap();
+        
+        // Perform recovery
+        let stats = recovery_manager.recover().await.unwrap();
+        
+        assert!(!stats.snapshot_restored);
+        assert_eq!(stats.wal_entries_replayed, 1);
+        assert_eq!(stats.wal_entries_failed, 0);
+        
+        // Verify data was recovered
+        let recovered_vector = recovery_manager.storage_engine.get_vector(vector_id).await.unwrap();
+        assert!(recovered_vector.is_some());
+        
+        let recovered_mapping = recovery_manager.storage_engine.get_hilbert_mapping(hilbert_index).await.unwrap();
+        assert!(recovered_mapping.is_some());
+        assert_eq!(recovered_mapping.unwrap(), vec![vector_id]);
+    }
+
+    #[tokio::test]
+    async fn test_recovery_with_snapshot() {
+        let temp_dir = TempDir::new().unwrap();
+        
+        // Create components
+        let backend = Box::new(MemoryBackend::new());
+        let storage_engine = StorageEngine::new(backend);
+        
+        let wal_path = temp_dir.path().join("test.wal");
+        let wal = WriteAheadLog::new(&wal_path, true).await.unwrap();
+        
+        let snapshot_manager = SnapshotManager::new(
+            temp_dir.path().join("snapshots"),
+            None,
+            None,
+            CompressionType::None,
+        ).await.unwrap();
+        
+        let recovery_manager = RecoveryManager::new(storage_engine, wal, snapshot_manager);
+        
+        // Add initial data and create snapshot
+        let vector_id1 = Uuid::new_v4();
+        let vector1 = Vector::random(3);
+        let entry1 = VectorEntry {
+            id: vector_id1,
+            vector: vector1.clone(),
+            metadata: Some(HashMap::new()),
+            created_at: chrono::Utc::now(),
+        };
+        
+        recovery_manager.storage_engine.put_vector(vector_id1, &entry1).await.unwrap();
+        recovery_manager.storage_engine.put_hilbert_mapping(123, &[vector_id1]).await.unwrap();
+        
+        let (snapshot_metadata, _) = recovery_manager.create_snapshot_checkpoint().await.unwrap();
+        
+        // Add more WAL entries after snapshot
+        let vector_id2 = Uuid::new_v4();
+        let vector2 = Vector::random(3);
+        
+        let add_op = WalOperation::AddVector {
+            id: vector_id2,
+            vector: vector2.clone(),
+            metadata: Some(HashMap::new()),
+            hilbert_index: 456,
+        };
+        
+        recovery_manager.wal.append(add_op).await.unwrap();
+        
+        // Clear storage to simulate crash
+        let backend2 = Box::new(MemoryBackend::new());
+        let storage_engine2 = StorageEngine::new(backend2);
+        let recovery_manager2 = RecoveryManager::new(
+            storage_engine2,
+            recovery_manager.wal,
+            recovery_manager.snapshot_manager,
+        );
+        
+        // Perform recovery
+        let stats = recovery_manager2.recover().await.unwrap();
+        
+        assert!(stats.snapshot_restored);
+        assert_eq!(stats.vectors_from_snapshot, 1);
+        assert_eq!(stats.wal_entries_replayed, 1);
+        assert_eq!(stats.wal_entries_failed, 0);
+        
+        // Verify both vectors were recovered
+        let recovered_vector1 = recovery_manager2.storage_engine.get_vector(vector_id1).await.unwrap();
+        assert!(recovered_vector1.is_some());
+        
+        let recovered_vector2 = recovery_manager2.storage_engine.get_vector(vector_id2).await.unwrap();
+        assert!(recovered_vector2.is_some());
+    }
+}
+

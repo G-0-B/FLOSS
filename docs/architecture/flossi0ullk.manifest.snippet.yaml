@@ -1,0 +1,8 @@
+# Insert under active_artifacts:
+- id: "research-report-agent-orchestration"
+  version: "1.0.0"
+  kind: "technical_report"
+
+- id: "kb-index-winwings"
+  version: "1.0.0"
+  kind: "research_index"

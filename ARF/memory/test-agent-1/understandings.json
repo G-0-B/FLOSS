@@ -1,0 +1,12 @@
+[
+  {
+    "content": "The coordination protocol is the conversation itself. The walking skeleton is already operational.",
+    "agent_id": "test-agent-1",
+    "timestamp": "2026-03-16T14:56:35.852932",
+    "context": "ADR-0 breakthrough after 13 months",
+    "is_decision": true,
+    "coherence_score": 0.95,
+    "metadata": {},
+    "embedding_ref": "94fcd9b7ac734c44bc792bad3d109841deb5f32acd871207bedfbcb914d58282"
+  }
+]
