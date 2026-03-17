@@ -1,0 +1,280 @@
+# Task {PHASE}.{TASK_NUM} Completion Report: {TASK_NAME}
+
+**Completed By**: Claude Code Agent
+**Date**: {DATE}
+**Duration**: {HOURS} hours
+**Branch**: parallel/phase{PHASE}-task{TASK_NUM}-{SESSION_ID}
+**Status**: ✅ COMPLETE / ⚠️ PARTIAL / ❌ BLOCKED
+
+---
+
+## Executive Summary
+
+{1-2 sentence summary of what was accomplished}
+
+---
+
+## Changes Made
+
+### Files Created
+- `{filepath}` - {description}
+- `{filepath}` - {description}
+
+### Files Modified
+- `{filepath}` - {what changed and why}
+- `{filepath}` - {what changed and why}
+
+### Files Deleted
+- `{filepath}` - {why deleted}
+
+---
+
+## Implementation Details
+
+### Approach
+{Describe the approach taken, key decisions made, alternatives considered}
+
+### Key Code Snippets
+
+{Show 1-3 important code sections}
+
+```python
+# Example
+def new_feature():
+    """What this does."""
+    ...
+```
+
+### Dependencies Added
+- `package-name==version` - {why needed}
+
+### Configuration Changes
+- {Any config file changes}
+
+---
+
+## Test Results
+
+### Unit Tests
+```bash
+$ pytest ARF/tests/test_{module}.py -v
+
+{PASTE TEST OUTPUT HERE}
+
+=========== X passed, Y warnings in Z.ZZs ===========
+```
+
+### Coverage Report
+```bash
+$ pytest --cov=ARF/{module} --cov-report=term-missing
+
+Name                    Stmts   Miss  Cover   Missing
+-----------------------------------------------------
+{module}.py               XXX     YY    ZZ%    {lines}
+-----------------------------------------------------
+TOTAL                     XXX     YY    ZZ%
+```
+
+**Coverage**: {XX}% {✅ ≥80% / ⚠️ <80%}
+
+### Integration Tests
+{If applicable}
+```bash
+$ pytest ARF/tests/integration/ -v -k {related_tests}
+
+{OUTPUT}
+```
+
+### Manual Testing
+{Describe any manual testing performed}
+
+```bash
+# Commands run
+$ python -c "from module import Class; ..."
+
+# Results
+{paste output}
+```
+
+---
+
+## Performance Benchmarks
+
+{If applicable}
+
+### Before Changes
+- Metric 1: {value}
+- Metric 2: {value}
+
+### After Changes
+- Metric 1: {value} ({+/- X%})
+- Metric 2: {value} ({+/- X%})
+
+### Performance Impact
+{Describe if there's any performance change}
+
+---
+
+## Acceptance Criteria
+
+Checklist from task specification:
+
+- [x] Criterion 1 from spec
+- [x] Criterion 2 from spec
+- [x] Criterion 3 from spec
+- [ ] {Any not met - explain why}
+
+### Additional Requirements Met
+- [x] {Any extra things accomplished}
+
+---
+
+## Known Issues
+
+### Issues Discovered
+1. **{Issue Title}**
+   - Description: {what's wrong}
+   - Severity: Critical / Major / Minor
+   - Workaround: {if any}
+   - TODO: {what needs to be done}
+
+### Out of Scope Items
+{List things explicitly not done, from task spec}
+
+---
+
+## Code Quality Checks
+
+### Linting
+```bash
+$ flake8 ARF/{module}.py --max-line-length=100
+
+{OUTPUT - should be clean or list acceptable exceptions}
+```
+
+### Type Checking (Python)
+```bash
+$ mypy ARF/{module}.py
+
+{OUTPUT}
+```
+
+### Clippy (Rust)
+```bash
+$ cargo clippy
+
+{OUTPUT - should have 0 warnings}
+```
+
+---
+
+## Documentation Updates
+
+### Docstrings Added/Updated
+- {Function/class name}: {what documented}
+
+### README Updates
+- {If README was updated}
+
+### Examples Added
+- {Any new example code or usage examples}
+
+---
+
+## Git Information
+
+### Branch Details
+```bash
+$ git log --oneline -5
+
+{RECENT COMMITS}
+```
+
+### Commit Hash
+Final commit: `{COMMIT_HASH}`
+
+### Files Changed Summary
+```bash
+$ git diff --stat origin/main...HEAD
+
+{OUTPUT showing file change statistics}
+```
+
+### Diff Size
+- Files changed: {N}
+- Lines added: {N}
+- Lines removed: {N}
+
+---
+
+## Integration Considerations
+
+### Dependencies for Other Tasks
+{Does any other task depend on this? Note for coordinator}
+
+### Merge Conflicts Expected
+{Anticipate any merge conflicts with other parallel tasks}
+
+### Breaking Changes
+{Any API changes that might affect other code}
+
+---
+
+## Next Steps
+
+### For Coordinator
+1. {What coordinator should do next}
+2. {Any special merge instructions}
+
+### For Future Work
+1. {Follow-up tasks identified}
+2. {Improvements that could be made later}
+
+### For Other Task Owners
+{Any coordination needed with other parallel tasks}
+
+---
+
+## Lessons Learned
+
+### What Went Well
+- {Positive experiences}
+
+### What Could Improve
+- {Challenges encountered and how to avoid them}
+
+### Recommendations
+- {Suggestions for similar tasks in the future}
+
+---
+
+## Appendix
+
+### Full Test Output
+{If main section was abbreviated, put full output here}
+
+### Configuration Files
+{Any full config files if relevant}
+
+### Error Messages Encountered
+{Any errors hit during development and how they were resolved}
+
+---
+
+## Sign-Off
+
+- [x] All acceptance criteria met
+- [x] Tests passing with ≥80% coverage
+- [x] Code follows style guide
+- [x] No linting errors
+- [x] Documentation complete
+- [x] Branch pushed to remote
+- [x] Ready for merge
+
+**Task Complete**: {YES/NO}
+
+**Blocked On**: {If not complete, what's blocking}
+
+---
+
+🌹 Task completion report generated by Claude Code autonomous development 🌹

@@ -9,6 +9,16 @@ pub const COST_LINK_EDGE: f32 = 3.0;
 // Represents the cost of creating a significant thoughtform
 pub const COST_CREATE_THOUGHT_CREDENTIAL: f32 = 10.0;
 
+// Memory operation costs (VVS spec requirements)
+// Cost to transmit an understanding to the DHT
+pub const COST_TRANSMIT_UNDERSTANDING: f32 = 1.0;
+// Cost per result when recalling understandings
+pub const COST_RECALL_UNDERSTANDINGS: f32 = 0.1;
+// Cost to compose memories from another agent
+pub const COST_COMPOSE_MEMORIES: f32 = 5.0;
+// Cost to validate a knowledge triple
+pub const COST_VALIDATE_TRIPLE: f32 = 2.0;
+
 // Total cognitive budget per window, reflecting the idea of a daily cognitive capacity
 pub const MAX_RU_PER_WINDOW: f32 = 100.0;
 // A 24-hour window for budget replenishment, aligning with natural human cycles
@@ -82,4 +92,50 @@ pub struct BudgetState {
     pub agent: AgentPubKey,
     pub remaining_ru: f32,
     pub window_start: Timestamp,
+}
+
+/// BudgetEngine manages resource units (RU) for autonomous operations
+/// Implements resource-bounded autonomy with graceful degradation
+pub struct BudgetEngine;
+
+impl BudgetEngine {
+    /// Reserve resource units (RU) for an operation
+    /// Returns an error if insufficient budget is available
+    pub fn reserve_ru(agent: &AgentPubKey, amount: f32) -> ExternResult<()> {
+        let budget_state = get_budget_state(agent)?;
+
+        if budget_state.remaining_ru >= amount {
+            consume_budget(agent, amount)?;
+            Ok(())
+        } else {
+            Err(wasm_error!(WasmErrorInner::Guest(
+                format!(
+                    "E_INSUFFICIENT_RU: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
+                    amount,
+                    budget_state.remaining_ru,
+                    budget_state.window_start.as_seconds() + BUDGET_WINDOW_SECONDS
+                )
+            )))
+        }
+    }
+
+    /// Allocate additional budget to an agent
+    pub fn allocate_budget(agent: &AgentPubKey, amount: f32) -> ExternResult<()> {
+        let budget_state = get_budget_state(agent)?;
+        let new_total = budget_state.remaining_ru + amount;
+        let capped_total = new_total.min(MAX_RU_PER_WINDOW * 2.0);
+        save_budget_entry(agent, capped_total, budget_state.window_start)?;
+        Ok(())
+    }
+
+    /// Get current budget status for an agent
+    pub fn get_status(agent: &AgentPubKey) -> ExternResult<BudgetState> {
+        get_budget_state(agent)
+    }
+
+    /// Check if an agent has sufficient budget for an operation
+    pub fn has_budget(agent: &AgentPubKey, amount: f32) -> ExternResult<bool> {
+        let budget_state = get_budget_state(agent)?;
+        Ok(budget_state.remaining_ru >= amount)
+    }
 }

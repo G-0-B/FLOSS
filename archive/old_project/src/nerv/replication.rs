@@ -176,7 +176,9 @@ impl ReplicationManager {
             bias: 0.01,
             version: 1,
             metadata: ModelMetadata {
-                timestamp: sys_time().map_err(|e| ShardError::Holochain(e))?,
+                timestamp: sys_time()
+                    .map_err(|e| ShardError::Holochain(e))?
+                    .as_millis() as u64,
                 metrics: ModelMetrics {
                     loss: 0.05,
                     accuracy: 0.95,
@@ -253,7 +255,9 @@ impl ReplicationManager {
             bias: aggregated_bias,
             version: updates.iter().map(|u| u.version).max().unwrap() + 1,
             metadata: ModelMetadata {
-                timestamp: sys_time().map_err(|e| ShardError::Holochain(e))?,
+                timestamp: sys_time()
+                    .map_err(|e| ShardError::Holochain(e))?
+                    .as_millis() as u64,
                 metrics: ModelMetrics {
                     loss: updates.iter().map(|u| u.metadata.metrics.loss).sum::<f32>() / update_count,
                     accuracy: updates.iter().map(|u| u.metadata.metrics.accuracy).sum::<f32>() / update_count,

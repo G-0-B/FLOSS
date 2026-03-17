@@ -3,10 +3,15 @@ use rose_forest_integrity::*;
 
 mod vector_ops;
 mod budget;
+mod sharding;
+mod crdt;
+mod versioning;
 
 use vector_ops::Vector;
-use budget::{consume_budget, get_budget_state, BudgetState};
+use budget::{consume_budget, get_budget_state, BudgetState, BudgetEngine};
 use budget::{COST_ADD_KNOWLEDGE, COST_LINK_EDGE, COST_CREATE_THOUGHT_CREDENTIAL};
+// Export memory operation costs
+pub use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES, COST_VALIDATE_TRIPLE};
 use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,7 +31,8 @@ pub fn add_knowledge(input: AddNodeInput) -> ExternResult<ActionHash> {
     let hash = create_entry(EntryTypes::RoseNode(node))?;
     let all_nodes_path = Path::from("all_nodes");
     create_link(all_nodes_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
-    let shard_key = format!("{:x}", hash.get_raw_36()[0]);
+    // Sharding based on the Hilbert curve of the embedding
+    let shard_key = sharding::get_shard_for_embedding(&input.embedding)?;
     let shard_path = Path::from(format!("shard.{}", shard_key));
     create_link(shard_path.path_entry_hash()?, hash.clone(), LinkTypes::ShardMember, ())?;
     Ok(hash)
@@ -96,4 +102,46 @@ pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternR
     create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
 
     Ok(hash)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateCentroidInput {
+    pub new_vector: Vec<f32>,
+}
+
+#[hdk_extern]
+pub fn update_centroid(input: UpdateCentroidInput) -> ExternResult<()> {
+    // In the future, this will update the centroid with the new vector.
+    // For now, it's a placeholder.
+    Ok(())
+}
+
+#[hdk_extern]
+pub fn get_centroid(_: ()) -> ExternResult<Option<crdt::Centroid>> {
+    // In the future, this will retrieve the centroid from the DHT.
+    // For now, it returns None.
+    Ok(None)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PublishNewVersionInput {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+#[hdk_extern]
+pub fn publish_new_version(input: PublishNewVersionInput) -> ExternResult<ActionHash> {
+    let version = versioning::Version {
+        major: input.major,
+        minor: input.minor,
+        patch: input.patch,
+        timestamp: sys_time()?,
+    };
+    create_entry(&version)
+}
+
+#[hdk_extern]
+pub fn get_latest_version(_: ()) -> ExternResult<Option<versioning::Version>> {
+    versioning::get_latest_version()
 }

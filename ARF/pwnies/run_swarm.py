@@ -38,8 +38,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def interactive_mode():
-    """
-    Interactive mode: Chat with pony swarm via terminal.
+    """Initiates an interactive chat session with the Pony Swarm.
+
+    This function provides a human-in-the-loop interface for interacting with the
+    decentralized AI swarm. It serves as a direct channel for "memetic transmission,"
+    allowing a human agent to inject queries and receive synthesized responses from
+    the collective intelligence of the ponies. This mode is a practical
+    demonstration of the project's commitment to human-AI collaboration and the
+    "Agency" principle of ULLK.
     """
     print("\n" + "="*80)
     print("🐴 DESKTOP PONY SWARM - Interactive Mode")
@@ -106,8 +112,14 @@ async def interactive_mode():
         bridge.close()
 
 async def demo_mode():
-    """
-    Demo mode: Run predefined examples.
+    """Runs a non-interactive demonstration of the Pony Swarm's capabilities.
+
+    This function executes a series of predefined queries, showcasing the swarm's
+    ability to perform recursive self-aggregation and generate coherent responses.
+    It serves as a repeatable benchmark and a "Specification-Driven Development" (SDD)
+    tool, providing a concrete example of the system's expected behavior. The demo
+    highlights the swarm's potential for decentralized problem-solving and
+    collective reasoning.
     """
     print("\n" + "="*80)
     print("🐴 DESKTOP PONY SWARM - Demo Mode")
@@ -138,7 +150,13 @@ async def demo_mode():
                 await asyncio.sleep(2)
 
 def main():
-    """Main entry point."""
+    """The main entry point for the Desktop Pony Swarm application.
+
+    This function parses command-line arguments to determine whether to run in
+    interactive or demo mode, and then launches the appropriate asynchronous
+    event loop. It acts as the primary bootstrap for the application, initiating
+    the process of decentralized intelligence.
+    """
     if len(sys.argv) > 1 and sys.argv[1] == "demo":
         asyncio.run(demo_mode())
     else:

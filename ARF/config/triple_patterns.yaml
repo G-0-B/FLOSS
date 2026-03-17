@@ -1,0 +1,34 @@
+patterns:
+  is_a:
+    regex: '(\S+(?:-\S+)*)\s+is\s+an?\s+([\w\s-]+?)(?:\s*$|[.,;!?])'
+    predicate: "is_a"
+    confidence: 1.0
+    examples:
+      - "GPT-4 is a large language model"
+      - "Python is an interpreted language"
+
+  improves_upon:
+    regex: '([\w\s.-]+?)\s+improves(?:\s+upon)?\s+([\w\s.-]+)'
+    predicate: "improves_upon"
+    confidence: 0.9
+    examples:
+      - "Sonnet 4.5 improves upon Sonnet 4"
+
+  capable_of:
+    regex: '(\S+(?:-\S+)*)\s+(?:can|is capable of)\s+(\w+)'
+    predicate: "capable_of"
+    confidence: 0.9
+    examples:
+      - "Claude can write code"
+      - "GPT-4 is capable of reasoning"
+
+known_predicates:
+  - is_a
+  - part_of
+  - related_to
+  - has_property
+  - improves_upon
+  - capable_of
+  - trained_on
+  - evaluated_on
+  - stated

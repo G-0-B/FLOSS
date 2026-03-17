@@ -1,0 +1,41 @@
+{
+  "rfc_id": "RFC-GOOD",
+  "decision": "APPROVED",
+  "rationale": "Decision: APPROVED\n\nSupporting Arguments:\n1. Tests are essential\n2. Agree\n3. Yes",
+  "votes": {
+    "agent_alice": {
+      "agent_id": "agent_alice",
+      "vote": 1,
+      "vote_str": "+1",
+      "rationale": "Tests are essential",
+      "timestamp": 1763505518.8962343,
+      "confidence": 1.0
+    },
+    "agent_bob": {
+      "agent_id": "agent_bob",
+      "vote": 1,
+      "vote_str": "+1",
+      "rationale": "Agree",
+      "timestamp": 1763505518.8962379,
+      "confidence": 1.0
+    },
+    "agent_charlie": {
+      "agent_id": "agent_charlie",
+      "vote": 1,
+      "vote_str": "+1",
+      "rationale": "Yes",
+      "timestamp": 1763505518.8962402,
+      "confidence": 1.0
+    }
+  },
+  "consensus_method": "voting",
+  "provenance": [
+    "agent_alice",
+    "agent_alice",
+    "agent_bob",
+    "agent_charlie"
+  ],
+  "created_at": 1763505518.8962898,
+  "outcome": "success",
+  "outcome_notes": "Tests caught 3 bugs"
+}

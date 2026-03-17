@@ -1,3 +1,4 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kalisam/FLOSS)
 # FLOSSIOULLK
 
 **Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge**

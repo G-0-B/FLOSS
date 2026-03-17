@@ -1,0 +1,12 @@
+[package]
+name = "infinity_bridge_registry"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "infinity_bridge_registry"
+
+[dependencies]
+hdk = "0.3"
+serde = "1"

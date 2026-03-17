@@ -20,15 +20,69 @@ target
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+#my untracked local working files
+.untracked/
 
 /ai-conversations
 *.zip
 *Key_Recovery_File*
 /media
+trajectory*.json
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 *.pyc
-.claude/worktrees/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# Node.js
 node_modules/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Memory storage for conversation_memory.py
+memory/
+memory_backup/
+
+# Claude Code
+.claude/worktrees/
 *.stackdump
 nul
-trajectory*.json

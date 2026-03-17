@@ -1,0 +1,204 @@
+.TH ARF 1 "November 2025" "ARF 0.1.0" "User Commands"
+.SH NAME
+arf \- FLOSSI0ULLK Agent Runtime Framework CLI
+.SH SYNOPSIS
+.B arf
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR...]
+.SH DESCRIPTION
+.B arf
+is a unified command-line interface for all ARF (Agent Runtime Framework) operations.
+It provides tools for conversation memory management, swarm intelligence, ontology operations,
+and performance benchmarking.
+
+The CLI follows Unix philosophy: composable commands, pipeable output, and JSON mode for scripting.
+
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output
+.TP
+.BR \-q ", " \-\-quiet
+Suppress output except errors
+.TP
+.BR \-\-help
+Show help message and exit
+
+.SH COMMANDS
+.SS memory
+Conversation memory operations
+.TP
+.B arf memory transmit \fICONTENT\fR
+Transmit understanding to conversation memory
+.TP
+.B arf memory recall \fIQUERY\fR
+Recall understandings from memory
+.TP
+.B arf memory compose
+Compose memories from multiple agents
+.TP
+.B arf memory stats
+Show memory statistics
+.TP
+.B arf memory export
+Export agent memory for composition
+
+.SS swarm
+Pony swarm operations using Recursive Self-Aggregation (RSA)
+.TP
+.B arf swarm query \fIQUESTION\fR
+Query the pony swarm
+.TP
+.B arf swarm info
+Show swarm configuration and capabilities
+
+.SS ontology
+Ontology validation and inference operations
+.TP
+.B arf ontology validate \fITRIPLE\fR
+Validate a knowledge triple
+.TP
+.B arf ontology infer \fITRIPLE\fR
+Perform inference on a triple
+.TP
+.B arf ontology list-predicates
+List all known predicates
+.TP
+.B arf ontology info
+Show ontology information
+
+.SS benchmark
+Benchmarking operations for performance testing
+.TP
+.B arf benchmark run
+Run benchmark suite
+.TP
+.B arf benchmark list-suites
+List available benchmark suites
+
+.SH COMMON OPTIONS
+Many commands support these common options:
+.TP
+.BR \-\-json
+Output as JSON for scripting (all commands)
+.TP
+.BR \-a ", " \-\-agent " " \fIAGENT_ID\fR
+Specify agent ID (memory commands)
+.TP
+.BR \-b ", " \-\-backend " " \fIBACKEND\fR
+Specify backend: file or holochain (memory commands)
+
+.SH EXAMPLES
+.SS Memory Operations
+.TP
+Transmit understanding:
+.B arf memory transmit "GPT-4 is a large language model"
+.TP
+Recall with specific agent:
+.B arf memory recall "LLM" \-\-agent alice
+.TP
+Export memory as JSON:
+.B arf memory export \-\-agent alice \-\-output alice.json
+.TP
+Compose memories:
+.B arf memory compose \-\-agent main \-\-with alice \-\-with bob
+
+.SS Swarm Operations
+.TP
+Query the swarm:
+.B arf swarm query "What is 47 * 89?"
+.TP
+Custom parameters:
+.B arf swarm query "Explain recursion" \-\-ponies 6 \-\-iterations 4
+
+.SS Ontology Operations
+.TP
+Validate a triple:
+.B arf ontology validate "(GPT-4, is_a, LLM)"
+.TP
+List predicates as JSON:
+.B arf ontology list-predicates \-\-json | jq '.predicates[]'
+
+.SS Benchmarking
+.TP
+Run memory benchmark:
+.B arf benchmark run \-\-suite memory \-\-iterations 10
+.TP
+Run all benchmarks:
+.B arf benchmark run \-\-suite all \-\-json
+
+.SH JSON OUTPUT
+All commands support
+.B \-\-json
+flag for machine-readable output. This enables:
+.TP
+\(bu Scripting and automation
+.TP
+\(bu Pipeline composition with jq and other tools
+.TP
+\(bu Integration with other systems
+.PP
+Example:
+.RS
+.B arf memory recall "test" \-\-json | jq '.results[0].content'
+.RE
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 130
+Interrupted by user (SIGINT)
+
+.SH FILES
+.TP
+.I ./memory/
+Default storage directory for conversation memory (file backend)
+.TP
+.I ~/.config/arf/
+User configuration directory (future)
+
+.SH ENVIRONMENT
+.TP
+.B ARF_BACKEND
+Override default backend (file or holochain)
+.TP
+.B ARF_STORAGE_PATH
+Override default storage path for memory
+
+.SH SEE ALSO
+.TP
+Full documentation:
+.I https://github.com/jmccardle/FLOSS
+.TP
+Roadmap:
+.I ARF/dev/ROADMAP_PHASE4_PLUS.md
+.TP
+Architecture:
+.I ARF/ARCHITECTURE_OVERVIEW.md
+
+.SH PHILOSOPHY
+ARF follows Specification-Driven Development (SDD):
+.TP
+\(bu Code serves the spec
+.TP
+\(bu Every library MUST have a CLI for observability and testing
+.TP
+\(bu Unix philosophy: composable, pipeable, transparent
+.TP
+\(bu JSON output for automation
+.TP
+\(bu Human-readable output for debugging
+
+.SH BUGS
+Report bugs at: https://github.com/jmccardle/FLOSS/issues
+
+.SH AUTHORS
+FLOSSI0ULLK Development Team
+
+.SH COPYRIGHT
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

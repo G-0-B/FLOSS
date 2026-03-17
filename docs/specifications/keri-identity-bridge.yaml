@@ -1,0 +1,447 @@
+# KERI Identity Bridge Specification
+# Version: 0.1.0
+# Status: RETROACTIVE (written after implementation - methodology violation)
+# Purpose: Define KERI-Holochain identity bridge for validation and test generation
+
+metadata:
+  name: "KERI Identity Bridge"
+  version: "0.1.0"
+  target: "rose_forest DNA"
+  authors:
+    - "Claude Sonnet 4.5"
+    - "Anthony (kalisam)"
+  created: "2025-11-17"
+  status: "RETROACTIVE"
+
+# Data structures define the shape of entries
+data_structures:
+  AutonomousIdentifier:
+    description: "KERI Autonomous Identifier with key management"
+    entry_type: true
+    fields:
+      aid:
+        type: String
+        description: "Self-certifying identifier (Base64 of public key)"
+        validation:
+          - rule: "starts_with('E')"  # Ed25519 derivation code
+            error: "AID must start with Ed25519 derivation code 'E'"
+          - rule: "length > 10"
+            error: "AID too short"
+
+      current_public_key:
+        type: Vec<u8>
+        description: "Current public key (may rotate)"
+        validation:
+          - rule: "not_empty"
+            error: "Current public key cannot be empty"
+
+      inception_public_key:
+        type: Vec<u8>
+        description: "Inception public key (never changes)"
+        validation:
+          - rule: "not_empty"
+            error: "Inception public key cannot be empty"
+
+      sequence:
+        type: u64
+        description: "Key state version number"
+        validation:
+          - rule: "> 0"
+            error: "Sequence must be positive"
+
+      kel_hash:
+        type: Option<ActionHash>
+        description: "Reference to Key Event Log"
+
+      created_at:
+        type: Timestamp
+        description: "When this AID was registered"
+
+    invariants:
+      - name: "AID derives from inception key"
+        rule: "aid == base64(hash(inception_public_key))"
+        level: "SHOULD"  # Hard to verify in Rust, requires KERI lib
+
+      - name: "Sequence monotonically increasing"
+        rule: "new.sequence >= old.sequence"
+        level: "MUST"
+
+      - name: "Inception key immutable"
+        rule: "new.inception_public_key == old.inception_public_key"
+        level: "MUST"
+
+  KeyEventLog:
+    description: "Immutable log of key lifecycle events"
+    entry_type: true
+    fields:
+      aid:
+        type: String
+        description: "The AID this log belongs to"
+
+      events:
+        type: Vec<KeyEvent>
+        description: "Ordered list of key events"
+        validation:
+          - rule: "not_empty"
+            error: "KEL must have at least inception event"
+
+      updated_at:
+        type: Timestamp
+        description: "Last update timestamp"
+
+    invariants:
+      - name: "Events form valid chain"
+        rule: "events[i].previous_digest == hash(events[i-1])"
+        level: "MUST"
+
+      - name: "First event is inception"
+        rule: "events[0].event_type == Inception"
+        level: "MUST"
+
+      - name: "Sequences increment"
+        rule: "events[i].sequence == events[i-1].sequence + 1"
+        level: "MUST"
+
+  IdentitySeal:
+    description: "Cryptographic binding between KERI AID and Holochain agent"
+    entry_type: true
+    fields:
+      aid:
+        type: String
+        description: "The KERI AID"
+
+      agent_pubkey:
+        type: AgentPubKey
+        description: "The Holochain agent public key"
+
+      keri_signature:
+        type: Vec<u8>
+        description: "Signature of agent_pubkey using KERI private key"
+        validation:
+          - rule: "not_empty"
+            error: "KERI signature required"
+
+      agent_signature:
+        type: Vec<u8>
+        description: "Signature of AID using Holochain agent key"
+        validation:
+          - rule: "not_empty"
+            error: "Agent signature required"
+
+      sealed_at:
+        type: Timestamp
+        description: "When this seal was created"
+
+      authorizing_event:
+        type: ActionHash
+        description: "Key event that authorized this seal"
+
+    invariants:
+      - name: "Dual signature verification"
+        rule: "verify(keri_signature, agent_pubkey, keri_key) && verify(agent_signature, aid, agent_key)"
+        level: "MUST"
+
+      - name: "One seal per AID-agent pair"
+        rule: "count(seals for (aid, agent)) <= 1"
+        level: "SHOULD"
+
+# Link types define relationships
+link_types:
+  AgentToSeal:
+    from: AgentPubKey
+    to: IdentitySeal
+    purpose: "Lookup seal by agent"
+
+  AIDToSeal:
+    from: "Path:aid:{aid_string}"
+    to: IdentitySeal
+    purpose: "Lookup seal by AID"
+
+  AIDToKEL:
+    from: AutonomousIdentifier
+    to: KeyEventLog
+    purpose: "Access key event log for AID"
+
+  SealToAID:
+    from: IdentitySeal
+    to: AutonomousIdentifier
+    purpose: "Access AID from seal"
+
+  AIDPathToEntry:
+    from: "Path:aid:{aid_string}"
+    to: AutonomousIdentifier
+    purpose: "Efficient AID lookup by string"
+
+# External functions define the API
+extern_functions:
+  register_aid:
+    description: "Register a new KERI AID with inception event"
+    inputs:
+      aid: String
+      public_key: Vec<u8>
+      inception_public_key: Vec<u8>
+      metadata: Option<String>
+
+    outputs:
+      success: ActionHash  # Hash of created AID entry
+      error: String
+
+    preconditions:
+      - "AID not already registered"
+      - "public_key == inception_public_key (first registration)"
+
+    postconditions:
+      - "AutonomousIdentifier entry created"
+      - "KeyEventLog created with inception event"
+      - "AID -> KEL link created"
+      - "Path anchor created for efficient lookup"
+      - "get_aid_hash(aid) returns created ActionHash"
+
+    side_effects:
+      - "Creates 2 entries (AID + KEL)"
+      - "Creates 2 links (AID->KEL + Path->AID)"
+
+  create_identity_seal:
+    description: "Create cryptographic seal binding AID to Holochain agent"
+    inputs:
+      aid: String
+      agent_pubkey: AgentPubKey
+      keri_signature: Vec<u8>
+      agent_signature: Vec<u8>
+
+    outputs:
+      success: ActionHash
+      error: String
+
+    preconditions:
+      - "caller == agent_pubkey (only agent can seal themselves)"
+      - "AID exists (registered previously)"
+      - "Signatures verify"
+
+    postconditions:
+      - "IdentitySeal entry created"
+      - "Bidirectional links created"
+      - "get_aid_for_agent(agent) returns AID"
+      - "get_agent_for_aid(aid) returns agent"
+
+  get_aid_for_agent:
+    description: "Lookup KERI AID for a Holochain agent"
+    inputs:
+      agent: AgentPubKey
+
+    outputs:
+      success: Option<AutonomousIdentifier>
+      error: String
+
+    algorithm:
+      - "Get links: agent -> IdentitySeal"
+      - "Get seal entry"
+      - "Get links: seal -> AID"
+      - "Get AID entry"
+      - "Return AID"
+
+  get_agent_for_aid:
+    description: "Lookup Holochain agent for a KERI AID"
+    inputs:
+      aid: String
+
+    outputs:
+      success: Option<AgentPubKey>
+      error: String
+
+    algorithm:
+      - "Get Path anchor for AID"
+      - "Get links: anchor -> IdentitySeal"
+      - "Get seal entry"
+      - "Return seal.agent_pubkey"
+
+  rotate_key:
+    description: "Rotate keys while maintaining identity"
+    inputs:
+      aid: String
+      new_public_key: Vec<u8>
+      witness_signatures: Vec<String>
+      metadata: Option<String>
+
+    outputs:
+      success: ActionHash
+      error: String
+
+    preconditions:
+      - "AID exists"
+      - "new_public_key != current_public_key"
+      - "Witness signatures valid (if required)"
+
+    postconditions:
+      - "AID.sequence incremented"
+      - "AID.current_public_key updated"
+      - "KEL has new rotation event"
+      - "Rotation event links to previous event"
+
+# Test generation templates
+tests:
+  unit:
+    test_aid_registration:
+      description: "AID can be registered and retrieved"
+      setup:
+        - "Generate valid KERI AID"
+        - "Generate keypair"
+      action:
+        - "Call register_aid(aid, public_key, inception_key)"
+      assertions:
+        - "Returns ActionHash"
+        - "get_aid_hash(aid) == returned hash"
+        - "Retrieved AID has correct fields"
+
+    test_seal_creation:
+      description: "Identity seal creates bidirectional binding"
+      setup:
+        - "Register AID"
+        - "Generate agent keypair"
+        - "Create signatures"
+      action:
+        - "Call create_identity_seal(aid, agent, sigs)"
+      assertions:
+        - "Returns ActionHash"
+        - "get_aid_for_agent(agent) == aid"
+        - "get_agent_for_aid(aid) == agent"
+
+    test_key_rotation:
+      description: "Keys can rotate without losing identity"
+      setup:
+        - "Register AID with initial keys"
+        - "Generate new keypair"
+      action:
+        - "Call rotate_key(aid, new_key)"
+      assertions:
+        - "AID.sequence incremented"
+        - "AID.current_public_key == new_key"
+        - "AID.inception_public_key unchanged"
+        - "KEL has rotation event"
+
+  integration:
+    test_cross_agent_identity:
+      description: "Identity verifiable across agents"
+      setup:
+        - "Agent A registers AID_A"
+        - "Agent B registers AID_B"
+      action:
+        - "Agent A queries Agent B's AID"
+      assertions:
+        - "Agent A can verify Agent B's seal"
+        - "Agent B can verify Agent A's seal"
+
+    test_identity_persistence:
+      description: "Identity survives key rotation"
+      setup:
+        - "Register AID with key_1"
+        - "Create seal with agent_1"
+        - "Rotate to key_2"
+      action:
+        - "Query identity after rotation"
+      assertions:
+        - "Same AID retrieved"
+        - "Seal still valid"
+        - "KEL shows rotation history"
+
+  reality:
+    test_sandbox_deployment:
+      description: "Deploy to Holochain sandbox and verify"
+      setup:
+        - "Deploy identity zomes to sandbox"
+        - "Spawn 3 agents"
+      action:
+        - "Each agent registers AID"
+        - "Each agent creates seal"
+        - "Agents verify each other"
+      assertions:
+        - "All registrations succeed"
+        - "All seals verify"
+        - "Cross-agent queries work"
+
+# Performance requirements
+performance:
+  register_aid:
+    latency:
+      target: "< 100ms"
+      max: "< 500ms"
+
+  create_identity_seal:
+    latency:
+      target: "< 50ms"
+      max: "< 200ms"
+
+  get_aid_for_agent:
+    latency:
+      target: "< 10ms"
+      max: "< 50ms"
+
+# Security requirements
+security:
+  signatures:
+    algorithm: "Ed25519"
+    key_size: "32 bytes"
+    verification: "REQUIRED before accepting seal"
+
+  key_rotation:
+    authorization: "MUST be signed by current key"
+    witnesses: "OPTIONAL (for increased security)"
+
+  seal_validation:
+    dual_signature: "MUST verify both directions"
+    timestamp_check: "SHOULD reject if too old"
+
+# Migration requirements
+migration:
+  from_no_keri:
+    description: "Existing Holochain agents want to adopt KERI"
+    strategy:
+      - "Generate KERI AID from existing agent key"
+      - "Create self-seal (AID = hash(agent_key))"
+      - "Preserve all existing Understanding entries"
+    compatibility: "Backward compatible (KERI optional)"
+
+# Documentation requirements
+documentation:
+  user_guide:
+    - "How to register KERI AID"
+    - "How to create identity seal"
+    - "How to rotate keys safely"
+    - "Troubleshooting common errors"
+
+  developer_guide:
+    - "KERI protocol overview"
+    - "Integration with Holochain"
+    - "Extending with custom validation"
+    - "Testing strategies"
+
+# Compliance
+compliance:
+  KERI_spec:
+    version: "v2.x"
+    conformance: "PARTIAL"  # Core KEL, not full witness network
+    deviations:
+      - "Witnesses optional (uses Holochain DHT instead)"
+      - "Simplified event types (no delegated events yet)"
+
+  Holochain:
+    version: "0.5.x"
+    patterns:
+      - "Integrity/coordinator separation: YES"
+      - "Path-based indexing: YES"
+      - "Link types for queries: YES"
+
+# Known limitations
+limitations:
+  - "No KERI witness network (uses Holochain validation instead)"
+  - "No delegated identifiers (yet)"
+  - "No ACDC (Authentic Chained Data Containers) support"
+  - "Simplified event types (inception, rotation, interaction only)"
+
+# Future extensions
+extensions:
+  - "Full KERI witness coordination"
+  - "Delegated identifiers for organizations"
+  - "ACDC credential support"
+  - "Multi-sig key management"
+  - "Recovery mechanisms"

@@ -1,0 +1,20 @@
+[package]
+name = "infinity_bridge_patterns"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "infinity_bridge_patterns"
+
+[dependencies]
+hdk = "0.3"
+serde = "1"
+
+[[test]]
+name = "pattern_validation"
+path = "tests/pattern_validation.rs"
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"

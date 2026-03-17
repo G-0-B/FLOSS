@@ -1,3 +1,5 @@
 numpy
 pyyaml
 h5py
+websockets>=10.0
+asyncio

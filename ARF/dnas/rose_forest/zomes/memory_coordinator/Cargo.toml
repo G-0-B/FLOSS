@@ -1,0 +1,15 @@
+[package]
+name = "memory_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+sha2 = "0.10"
+ontology_integrity = { path = "../ontology_integrity" }
+rose_forest_integrity = { path = "../integrity" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

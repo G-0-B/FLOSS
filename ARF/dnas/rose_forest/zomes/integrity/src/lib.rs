@@ -1,6 +1,14 @@
 use hdi::prelude::*;
 use std::collections::BTreeMap;
 
+/// Represents a node in the Rose-Forest knowledge graph.
+///
+/// Each `RoseNode` is an atomic unit of knowledge, containing a piece of
+/// content, its semantic embedding, and associated metadata. These nodes form
+/// the vertices of the decentralized knowledge graph, which is a core component
+/// of the "Federated Knowledge Commons."
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct RoseNode {
@@ -10,6 +18,14 @@ pub struct RoseNode {
     pub metadata: BTreeMap<String, String>,
 }
 
+/// Represents a directed, weighted edge between two `RoseNode`s.
+///
+/// `KnowledgeEdge`s define the relationships between nodes in the knowledge
+/// graph, allowing for the creation of complex semantic networks. The
+/// `relationship` and `confidence` fields provide a rich way to express the
+/// nature and strength of the connection between two pieces of knowledge.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct KnowledgeEdge {
@@ -19,6 +35,14 @@ pub struct KnowledgeEdge {
     pub confidence: f32,
 }
 
+/// Tracks the computational budget for an agent.
+///
+/// This entry is part of the system's resource management and incentive
+/// mechanism. It ensures that agents have a defined "autonomy budget,"
+/// preventing any single agent from consuming an undue amount of computational
+/// resources.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct BudgetEntry {
@@ -39,6 +63,15 @@ pub enum EntryTypes {
     ThoughtCredential(ThoughtCredential),
 }
 
+/// The primary validation callback for this integrity zome.
+///
+/// This function is called by the Holochain conductor for every operation that
+/// attempts to modify the DHT. It acts as the guardian of the shared knowledge
+/// graph, enforcing the validation rules for `RoseNode`s, `KnowledgeEdge`s, and
+/// `ThoughtCredential`s. This is a critical component of the "Verifiable
+/// Provenance" system.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
@@ -101,7 +134,15 @@ fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbac
 
 
 
-
+/// A verifiable credential representing a moment of "thought" or insight.
+///
+/// This struct is a more abstract and fine-grained representation of knowledge
+/// than a `RoseNode`. It captures the semantic essence of a thought, its emotional
+/// connotation, its provenance (who thought it), and its perceived impact.
+/// This is a key data structure for enabling "Cognitive Liberation" and the
+/// fine-grained tracking of memetic evolution.
+///
+/// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ThoughtCredential {
