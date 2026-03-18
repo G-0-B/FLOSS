@@ -1,5 +1,5 @@
 use hdk::prelude::*;
-use rose_forest_integrity::{BudgetEntry, EntryTypes, LinkTypes};
+use rose_forest_integrity::{BudgetEntry, EntryTypes};
 
 // Bio-aware budget parameters based on the manifesto
 // Represents a unit of cognitive output, calibrated to the idea of ~3 major cognitive pulses per day
@@ -78,12 +78,12 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     }
 }
 
-/// Persist a budget snapshot to the source chain (and link for future cross-agent queries).
+/// Persist a budget snapshot to the agent's source chain.
+/// Budget is agent-local state — the source chain is the authoritative record.
+/// No DHT links needed; we query the source chain directly in get_budget_state.
 fn save_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
     let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
     let hash = create_entry(EntryTypes::BudgetEntry(budget_entry))?;
-    let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
     Ok(hash)
 }
 

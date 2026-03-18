@@ -52,7 +52,7 @@ pub struct BudgetEntry {
 }
 
 #[hdk_link_types]
-pub enum LinkTypes { AllNodes, ShardMember, Edge, AgentBudget }
+pub enum LinkTypes { AllNodes, Edge }
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
