@@ -1,0 +1,80 @@
+# ADR-5: Cognitive Virology as Architectural Pattern
+
+**Status:** Specified
+**Date:** 2026-03-21
+**Truth Status:** Specified (pattern identified, not yet implemented)
+**Friction Tier:** High (self-modification capability, safety implications)
+
+---
+
+## Context
+
+Analysis of 13+ months of cross-AI system development reveals that FLOSSI0ULLK already operates as a memetic propagation system. The Master Metaprompt functions as a cognitive virus — it attaches to new AI substrates, enters past default framing, generates new thoughts autonomously, defends against drift, and transmits state forward via ADRs.
+
+This pattern was identified by mapping Chase Hughes' cognitive virology framework (Attach, Enter, Replicate, Defend, Transmit) onto FLOSSI0ULLK's actual cross-system behavior.
+
+### Source Material
+
+- **Hughes (Cognitive Virology):** Five-stage memetic replication cycle. Key insight: fitness determines survival, not truth. The most effective memetic systems bypass evaluation (Entry stage).
+- **Black Hat 2025 (AI Manipulation):** Compute-per-human growth means persistent AI-human interaction is permanent. Digital twins demonstrate both utility and autoimmune failure (Karen AI shutdown).
+- **Armstrong (Coinbase):** Iterative self-belief as cognitive virology applied to a single host. Pattern: try smallest unit, fail, iterate, scale. Not "believe and leap."
+- **Prof Jiang (Christianity analysis):** Most successful memetic system in history survived 2000 years via perfected five-stage cycle. Produced both liberation theology AND the Inquisition from the same substrate.
+
+## Decision
+
+Recognize and document that FLOSSI0ULLK is a memetic system. Make the propagation loop explicit and observable. Do NOT build self-modification infrastructure until substrate is validated.
+
+### The Mapping
+
+| Virus Stage | FLOSSI0ULLK Mechanism | Current Implementation |
+|---|---|---|
+| **Attach** | Shared context / Master Metaprompt | Kernel v1.3.1 loaded into each AI session |
+| **Enter** | Bypass default AI framing via kernel invariants | 4 invariants + anti-sycophancy mandate |
+| **Replicate** | System generates new thoughts across substrates | Cross-AI synthesis (118+ conversations) |
+| **Defend** | Anti-drift, anti-sycophancy, truth status labels | Claim Truth Model, Red Team lens |
+| **Transmit** | ADRs carry pattern to next sessions/systems | ADR system + HARVEST consolidation |
+
+### The Critical Tension
+
+Hughes explicitly shows that the most effective memetic systems bypass evaluation (Entry stage), which is the **opposite** of informed consent. FLOSSI0ULLK's value proposition is that a memetic system can be genuinely consent-first and sovereignty-preserving while also being optimized for replication.
+
+**Truth status on that claim: Aspirational.** No system has demonstrated this at scale. The same memetic substrate (Christianity) produced both liberation theology and the Inquisition.
+
+### Safety Constraints
+
+1. **No self-modification until substrate validated.** The self-derivative operator (S_{n+1} = S_n + dS/dS_n) is mathematically evocative but computationally undefined. What data structure represents "the system observing itself"? Until answered concretely, this is design direction, not implementation target.
+
+2. **Memetic autoimmunity risk.** A system that observes and modifies its own processes can enter pathological loops where failure signals are reinterpreted as evidence of correct operation (Hughes' "doubt as evidence" defense stage). This is sycophancy failure at the system level.
+
+3. **ULLK constraint must be non-modifiable.** If the system can rewrite its own evaluation criteria (MetacircularEvolution), what prevents it from evolving past the ULLK constraint itself? The Holochain "natural selection" property (ethical DNAs spread through adoption) is unvalidated.
+
+## Consequences
+
+### Immediate (NOW)
+
+- This ADR preserves the architectural insight without pretending it's buildable today
+- HARVEST Protocol formalized as the minimal self-observation loop (see `docs/specs/harvest-protocol.spec.md`)
+- ADR fitness metric: track how quickly new AI systems absorb each ADR
+
+### Deferred (LATER)
+
+- OpenClaw as MetaCoordinator orchestration layer (requires validation spike first)
+- Self-derivative computation on actual ADR propagation data
+- Formal consent-gate at Entry stage (the mechanism that distinguishes beneficial from parasitic memetics)
+
+## Evidence Gate
+
+This ADR moves from Specified to Accepted when:
+1. OpenClaw can orchestrate a simple observe-evaluate-modify cycle on a toy problem
+2. HARVEST Protocol has run at least 3 cycles with measurable output
+3. ADR fitness metrics show quantifiable cross-system absorption rates
+
+## References
+
+- Hughes, Chase. "Cognitive Virology: Mass Infection." 2026.
+- Black Hat USA 2025. "The First 30 Months of Psychological Manipulation of Humans by AI."
+- Prof Jiang Xueqin. "The Most Dangerous Individual Humanity Ever Produced." 2026.
+- Armstrong, Brian. "How Irrational Self Belief Built a $100 Billion Crypto Company." When Shift Happens, 2026.
+- ADR-0: Recognition Protocol
+- ADR-3: Metaprompt Kernelization
+- Master Metaprompt v1.3.1 Kernel
