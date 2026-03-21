@@ -113,7 +113,7 @@ impl BudgetEngine {
                     "E_INSUFFICIENT_RU: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
                     amount,
                     budget_state.remaining_ru,
-                    budget_state.window_start.as_seconds() + BUDGET_WINDOW_SECONDS
+                    budget_state.window_start.as_seconds_and_nanos().0 + BUDGET_WINDOW_SECONDS
                 )
             )))
         }

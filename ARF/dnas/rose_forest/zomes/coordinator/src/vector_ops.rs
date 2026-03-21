@@ -21,16 +21,17 @@ impl Vector {
     /// Returns a value in [-1.0, 1.0].  Returns 0.0 if either vector has
     /// zero magnitude (avoids division by zero).
     ///
-    /// Panics if vectors have different dimensions — callers must ensure
-    /// embeddings are the same size (the integrity zome enforces [32, 4096]).
-    pub fn cosine_similarity(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.data.len(),
-            other.data.len(),
-            "Vector dimension mismatch: {} vs {}",
-            self.data.len(),
-            other.data.len()
-        );
+    /// Returns `Err` if vectors have different dimensions.  Callers should
+    /// handle this gracefully (e.g. skip mismatched embeddings) since the
+    /// DHT may contain embeddings of varying sizes.
+    pub fn cosine_similarity(&self, other: &Vector) -> Result<f32, String> {
+        if self.data.len() != other.data.len() {
+            return Err(format!(
+                "Vector dimension mismatch: {} vs {}",
+                self.data.len(),
+                other.data.len()
+            ));
+        }
 
         let dot_product: f32 = self.data.iter()
             .zip(other.data.iter())
@@ -48,29 +49,29 @@ impl Vector {
             .sqrt();
 
         if self_magnitude == 0.0 || other_magnitude == 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
 
-        dot_product / (self_magnitude * other_magnitude)
+        Ok(dot_product / (self_magnitude * other_magnitude))
     }
 
     /// Euclidean distance between two vectors.
     ///
-    /// Panics if vectors have different dimensions.
-    pub fn distance(&self, other: &Vector) -> f32 {
-        assert_eq!(
-            self.data.len(),
-            other.data.len(),
-            "Vector dimension mismatch: {} vs {}",
-            self.data.len(),
-            other.data.len()
-        );
+    /// Returns `Err` if vectors have different dimensions.
+    pub fn distance(&self, other: &Vector) -> Result<f32, String> {
+        if self.data.len() != other.data.len() {
+            return Err(format!(
+                "Vector dimension mismatch: {} vs {}",
+                self.data.len(),
+                other.data.len()
+            ));
+        }
 
-        self.data.iter()
+        Ok(self.data.iter()
             .zip(other.data.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f32>()
-            .sqrt()
+            .sqrt())
     }
 
     /// Normalize the vector to unit length in-place.
@@ -96,51 +97,53 @@ mod tests {
     fn test_cosine_identical_vectors() {
         let a = Vector::new(vec![1.0, 0.0, 0.0]);
         let b = Vector::new(vec![1.0, 0.0, 0.0]);
-        assert!((a.cosine_similarity(&b) - 1.0).abs() < 1e-6);
+        assert!((a.cosine_similarity(&b).unwrap() - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_cosine_orthogonal_vectors() {
         let a = Vector::new(vec![1.0, 0.0]);
         let b = Vector::new(vec![0.0, 1.0]);
-        assert!(a.cosine_similarity(&b).abs() < 1e-6);
+        assert!(a.cosine_similarity(&b).unwrap().abs() < 1e-6);
     }
 
     #[test]
     fn test_cosine_opposite_vectors() {
         let a = Vector::new(vec![1.0, 0.0]);
         let b = Vector::new(vec![-1.0, 0.0]);
-        assert!((a.cosine_similarity(&b) + 1.0).abs() < 1e-6);
+        assert!((a.cosine_similarity(&b).unwrap() + 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_cosine_zero_vector_returns_zero() {
         let a = Vector::new(vec![0.0, 0.0]);
         let b = Vector::new(vec![1.0, 1.0]);
-        assert_eq!(a.cosine_similarity(&b), 0.0);
+        assert_eq!(a.cosine_similarity(&b).unwrap(), 0.0);
     }
 
     #[test]
     fn test_distance() {
         let a = Vector::new(vec![0.0, 0.0]);
         let b = Vector::new(vec![3.0, 4.0]);
-        assert!((a.distance(&b) - 5.0).abs() < 1e-6);
+        assert!((a.distance(&b).unwrap() - 5.0).abs() < 1e-6);
     }
 
     #[test]
-    #[should_panic(expected = "Vector dimension mismatch")]
-    fn test_cosine_dimension_mismatch_panics() {
+    fn test_cosine_dimension_mismatch_returns_error() {
         let a = Vector::new(vec![1.0, 0.0, 0.0]);
         let b = Vector::new(vec![1.0, 0.0]);
-        a.cosine_similarity(&b);
+        let result = a.cosine_similarity(&b);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("dimension mismatch"));
     }
 
     #[test]
-    #[should_panic(expected = "Vector dimension mismatch")]
-    fn test_distance_dimension_mismatch_panics() {
+    fn test_distance_dimension_mismatch_returns_error() {
         let a = Vector::new(vec![1.0, 0.0, 0.0]);
         let b = Vector::new(vec![1.0, 0.0]);
-        a.distance(&b);
+        let result = a.distance(&b);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("dimension mismatch"));
     }
 
     #[test]
