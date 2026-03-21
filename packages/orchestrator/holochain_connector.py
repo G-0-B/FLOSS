@@ -86,10 +86,30 @@ class HolochainConnector:
         self._cell_id: Optional[list] = None
         self._zome_name = "rose_forest"
 
-    async def connect(self, installed_app_id: str = "rose_forest"):
-        """Connect to the conductor app WebSocket and resolve the cell ID."""
+    async def connect(self, installed_app_id: str = "rose_forest", token: Optional[bytes] = None):
+        """Connect to the conductor app WebSocket and resolve the cell ID.
+
+        Args:
+            installed_app_id: The installed app ID to connect to.
+            token: Authentication token from the admin interface. Holochain
+                   app interfaces require an Authenticate message before any
+                   Request traffic. If not provided, attempts unauthenticated
+                   connection (works for some conductor configurations).
+        """
         logger.info(f"Connecting to {self.app_ws_url}")
         self._ws = await websockets.connect(self.app_ws_url)
+
+        # Holochain app interfaces require authentication before requests.
+        # The token is issued via the admin interface's `issue_app_auth_token`.
+        if token is not None:
+            auth_msg = msgpack.packb({
+                "type": "authenticate",
+                "data": {"token": token},
+            })
+            await self._ws.send(auth_msg)
+            auth_response = await self._ws.recv()
+            auth_result = msgpack.unpackb(auth_response, raw=False)
+            logger.info(f"Authentication result: {auth_result}")
 
         # Get app info to resolve cell_id
         app_info = await self._app_request("app_info", None)

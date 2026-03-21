@@ -20,7 +20,18 @@ impl Vector {
     ///
     /// Returns a value in [-1.0, 1.0].  Returns 0.0 if either vector has
     /// zero magnitude (avoids division by zero).
+    ///
+    /// Panics if vectors have different dimensions — callers must ensure
+    /// embeddings are the same size (the integrity zome enforces [32, 4096]).
     pub fn cosine_similarity(&self, other: &Vector) -> f32 {
+        assert_eq!(
+            self.data.len(),
+            other.data.len(),
+            "Vector dimension mismatch: {} vs {}",
+            self.data.len(),
+            other.data.len()
+        );
+
         let dot_product: f32 = self.data.iter()
             .zip(other.data.iter())
             .map(|(a, b)| a * b)
@@ -44,7 +55,17 @@ impl Vector {
     }
 
     /// Euclidean distance between two vectors.
+    ///
+    /// Panics if vectors have different dimensions.
     pub fn distance(&self, other: &Vector) -> f32 {
+        assert_eq!(
+            self.data.len(),
+            other.data.len(),
+            "Vector dimension mismatch: {} vs {}",
+            self.data.len(),
+            other.data.len()
+        );
+
         self.data.iter()
             .zip(other.data.iter())
             .map(|(a, b)| (a - b).powi(2))
@@ -104,6 +125,22 @@ mod tests {
         let a = Vector::new(vec![0.0, 0.0]);
         let b = Vector::new(vec![3.0, 4.0]);
         assert!((a.distance(&b) - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector dimension mismatch")]
+    fn test_cosine_dimension_mismatch_panics() {
+        let a = Vector::new(vec![1.0, 0.0, 0.0]);
+        let b = Vector::new(vec![1.0, 0.0]);
+        a.cosine_similarity(&b);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector dimension mismatch")]
+    fn test_distance_dimension_mismatch_panics() {
+        let a = Vector::new(vec![1.0, 0.0, 0.0]);
+        let b = Vector::new(vec![1.0, 0.0]);
+        a.distance(&b);
     }
 
     #[test]
