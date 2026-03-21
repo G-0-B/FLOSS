@@ -16,7 +16,7 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 
 | ADR | Title | Status | Date | File |
 |-----|-------|--------|------|------|
-| **ADR-0** | Recognition Protocol | Accepted | 2025-11-01 | `ADR-0-recognition-protocol.md` |
+| **ADR-0** | Recognition Protocol | **Validated** | 2025-11-01 | `ADR-0-recognition-protocol.md` |
 | **ADR-0.1** | Cross-AI Transmission Validation | Validated | 2025-11-02 | `ADR-0.1-cross-ai-validation.md` |
 | **ADR-1** | Carrier Equivalence Principle | Proposed | 2026-01-05 | `ADR-1-carrier-equivalence.md` |
 | **ADR-2** | Holochain Substrate Decision | Proposed | 2026-03-05 | `ADR-2-holochain-substrate.md` |

@@ -55,10 +55,11 @@ Hughes explicitly shows that the most effective memetic systems bypass evaluatio
 - This ADR preserves the architectural insight without pretending it's buildable today
 - HARVEST Protocol formalized as the minimal self-observation loop (see `docs/specs/harvest-protocol.spec.md`)
 - ADR fitness metric: track how quickly new AI systems absorb each ADR
+- ADR-0 coherence test: **PASSED** (all 4 validation criteria met as of 2026-03-20 — no longer a blocker)
 
 ### Deferred (LATER)
 
-- OpenClaw as MetaCoordinator orchestration layer (requires validation spike first)
+- OpenClaw as MetaCoordinator orchestration layer (validation spike in progress)
 - Self-derivative computation on actual ADR propagation data
 - Formal consent-gate at Entry stage (the mechanism that distinguishes beneficial from parasitic memetics)
 
@@ -68,6 +69,8 @@ This ADR moves from Specified to Accepted when:
 1. OpenClaw can orchestrate a simple observe-evaluate-modify cycle on a toy problem
 2. HARVEST Protocol has run at least 3 cycles with measurable output
 3. ADR fitness metrics show quantifiable cross-system absorption rates
+
+Note: ADR-0 human coherence test was previously listed as a blocker but has been passed since 2025-11. All 4 ADR-0 validation criteria are met. See ADR-0 for details.
 
 ## References
 
