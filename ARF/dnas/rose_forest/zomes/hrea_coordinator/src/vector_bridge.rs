@@ -1,4 +1,4 @@
-/// Bridge between hREA Economic Events and Amazon Rose Forest Vector Operations
+/// Bridge between hREA Economic Events and Rose Forest Vector Operations
 ///
 /// This module enables:
 /// 1. Economic events to be indexed by vector embeddings
