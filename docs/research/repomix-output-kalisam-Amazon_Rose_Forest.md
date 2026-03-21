@@ -357,7 +357,7 @@ See individual component documentation for specific implementation details and A
 
 ## File: docs/architecture/overview.md
 ````markdown
-# Amazon Rose Forest Architecture Overview
+# Rose Forest Architecture Overview
 
 ## Current Implementation
 
@@ -383,7 +383,7 @@ See individual component documentation for specific implementation details and A
 
 ## System Architecture
 
-The Amazon Rose Forest project is built on a decentralized, multi-layered architecture that integrates AI, VR/AR, and blockchain technologies to create an immersive, ethical, and scalable ecosystem.
+The Rose Forest project is built on a decentralized, multi-layered architecture that integrates AI, VR/AR, and blockchain technologies to create an immersive, ethical, and scalable ecosystem.
 
 ### High-Level Architecture Diagram
 
@@ -692,7 +692,7 @@ Open questions or potential challenges...
 
 ## File: docs/vision/README.md
 ````markdown
-# Amazon Rose Forest Vision
+# Rose Forest Vision
 
 ## Goal
 Create a Free Open Source Singularity (FOSS) by harnessing AI and decentralized technologies to create a utopian future with infinite resources and knowledge for all.
@@ -769,7 +769,7 @@ Follow the established project structure:
 
 ## File: docs/PRINCIPLES.md
 ````markdown
-# Amazon Rose Forest - Core Principles
+# Rose Forest - Core Principles
 
 ## Foundational Philosophy
 
@@ -848,9 +848,9 @@ Follow the established project structure:
 
 ## File: docs/README.md
 ````markdown
-# Amazon Rose Forest Documentation
+# Rose Forest Documentation
 
-Welcome to the Amazon Rose Forest documentation. This directory contains comprehensive documentation about the project's architecture, APIs, and research findings.
+Welcome to the Rose Forest documentation. This directory contains comprehensive documentation about the project's architecture, APIs, and research findings.
 
 ## Directory Structure
 
@@ -3301,9 +3301,9 @@ async fn main() {
     env_logger::init();
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 && args[1] == "serve" {
-        println!("Starting Amazon Rose Forest server...");
+        println!("Starting Rose Forest server...");
     } else {
-        println!("Amazon Rose Forest AI");
+        println!("Rose Forest AI");
         println!("Usage: amazon-rose-forest [command]");
         println!("Commands:");
         println!("  serve    Start the server");
@@ -3318,7 +3318,7 @@ async fn main() {
 
 # Source Code Directory
 
-This directory contains the source code for the Amazon Rose Forest project.
+This directory contains the source code for the Rose Forest project.
 
 ## Directory Structure
 
@@ -4070,7 +4070,7 @@ if __name__ == "__main__":
 name = "amazon-rose-forest"
 version = "0.1.0"
 edition = "2021"
-description = "Amazon Rose Forest AI with YumeiCHAIN integration"
+description = "Rose Forest AI with YumeiCHAIN integration"
 authors = ["Your Team"]
 license = "MIT"
 
@@ -4114,11 +4114,11 @@ path = "src/lib.rs"
 
 ## File: ContextualOverview.md
 ````markdown
-# Amazon Rose Forest Context Window Prompt
+# Rose Forest Context Window Prompt
 
 ## Project Overview
 
-You are analyzing the Amazon Rose Forest project, which aims to create a Free Open Source Singularity (FOSS) through decentralized AI and collaborative knowledge sharing. Your task is to understand the codebase, identify improvement opportunities, and suggest implementations that align with the project's vision.
+You are analyzing the Rose Forest project, which aims to create a Free Open Source Singularity (FOSS) through decentralized AI and collaborative knowledge sharing. Your task is to understand the codebase, identify improvement opportunities, and suggest implementations that align with the project's vision.
 
 ## Core Architecture
 
@@ -4205,7 +4205,7 @@ Your implementations should align with the project's vision of:
 - Collaborative knowledge evolution
 - Privacy-preserving protocols
 
-By analyzing this codebase and implementing these improvements, you'll help advance the Amazon Rose Forest project toward its goal of creating a decentralized AI ecosystem that empowers collective intelligence.
+By analyzing this codebase and implementing these improvements, you'll help advance the Rose Forest project toward its goal of creating a decentralized AI ecosystem that empowers collective intelligence.
 
 **src/core/sharding/hilbert.rs**:
 ```rust
@@ -5760,7 +5760,7 @@ pub mod router;
 
 **src/lib.rs**:
 ```rust
-//! Amazon Rose Forest - A decentralized AI and knowledge sharing system
+//! Rose Forest - A decentralized AI and knowledge sharing system
 //! 
 //! This library implements a Free Open Source Singularity (FOSS) through
 //! decentralized AI and collaborative knowledge sharing.
@@ -7461,7 +7461,7 @@ Public License instead of this License.  But first, please read
 
 ## File: README.md
 ````markdown
-# Amazon Rose Forest
+# Rose Forest
 
 ## Vision
 Building a Free Open Source Singularity (FOSS) through decentralized AI and collaborative knowledge sharing.

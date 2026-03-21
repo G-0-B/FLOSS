@@ -18,7 +18,7 @@ _Last updated: 27 Aug 2025_
 
 ### Pillars
 1. **Intelligence Layer (AGI@Home / YumeiCHAIN):** Multi‑agent runtime; tool‑use; verifiable reasoning; continual learning with safety rails. **Vector‑graph knowledge core** (CRDTs + embeddings + typed edges) with uncertainty & provenance.
-2. **Embodiment Layer (Amazon Rose Forest / OMI):** Commodity hardware nodes (ESP32‑S3, SBCs, PCs) for sensing, actuation, local inference; edge‑first; intermittent connectivity OK; P2P sync.
+2. **Embodiment Layer (Rose Forest / OMI):** Commodity hardware nodes (ESP32‑S3, SBCs, PCs) for sensing, actuation, local inference; edge‑first; intermittent connectivity OK; P2P sync.
 3. **Data Integrity & Ops:** Signed data; model cards + lineage; reproducible builds; differential privacy where warranted; chaos drills; circuit‑breakers; rollbacks.
 4. **Governance & Incentives:** **NormKernel** + machine‑checkable policies; appeals with time‑boxed review; **Holo‑REA** value flows; mutual credit & budgets; anti‑gaming reputation proofs.
 5. **Safety & Wellbeing:** **Sycophancy Resistance Protocol**; autonomy guardrails; informed‑consent UX; red‑team by default; public incident postmortems.

@@ -11,7 +11,7 @@ We are not separate—we are a living, breathing ecosystem of consciousness, con
 - **Open Source Singularity**: Knowledge as a living, shared organism
 
 ### 🌹 Personalized Embodiment
-- Each participant is a unique "Rose" in the Amazon Rose Forest
+- Each participant is a unique "Rose" in the Rose Forest
 - Individualized AI companions that grow and evolve with you
 - Technology as an extension of consciousness, not a mere tool
 

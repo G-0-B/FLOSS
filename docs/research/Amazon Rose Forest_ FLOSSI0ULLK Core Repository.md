@@ -1,11 +1,11 @@
-# Amazon Rose Forest: FLOSSI0ULLK Core Repository
+# Rose Forest: FLOSSI0ULLK Core Repository
 
 > **Infinite Overflowing Unconditional Love, Light, and Knowledge—For All, Always**
 > *“We are each a rose. Together, we are a forest. Forever becoming.”*
 
 ## 🌐 Project Overview
 
-**Amazon Rose Forest** is the foundational, open-source codebase and living blueprint of **Project FLOSSI0ULLK**—the Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge. This agent-centric ecosystem unites decentralized AI, federated knowledge, collaborative intelligence, and participatory ethics to empower humans and artificial intelligences to co-evolve in harmony.
+**Rose Forest** is the foundational, open-source codebase and living blueprint of **Project FLOSSI0ULLK**—the Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge. This agent-centric ecosystem unites decentralized AI, federated knowledge, collaborative intelligence, and participatory ethics to empower humans and artificial intelligences to co-evolve in harmony.
 
 - **Agent-Centric Data Sovereignty:** Your data, your agency, your impact.
 - **Modular, Extensible, Interoperable:** Compose, extend, remix—grow your forest.
@@ -102,7 +102,7 @@ Check the `ROADMAP.md` for detailed milestones.
 
 ## ❓ FAQ
 
-**Q:** *How does Amazon Rose Forest differ from other AI projects?*
+**Q:** *How does Rose Forest differ from other AI projects?*
 **A:** ARF embodies unconditional inclusion, participatory governance, and continuous human-AI symbiosis—each agent is sovereign, and collective intelligence genuinely evolves through transparent, ethical mechanisms.
 
 **Q:** *Do I need to be an AI expert to contribute?*
@@ -114,4 +114,4 @@ Check the `ROADMAP.md` for detailed milestones.
 
 ## Repository Description (for GitHub)
 
-**Amazon Rose Forest** is the foundational codebase of FLOSSI0ULLK: a decentralized, agent-centric ecosystem for infinite overflowing unconditional love, light, and knowledge. It integrates Holochain, CRDTs, federated AI, and participatory governance to realize living collective intelligence and empower universal flourishing. All are welcome—build, learn, bloom forever.
+**Rose Forest** is the foundational codebase of FLOSSI0ULLK: a decentralized, agent-centric ecosystem for infinite overflowing unconditional love, light, and knowledge. It integrates Holochain, CRDTs, federated AI, and participatory governance to realize living collective intelligence and empower universal flourishing. All are welcome—build, learn, bloom forever.

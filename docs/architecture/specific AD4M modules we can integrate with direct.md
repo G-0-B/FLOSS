@@ -2,7 +2,7 @@
 
 # specific AD4M modules we can integrate with directly
 
-Certainly! Here are key **AD4M modules** that the Amazon Rose Forest can directly integrate with to accelerate development and maximize synergy, leveraging existing capabilities instead of reinventing functionality:
+Certainly! Here are key **AD4M modules** that the Rose Forest can directly integrate with to accelerate development and maximize synergy, leveraging existing capabilities instead of reinventing functionality:
 
 ***
 
@@ -71,7 +71,7 @@ Certainly! Here are key **AD4M modules** that the Amazon Rose Forest can directl
 
 By **leveraging these existing AD4M modules** and progressively building atop them:
 
-- **Amazon Rose Forest gains a battle-tested foundation** for identity, data, and coordination.
+- **Rose Forest gains a battle-tested foundation** for identity, data, and coordination.
 - Effort focuses on **implementing unique domain logic, rituals, and experiential layers** rather than reinventing core protocols.
 - The evolving **meta-layer emerges organically in concert with AD4M’s modular ecosystem**, ensuring compatibility and community extensibility.
 

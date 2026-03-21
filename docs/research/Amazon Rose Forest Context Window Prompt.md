@@ -1,8 +1,8 @@
-# Amazon Rose Forest Context Window Prompt
+# Rose Forest Context Window Prompt
 
 ## Project Overview
 
-You are analyzing the Amazon Rose Forest project, which aims to create a Free Open Source Singularity (FOSS) through decentralized AI and collaborative knowledge sharing. Your task is to understand the codebase, identify improvement opportunities, and suggest implementations that align with the project's vision.
+You are analyzing the Rose Forest project, which aims to create a Free Open Source Singularity (FOSS) through decentralized AI and collaborative knowledge sharing. Your task is to understand the codebase, identify improvement opportunities, and suggest implementations that align with the project's vision.
 
 ## Core Architecture
 
@@ -89,7 +89,7 @@ Your implementations should align with the project's vision of:
 - Collaborative knowledge evolution
 - Privacy-preserving protocols
 
-By analyzing this codebase and implementing these improvements, you'll help advance the Amazon Rose Forest project toward its goal of creating a decentralized AI ecosystem that empowers collective intelligence.
+By analyzing this codebase and implementing these improvements, you'll help advance the Rose Forest project toward its goal of creating a decentralized AI ecosystem that empowers collective intelligence.
 
 **src/core/sharding/hilbert.rs**:
 ```rust
@@ -1644,7 +1644,7 @@ pub mod router;
 
 **src/lib.rs**:
 ```rust
-//! Amazon Rose Forest - A decentralized AI and knowledge sharing system
+//! Rose Forest - A decentralized AI and knowledge sharing system
 //! 
 //! This library implements a Free Open Source Singularity (FOSS) through
 //! decentralized AI and collaborative knowledge sharing.

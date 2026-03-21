@@ -38,7 +38,7 @@ This comprehensive living document fully integrates previous iterations, holonic
 ├──────────────────────────────────────────────────────────┤
 │ L2 Cognitive Agents       – Yumeichan (trinary logic)    │
 ├──────────────────────────────────────────────────────────┤
-│ L1 Knowledge Fabric       – Amazon Rose Forest (DHT, CRDT)│
+│ L1 Knowledge Fabric       – Rose Forest (DHT, CRDT)│
 ├──────────────────────────────────────────────────────────┤
 │ L0 Trust Substrate        – Holochain, libp2p, IPFS      │
 └──────────────────────────────────────────────────────────┘
@@ -231,7 +231,7 @@ Below is a complete, expert-level synthesis and analysis of the **FLOSSI0ULLK Un
 ├──────────────────────────────────────────────────────────┤
 │ L2 Cognitive Agents       – Yumeichan (trinary logic)    │
 ├──────────────────────────────────────────────────────────┤
-│ L1 Knowledge Fabric       – Amazon Rose Forest (DHT, CRDT)│
+│ L1 Knowledge Fabric       – Rose Forest (DHT, CRDT)│
 ├──────────────────────────────────────────────────────────┤
 │ L0 Trust Substrate        – Holochain, libp2p, IPFS      │
 └──────────────────────────────────────────────────────────┘
@@ -385,7 +385,7 @@ sequenceDiagram
 - **Decentralized Code Evolution:** The EvoGit framework demonstrates scalable, asynchronous, multi-agent code evolution using a Git-native phylogenetic graph, enabling open-ended, lineage-aware, and structurally dominant collaboration without scalar fitness bottlenecks. This approach is directly compatible with FLOSSI0ULLK’s holonic, agent-centric vision, supporting evolutionary branching, recombination, and human-in-the-loop curation for continual improvement[^1].
 - **Self-Improving Agents:** The latest Darwin Gödel Machine (DGM) research proves that open-ended exploration and iterative self-improvement are essential for continual agent evolution and outperforming static, hand-crafted solutions. DGM’s archive-based approach, which allows branching from any agent in the lineage, aligns with FLOSSI0ULLK’s holonic and restorative governance model, enabling resilience, diversity, and safe innovation[^2].
 - **Self-Rewarding Language Models:** Advanced LLMs can now self-improve via inference-time validation, self-rewarding schemes, and SFT-sharpening, providing a foundation for autonomous, federated learning and trinary logic-based validation in distributed agent collectives[^5].
-- **Symbolic \& Metaphoric UI:** The “Name Tree” and “Amazon Rose Forest” metaphors provide a powerful, poetic, and technically robust UI/UX paradigm, mapping symbolic growth and validation rituals directly onto Holochain DNA schemas, validation callbacks, and collaborative rituals. This supports deep user engagement, intuitive trust-building, and mythopoetic governance[^3][^4].
+- **Symbolic \& Metaphoric UI:** The “Name Tree” and “Rose Forest” metaphors provide a powerful, poetic, and technically robust UI/UX paradigm, mapping symbolic growth and validation rituals directly onto Holochain DNA schemas, validation callbacks, and collaborative rituals. This supports deep user engagement, intuitive trust-building, and mythopoetic governance[^3][^4].
 
 
 ## Next Steps

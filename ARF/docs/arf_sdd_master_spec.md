@@ -1,6 +1,6 @@
 # ARF / FLOSSI0ULLK — Specification‑Driven Development (SDD) Master Specification v0.1
 
-> Purpose: Establish a complete, executable Product Requirements Document (PRD/spec) for the Amazon Rose Forest (ARF) / FLOSSI0ULLK ecosystem that will generate implementation plans, tests, and code via SDD. This document is the single source of truth; code serves this specification.
+> Purpose: Establish a complete, executable Product Requirements Document (PRD/spec) for the Rose Forest (ARF) / FLOSSI0ULLK ecosystem that will generate implementation plans, tests, and code via SDD. This document is the single source of truth; code serves this specification.
 
 ---
 

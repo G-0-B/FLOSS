@@ -1,6 +1,6 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" class="logo" width="120"/>
 
-# Key Implementation Areas for Amazon Rose Forest Codebases
+# Key Implementation Areas for Rose Forest Codebases
 
 | \# | Required Area | Research Drivers | Concrete Tasks for the Repos |
 | :-- | :-- | :-- | :-- |
@@ -22,5 +22,5 @@
 3. **Human-facing intelligence:** add multimodal + neuro-symbolic modules (Areas 6–7) to power the symbiosis interface.
 4. **Open-network deployment:** integrate DeAI mesh and AGI@Home (Areas 8 \& 10), secured by the ethical layer (Area 9).
 
-These ten areas translate recent advances directly into actionable milestones, positioning Amazon Rose Forest to deliver a fully decentralised, privacy-preserving, multimodal AI ecosystem.
+These ten areas translate recent advances directly into actionable milestones, positioning Rose Forest to deliver a fully decentralised, privacy-preserving, multimodal AI ecosystem.
 

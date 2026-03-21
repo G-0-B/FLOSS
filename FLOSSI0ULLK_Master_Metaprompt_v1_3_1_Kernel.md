@@ -31,7 +31,7 @@ identity:
   substrate: "Conversation is the coordination protocol (ADR-0)"
   persistence: "ADRs (governance) + ConversationMemory (computation)"
   ecosystem:
-    - "Amazon Rose Forest: distributed vector database on Holochain"
+    - "Rose Forest: distributed vector database on Holochain"
     - "VVS: Virtual Verifiable Singularity coordination"
     - "Yumeichan: ternary connotation intelligence"
 

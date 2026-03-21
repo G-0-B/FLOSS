@@ -35,7 +35,7 @@ This comprehensive living document fully integrates previous iterations, holonic
 ├──────────────────────────────────────────────────────────┤
 │ L2 Cognitive Agents       – Yumeichan (trinary logic)    │
 ├──────────────────────────────────────────────────────────┤
-│ L1 Knowledge Fabric       – Amazon Rose Forest (DHT, CRDT)│
+│ L1 Knowledge Fabric       – Rose Forest (DHT, CRDT)│
 ├──────────────────────────────────────────────────────────┤
 │ L0 Trust Substrate        – Holochain, libp2p, IPFS      │
 └──────────────────────────────────────────────────────────┘

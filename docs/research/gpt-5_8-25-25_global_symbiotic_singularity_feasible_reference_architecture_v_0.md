@@ -1,5 +1,5 @@
 # 🌐 Global Symbiotic Singularity – Feasible Reference Architecture v0.6
-**Amazon Rose Forest · YumeiCHAIN · AGI@Home**
+**Rose Forest · YumeiCHAIN · AGI@Home**
 
 > A pragmatic, buildable path to a global superintelligent synthetic–human collaborative symbiosis, optimized for decentralization, safety, and iteration speed.
 

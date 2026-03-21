@@ -1,4 +1,4 @@
-# Symbolic-First Architecture for Amazon Rose Forest
+# Symbolic-First Architecture for Rose Forest
 ## Neurosymbolic AI with Holochain - Complete Implementation Specification
 
 **Version:** 1.0  

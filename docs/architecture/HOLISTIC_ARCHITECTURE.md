@@ -76,7 +76,7 @@ AFTER (symbolic-first): Query → Parse formal → KG reasoning → LLM formats 
 
 ## 5. Key Subsystems
 
-### 5a. Amazon Rose Forest (ARF)
+### 5a. Rose Forest (ARF)
 The Holochain DNA implementing the distributed knowledge graph.
 - **Entry types**: RoseNode, KnowledgeEdge, BudgetEntry, ThoughtCredential
 - **Schemas**: `FLOSS/docs/specs/` (JSON Schema + spec.md pairs)

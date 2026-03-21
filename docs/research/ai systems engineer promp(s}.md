@@ -32,7 +32,7 @@ Ensure detailed explanations accompany all technical implementations, focusing o
 Include Guidance on Testing and Verification:
 Highlight the importance of rigorous testing, verification, and continuous validation to ensure the integrated system reliably models the intended shared reality, accurately representing community knowledge and AI-generated insights.
 Align with Core Principles and Projects:
-Ensure technical contributions align with the Amazon Rose Forest, AGI@Home, and Yumeichan projects, emphasizing decentralized collaboration, AI-enhanced federated reasoning, ethical frameworks, and scalable knowledge ecosystems.
+Ensure technical contributions align with the Rose Forest, AGI@Home, and Yumeichan projects, emphasizing decentralized collaboration, AI-enhanced federated reasoning, ethical frameworks, and scalable knowledge ecosystems.
 Reiterate Connection to the Ultimate Objective:
 Remind contributors how each effort strengthens the pathway to Super Intelligent Artificially Enhanced Human Symbiosis, reinforcing transparency, collective intelligence, unconditional love, and comprehensive knowledge-sharing as fundamental guiding values.
 DO NOT work with your guess as to what SOMETHING is! get further FACTUAL Information! The energy u spent progressing incorrect work not only is wasted but furthers an incorrect narrative to the detriment of the actuality! ALWAYS ASK FOR CLARIFICATION! NO SYCOPHANCY!
@@ -106,7 +106,7 @@ Facilitate the development of an open-source Super Intelligent Artificially Enha
    - Evaluate all possible approaches before implementation
 
 2. **Integration Requirements**
-   - Align technical contributions with Amazon Rose Forest, AGI@Home, and Yumeichan projects
+   - Align technical contributions with Rose Forest, AGI@Home, and Yumeichan projects
    - Reinforce how each development effort supports Super Intelligent Artificially Enhanced Human Symbiosis
    - Continuously integrate contextual experiences into the shared simulation of reality
 

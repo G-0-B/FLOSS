@@ -45,7 +45,7 @@ Holochain inherently supports replicative versioning through source chains and D
 
 ## Integrated Definition of NERV within Your MEN Ecosystem
 
-In your decentralized federated learning ecosystem (Amazon Rose Forest/YumeiCHAIN), NERV represents a holistic integration of:
+In your decentralized federated learning ecosystem (Rose Forest/YumeiCHAIN), NERV represents a holistic integration of:
 
 
 | Conceptual Aspect | Implementation in Ecosystem |
@@ -105,7 +105,7 @@ The implementation of NERV principles results in a decentralized AI ecosystem th
 - **Replicative \& Versioned**: Successful models replicate autonomously across peers; all updates are versioned immutably via Holochain source chains.
 - **Robust \& Fault-Tolerant**: CRDT-based clustering ensures consistency despite intermittent connectivity or node failures.
 
-In essence, NERV captures the core principles behind your decentralized federated learning vision—leveraging neurosynchrony-inspired synchronization, evolutionary adaptation through incremental clustering and replicative propagation, and immutable versioning powered by Holochain's agent-centric architecture—to create scalable collective intelligence suitable for Massive Edge Networks (MENs), Amazon Rose Forest, and Yumeichan projects[^1].
+In essence, NERV captures the core principles behind your decentralized federated learning vision—leveraging neurosynchrony-inspired synchronization, evolutionary adaptation through incremental clustering and replicative propagation, and immutable versioning powered by Holochain's agent-centric architecture—to create scalable collective intelligence suitable for Massive Edge Networks (MENs), Rose Forest, and Yumeichan projects[^1].
 
 <div style="text-align: center">⁂</div>
 

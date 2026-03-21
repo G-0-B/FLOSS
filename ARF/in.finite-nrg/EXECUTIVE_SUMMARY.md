@@ -47,7 +47,7 @@ Enable AI agents to autonomously discover, subscribe to, and correlatively analy
 ### Architecture: 7-Layer Stack
 
 ```
-Layer 7: Applications       │ Amazon Rose Forest, AGI@Home, Custom
+Layer 7: Applications       │ Rose Forest, AGI@Home, Custom
 Layer 6: Semantic           │ AD4M (multi-substrate interoperability)
 Layer 5: Agent Protocol     │ MCP (data), A2A (coordination)
 Layer 4: Correlation Engine │ 4 OPTIONS (see below)

@@ -19,7 +19,7 @@ Multiple substrates were evaluated over 13+ months of iteration, including custo
 
 ## Decision
 
-**Adopt Holochain (hdi/hdk 0.5.x) as the Plane B runtime substrate.**
+**Adopt Holochain (hdi 0.5.1 / hdk 0.4.1) as the Plane B runtime substrate.**
 
 ### Rationale
 
@@ -39,9 +39,10 @@ The Rose Forest DNA (`ARF/dnas/rose_forest/`) implements the substrate:
 
 ### Version Pinning
 
-- Target: hdi/hdk 0.5.x (latest stable as of 2026-03)
+- Target: hdi 0.5.1 / hdk 0.4.1 (actual versions in the Cargo workspace)
+- holonix flake uses `main-0.4` branch
 - Previous codebase (`code/project/`) used hdk 0.1.0 — deprecated and incompatible
-- Version drift between 0.5.x releases managed via Cargo.toml pinning + holonix flake
+- Version drift between releases managed via Cargo.toml pinning + holonix flake
 
 ## Consequences
 
@@ -54,7 +55,7 @@ The Rose Forest DNA (`ARF/dnas/rose_forest/`) implements the substrate:
 ### Negative
 - Holochain ecosystem is smaller than Ethereum/Solana; fewer libraries
 - Development requires nix (holonix) which complicates Windows development (WSL2 required)
-- API stability between 0.5.x releases not guaranteed
+- API stability between 0.4.x releases not guaranteed
 - Debugging distributed Holochain apps is harder than centralized alternatives
 
 ### Mitigations

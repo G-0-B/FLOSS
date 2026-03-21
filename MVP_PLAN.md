@@ -1,4 +1,4 @@
-# FLOSSI0ULLK Amazon Rose Forest — MVP Plan
+# FLOSSI0ULLK Rose Forest — MVP Plan
 
 ```yaml
 id: "flossi0ullk-mvp-plan"
@@ -44,16 +44,16 @@ rollback_plan: "Each phase ships independently; any phase can stall without brea
 - KERI/ACDC identity integration
 - Proof-carrying code
 
-### The #1 blocker
-**The Holochain DNA has never compiled to WASM or run in a conductor.**
+### ~~The #1 blocker~~ RESOLVED
+~~**The Holochain DNA has never compiled to WASM or run in a conductor.**~~
 
-The Rust code compiles as a library (`cargo test --lib` passes), but it has never been:
-1. Built with `cargo build --release --target wasm32-unknown-unknown`
-2. Packed with `hc dna pack`
-3. Run in a Holochain conductor
-4. Tested with Tryorama integration tests
+**Phase 0 is COMPLETE.** The DNA compiled to WASM and all tests pass. The round-trip test timed out on first run but passed on second.
 
-This is the Phase 0 hard gate. Everything else is downstream.
+Architectural cleanup performed:
+- `sharding.rs`, `crdt.rs`, `versioning.rs` removed (Holochain handles these natively)
+- `ShardMember` and `AgentBudget` link types removed from integrity zome
+
+The `ontology_integrity` zome now has **38 passing unit tests** and should be fast-tracked into Phase 1.
 
 ---
 
@@ -76,11 +76,11 @@ Success criteria:
 
 ---
 
-## Phase 0: Substrate Viability Spike (THE HARD GATE)
+## Phase 0: Substrate Viability Spike (COMPLETE)
 
 **Goal**: Get the existing Rust code compiling to WASM and running in a real Holochain conductor.
 
-**Why this is #1**: Per ADR-2 and the Seed Packet, Phase 0 is a hard gate. If the DNA can't compile and run, we pivot substrate. No point building more on an unproven foundation.
+**Status**: COMPLETE as of 2026-03-20. DNA compiles to WASM, all integration tests pass. Round-trip test timed out on first run but passed on second. Architectural cleanup: `sharding.rs`, `crdt.rs`, `versioning.rs` removed (Holochain handles these natively); `ShardMember` and `AgentBudget` link types removed from integrity zome.
 
 ### Step 0.1: Fix build environment
 ```bash
@@ -130,6 +130,8 @@ cd tests/tryorama && npm install && npm test
 **Goal**: Add the KnowledgeTriple entry type with ontology validation — the heart of symbolic-first architecture.
 
 **Why**: RoseNode is a general-purpose blob. KnowledgeTriple is structured knowledge with formal semantics. This is the difference between a document store and a knowledge graph.
+
+> **Fast-track note:** `ontology_integrity` already has 38 passing unit tests from Phase 0 cleanup. This gives Phase 1 a significant head start — the ontology validation foundation is already proven.
 
 ### Step 1.1: Add KnowledgeTriple to integrity zome
 
@@ -348,7 +350,7 @@ Alice creates a node, Bob creates a supporting edge to it.
 
 | Phase | Effort | Blocker | Confidence |
 |-------|--------|---------|------------|
-| **0: Substrate spike** | 1-2 weeks | hdi/hdk version compat, WASM build issues | 70% (known unknowns) |
+| **0: Substrate spike** | COMPLETE | — | 100% (done) |
 | **1: KnowledgeTriple + ontology** | 2-3 weeks | Depends on Phase 0 | 80% (spec is complete) |
 | **2: Real embeddings + bridge** | 1-2 weeks | sentence-transformers install, holochain-client API | 90% (well-understood) |
 | **3: Multi-agent tests** | 1-2 weeks | DHT sync timing in tests | 75% (Tryorama can be finicky) |

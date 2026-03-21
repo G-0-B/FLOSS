@@ -273,7 +273,7 @@ This is not just a sensor network - it's a **global brain** for physical reality
 ## Architecture
 
 ```
-Application Layer     │ Amazon Rose Forest, AGI@Home, Custom
+Application Layer     │ Rose Forest, AGI@Home, Custom
 Semantic Layer        │ AD4M (multi-substrate interoperability)
 Agent Protocol Layer  │ MCP (data access), A2A (coordination)
 Correlation Engine    │ Federated pattern detection (4 options)
@@ -547,7 +547,7 @@ Built on the shoulders of giants:
 - Anthropic (MCP protocol)
 - Google (A2A protocol)
 - Coasys (AD4M semantic layer)
-- Amazon Rose Forest (federated knowledge vision)
+- Rose Forest (federated knowledge vision)
 - The global FOSS community
 
 ---
@@ -956,7 +956,7 @@ This is not speculative architecture - this is **production-ready design** backe
 - **Architecture Design**: FLOSSI0ULLK Community
 - **Protocol Specifications**: Based on Holochain, MCP, A2A, AD4M
 - **Scientific Foundation**: Information Theory, Signal Processing, Physics
-- **Inspiration**: Amazon Rose Forest, AGI@Home, Open Source Singularity
+- **Inspiration**: Rose Forest, AGI@Home, Open Source Singularity
 - **Values Alignment**: FLOSSI0ULLK (Love, Light, Knowledge)
 
 ---
@@ -1292,7 +1292,7 @@ Traditional sensor networks require centralized coordination and homogeneous dat
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 7: Application (Amazon Rose Forest, AGI@Home, Custom)    │
+│  Layer 7: Application (Rose Forest, AGI@Home, Custom)    │
 ├─────────────────────────────────────────────────────────────────┤
 │  Layer 6: Semantic (AD4M - Multi-substrate semantic layer)      │
 ├─────────────────────────────────────────────────────────────────┤
@@ -1442,7 +1442,7 @@ Each bridge is a **self-contained microcontroller system** (ESP32, STM32, RP2040
   - Link different knowledge substrates
 
 ### Layer 7: Applications
-- **Amazon Rose Forest**: Federated knowledge commons
+- **Rose Forest**: Federated knowledge commons
 - **AGI@Home**: Distributed cognitive architectures
 - **Custom**: User-defined applications
 

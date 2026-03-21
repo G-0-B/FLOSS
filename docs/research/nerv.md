@@ -138,4 +138,4 @@ Although Holochain is not a traditional blockchain, you can still:
 
 By integrating the **NERV** concept as a **runtime** on Holochain, you create an agent-centric, fully decentralized environment where AI knowledge is stored, replicated, and advanced in an evolutionary fashion. **Neurosynchrony** emerges as each node’s model or cluster state “oscillates” in unison via streaming updates and CRDT merges. **Evolutionary** forces shape cluster formation, merging the best global solutions. **Replicative** versioning ensures the entire system can move forward with or revert to known stable states, all captured in Holochain’s “source chain” logs.
 
-This synergy empowers your multi-project ecosystem—**AGI@Home**, **Amazon Rose Forest**, **Yumeichan**—to scale up in a robust, biologically-inspired manner, turning your distributed AI vision into a reality.
+This synergy empowers your multi-project ecosystem—**AGI@Home**, **Rose Forest**, **Yumeichan**—to scale up in a robust, biologically-inspired manner, turning your distributed AI vision into a reality.

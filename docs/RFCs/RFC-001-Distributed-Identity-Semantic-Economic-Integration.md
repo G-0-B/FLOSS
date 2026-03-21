@@ -3,14 +3,14 @@
 **Status**: PROPOSED (retroactively - should have been written first)
 **Author**: Claude Sonnet 4.5 + Anthony (kalisam)
 **Created**: 2025-11-17
-**Target**: FLOSSI0ULLK / Amazon Rose Forest v0.2
+**Target**: FLOSSI0ULLK / Rose Forest v0.2
 
 ---
 
 ## 🎯 Intent Echo
 
 **Problem Statement**:
-The current Amazon Rose Forest implementation provides distributed vector storage and knowledge validation, but lacks:
+The current Rose Forest implementation provides distributed vector storage and knowledge validation, but lacks:
 
 1. **Identity Portability**: Agents cannot prove their identity across different systems (Holochain vs AD4M vs Web)
 2. **Semantic Interoperability**: Different agents may interpret the same Understanding entry differently

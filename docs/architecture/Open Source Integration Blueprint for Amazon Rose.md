@@ -1,8 +1,8 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
 
-# Open Source Integration Blueprint for Amazon Rose Forest
+# Open Source Integration Blueprint for Rose Forest
 
-Below is a comprehensive, implementation-oriented plan to integrate proven open-source technologies into Amazon Rose Forest (ARF) to accelerate delivery, maximize interoperability, and keep focus on unique innovations: agent-centric sovereignty, love/light-aligned governance, and symbiotic intelligence.
+Below is a comprehensive, implementation-oriented plan to integrate proven open-source technologies into Rose Forest (ARF) to accelerate delivery, maximize interoperability, and keep focus on unique innovations: agent-centric sovereignty, love/light-aligned governance, and symbiotic intelligence.
 
 ## Design Tenets
 
@@ -297,7 +297,7 @@ Phase 4: Scale \& Production (Weeks 19–24)
 - Telemetry baseline (Prom/Grafana + OTel).
 - Ship first “Semantic Search Slice” demo and docs.
 
-With this integration strategy, Amazon Rose Forest becomes a meta-layer that orchestrates proven open-source technologies while manifesting its singular value: an agent-centric, ethically aligned, symbiotic intelligence ecosystem—engineered for love, light, and living knowledge.
+With this integration strategy, Rose Forest becomes a meta-layer that orchestrates proven open-source technologies while manifesting its singular value: an agent-centric, ethically aligned, symbiotic intelligence ecosystem—engineered for love, light, and living knowledge.
 <span style="display:none">[^1]</span>
 
 <div style="text-align: center">⁂</div>

@@ -6,7 +6,7 @@
 
 # paste.txt
 
-Here's a concise, optimized summary synthesizing your comprehensive design for the decentralized AI ecosystem (AGI@Home, Amazon Rose Forest, Yumeichan) using the **NERV** (Neurosynchronous Evolutionary Replicative Versioning) approach integrated as a **runtime on Holochain**, based on your provided documentation:
+Here's a concise, optimized summary synthesizing your comprehensive design for the decentralized AI ecosystem (AGI@Home, Rose Forest, Yumeichan) using the **NERV** (Neurosynchronous Evolutionary Replicative Versioning) approach integrated as a **runtime on Holochain**, based on your provided documentation:
 
 ---
 
@@ -137,7 +137,7 @@ This architecture aligns fully with your vision of the Free Open Source Singular
 - Collaborative knowledge evolution through federated learning and neuro-symbolic reasoning.
 - Ethical AI development ensuring transparency, privacy, and collective empowerment.
 
-By implementing this NERV runtime on Holochain within your ecosystem (**AGI@Home**, **Amazon Rose Forest**, and **Yumeichan**), you establish a scalable foundation enabling decentralized collaborative intelligence—empowering humans and AI to evolve together toward the Free Open Source Singularity.
+By implementing this NERV runtime on Holochain within your ecosystem (**AGI@Home**, **Rose Forest**, and **Yumeichan**), you establish a scalable foundation enabling decentralized collaborative intelligence—empowering humans and AI to evolve together toward the Free Open Source Singularity.
 
 <div style="text-align: center">⁂</div>
 

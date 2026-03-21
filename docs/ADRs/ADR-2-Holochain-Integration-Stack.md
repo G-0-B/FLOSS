@@ -1,5 +1,7 @@
 # ADR-2: Holochain Integration Stack (KERI, AD4M, hREA)
 
+> **SUPERSEDED**: This document is superseded by [`docs/adr/ADR-2-holochain-substrate.md`](../adr/ADR-2-holochain-substrate.md). It is retained as a record of a methodology violation (implementation built before specification). See "Lessons Learned" section below.
+
 > **Note**: This was originally numbered ADR-1 but was renumbered to ADR-2 to resolve a conflict with `ARF/ADR-1.md` which documents "Python Module Extraction and Validation Strategy".
 
 **Status**: ACCEPTED (retroactively documented)
@@ -11,7 +13,7 @@
 
 ## 🎯 Intent Echo
 
-**Original Request**: "Integrate Holochain, AD4M, KERI, and hREA into the FLOSSI0ULLK/Amazon Rose Forest stack to enable distributed intelligence coordination."
+**Original Request**: "Integrate Holochain, AD4M, KERI, and hREA into the FLOSSI0ULLK/Rose Forest stack to enable distributed intelligence coordination."
 
 **Clarified Intent**:
 - Enable sovereign identity across systems (KERI)
@@ -20,7 +22,7 @@
 - Connect economic value to semantic search (Vector Bridge)
 
 **Actual Problem Being Solved**:
-The existing Amazon Rose Forest (vector database + Understanding entries) lacks:
+The existing Rose Forest (vector database + Understanding entries) lacks:
 1. Cross-system identity (agents can't prove same identity across Holochain/AD4M/Web)
 2. Semantic context (different agents interpret same data differently)
 3. Economic incentives (contributors not recognized/rewarded)
@@ -33,7 +35,7 @@ The existing Amazon Rose Forest (vector database + Understanding entries) lacks:
 ### Practical/Engineering Lens
 
 **What already exists**:
-- ✅ Amazon Rose Forest with Understanding entries
+- ✅ Rose Forest with Understanding entries
 - ✅ Holochain DNAs (rose_forest, infinity_bridge)
 - ✅ Budget system (RU tracking)
 - ✅ Ontology validation (KnowledgeTriple)

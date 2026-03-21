@@ -44,7 +44,7 @@ FLOSS (Free Libre Open Source Singularity) is the ARF FLOSSIOULLK ecosystem - an
 
 1. **ARF (Agent Runtime Framework)**: Python-based CLI and libraries for agent operations
 2. **Holochain DNAs**: Distributed data integrity for knowledge verification
-3. **Infinity Bridge**: Cross-substrate coordination layer
+3. **Infinity Bridge**: Cross-substrate coordination layer *(DEFERRED per MVP_PLAN.md — not in current MVP scope)*
 4. **Pwnies (Desktop Pony Swarm)**: Multi-agent swarm intelligence system (RSA implementation)
 5. **Validation Framework**: LLM committee-based knowledge validation
 6. **ADR System**: Persistent memory across AI conversations
@@ -348,7 +348,7 @@ def recursive_self_aggregate(query, population_size=5, iterations=3):
 │   │       ├── bridge/          # Desktop Ponies integration
 │   │       └── benchmarks/      # Performance testing
 │   │
-│   ├── in.finite-nrg/           # Infinity Bridge subsystem
+│   ├── in.finite-nrg/           # Infinity Bridge subsystem (DEFERRED per MVP_PLAN.md)
 │   │   └── infinity-bridge/
 │   │       ├── orchestrator/    # MCP server & discovery
 │   │       ├── agents/          # Coherence validation agents
@@ -358,7 +358,7 @@ def recursive_self_aggregate(query, population_size=5, iterations=3):
 │   │   ├── rose_forest/         # Memory & ontology DNA
 │   │   │   ├── zomes/integrity/ # Validation rules (CANNOT be bypassed)
 │   │   │   └── zomes/coordinator/ # Business logic, queries
-│   │   └── infinity_bridge/     # Cross-substrate coordination DNA
+│   │   └── infinity_bridge/     # Cross-substrate coordination DNA (DEFERRED per MVP_PLAN.md)
 │   │
 │   ├── tests/                   # Test suite
 │   │   ├── integration/         # Integration tests
@@ -385,7 +385,7 @@ def recursive_self_aggregate(query, population_size=5, iterations=3):
 │   ├── INSTRUCTIONS_FOR_CODE.md # Development guidelines
 │   ├── Week-1-Quick-Start-Guide.md # IPFS integration guide
 │   ├── ADR-N-IPFS-Integration-VVS.md # Architecture decision record
-│   ├── AD4M-hREA-Integration-Analysis.md # Semantic layer analysis
+│   ├── AD4M-hREA-Integration-Analysis.md # Semantic layer analysis (AD4M/hREA DEFERRED per MVP_PLAN.md)
 │   ├── FLOSSIOULLK-Alignment-Verification.md # Compliance verification
 │   └── Fractal-Coordination-Patterns.md # Pattern library
 │
@@ -559,11 +559,15 @@ rich>=13.0.0
 - **Coordinator zomes**: Business logic, queries, links
 - Testing with Tryorama framework
 
+**Current target**: Holochain 0.4.x (hdi 0.5.1, hdk 0.4.1, holonix main-0.4)
+
 **Key Holochain Concepts**:
-- **Entry types**: FileArtifact, KnowledgeTriple, PinningProof, etc.
+- **Entry types**: RoseNode, KnowledgeEdge, BudgetEntry, ThoughtCredential
+- **Link types**: AllNodes, Edge
 - **Validation rules**: FOSS licenses, CID format, hash verification, ontology compliance
 - **Links**: Path-based indexing for queries
 - **Agent-centric**: Data lives on agent's source chain
+- **Budget tracking**: Uses source chain queries (not DHT links)
 
 ### Infrastructure
 
@@ -1113,6 +1117,7 @@ The system builds itself.
 |---------|------|---------|
 | 1.0 | 2025-11-16 | Initial comprehensive CLAUDE.md creation |
 | 2.0 | 2025-11-16 | Enhanced with operating instructions, decision framework, anti-patterns |
+| 2.1 | 2026-03-20 | Mark Infinity Bridge, AD4M/hREA as deferred per MVP_PLAN.md; update Holochain target to 0.4.x; update entry/link types to current MVP; note budget tracking uses source chain queries |
 
 ---
 
