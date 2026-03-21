@@ -1,4 +1,4 @@
-# Amazon Rose Forest-Technical Specification v1.0
+# Rose Forest-Technical Specification v1.0
 ## Engineering the Infrastructure for Collective Intelligence
 
 ---
@@ -625,7 +625,7 @@ Concrete performance targets based on real-world testing:
 
 ## Conclusion
 
-This technical specification grounds the Amazon Rose Forest vision in concrete mathematics, proven distributed systems principles, and measurable performance targets. Every component is based on peer-reviewed research and battle-tested engineering practices. The "love, light, and knowledge" emerge not from empty metaphors but from:
+This technical specification grounds the Rose Forest vision in concrete mathematics, proven distributed systems principles, and measurable performance targets. Every component is based on peer-reviewed research and battle-tested engineering practices. The "love, light, and knowledge" emerge not from empty metaphors but from:
 
 - **Love**: Mathematically optimal connections through vector similarity
 - **Light**: Cryptographically guaranteed transparency through zero-knowledge proofs

@@ -48,8 +48,13 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 let node_vec = Vector::new(node.embedding);
-                let score = query.cosine_similarity(&node_vec);
-                results.push(SearchResult { hash: target_hash, score, content: node.content });
+                // Skip embeddings with mismatched dimensions rather than
+                // trapping the entire search — the DHT may contain embeddings
+                // of varying sizes from different models.
+                match query.cosine_similarity(&node_vec) {
+                    Ok(score) => results.push(SearchResult { hash: target_hash, score, content: node.content }),
+                    Err(_) => continue,
+                }
             }
         }
     }

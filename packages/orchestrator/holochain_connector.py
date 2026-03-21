@@ -86,26 +86,64 @@ class HolochainConnector:
         self._cell_id: Optional[list] = None
         self._zome_name = "rose_forest"
 
-    async def connect(self, installed_app_id: str = "rose_forest"):
-        """Connect to the conductor app WebSocket and resolve the cell ID."""
-        logger.info(f"Connecting to {self.app_ws_url}")
+    async def connect(self, installed_app_id: str = "rose_forest", token: Optional[bytes] = None):
+        """Connect to the conductor app WebSocket and resolve the cell ID.
+
+        Args:
+            installed_app_id: The installed app ID to connect to. Used to
+                identify the app in error messages. (The app WebSocket is
+                already bound to a specific app by the conductor.)
+            token: Authentication token from the admin interface. Holochain
+                   app interfaces require an Authenticate message before any
+                   Request traffic. If not provided, attempts unauthenticated
+                   connection (works for some conductor configurations).
+        """
+        logger.info("Connecting to %s", self.app_ws_url)
         self._ws = await websockets.connect(self.app_ws_url)
+
+        # Holochain app interfaces require authentication before requests.
+        # The token is issued via the admin interface's `issue_app_auth_token`.
+        # Wire format: msgpack({type: "authenticate", data: msgpack({token: <bytes>})})
+        if token is not None:
+            auth_msg = msgpack.packb({
+                "type": "authenticate",
+                "data": msgpack.packb({"token": token}),
+            })
+            await self._ws.send(auth_msg)
+            auth_response = await self._ws.recv()
+            auth_result = msgpack.unpackb(auth_response, raw=False)
+            logger.info("Authentication result: %s", auth_result)
+
+            # Validate authentication succeeded before proceeding
+            if isinstance(auth_result, dict):
+                auth_type = auth_result.get("type", "")
+                if auth_type == "error" or auth_type != "authenticated":
+                    error_data = auth_result.get("data", "unknown error")
+                    raise HolochainError(
+                        "Authentication failed: %s" % error_data
+                    )
+            else:
+                raise HolochainError(
+                    "Unexpected authentication response format"
+                )
 
         # Get app info to resolve cell_id
         app_info = await self._app_request("app_info", None)
         if app_info is None:
             raise HolochainError("No app info returned — is the app installed?")
 
-        # Extract cell_id from the first role
+        # Extract cell_id from the first provisioned role
         cell_info = app_info.get("cell_info", {})
         for role_name, cells in cell_info.items():
             for cell in cells:
                 if "provisioned" in cell:
                     self._cell_id = cell["provisioned"]["cell_id"]
-                    logger.info(f"Resolved cell_id for role '{role_name}'")
+                    logger.info("Resolved cell_id for role '%s'", role_name)
                     return
 
-        raise HolochainError(f"No provisioned cell found in app '{installed_app_id}'")
+        raise HolochainError(
+            "No provisioned cell found in app '%s'" % installed_app_id
+        )
 
     async def close(self):
         """Close the WebSocket connection."""
@@ -209,7 +247,9 @@ class HolochainConnector:
                 data = msgpack.unpackb(data, raw=False)
 
             if isinstance(data, dict) and data.get("type") == "error":
-                raise HolochainError(f"Conductor error: {data.get('data', 'unknown')}")
+                raise HolochainError(
+                    "Conductor error: %s" % data.get("data", "unknown")
+                )
 
             # Unpack nested msgpack in response data
             if isinstance(data, dict) and "data" in data:
@@ -219,7 +259,9 @@ class HolochainConnector:
                 return inner
             return data
         else:
-            raise HolochainError(f"Unexpected response type: {response.get('type')}")
+            raise HolochainError(
+                "Unexpected response type: %s" % response.get("type")
+            )
 
 
 # ── Convenience Functions ────────────────────────────
@@ -303,26 +345,26 @@ async def round_trip_demo(app_ws_url: str = "ws://localhost:8888"):
     try:
         await connector.connect()
 
-        print(f"Writing Understanding as RoseNode...")
+        print("Writing Understanding as RoseNode...")
         action_hash = await connector.add_knowledge(node_input)
-        print(f"  → ActionHash: {action_hash.hex()[:24]}...")
+        print("  → ActionHash: %s..." % action_hash.hex()[:24])
 
         # Check budget
         budget = await connector.budget_status()
-        print(f"  → Budget remaining: {budget.get('remaining_ru', '?')} RU")
+        print("  → Budget remaining: %s RU" % budget.get("remaining_ru", "?"))
 
         # Search for it
-        print(f"Searching via vector_search...")
+        print("Searching via vector_search...")
         results = await connector.vector_search(
             SearchInput(query_embedding=embedding, k=1)
         )
 
         if results:
             top = results[0]
-            print(f"  → Found: score={top.score:.4f}")
-            print(f"  → Content matches: {top.content == understanding['content']}")
+            print("  → Found: score=%.4f" % top.score)
+            print("  → Content matches: %s" % (top.content == understanding["content"]))
             assert top.content == understanding["content"], "Content mismatch!"
-            assert top.score > 0.99, f"Expected near-perfect match, got {top.score}"
+            assert top.score > 0.99, "Expected near-perfect match, got %.4f" % top.score
             print("✓ Round-trip verified!")
         else:
             print("✗ No results returned")
@@ -337,7 +379,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     url = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:8888"
-    print(f"Running round-trip demo against {url}")
+    print("Running round-trip demo against %s" % url)
     print("(Requires running Holochain conductor with rose_forest hApp)\n")
 
     asyncio.run(round_trip_demo(url))
