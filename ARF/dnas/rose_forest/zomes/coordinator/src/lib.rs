@@ -3,11 +3,12 @@ use rose_forest_integrity::*;
 
 mod vector_ops;
 mod budget;
+mod ontology;
 
 use vector_ops::Vector;
 use budget::{consume_budget, get_budget_state, BudgetState, BudgetEngine};
-use budget::{COST_ADD_KNOWLEDGE, COST_LINK_EDGE, COST_CREATE_THOUGHT_CREDENTIAL};
-pub use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES, COST_VALIDATE_TRIPLE};
+use budget::{COST_ADD_KNOWLEDGE, COST_LINK_EDGE, COST_CREATE_THOUGHT_CREDENTIAL, COST_VALIDATE_TRIPLE};
+pub use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES};
 use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -96,4 +97,75 @@ pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternR
     create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
 
     Ok(hash)
+}
+
+// --- Phase 1: Knowledge Triples ---
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AssertTripleInput {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TripleResult {
+    pub hash: ActionHash,
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryTriplesInput {
+    pub subject: Option<String>,
+    pub predicate: Option<String>,
+}
+
+#[hdk_extern]
+pub fn assert_triple(input: AssertTripleInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_latest_pubkey;
+    consume_budget(&agent, COST_VALIDATE_TRIPLE)?;
+    ontology::create_triple(&agent, input.subject, input.predicate, input.object, input.confidence)
+}
+
+#[hdk_extern]
+pub fn query_triples(input: QueryTriplesInput) -> ExternResult<Vec<TripleResult>> {
+    let results = match (&input.subject, &input.predicate) {
+        (Some(subject), _) => ontology::query_by_subject(subject)?,
+        (_, Some(predicate)) => ontology::query_by_predicate(predicate)?,
+        (None, None) => return Err(wasm_error!(WasmErrorInner::Guest(
+            "E_QUERY: must specify subject or predicate".into()
+        ))),
+    };
+    Ok(results.into_iter().map(|(hash, t)| TripleResult {
+        hash,
+        subject: t.subject,
+        predicate: t.predicate,
+        object: t.object,
+        confidence: t.confidence,
+    }).collect())
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PredicateInfo {
+    pub name: String,
+    pub category: String,
+}
+
+#[hdk_extern]
+pub fn get_predicates(_: ()) -> ExternResult<Vec<PredicateInfo>> {
+    let mut predicates = Vec::new();
+    for p in ontology::BASE_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "base".into() });
+    }
+    for p in ontology::AI_ML_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "ai_ml".into() });
+    }
+    for p in ontology::KNOWLEDGE_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "knowledge".into() });
+    }
+    Ok(predicates)
 }

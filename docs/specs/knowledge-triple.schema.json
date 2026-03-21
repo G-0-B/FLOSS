@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossioullk.org/specs/knowledge-triple/1.0.0",
+  "title": "KnowledgeTriple",
+  "description": "An atomic fact in the knowledge graph: subject-predicate-object with mandatory provenance and confidence.",
+  "type": "object",
+  "required": ["subject", "predicate", "object", "confidence", "source", "created_at"],
+  "properties": {
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Entity the fact is about (URI or identifier)"
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "enum": [
+        "is_a", "part_of", "related_to", "has_property",
+        "trained_on", "improves_upon", "capable_of", "evaluated_on",
+        "relates_to", "supports", "contradicts",
+        "heals", "releases", "neutralizes", "recalibrates"
+      ],
+      "description": "Relationship type from the registered ontology"
+    },
+    "object": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Value or entity URI"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Certainty score in [0,1]"
+    },
+    "source": {
+      "type": "string",
+      "description": "AgentPubKey of the agent who asserted this triple"
+    },
+    "created_at": {
+      "description": "Holochain Timestamp when the triple was created",
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "description": "seconds since Unix epoch" },
+        { "type": "integer", "description": "nanoseconds" }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Budget cost: assert_triple=2 RU (COST_VALIDATE_TRIPLE). Domain/range constraints enforced by coordinator ontology module."
+}
