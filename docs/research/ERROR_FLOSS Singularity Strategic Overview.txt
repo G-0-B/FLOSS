@@ -1,0 +1,4 @@
+Failed to download: FLOSS Singularity Strategic Overview (Version 1)
+URL: https://gamma.app/embed/r4bdstqvbe42glp
+Error: Failed to fetch
+Time: 12/25/2025, 7:39:29 PM

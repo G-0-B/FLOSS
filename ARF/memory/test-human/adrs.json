@@ -1,0 +1,16 @@
+[
+  {
+    "id": "ADR-0",
+    "content": {
+      "content": "The breakthrough is recognizing that the conversation IS the system.",
+      "agent_id": "test-human",
+      "timestamp": "2026-03-16T14:56:35.903354",
+      "context": "Core insight",
+      "is_decision": true,
+      "coherence_score": 0.95,
+      "metadata": {},
+      "embedding_ref": "51d59bc2d2e2ea45a697574652c6bd841b9463a559b0add325c1df64dcf58b61"
+    },
+    "embedding_ref": "51d59bc2d2e2ea45a697574652c6bd841b9463a559b0add325c1df64dcf58b61"
+  }
+]

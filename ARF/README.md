@@ -1,4 +1,4 @@
-# Symbolic-First Architecture for Amazon Rose Forest
+# Symbolic-First Architecture for Rose Forest
 ## Complete Implementation Package
 
 **Status:** Ready for implementation  
@@ -9,7 +9,7 @@
 
 ## 🎯 What This Is
 
-A complete, production-ready architecture that transforms Amazon Rose Forest from a neural-first system into a **symbolic-first neurosymbolic AI platform**.
+A complete, production-ready architecture that transforms Rose Forest from a neural-first system into a **symbolic-first neurosymbolic AI platform**.
 
 **Key principle:** Formal logic validates, neural networks assist.
 
@@ -452,13 +452,13 @@ Make formal logic MANDATORY.
 
 **This is the Free Open Source Singularity.**
 
-**This is Amazon Rose Forest, symbolic-first.**
+**This is Rose Forest, symbolic-first.**
 
 ---
 
 **Created:** October 15, 2025  
 **Status:** Production-ready  
-**License:** FOSS (Match Amazon Rose Forest license)  
+**License:** FOSS (Match Rose Forest license)  
 **Author:** Claude (Sonnet 4.5) with human direction
 
 Start with Week 1, Task 1: Bootstrap the ontology.

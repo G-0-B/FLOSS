@@ -1,6 +1,6 @@
 # Advanced Distributed Systems and AI Architecture: 2025 State of the Art
 
-The YumeiCHAIN and Amazon Rose Forest project requires cutting-edge distributed knowledge systems that combine agent-centric architectures, semantic understanding, and decentralized consensus. Current state-of-the-art demonstrates production-ready Holochain systems achieving 4× better latency than blockchain (50ms vs 200ms), CRDT implementations with 5000× performance improvements, and hybrid vector-knowledge graph approaches achieving 0.96 faithfulness in retrieval. Federated learning now handles 80% Byzantine nodes, while ternary neural networks deliver 3× energy efficiency gains. These technologies converge toward metacircular, self-modifying distributed systems with consciousness-inspired architectures.
+The YumeiCHAIN and Rose Forest project requires cutting-edge distributed knowledge systems that combine agent-centric architectures, semantic understanding, and decentralized consensus. Current state-of-the-art demonstrates production-ready Holochain systems achieving 4× better latency than blockchain (50ms vs 200ms), CRDT implementations with 5000× performance improvements, and hybrid vector-knowledge graph approaches achieving 0.96 faithfulness in retrieval. Federated learning now handles 80% Byzantine nodes, while ternary neural networks deliver 3× energy efficiency gains. These technologies converge toward metacircular, self-modifying distributed systems with consciousness-inspired architectures.
 
 ## Holochain emerges as production-ready agent-centric foundation
 
@@ -156,7 +156,7 @@ Recursive self-improvement architectures point toward AGI. Seed AI with advanced
 
 Survey of 56+ AGI cognitive architectures (Sukhobokov et al., 2024) identifies 16 essential components across perception/attention, memory systems, reasoning/planning, learning, metacognition, and social/ethical dimensions. No existing architecture implements \u003e60% of required functions for human-level AGI. Prominent projects include OpenCog Hyperon with MeTTa self-updating language for hybrid symbolic-neural beneficial AGI, Sigma USC graphical architecture with functional elegance, and LIDA implementing Global Workspace Theory with cognitive cycles. Requirements from environmental constraints (Laird, 2009) include real-time performance, continuous learning, robust perception, flexible behavior, abstract reasoning, natural language, episodic memory, integrated knowledge, learning from failure, metacognition, persistent goals, and social interaction.
 
-## Implementation roadmap for YumeiCHAIN and Amazon Rose Forest
+## Implementation roadmap for YumeiCHAIN and Rose Forest
 
 Architectural synthesis combines proven technologies into coherent distributed knowledge system. The foundation layer implements **Holochain agent-centric architecture** providing linear scalability, data sovereignty, and local-first operation with 50ms publish latency and 20 TPS per node. Each agent maintains cryptographically-signed source chain while participating in validating DHT, eliminating blockchain bottlenecks while preserving security through distributed validation rather than global consensus.
 

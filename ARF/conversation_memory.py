@@ -437,12 +437,15 @@ class ConversationMemory:
         
         if across_scales:
             results = []
-            for level in range(self.embeddings.get_num_levels()):
-                level_results = self._search_at_level(query_vector, level, top_k=top_k)
+            for level_name in self.embeddings.get_level_names():
+                level_results = self._search_at_level(query_vector, level_name, top_k=top_k)
                 results.extend(level_results)
+
+            # Deduplicate and re-rank
             results = self._deduplicate_and_rank(results, top_k)
         else:
-            results = self._search_at_level(query_vector, level=0, top_k=top_k)
+            # Just finest granularity
+            results = self._search_at_level(query_vector, level="level_0", top_k=top_k)
         
         return results
     
@@ -493,18 +496,26 @@ class ConversationMemory:
         embedding = self._embedding_model.encode(text, normalize_embeddings=True)
         return embedding
     
-    def _search_at_level(self, query_vector: np.ndarray, level: int, top_k: int) -> List[Dict]:
-        level_embeddings = self.embeddings.get_embeddings_at_level(level)
+    def _search_at_level(self, query_vector: np.ndarray, level: str, top_k: int) -> List[Dict]:
+        """Search at a specific granularity level"""
+        # Get embeddings at this level
+        try:
+            level_embeddings = self.embeddings.get_all_embeddings(level)
+        except KeyError:
+            return []
+
         if not level_embeddings:
             return []
-        
+
+        # Compute similarities
         similarities = []
         for name, embedding in level_embeddings.items():
             sim = np.dot(query_vector, embedding.vector)
             similarities.append((name, sim, embedding.metadata))
-        
+
+        # Sort and return top-k
         similarities.sort(key=lambda x: x[1], reverse=True)
-        
+
         results = []
         for name, score, metadata in similarities[:top_k]:
             idx = int(name.split('-')[1]) if 'understanding-' in name else None

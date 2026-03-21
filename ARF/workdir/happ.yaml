@@ -1,0 +1,15 @@
+---
+manifest_version: "1"
+name: rose_forest
+roles:
+  - name: rose_forest
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dnas/rose_forest/workdir/rose_forest.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+        origin_time: ~
+        quantum_time: ~

@@ -1,0 +1,20 @@
+{
+  "name": "rose-forest-tests",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "node fix-libsodium-esm.mjs"
+  },
+  "dependencies": {
+    "@holochain/tryorama": "^0.17.0",
+    "@holochain/client": "^0.18.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0",
+    "typescript": "^5.4.0",
+    "ajv": "^8.17.0"
+  }
+}

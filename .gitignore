@@ -23,14 +23,17 @@ target
 #my untracked local working files
 .untracked/
 
+/ai-conversations
+*.zip
+*Key_Recovery_File*
+/media
+trajectory*.json
+
 # Python
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -78,3 +81,8 @@ node_modules/
 # Memory storage for conversation_memory.py
 memory/
 memory_backup/
+
+# Claude Code
+.claude/worktrees/
+*.stackdump
+nul

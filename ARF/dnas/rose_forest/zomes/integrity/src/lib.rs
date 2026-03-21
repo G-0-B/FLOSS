@@ -35,6 +35,24 @@ pub struct KnowledgeEdge {
     pub confidence: f32,
 }
 
+/// A single atomic fact in the knowledge graph: subject-predicate-object.
+///
+/// Captures a relationship between two entities with mandatory provenance
+/// tracking. This is the core unit of structured knowledge in the commons,
+/// enabling symbolic-first validation against ontology rules.
+///
+/// See: docs/specs/knowledge-triple.spec.md
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct KnowledgeTriple {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+    pub source: AgentPubKey,
+    pub created_at: Timestamp,
+}
+
 /// Tracks the computational budget for an agent.
 ///
 /// This entry is part of the system's resource management and incentive
@@ -52,15 +70,16 @@ pub struct BudgetEntry {
 }
 
 #[hdk_link_types]
-pub enum LinkTypes { AllNodes, ShardMember, Edge, AgentBudget }
+pub enum LinkTypes { AllNodes, Edge, TriplesBySubject, TriplesByPredicate }
 
-#[hdk_entry_defs]
+#[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     RoseNode(RoseNode),
     KnowledgeEdge(KnowledgeEdge),
     BudgetEntry(BudgetEntry),
     ThoughtCredential(ThoughtCredential),
+    KnowledgeTriple(KnowledgeTriple),
 }
 
 /// The primary validation callback for this integrity zome.
@@ -82,6 +101,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
                     EntryTypes::BudgetEntry(_) => Ok(ValidateCallbackResult::Valid),
                     EntryTypes::ThoughtCredential(credential) => validate_thought_credential(&credential),
+                    EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple),
                 }
             }
             _ => Ok(ValidateCallbackResult::Valid),
@@ -118,6 +138,36 @@ fn validate_rose_node(node: &RoseNode) -> ExternResult<ValidateCallbackResult> {
         (Some(_), Some(hash)) if hash.starts_with("sha256:") => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Invalid("E_MODEL_CARD_MISSING".into())),
     }
+}
+
+fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateCallbackResult> {
+    if triple.subject.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_SUBJECT: subject must not be empty".into()));
+    }
+    if triple.predicate.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_PREDICATE: predicate must not be empty".into()));
+    }
+    if triple.object.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_OBJECT: object must not be empty".into()));
+    }
+    if !(0.0..=1.0).contains(&triple.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!("E_TRIPLE_CONFIDENCE: {} out of [0,1]", triple.confidence)));
+    }
+    // Predicate must be from a registered ontology namespace.
+    // Base predicates + AI/ML predicates from the ontology_integrity module.
+    const VALID_PREDICATES: &[&str] = &[
+        "is_a", "part_of", "related_to", "has_property",
+        "trained_on", "improves_upon", "capable_of", "evaluated_on",
+        // Knowledge graph relationship predicates (same as KnowledgeEdge)
+        "relates_to", "supports", "contradicts",
+        "heals", "releases", "neutralizes", "recalibrates",
+    ];
+    if !VALID_PREDICATES.contains(&triple.predicate.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!("E_TRIPLE_PREDICATE_UNKNOWN: '{}' not in registered ontology", triple.predicate)
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbackResult> {

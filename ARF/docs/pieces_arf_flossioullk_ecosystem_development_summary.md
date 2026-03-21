@@ -2,7 +2,7 @@
 ---
 ## ARF/FLOSSIOULLK: A Federated Multi-Agent Knowledge Commons
 
-The Amazon Rose Forest (ARF) FLOSSIOULLK ecosystem is a decentralized, agent-centric platform designed for collective intelligence and cognitive liberation. It operates on principles of Unconditional Love, Light, and Knowledge (ULLK), emphasizing transparency, agency, liberation, and evolution. This architecture integrates Holochain for distributed trust, AD4M for semantic interoperability, and HREA for economic value flows, creating a robust framework for verifiable knowledge sharing and collaborative intelligence. The architecture is driven by recent research validating the efficacy of **agent-centric, distributed, collectively intelligent systems** that preserve human agency and amplify cognitive capabilities [Meta-Orchestrated Research Synthesis].
+The Rose Forest (ARF) FLOSSIOULLK ecosystem is a decentralized, agent-centric platform designed for collective intelligence and cognitive liberation. It operates on principles of Unconditional Love, Light, and Knowledge (ULLK), emphasizing transparency, agency, liberation, and evolution. This architecture integrates Holochain for distributed trust, AD4M for semantic interoperability, and HREA for economic value flows, creating a robust framework for verifiable knowledge sharing and collaborative intelligence. The architecture is driven by recent research validating the efficacy of **agent-centric, distributed, collectively intelligent systems** that preserve human agency and amplify cognitive capabilities [Meta-Orchestrated Research Synthesis].
 
 ### I. Guiding Vision and Core Principles
 

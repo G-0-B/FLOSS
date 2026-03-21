@@ -1,5 +1,5 @@
 use hdk::prelude::*;
-use rose_forest_integrity::BudgetEntry;
+use rose_forest_integrity::{BudgetEntry, EntryTypes};
 
 // Bio-aware budget parameters based on the manifesto
 // Represents a unit of cognitive output, calibrated to the idea of ~3 major cognitive pulses per day
@@ -22,7 +22,7 @@ pub const COST_VALIDATE_TRIPLE: f32 = 2.0;
 // Total cognitive budget per window, reflecting the idea of a daily cognitive capacity
 pub const MAX_RU_PER_WINDOW: f32 = 100.0;
 // A 24-hour window for budget replenishment, aligning with natural human cycles
-pub const BUDGET_WINDOW_SECONDS: u64 = 86400;
+pub const BUDGET_WINDOW_SECONDS: i64 = 86400;
 
 pub fn consume_budget(agent: &AgentPubKey, cost: f32) -> ExternResult<()> {
     let mut budget_state = get_budget_state(agent)?;
@@ -32,7 +32,7 @@ pub fn consume_budget(agent: &AgentPubKey, cost: f32) -> ExternResult<()> {
     }
 
     budget_state.remaining_ru -= cost;
-    update_budget_entry(agent, budget_state.remaining_ru, budget_state.window_start)?; // Update the budget entry
+    save_budget_entry(agent, budget_state.remaining_ru, budget_state.window_start)?;
     Ok(())
 }
 
@@ -40,52 +40,54 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     let now = sys_time()?;
     let agent_address = agent.clone();
 
-    let path = Path::from(format!("agent_budget.{}", agent_address));
-    let links = get_links(GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AgentBudget)?.build())?;
+    // Query local source chain for the latest BudgetEntry.
+    // This is correct for agent-local state: source chain order guarantees
+    // the last BudgetEntry is the most recent, avoiding the bug where
+    // DHT-based get_links returned multiple entries with the same window_start
+    // and non-deterministic ordering.
+    let filter = ChainQueryFilter::new().include_entries(true);
+    let records = query(filter)?;
 
     let mut latest_budget: Option<BudgetEntry> = None;
-    let mut latest_timestamp: Option<Timestamp> = None;
-
-    for link in links {
-        if let Some(record) = get(link.target.clone(), GetOptions::default())? {
-            if let Some(budget_entry) = record.entry().to_app_option::<BudgetEntry>()? {
-                if latest_timestamp.is_none() || budget_entry.window_start > latest_timestamp.unwrap() {
-                    latest_budget = Some(budget_entry);
-                    latest_timestamp = Some(budget_entry.window_start);
-                }
+    // Iterate in reverse (most recent source chain action first)
+    for record in records.iter().rev() {
+        if let Some(budget_entry) = record.entry()
+            .to_app_option::<BudgetEntry>()
+            .ok()       // treat deserialization errors (non-BudgetEntry types) as None
+            .flatten()
+        {
+            if budget_entry.agent == agent_address {
+                latest_budget = Some(budget_entry);
+                break;
             }
         }
     }
 
+    let now_secs = now.as_seconds_and_nanos().0;
+
     match latest_budget {
-        Some(budget) if (now.as_seconds() - budget.window_start.as_seconds()) < BUDGET_WINDOW_SECONDS => {
+        Some(budget) if (now_secs - budget.window_start.as_seconds_and_nanos().0) < BUDGET_WINDOW_SECONDS => {
             Ok(BudgetState { agent: agent_address, remaining_ru: budget.remaining_ru, window_start: budget.window_start })
         },
         _ => {
-            // Initialize or reset budget
-            let new_budget = BudgetState { agent: agent_address, remaining_ru: MAX_RU_PER_WINDOW, window_start: now };
-            create_budget_entry(agent, new_budget.remaining_ru, new_budget.window_start)?; // Create a new budget entry
-            Ok(new_budget)
+            // Fresh or expired budget — no entry created until actually consumed.
+            // This avoids the previous bug where get_budget_state created a 100 RU
+            // entry that competed with the real consumed-budget entry.
+            Ok(BudgetState { agent: agent_address, remaining_ru: MAX_RU_PER_WINDOW, window_start: now })
         }
     }
 }
 
-fn create_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
+/// Persist a budget snapshot to the agent's source chain.
+/// Budget is agent-local state — the source chain is the authoritative record.
+/// No DHT links needed; we query the source chain directly in get_budget_state.
+fn save_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
     let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
-    let hash = create_entry(&budget_entry)?;
-    let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
+    let hash = create_entry(EntryTypes::BudgetEntry(budget_entry))?;
     Ok(hash)
 }
 
-fn update_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
-    let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
-    let hash = create_entry(&budget_entry)?;
-    let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
-    Ok(hash)
-}
-
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BudgetState {
     pub agent: AgentPubKey,
     pub remaining_ru: f32,
@@ -103,7 +105,6 @@ impl BudgetEngine {
         let budget_state = get_budget_state(agent)?;
 
         if budget_state.remaining_ru >= amount {
-            // Consume the budget by updating the state
             consume_budget(agent, amount)?;
             Ok(())
         } else {
@@ -119,15 +120,11 @@ impl BudgetEngine {
     }
 
     /// Allocate additional budget to an agent
-    /// Used for budget replenishment or granting additional resources
     pub fn allocate_budget(agent: &AgentPubKey, amount: f32) -> ExternResult<()> {
         let budget_state = get_budget_state(agent)?;
         let new_total = budget_state.remaining_ru + amount;
-
-        // Cap at maximum budget to prevent abuse
-        let capped_total = new_total.min(MAX_RU_PER_WINDOW * 2.0); // Allow 2x max for special cases
-
-        update_budget_entry(agent, capped_total, budget_state.window_start)?;
+        let capped_total = new_total.min(MAX_RU_PER_WINDOW * 2.0);
+        save_budget_entry(agent, capped_total, budget_state.window_start)?;
         Ok(())
     }
 

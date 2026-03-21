@@ -3,15 +3,12 @@ use rose_forest_integrity::*;
 
 mod vector_ops;
 mod budget;
-mod sharding;
-mod crdt;
-mod versioning;
+mod ontology;
 
 use vector_ops::Vector;
 use budget::{consume_budget, get_budget_state, BudgetState, BudgetEngine};
-use budget::{COST_ADD_KNOWLEDGE, COST_LINK_EDGE, COST_CREATE_THOUGHT_CREDENTIAL};
-// Export memory operation costs
-pub use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES, COST_VALIDATE_TRIPLE};
+use budget::{COST_ADD_KNOWLEDGE, COST_LINK_EDGE, COST_CREATE_THOUGHT_CREDENTIAL, COST_VALIDATE_TRIPLE};
+pub use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES};
 use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,15 +23,13 @@ pub struct AddEdgeInput { pub from: ActionHash, pub to: ActionHash, pub relation
 #[hdk_extern]
 pub fn add_knowledge(input: AddNodeInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    consume_budget(&agent, COST_ADD_KNOWLEDGE)?; // Consume budget for cognitive output
+    consume_budget(&agent, COST_ADD_KNOWLEDGE)?;
     let node = RoseNode { content: input.content.clone(), embedding: input.embedding, license: input.license, metadata: input.metadata };
-    let hash = create_entry(&node)?;
+    let hash = create_entry(EntryTypes::RoseNode(node))?;
+    // Link into the all_nodes discovery path — the DHT handles distribution
+    // across neighborhoods automatically, no manual sharding needed.
     let all_nodes_path = Path::from("all_nodes");
     create_link(all_nodes_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
-    // Sharding based on the Hilbert curve of the embedding
-    let shard_key = sharding::get_shard_for_embedding(&input.embedding)?;
-    let shard_path = Path::from(format!("shard.{}", shard_key));
-    create_link(shard_path.path_entry_hash()?, hash.clone(), LinkTypes::ShardMember, ())?;
     Ok(hash)
 }
 
@@ -45,11 +40,16 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
     let links = get_links(GetLinksInputBuilder::try_new(all_nodes_path.path_entry_hash()?, LinkTypes::AllNodes)?.build())?;
     let mut results: Vec<SearchResult> = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target.clone(), GetOptions::default())? {
-            if let Some(node) = record.entry().to_app_option::<RoseNode>()? {
+        let target_hash = link.target.into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        if let Some(record) = get(target_hash.clone(), GetOptions::default())? {
+            if let Some(node) = record.entry()
+                .to_app_option::<RoseNode>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
                 let node_vec = Vector::new(node.embedding);
                 let score = query.cosine_similarity(&node_vec);
-                results.push(SearchResult { hash: link.target.into_action_hash().ok_or(wasm_error!(WasmErrorInner::Guest("Invalid hash".into())))?, score, content: node.content });
+                results.push(SearchResult { hash: target_hash, score, content: node.content });
             }
         }
     }
@@ -61,9 +61,9 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
 #[hdk_extern]
 pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    consume_budget(&agent, COST_LINK_EDGE)?; // Consume budget for cognitive linking
+    consume_budget(&agent, COST_LINK_EDGE)?;
     let edge = KnowledgeEdge { from: input.from.clone(), to: input.to.clone(), relationship: input.relationship, confidence: input.confidence };
-    let hash = create_entry(&edge)?;
+    let hash = create_entry(EntryTypes::KnowledgeEdge(edge))?;
     create_link(input.from, hash.clone(), LinkTypes::Edge, ())?;
     Ok(hash)
 }
@@ -71,22 +71,18 @@ pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn budget_status(_: ()) -> ExternResult<BudgetState> { get_budget_state(&agent_info()?.agent_latest_pubkey) }
 
-
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateThoughtCredentialInput {
-    pub content: Vec<f32>, // SemanticVector
-    pub connotation: i8, // TernaryScore: -1, 0, 1
-    pub resonance: Vec<AgentPubKey>, // AgentEndorsement
-    pub impact: f32, // WisdomMetric
+    pub content: Vec<f32>,
+    pub connotation: i8,
+    pub resonance: Vec<AgentPubKey>,
+    pub impact: f32,
 }
 
 #[hdk_extern]
 pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_latest_pubkey;
-    // Define a cost for creating a ThoughtCredential, reflecting its significance
-    let cost_create_thought_credential: f32 = COST_CREATE_THOUGHT_CREDENTIAL;
-    consume_budget(&agent, cost_create_thought_credential)?; // Consume budget for creating a thoughtform
+    consume_budget(&agent, COST_CREATE_THOUGHT_CREDENTIAL)?;
 
     let thought_credential = ThoughtCredential {
         content: input.content,
@@ -96,52 +92,80 @@ pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternR
         impact: input.impact,
     };
 
-    let hash = create_entry(&thought_credential)?;
-    // Link the thought credential to the agent's path or a general thoughtforms path
+    let hash = create_entry(EntryTypes::ThoughtCredential(thought_credential))?;
     let thoughtforms_path = Path::from("all_thought_credentials");
-    create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?; // Using AllNodes for now, could be a specific LinkType
+    create_link(thoughtforms_path.path_entry_hash()?, hash.clone(), LinkTypes::AllNodes, ())?;
 
     Ok(hash)
 }
 
+// --- Phase 1: Knowledge Triples ---
+
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateCentroidInput {
-    pub new_vector: Vec<f32>,
-}
-
-#[hdk_extern]
-pub fn update_centroid(input: UpdateCentroidInput) -> ExternResult<()> {
-    // In the future, this will update the centroid with the new vector.
-    // For now, it's a placeholder.
-    Ok(())
-}
-
-#[hdk_extern]
-pub fn get_centroid(_: ()) -> ExternResult<Option<crdt::Centroid>> {
-    // In the future, this will retrieve the centroid from the DHT.
-    // For now, it returns None.
-    Ok(None)
+pub struct AssertTripleInput {
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PublishNewVersionInput {
-    pub major: u32,
-    pub minor: u32,
-    pub patch: u32,
+pub struct TripleResult {
+    pub hash: ActionHash,
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct QueryTriplesInput {
+    pub subject: Option<String>,
+    pub predicate: Option<String>,
 }
 
 #[hdk_extern]
-pub fn publish_new_version(input: PublishNewVersionInput) -> ExternResult<ActionHash> {
-    let version = versioning::Version {
-        major: input.major,
-        minor: input.minor,
-        patch: input.patch,
-        timestamp: sys_time()?,
+pub fn assert_triple(input: AssertTripleInput) -> ExternResult<ActionHash> {
+    let agent = agent_info()?.agent_latest_pubkey;
+    consume_budget(&agent, COST_VALIDATE_TRIPLE)?;
+    ontology::create_triple(&agent, input.subject, input.predicate, input.object, input.confidence)
+}
+
+#[hdk_extern]
+pub fn query_triples(input: QueryTriplesInput) -> ExternResult<Vec<TripleResult>> {
+    let results = match (&input.subject, &input.predicate) {
+        (Some(subject), _) => ontology::query_by_subject(subject)?,
+        (_, Some(predicate)) => ontology::query_by_predicate(predicate)?,
+        (None, None) => return Err(wasm_error!(WasmErrorInner::Guest(
+            "E_QUERY: must specify subject or predicate".into()
+        ))),
     };
-    create_entry(&version)
+    Ok(results.into_iter().map(|(hash, t)| TripleResult {
+        hash,
+        subject: t.subject,
+        predicate: t.predicate,
+        object: t.object,
+        confidence: t.confidence,
+    }).collect())
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PredicateInfo {
+    pub name: String,
+    pub category: String,
 }
 
 #[hdk_extern]
-pub fn get_latest_version(_: ()) -> ExternResult<Option<versioning::Version>> {
-    versioning::get_latest_version()
+pub fn get_predicates(_: ()) -> ExternResult<Vec<PredicateInfo>> {
+    let mut predicates = Vec::new();
+    for p in ontology::BASE_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "base".into() });
+    }
+    for p in ontology::AI_ML_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "ai_ml".into() });
+    }
+    for p in ontology::KNOWLEDGE_PREDICATES {
+        predicates.push(PredicateInfo { name: p.to_string(), category: "knowledge".into() });
+    }
+    Ok(predicates)
 }

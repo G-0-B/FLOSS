@@ -26,7 +26,7 @@ Rigorous multi-layered testing is foundational, with Reality Validation integrat
 
 ### Alignment with Foundational Projects
 
-This architecture aligns with Amazon Rose Forest, AGI@Home, and Yumeichan by prioritizing:
+This architecture aligns with Rose Forest, AGI@Home, and Yumeichan by prioritizing:
 
 - Decentralized collaboration and federated reasoning for transparent knowledge validation,
 - Ethical frameworks (ULLK policies) operationalized as machine-checkable rules,

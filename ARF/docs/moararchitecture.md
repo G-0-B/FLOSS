@@ -50,7 +50,7 @@ The name itself encodes the architecture, committing us to a system where:
 
 ---
 
-## **SCALE 3: ECOSYSTEM → Amazon Rose Forest**
+## **SCALE 3: ECOSYSTEM → Rose Forest**
 
 ### **The Garden as Computation**
 

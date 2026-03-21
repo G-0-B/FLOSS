@@ -1,0 +1,12 @@
+[
+  {
+    "content": "First conversation: The stakes are existential - extinction vs flourishing.",
+    "agent_id": "test-persistence-agent",
+    "timestamp": "2026-03-16T14:56:35.893717",
+    "context": "Human explaining the why behind FLOSSI0ULLK",
+    "is_decision": false,
+    "coherence_score": 0.9,
+    "metadata": {},
+    "embedding_ref": "c1bd757bc06be4c776d8d4f9de4a18261e1d1023d0312f78d63e1fbcd637fa93"
+  }
+]

@@ -1,0 +1,16 @@
+---
+manifest_version: "1"
+name: rose_forest
+integrity:
+  origin_time: 2024-01-01T00:00:00.000000Z
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: rose_forest_integrity
+      bundled: ../../../target/wasm32-unknown-unknown/release/rose_forest_integrity.wasm
+coordinator:
+  zomes:
+    - name: rose_forest
+      bundled: ../../../target/wasm32-unknown-unknown/release/rose_forest.wasm
+      dependencies:
+        - name: rose_forest_integrity

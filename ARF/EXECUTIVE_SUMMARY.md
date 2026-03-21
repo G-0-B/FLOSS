@@ -6,7 +6,7 @@
 
 ## What You're Getting
 
-A complete neurosymbolic AI architecture for Amazon Rose Forest that puts **formal logic first** and uses **LLMs as assistants**.
+A complete neurosymbolic AI architecture for Rose Forest that puts **formal logic first** and uses **LLMs as assistants**.
 
 ---
 

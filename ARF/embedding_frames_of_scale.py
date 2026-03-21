@@ -263,6 +263,14 @@ class MultiScaleEmbedding:
             raise KeyError(f"Level '{level}' does not exist")
         return self.levels[level].copy()
 
+    def get_num_levels(self) -> int:
+        """Return the number of levels currently defined."""
+        return len(self.levels)
+
+    def get_level_names(self) -> List[str]:
+        """Return all level names in insertion order."""
+        return list(self.levels.keys())
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the multi-scale embedding to a dictionary.
 
@@ -273,14 +281,6 @@ class MultiScaleEmbedding:
         -------
         Dict[str, Any]
             Dictionary representation suitable for JSON serialization.
-
-        Example
-        -------
-        >>> mse = MultiScaleEmbedding()
-        >>> mse.add_embedding('fine', 'node1', np.array([1.0, 2.0]))
-        >>> data = mse.to_dict()
-        >>> 'levels' in data
-        True
         """
         serialized_levels = {}
         for level_name, embeddings in self.levels.items():

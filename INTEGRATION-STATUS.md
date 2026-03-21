@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This document tracks the integration of four critical distributed technologies into the FLOSSI0ULLK/Amazon Rose Forest stack:
+This document tracks the integration of four critical distributed technologies into the FLOSSI0ULLK/Rose Forest stack:
 
 1. **KERI** (Key Event Receipt Infrastructure) - Cryptographic identity layer
 2. **AD4M** (Agent-centric Distributed Application Meta-ontology) - Semantic interoperability
@@ -22,7 +22,7 @@ We've implemented the **foundational integration layers** that enable these tech
 - ✅ **KERI Identity Bridge**: Maps KERI AIDs to Holochain agent keys with cryptographic seals
 - ✅ **AD4M Semantic Layer**: Integrated perspectives, semantic contexts, and language addresses
 - ✅ **hREA Economic Events**: Full REA ontology implementation with value flows and DICE attribution
-- ✅ **Vector Bridge**: Connects economic events to semantic search over Amazon Rose Forest
+- ✅ **Vector Bridge**: Connects economic events to semantic search over Rose Forest
 
 ### Current State
 
@@ -71,7 +71,7 @@ We've implemented the **foundational integration layers** that enable these tech
                                     │
                                     ▼
         ┌─────────────────────────────────────────────────────────┐
-        │         Amazon Rose Forest (Vector Database)             │
+        │         Rose Forest (Vector Database)             │
         │                                                           │
         │  • Understanding entries (enhanced with AD4M)            │
         │  • Vector embeddings (economic event indexing)           │
@@ -331,7 +331,7 @@ We've implemented the **foundational integration layers** that enable these tech
 
 ---
 
-## 4. Vector Bridge (hREA ↔ Amazon Rose Forest)
+## 4. Vector Bridge (hREA ↔ Rose Forest)
 
 ### Implementation
 
