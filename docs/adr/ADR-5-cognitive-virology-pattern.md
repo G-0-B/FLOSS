@@ -20,6 +20,13 @@ This pattern was identified by mapping Chase Hughes' cognitive virology framewor
 - **Armstrong (Coinbase):** Iterative self-belief as cognitive virology applied to a single host. Pattern: try smallest unit, fail, iterate, scale. Not "believe and leap."
 - **Prof Jiang (Christianity analysis):** Most successful memetic system in history survived 2000 years via perfected five-stage cycle. Produced both liberation theology AND the Inquisition from the same substrate.
 
+## Problem Statement
+
+FLOSSI0ULLK propagates across AI substrates and human sessions via an implicit memetic loop, but this loop is undocumented and unobservable. Without explicit recognition:
+- The propagation mechanism cannot be measured, improved, or safety-constrained
+- Failure modes (memetic autoimmunity, consent bypass, drift) cannot be detected
+- The tension between replication fitness and informed consent remains unaddressed
+
 ## Decision
 
 Recognize and document that FLOSSI0ULLK is a memetic system. Make the propagation loop explicit and observable. Do NOT build self-modification infrastructure until substrate is validated.
@@ -48,6 +55,23 @@ Hughes explicitly shows that the most effective memetic systems bypass evaluatio
 
 3. **ULLK constraint must be non-modifiable.** If the system can rewrite its own evaluation criteria (MetacircularEvolution), what prevents it from evolving past the ULLK constraint itself? The Holochain "natural selection" property (ethical DNAs spread through adoption) is unvalidated.
 
+## Implementation Strategy
+
+1. **HARVEST Protocol** (`docs/specs/harvest-protocol.spec.md`) — formalize the existing manual consolidation practice as a 5-stage self-observation loop (OBSERVE → EVALUATE → PROPOSE → VALIDATE → COMMIT). Run manually first.
+2. **ADR fitness metric** — for each ADR, track cross-system absorption rate (how quickly new AI sessions reference it, how many sessions absorb it without re-explanation).
+3. **OpenClaw validation spike** — determine if OpenClaw can orchestrate a simple observe-evaluate-modify cycle, which would enable semi-automated HARVEST.
+4. **Consent gate design** — the mechanism distinguishing beneficial from parasitic memetics. Deferred until HARVEST has run at least 3 cycles and produced data.
+
+## Validation Criteria
+
+This ADR moves from Specified → Accepted when:
+
+1. OpenClaw orchestrates a simple observe-evaluate-modify cycle on a toy problem
+2. HARVEST Protocol has completed at least 3 cycles with measurable output logged in `docs/governance/HARVEST_LOG.md`
+3. ADR fitness metrics show quantifiable cross-system absorption rates for at least 3 ADRs
+
+Note: ADR-0 human coherence test was previously listed as a blocker. It has been passed since 2025-11 (all 4 validation criteria met). No longer a gate.
+
 ## Consequences
 
 ### Immediate (NOW)
@@ -63,21 +87,16 @@ Hughes explicitly shows that the most effective memetic systems bypass evaluatio
 - Self-derivative computation on actual ADR propagation data
 - Formal consent-gate at Entry stage (the mechanism that distinguishes beneficial from parasitic memetics)
 
-## Evidence Gate
+## Related Documents
 
-This ADR moves from Specified to Accepted when:
-1. OpenClaw can orchestrate a simple observe-evaluate-modify cycle on a toy problem
-2. HARVEST Protocol has run at least 3 cycles with measurable output
-3. ADR fitness metrics show quantifiable cross-system absorption rates
+- `docs/adr/ADR-0-recognition-protocol.md` — Recognition Protocol (Validated, all 4 criteria passed)
+- `docs/adr/ADR-3-metaprompt-kernelization.md` — Metaprompt Kernelization
+- `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
+- `docs/specs/harvest-protocol.spec.md` — HARVEST Protocol specification (minimal self-observation loop)
 
-Note: ADR-0 human coherence test was previously listed as a blocker but has been passed since 2025-11. All 4 ADR-0 validation criteria are met. See ADR-0 for details.
-
-## References
+### External References
 
 - Hughes, Chase. "Cognitive Virology: Mass Infection." 2026.
 - Black Hat USA 2025. "The First 30 Months of Psychological Manipulation of Humans by AI."
 - Prof Jiang Xueqin. "The Most Dangerous Individual Humanity Ever Produced." 2026.
 - Armstrong, Brian. "How Irrational Self Belief Built a $100 Billion Crypto Company." When Shift Happens, 2026.
-- ADR-0: Recognition Protocol
-- ADR-3: Metaprompt Kernelization
-- Master Metaprompt v1.3.1 Kernel

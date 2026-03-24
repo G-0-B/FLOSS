@@ -50,21 +50,25 @@ The "walking skeleton" is:
 ## Implementation Strategy
 
 ### Phase 0: Capture the Skeleton — COMPLETE
+
 - [x] Write this ADR
 - [x] Persist current conversation as reference material
 - [x] Extract key patterns into reusable memory substrate
 
 ### Phase 1: Memory Persistence — COMPLETE
+
 - [x] Build `ConversationMemory` class using existing `MultiScaleEmbedding`
 - [x] Test by encoding this conversation
 - [x] Verify recall works across conversation boundaries (Claude memory, Serena memories, CLAUDE.md, ADR system all persist across sessions)
 
 ### Phase 2: Multi-Agent Composition — COMPLETE
+
 - [x] Enable loading context from multiple AI systems (118+ conversations across 5 systems analyzed 2026-03-20)
 - [x] Test coherence when new AI system joins (each new session loads kernel + ADRs and is productive within minutes)
 - [x] Measure "context reconstruction time": ~5 minutes with kernel v1.3.1 + ADR index (down from 13 months)
 
 ### Phase 3: Holochain Integration — IN PROGRESS
+
 - [x] Port memory substrate to Holochain DNA (Rose Forest DNA, Phase 0 complete)
 - [x] Enable agent-centric distributed storage (KnowledgeTriple entry type, Phase 1)
 - [ ] Cryptographic verification of memory provenance (LATER — requires KERI integration)
