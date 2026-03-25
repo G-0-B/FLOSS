@@ -5,16 +5,17 @@ id: "flossi0ullk-mvp-plan"
 version: "0.1.0"
 kind: "implementation_plan"
 status: "Proposed"
-updated: "2026-03-16"
+updated: "2026-03-25"
 truth_status: "Specified"
 evidence_sources:
   - "Master Metaprompt v1.3.1 (governance)"
   - "SDD-Master-Spec-0.22 (architecture)"
   - "ARF/dnas/rose_forest/ (412 LOC Rust, tested)"
   - "ARF/conversation_memory.py (503 LOC Python, 3/4 tests)"
-  - "All ADRs (0, 0.1, 1, 2, 3, 4)"
+  - "All ADRs (0, 0.1, 1, 2, 3, 4, 5)"
   - "SYMBOLIC_FIRST_CORE.md (878 lines specification)"
-  - "docs/specs/ (5 entry types, 4 JSON schemas)"
+  - "docs/specs/ (6 entry types, 5 JSON schemas, phase0 bridge spec)"
+  - "Orchestration Landscape Report v2.0.0 (Silo-Bench, MAS-ProVe constraints)"
 rollback_plan: "Each phase ships independently; any phase can stall without breaking prior phases"
 ```
 
@@ -359,9 +360,27 @@ Alice creates a node, Bob creates a supporting edge to it.
 
 ---
 
+## Architectural Constraints (from v2.0.0 Landscape Report)
+
+These constraints are empirically derived and must inform all implementation decisions:
+
+1. **Agent team size: k<=5** — Silo-Bench (March 2026) shows coordination overhead eliminates parallelization gains at k=50. At k=2, you lose 15-49% of single-agent performance. Design for small coordinated teams, not swarms.
+
+2. **Output verification > process verification** — MAS-ProVe demonstrates that process-level verification of LLM reasoning trajectories does not consistently improve performance. Test outputs and adversarial scenarios, not trajectories.
+
+3. **Non-token economics validated** — Every major token (OLAS, GTC, FET, AGIX, OCEAN) has declined dramatically. Holochain's intentional absence of a native token layer is the correct approach.
+
+4. **IPFS multi-pinning required** — Peer availability dropped from 60% to 40%, with 50% of peers online less than 4 days. Single-pin is insufficient for persistence.
+
+See `docs/research/Automated-Agent-Orchestration-Report_v2.0.0.md` for full analysis.
+
+---
+
 ## Immediate Next Action
 
-**Right now, today**: Enter the nix dev shell and attempt `cargo build --release --target wasm32-unknown-unknown`.
+**Phase 0 Substrate Bridge Validation** — `docs/specs/phase0-substrate-bridge.spec.md`
+
+Write and run a 2-agent Tryorama test that validates: publish, provenance, independent verify, discovery via query, fork visibility, and no privilege. This is the narrowest test that proves the architecture end-to-end.
 
 That single command will tell us whether Phase 0 is a 2-hour fix or a 2-week investigation. Everything else flows from there.
 
