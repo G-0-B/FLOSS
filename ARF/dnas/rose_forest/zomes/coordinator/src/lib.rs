@@ -160,6 +160,13 @@ pub struct PredicateInfo {
     pub category: String,
 }
 
+/// Retrieve a triple's full Record (entry + signed action with provenance).
+/// Used by substrate bridge validation to verify author pubkey and timestamp.
+#[hdk_extern]
+pub fn get_triple_record(hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(hash, GetOptions::default())
+}
+
 #[hdk_extern]
 pub fn get_predicates(_: ()) -> ExternResult<Vec<PredicateInfo>> {
     let mut predicates = Vec::new();
