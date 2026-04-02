@@ -150,8 +150,10 @@ fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateC
     if triple.object.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_OBJECT: object must not be empty".into()));
     }
-    if !(0.0..=1.0).contains(&triple.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_TRIPLE_CONFIDENCE: {} out of [0,1]", triple.confidence)));
+    // Signed gradient: negative = movement away from truth, positive = toward truth.
+    // Aligns with ternary logic (-1/0/+1) and Yumeichan connotation framework.
+    if !(-1.0..=1.0).contains(&triple.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!("E_TRIPLE_CONFIDENCE: {} out of [-1,1]", triple.confidence)));
     }
     // Predicate must be from a registered ontology namespace.
     // Base predicates + AI/ML predicates from the ontology_integrity module.
@@ -171,8 +173,9 @@ fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateC
 }
 
 fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbackResult> {
-    if !(0.0..=1.0).contains(&edge.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_CONFIDENCE: {} out of [0,1]", edge.confidence)));
+    // Signed gradient: same range as KnowledgeTriple confidence.
+    if !(-1.0..=1.0).contains(&edge.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!("E_CONFIDENCE: {} out of [-1,1]", edge.confidence)));
     }
     // New relationship types reflecting the manifesto
     const VALID_RELATIONSHIPS: &[&str] = &["relates_to", "supports", "contradicts", "heals", "releases", "neutralizes", "recalibrates"];

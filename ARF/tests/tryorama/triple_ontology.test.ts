@@ -71,7 +71,7 @@ describe("KnowledgeTriple Schema Validation (offline)", () => {
     assert.ok(!validateKnowledgeTriple(payload), "Should fail on invalid predicate");
   });
 
-  test("KnowledgeTriple with out-of-range confidence fails schema", () => {
+  test("KnowledgeTriple with out-of-range confidence fails schema (above)", () => {
     const payload = {
       subject: "entity_a",
       predicate: "is_a",
@@ -81,6 +81,30 @@ describe("KnowledgeTriple Schema Validation (offline)", () => {
       created_at: [1710000000, 0],
     };
     assert.ok(!validateKnowledgeTriple(payload), "Should fail on confidence > 1.0");
+  });
+
+  test("KnowledgeTriple with out-of-range confidence fails schema (below)", () => {
+    const payload = {
+      subject: "entity_a",
+      predicate: "is_a",
+      object: "Entity",
+      confidence: -1.5,
+      source: "uhCAkAgent",
+      created_at: [1710000000, 0],
+    };
+    assert.ok(!validateKnowledgeTriple(payload), "Should fail on confidence < -1.0");
+  });
+
+  test("KnowledgeTriple with negative confidence is valid (signed gradient)", () => {
+    const payload = {
+      subject: "entity_a",
+      predicate: "contradicts",
+      object: "entity_b",
+      confidence: -0.8,
+      source: "uhCAkAgent",
+      created_at: [1710000000, 0],
+    };
+    assert.ok(validateKnowledgeTriple(payload), "Negative confidence should be valid in [-1,+1]");
   });
 
   test("KnowledgeTriple with empty subject fails schema", () => {
