@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.org/schemas/consensus-gate/v0.1.0",
+  "title": "Consensus Gate Schemas",
+  "description": "Claim, Vote, and Decision schemas for the FLOSSI0ULLK Consensus Gate (ADR-6 Seam 1)",
+  "definitions": {
+    "Claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "proposer",
+        "proposal_type",
+        "summary",
+        "body",
+        "truth_status",
+        "blast_radius",
+        "submitted_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "UUID v7 (time-sortable)"
+        },
+        "proposer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Agent public key or identifier"
+        },
+        "proposal_type": {
+          "type": "string",
+          "enum": ["CodeChange", "ConfigChange", "SpecChange", "AdrChange", "Other"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1
+        },
+        "truth_status": {
+          "type": "string",
+          "enum": ["Unverified"],
+          "description": "Always Unverified on submission; upgraded by decision outcome"
+        },
+        "blast_radius": {
+          "type": "string",
+          "enum": ["Local", "Module", "System", "Substrate"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "ref"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["spec", "test", "adr", "url", "commit"]
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "submitted_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Vote": {
+      "type": "object",
+      "required": ["voter", "vote", "rationale", "voted_at"],
+      "properties": {
+        "voter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vote": {
+          "type": "integer",
+          "enum": [-1, 0, 1],
+          "description": "Ternary: -1 reject, 0 abstain/defer, +1 approve"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "voted_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Decision": {
+      "type": "object",
+      "required": ["claim_id", "outcome", "votes", "decided_at"],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["APPROVED", "DEFERRED", "REJECTED", "OVERRIDDEN"]
+        },
+        "votes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Vote" }
+        },
+        "decided_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "adr_ref": {
+          "type": "string",
+          "description": "Path to ADR stub recording this decision"
+        },
+        "override_by": {
+          "type": "string",
+          "description": "Human identity if outcome is OVERRIDDEN"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "outcome": { "const": "OVERRIDDEN" } }
+          },
+          "then": {
+            "required": ["override_by"]
+          }
+        }
+      ]
+    }
+  }
+}

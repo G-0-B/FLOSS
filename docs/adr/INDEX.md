@@ -23,6 +23,7 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 | **ADR-3** | Metaprompt Kernelization | Proposed | 2026-01-12 | `ADR-3-metaprompt-kernelization.md` |
 | **ADR-4** | Specification-Driven Development | Accepted | 2025-12-15 | `ADR-4-spec-driven-development.md` |
 | **ADR-5** | Cognitive Virology as Architectural Pattern | Specified | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
+| **ADR-6** | Four-System Meta-Orchestration Integration | Proposed | 2026-04-04 | `ADR-6-four-system-integration.md` |
 
 ---
 
