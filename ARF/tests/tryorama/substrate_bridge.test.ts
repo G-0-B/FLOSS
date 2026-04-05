@@ -20,12 +20,13 @@ import {
   Scenario,
 } from "@holochain/tryorama";
 import type { ActionHash, AgentPubKey, Record as HcRecord } from "@holochain/client";
+import { decode } from "@msgpack/msgpack";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ── Setup ────────────────────────────────────────────
 const hAppPath = path.resolve(
-  fileURLToPath(import.meta.url),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../../workdir/rose_forest.happ"
 );
 
@@ -143,9 +144,35 @@ describe("Substrate Bridge Validation", () => {
 
       assert.ok(record, "Bob should be able to retrieve Alice's record");
 
-      // Verify content matches what Alice wrote
-      const entry = record!.entry;
-      assert.ok(entry, "Record should have entry data");
+      // Verify content matches what Alice wrote — decode the entry bytes
+      assert.ok(record!.entry, "Record should have entry data");
+      const entryVariant = (record!.entry as { Present?: { entry: Uint8Array } }).Present;
+      assert.ok(entryVariant, "Entry should be Present variant (not Hidden/NotApplicable)");
+      const tripleData = decode(entryVariant!.entry) as {
+        subject: string;
+        predicate: string;
+        object: string;
+        confidence: number;
+      };
+      assert.equal(
+        tripleData.subject,
+        "flossi0ullk",
+        "Bob's fetched subject must match Alice's input"
+      );
+      assert.equal(
+        tripleData.predicate,
+        "is_a",
+        "Bob's fetched predicate must match Alice's input"
+      );
+      assert.equal(
+        tripleData.object,
+        "coordination_protocol",
+        "Bob's fetched object must match Alice's input"
+      );
+      assert.ok(
+        Math.abs(tripleData.confidence - 0.9) < 0.001,
+        `Bob's fetched confidence must match Alice's input (got ${tripleData.confidence})`
+      );
 
       // Verify provenance points to Alice, not Bob
       const author = record!.signed_action.hashed.content.author;
@@ -161,6 +188,50 @@ describe("Substrate Bridge Validation", () => {
         bobPubKey,
         "Author should NOT be Bob"
       );
+    });
+  });
+
+  test("Criterion 3b: VERIFY (negative) — get_triple_record returns null for non-existent hash", async () => {
+    // Guards against a contract regression where get_triple_record silently
+    // returns an entry from another type (or fabricates one) when asked for a
+    // hash that has never been authored. If this test ever passes with a
+    // non-null record, the zome's None-handling path is broken.
+    await runScenario(async (scenario: Scenario) => {
+      const alice = await scenario.addPlayerWithApp({ path: hAppPath });
+      const aliceCall = getZomeCaller(alice.cells[0], ZOME);
+
+      // Author one real triple so we have a valid-shape ActionHash to mutate
+      const realHash = await aliceCall<ActionHash>("assert_triple", {
+        subject: "negative_probe_subject",
+        predicate: "is_a",
+        object: "negative_probe_object",
+        confidence: 0.5,
+      });
+
+      // Construct a valid-shape but non-existent ActionHash by XOR-mutating
+      // the content bytes (preserving the 3-byte multihash prefix at [0..3)).
+      const nonExistentHash = new Uint8Array(realHash);
+      for (let i = 3; i < nonExistentHash.length - 4; i++) {
+        nonExistentHash[i] = nonExistentHash[i] ^ 0xa5;
+      }
+
+      const missing = await aliceCall<HcRecord | null>(
+        "get_triple_record",
+        nonExistentHash
+      );
+
+      assert.equal(
+        missing,
+        null,
+        "get_triple_record must return null (not throw, not fabricate) for a hash that was never authored"
+      );
+
+      // Sanity: the real hash still resolves (proves we didn't corrupt state)
+      const present = await aliceCall<HcRecord | null>(
+        "get_triple_record",
+        realHash
+      );
+      assert.ok(present, "Real hash should still resolve after negative probe");
     });
   });
 

@@ -52,7 +52,7 @@ The substrate bridge is validated when ALL of the following pass:
 
 ### 3.2 Test: Publish + Provenance
 
-```
+```typescript
 Agent A calls assert_triple({
   subject: "holochain",
   predicate: "is_a",
@@ -69,7 +69,7 @@ ASSERT: get(action_hash) returns Record with:
 
 ### 3.3 Test: Independent Verification
 
-```
+```typescript
 Agent B calls get(action_hash) using hash from 3.2
 
 ASSERT: returns same Record
@@ -79,7 +79,7 @@ ASSERT: provenance (author pubkey) == Agent A (not Agent B)
 
 ### 3.4 Test: Discovery via Query
 
-```
+```typescript
 Agent B calls query_triples({ subject: "holochain", predicate: None })
 
 ASSERT: results contain the triple from 3.2
@@ -88,7 +88,7 @@ ASSERT: result includes action_hash, subject, predicate, object, confidence
 
 ### 3.5 Test: Fork Visibility
 
-```
+```typescript
 Agent A calls assert_triple({
   subject: "flossi0ullk",
   predicate: "is_a",
@@ -112,7 +112,7 @@ ASSERT: both have correct provenance (different authors)
 
 ### 3.6 Test: No Privilege
 
-```
+```typescript
 ASSERT: Agent A and Agent B use identical zome calls (no admin-only functions)
 ASSERT: Neither agent's entries are prioritized in query results by authority
 ```
@@ -137,9 +137,16 @@ ASSERT: Neither agent's entries are prioritized in query results by authority
    - Runs tests 3.2 through 3.6 sequentially
    - Reports pass/fail for each criterion
 
-2. **Provenance retrieval helper** — The existing `query_triples` returns content but not full provenance (author, timestamp). Either:
-   - (a) Add a `get_triple_with_provenance` extern that returns `Record` metadata, or
-   - (b) Add author/timestamp fields to `TripleResult` struct
+2. **Provenance retrieval helper** — The existing `query_triples` returns content but not full provenance (author, timestamp). **Decision (adopted 2026-04-05):** use option (b) — extend `TripleResult` with `author: AgentPubKey` and `created_at: Timestamp` fields, mapped from the existing `KnowledgeTriple.source` and `KnowledgeTriple.created_at` fields that the integrity zome already persists. Rejected option (a) `get_triple_with_provenance` extern because it would require a second round-trip per result and increase RU cost, and because making provenance part of every query response aligns with the provenance-first architecture (see CLAUDE.md learnings).
+
+   Mapping:
+
+   ```text
+   KnowledgeTriple.source      -> TripleResult.author
+   KnowledgeTriple.created_at  -> TripleResult.created_at
+   ```
+
+   (The `get_triple_record` extern added in the Phase 0 spike returns the full `Record` for cases that need the full action metadata; `query_triples` now returns enough provenance to satisfy Criteria 3 and 5 without a follow-up `get`.)
 
 ### What This Does NOT Require
 
@@ -161,6 +168,7 @@ ASSERT: Neither agent's entries are prioritized in query results by authority
 
 ## 6. Definition of Done
 
+- [ ] Provenance retrieval implemented: `TripleResult` extended with `author` and `created_at` fields (option b from §4) — prerequisite for Criteria 3, 4, and 5, and for ADR-2 acceptance evidence in HARVEST_LOG.md
 - [ ] `substrate_bridge.test.ts` written with all 6 criteria as test cases
 - [ ] All 6 tests pass against running Holochain conductor
 - [ ] Results logged in `docs/governance/HARVEST_LOG.md` as substrate bridge validation

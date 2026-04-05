@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@holochain/tryorama": "^0.17.0",
-    "@holochain/client": "^0.18.0"
+    "@holochain/client": "^0.18.0",
+    "@msgpack/msgpack": "^3.0.0-beta2"
   },
   "devDependencies": {
     "vitest": "^1.6.0",

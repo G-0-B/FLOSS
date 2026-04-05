@@ -39,8 +39,10 @@ FLOSS/
 ```
 
 ## Key Files (Hot Path)
-- `ARF/dnas/rose_forest/zomes/coordinator/src/lib.rs` — 5 zome extern functions
+
+- `ARF/dnas/rose_forest/zomes/coordinator/src/lib.rs` — 9 zome extern functions: `add_knowledge`, `vector_search`, `link_edge`, `budget_status`, `create_thought_credential`, `assert_triple`, `query_triples`, `get_triple_record`, `get_predicates`
 - `ARF/dnas/rose_forest/zomes/coordinator/src/budget.rs` — Source-chain budget tracking
 - `ARF/dnas/rose_forest/zomes/coordinator/src/vector_ops.rs` — Cosine similarity math
 - `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs` — Entry types + validation rules
-- `packages/orchestrator/holochain_connector.py` — Python↔Holochain bridge
+- `packages/orchestrator/holochain_connector.py` — Python↔Holochain bridge (Rose Forest DNA)
+- `ARF/in.finite-nrg/infinity-bridge/orchestrator/holochain_connector.py` — Infinity Bridge DNA connector

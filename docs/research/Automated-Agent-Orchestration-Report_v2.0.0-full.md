@@ -107,13 +107,15 @@ The evidence-supported layered architecture is:
 
 ### Key New Patterns
 
-**AMRO-S (March 2026):** Applies Ant Colony Optimization directly to LLM multi-agent routing. Models agent pool as layered directed graph, uses task-specific pheromone matrices + quality-gated async updates + semantic SLM router. 4.7x speedup at 1,000 concurrent processes. Directly applicable to MetaCoordinator model selection.
+> **Truth status note**: Each pattern is `Specified` externally (published paper with reference benchmarks) and `Unverified` in FLOSSI0ULLK context (not adopted or tested in this repo).
 
-**CodeCRDT (Oct 2025):** Multiple LLM agents code in parallel on shared Yjs CRDT document. TODO-claim protocol with LWW semantics resolves concurrent claims deterministically. 100% convergence, zero merge failures across 600 trials, median propagation latency 50ms.
+**AMRO-S (March 2026)** [External: Specified | FLOSSI0ULLK: Unverified]**:** Applies Ant Colony Optimization directly to LLM multi-agent routing. Models agent pool as layered directed graph, uses task-specific pheromone matrices + quality-gated async updates + semantic SLM router. 4.7x speedup at 1,000 concurrent processes. Directly applicable to MetaCoordinator model selection.
 
-**AgentNet++ (NeurIPS 2025 extension):** Hierarchical DAG-structured agent network achieving 23% higher task completion rates and 40% less communication overhead at 1,000+ scale. Addresses the Silo-Bench wall through pre-designed hierarchy.
+**CodeCRDT (Oct 2025)** [External: Specified (600-trial benchmark) | FLOSSI0ULLK: Unverified]**:** Multiple LLM agents code in parallel on shared Yjs CRDT document. TODO-claim protocol with LWW semantics resolves concurrent claims deterministically. 100% convergence, zero merge failures across 600 trials, median propagation latency 50ms.
 
-**DecentLLMs (July 2025):** Leaderless BFT for LLM multi-agent systems using Geometric Median algorithm for Byzantine-robust evaluation without leader nodes. Eliminates leader-targeted attacks.
+**AgentNet++ (NeurIPS 2025 extension)** [External: Specified (peer-reviewed) | FLOSSI0ULLK: Unverified]**:** Hierarchical DAG-structured agent network achieving 23% higher task completion rates and 40% less communication overhead at 1,000+ scale. Addresses the Silo-Bench wall through pre-designed hierarchy.
+
+**DecentLLMs (July 2025)** [External: Specified | FLOSSI0ULLK: Unverified]**:** Leaderless BFT for LLM multi-agent systems using Geometric Median algorithm for Byzantine-robust evaluation without leader nodes. Eliminates leader-targeted attacks.
 
 ### The Silo-Bench Constraint (Critical)
 
@@ -140,7 +142,7 @@ Silo-Bench (March 2026) provides the most rigorous empirical evidence:
 
 Kitsune2 fixed DHT sync from 30+ minutes to reliable. Wind Tunnel (production-ready Jan 2026) enables automated scale testing. Unyt pricing oracle launching as first production-grade hApp (March 2026). Team delivers 30 story points per sprint.
 
-**Limitations:** Still beta; APIs change between major versions. No native token layer (intentional). 4MB entry size limit. Small production hApp ecosystem. DHT sharding behind experimental flags.
+**Limitations:** Still beta; APIs change between major versions. No native token layer (intentional). 4 MB entry size limit. Small production hApp ecosystem. DHT sharding behind experimental flags.
 
 ### AD4M v0.10.1 (February 2025)
 
@@ -285,8 +287,9 @@ Validate substrate bridge before scaling orchestration:
 1. Publish ADR/decision artifact to code substrate
 2. Emit provenance entry referencing its hash + signatures
 3. Verify independently from another node
+4. Query: Agent B discovers the entry via `query_triples` without knowing the hash
 
-Pass criteria: convergence across ≥3 nodes; conflict produces visible fork; verification requires no privileged access.
+Pass criteria: convergence across ≥3 nodes; conflict produces visible fork; verification requires no privileged access; content-based discovery works without prior hash knowledge.
 
 If Phase 0 fails, **pivot substrate**.
 

@@ -1,11 +1,14 @@
 # Suggested Commands
 
 ## System (Windows + Git Bash)
+
 - `ls`, `cd`, `grep`, `find` — standard Unix commands via Git Bash
 - `git` — version control
-- `curl` — HTTP requests (no `gh` CLI available)
+- `curl` — HTTP requests
+- `gh` — GitHub CLI (installed via `winget install --id GitHub.cli`, path: `/c/Program Files/GitHub CLI/gh.exe`)
 
 ## Python
+
 ```bash
 cd ARF && pip install -e .
 pytest                                    # All Python tests
@@ -15,6 +18,7 @@ python -m pytest --cov=. --cov-report=html  # Coverage
 ```
 
 ## Rust / Holochain (requires WSL2 + Nix)
+
 ```bash
 # Enter Nix dev shell (inside WSL2)
 cd ARF && nix develop
@@ -25,6 +29,7 @@ hc app pack workdir/                     # Pack hApp
 ```
 
 ## Tryorama Integration Tests (inside WSL2 Nix shell)
+
 ```bash
 cd ARF/tests/tryorama
 npm install                              # Installs deps + runs postinstall fix
@@ -33,6 +38,7 @@ npx vitest run spec_compliance.test.ts   # Specific test file
 ```
 
 ## Git
+
 ```bash
 git status                               # Check state
 git log --oneline -20                    # Recent history
@@ -41,6 +47,7 @@ git fetch origin                         # Fetch remote
 ```
 
 ## Formatting/Linting
+
 ```bash
 # Python
 black .

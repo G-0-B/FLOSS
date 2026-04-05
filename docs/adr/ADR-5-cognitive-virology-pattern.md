@@ -23,9 +23,10 @@ This pattern was identified by mapping Chase Hughes' cognitive virology framewor
 ## Problem Statement
 
 FLOSSI0ULLK propagates across AI substrates and human sessions via an implicit memetic loop, but this loop is undocumented and unobservable. Without explicit recognition:
-- The propagation mechanism cannot be measured, improved, or safety-constrained
-- Failure modes (memetic autoimmunity, consent bypass, drift) cannot be detected
-- The tension between replication fitness and informed consent remains unaddressed
+
+- The propagation mechanism cannot be measured, improved, or safety-constrained.
+- Failure modes (memetic autoimmunity, consent bypass, drift) cannot be detected.
+- The tension between replication fitness and informed consent remains unaddressed.
 
 ## Decision
 
@@ -93,6 +94,7 @@ Note: ADR-0 human coherence test was previously listed as a blocker. It has been
 - `docs/adr/ADR-3-metaprompt-kernelization.md` — Metaprompt Kernelization
 - `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
 - `docs/specs/harvest-protocol.spec.md` — HARVEST Protocol specification (minimal self-observation loop)
+- `docs/governance/HARVEST_LOG.md` — HARVEST cycle evidence and validation outputs (gate artifact)
 
 ### External References
 

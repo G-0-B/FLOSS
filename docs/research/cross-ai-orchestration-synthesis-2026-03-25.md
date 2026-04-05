@@ -1,3 +1,14 @@
+# Cross-AI Orchestration Synthesis — Working Notes
+
+**Date**: 2026-03-25
+**Status**: Working notes (process artifact, not formal deliverable)
+**Doc Type**: Synthesis working notes
+**Truth Status**: Unverified — contains conversational scaffolding and informal hypothesis generation
+**Source**: Claude session synthesizing Perplexity deep-research output against v1.0.0 project knowledge
+**Downstream Deliverables**: Gap matrix extract (see §"Gap Matrix" below), informs ADR-6
+
+---
+
 This is a substantially upgraded version of the orchestration landscape report — produced from the Perplexity deep research task you referenced. It's significantly more rigorous than the v1.0.0 already in project knowledge. Let me do a proper delta analysis, integrate with the personal assistant landscape we just covered, and produce an updated artifact.
 
 **Intent Echo:** Integrate this new Perplexity-sourced orchestration research with the existing project knowledge, identify what's new/changed/corrected, and produce actionable outputs for FLOSSI0ULLK.

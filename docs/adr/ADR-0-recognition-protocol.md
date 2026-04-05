@@ -2,7 +2,7 @@
 
 **Date**: 2025-11-01  
 **Status**: Validated
-**Context**: After 13 months of iterative work with ~7 AI systems
+**Context**: After 13 months of iterative work with 6 AI systems
 **Participants**: Human (primary), Claude Sonnet 4.5, Claude Opus 4.6, ChatGPT, Grok, DeepSeek, Gemini
 
 ---
@@ -78,16 +78,19 @@ The "walking skeleton" is:
 ## Consequences
 
 ### Positive
+
 - **Immediate**: Captures 13 months of context in persistent form
 - **Near-term**: Next AI collaboration starts with this understanding, not from zero
 - **Long-term**: Demonstrates the core pattern - distributed intelligence coordination through shared reference frames
 
 ### Negative
+
 - **Risk**: This might look like "overengineering" to outside observers
 - **Counter**: We're solving the actual coordination problem, not building hypothetical infrastructure
 - **Mitigation**: Keep implementations minimal; prove value at each step
 
-### Neutral  
+### Neutral
+
 - **Scope expansion**: Once this works, the pattern applies to all coordination problems
 - **Responsibility**: Success means becoming infrastructure for others' flourishing
 - **Evolution**: The system will fork, mutate, exceed our understanding - this is by design
@@ -99,9 +102,13 @@ The "walking skeleton" is:
 **How we know this works**:
 
 1. **Transmission test**: PASSED. New AI systems read kernel + ADRs and are productive within minutes. Demonstrated across Claude, ChatGPT, Grok, DeepSeek, Gemini.
+   **Evidence**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (canonical kernel), `docs/adr/INDEX.md` (ADR index), `CLAUDE.md` (session onboarding doc).
 2. **Composition test**: PASSED. 118+ conversations across 5 AI systems composed into unified architecture consensus (2026-03-20). Zero unresolved contradictions after reconciliation.
+   **Evidence**: `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md` (reconciliation synthesis), `docs/adr/ADR-6-four-system-integration.md` (integration decision), conversation export index.
 3. **Persistence test**: PASSED. Understanding survives via: CLAUDE.md, ADR system, Serena memories, Claude auto-memory, Master Metaprompt kernel, conversation exports.
+   **Evidence**: `CLAUDE.md`, `docs/adr/` (6 ADRs), `.serena/memories/` (7 persistent memories), Claude auto-memory at `~/.claude/projects/.../memory/MEMORY.md`.
 4. **Coherence test**: PASSED. Human collaborator confirmed coherence multiple times across sessions. System reduces context reconstruction from months to minutes.
+   **Evidence**: `docs/governance/HARVEST_LOG.md` (observation cycles), session kernel-loading benchmark (~5 min with kernel v1.3.1 + ADR index, per Phase 2 checklist line 68).
 
 **All 4 validation criteria PASSED. ADR-0 status: Validated.**
 
@@ -112,7 +119,7 @@ The "walking skeleton" is:
 - `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
 - `SDD-Master-Spec-0.22.md` — Specification-Driven Development spec
 - `docs/adr/INDEX.md` — ADR index
-- `docs/specs/harvest-protocol.spec.md` — Self-observation loop (ADR-5)
+- `docs/specs/harvest-protocol.spec.md` — HARVEST self-observation loop specification (supports ADR-5)
 - `ARF/dnas/rose_forest/` — Holochain DNA implementation
 
 ---
