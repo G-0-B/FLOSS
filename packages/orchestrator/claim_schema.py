@@ -16,6 +16,8 @@ from typing import Any, Optional
 
 
 class ProposalType(str, Enum):
+    """Category of change a Claim proposes (spec §4.1)."""
+
     CODE_CHANGE = "CodeChange"
     CONFIG_CHANGE = "ConfigChange"
     SPEC_CHANGE = "SpecChange"
@@ -24,6 +26,8 @@ class ProposalType(str, Enum):
 
 
 class BlastRadius(str, Enum):
+    """Scope of impact; drives quorum and override rules (spec §4.3)."""
+
     LOCAL = "Local"
     MODULE = "Module"
     SYSTEM = "System"
@@ -31,6 +35,8 @@ class BlastRadius(str, Enum):
 
 
 class TruthStatus(str, Enum):
+    """Truth-model label applied to Claims (spec §4.2). Claims submit as Unverified."""
+
     UNVERIFIED = "Unverified"
     SPECIFIED = "Specified"
     VERIFIED = "Verified"
@@ -38,6 +44,8 @@ class TruthStatus(str, Enum):
 
 
 class Outcome(str, Enum):
+    """Terminal outcome of a Decision (spec §4.5)."""
+
     APPROVED = "APPROVED"
     DEFERRED = "DEFERRED"
     REJECTED = "REJECTED"
@@ -73,6 +81,8 @@ def _new_id() -> str:
 
 @dataclass(frozen=True)
 class EvidenceRef:
+    """Typed reference to supporting evidence for a Claim (spec §4.1)."""
+
     type: str  # "spec" | "test" | "adr" | "url" | "commit"
     ref: str
 
@@ -105,6 +115,7 @@ class Claim:
             )
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize Claim to a plain dict (enums rendered as their .value strings)."""
         d = asdict(self)
         d["proposal_type"] = self.proposal_type.value
         d["blast_radius"] = self.blast_radius.value
@@ -131,6 +142,7 @@ class Vote:
             raise ValueError("E_VOTE_INVALID_SCHEMA: rationale must be 1..1000 chars")
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize Vote to a plain dict."""
         return asdict(self)
 
 
@@ -151,6 +163,7 @@ class Decision:
             raise ValueError("E_OVERRIDE_NOT_HUMAN: OVERRIDDEN requires override_by")
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize Decision to a plain dict (outcome as .value; optional fields omitted when None)."""
         d = {
             "claim_id": self.claim_id,
             "outcome": self.outcome.value,

@@ -97,9 +97,11 @@ class Understanding:
     embedding_ref: Optional[str] = None
     
     def to_dict(self) -> Dict:
+        """Return this Understanding as a plain dict (via dataclasses.asdict)."""
         return asdict(self)
-    
+
     def hash(self) -> str:
+        """Return a SHA-256 hex digest of the canonicalized dict form (stable across runs)."""
         content_str = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()
 
@@ -110,6 +112,16 @@ class ConversationMemory:
     def __init__(self, agent_id: str, storage_path: Optional[str] = None,
                  validate_ontology: bool = True, backend: str = 'file',
                  use_committee_validation: bool = False, committee_use_mock: bool = True):
+        """Initialize memory for the given agent.
+
+        Args:
+            agent_id: Stable identifier for the owning agent.
+            storage_path: Directory for the file backend; defaults to ./memory/<agent_id>.
+            validate_ontology: If True, enforce predicate/ontology checks on extracted triples.
+            backend: 'file' (default) or 'holochain'.
+            use_committee_validation: Enable TripleValidationCommittee for triples.
+            committee_use_mock: Use a mock committee instead of live agents.
+        """
         self.agent_id = agent_id
         self.validate_ontology = validate_ontology
         self.backend = backend
@@ -190,12 +202,14 @@ class ConversationMemory:
         logger.info(f"Initialized ConversationMemory for agent: {agent_id} (backend: {backend})")
     
     def transmit(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
+        """Persist an Understanding via the configured backend; returns the resulting id/hash or None on failure."""
         if self.backend == 'holochain':
             return self._transmit_holochain(understanding_dict, skip_validation)
         else:
             return self._transmit_file(understanding_dict, skip_validation)
 
     def _transmit_holochain(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
+        """Transmit an Understanding to the Holochain backend via memory_coordinator zome."""
         if self.budget_manager:
             self.budget_manager.check_budget()
 
@@ -228,6 +242,7 @@ class ConversationMemory:
             return None
 
     def _transmit_file(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
+        """Transmit an Understanding to the file backend; returns the understanding hash or None on failure."""
         if self.budget_manager:
             self.budget_manager.check_budget()
 
@@ -328,6 +343,7 @@ class ConversationMemory:
         return understanding.hash()
 
     def _extract_triple(self, understanding_dict: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
+        """Extract a (subject, predicate, object) triple from content using configured regex patterns with fallback heuristics."""
         content = understanding_dict.get('content', '')
         if not content:
             return None
@@ -371,6 +387,11 @@ class ConversationMemory:
         return (self.agent_id, STATED, f"understanding_{content_hash}")
 
     def _validate_triple(self, triple: Tuple[str, str, str], context: str = "") -> Tuple[bool, Optional[str], Optional[Dict]]:
+        """Validate a triple via committee (if enabled) then basic predicate/shape checks.
+
+        Returns:
+            Tuple of (accepted, rejection_reason_or_None, optional_committee_metadata).
+        """
         if not self.validate_ontology:
             return (True, None, None)
 
@@ -424,9 +445,15 @@ class ConversationMemory:
         return (True, None, None)
 
     def get_validation_stats(self) -> Dict[str, int]:
+        """Return a copy of running validation counters (attempts/passed/failed/skipped)."""
         return self.validation_stats.copy()
 
     def recall(self, query: str, across_scales: bool = True, top_k: int = 5) -> List[Dict]:
+        """Recall Understandings matching `query`, using multi-scale embeddings when available.
+
+        Falls back to text overlap when embeddings are unavailable and routes to the
+        Holochain backend when configured. Returns up to `top_k` ranked dicts.
+        """
         if self.backend == 'holochain':
             return self._recall_holochain(query, top_k)
 
@@ -450,6 +477,7 @@ class ConversationMemory:
         return results
     
     def export_for_composition(self) -> Dict:
+        """Export a serializable snapshot of this memory (understandings, ADRs, embedding state) for composition with another agent."""
         return {
             'agent_id': self.agent_id,
             'understandings': [u.to_dict() for u in self.understandings],
@@ -459,6 +487,7 @@ class ConversationMemory:
         }
     
     def import_and_compose(self, other_memory_export: Dict) -> None:
+        """Merge another agent's exported memory into this one and persist the result."""
         other_agent = other_memory_export['agent_id']
         logger.info(f"Composing memory from {other_agent} with {self.agent_id}")
         
@@ -484,9 +513,11 @@ class ConversationMemory:
         logger.info(f"Composition complete. Total understandings: {len(self.understandings)}")
     
     def get_adr_history(self) -> List[Dict]:
+        """Return all recorded ADRs sorted by their id."""
         return sorted(self.adrs, key=lambda x: x['id'])
-    
+
     def _encode_text(self, text: str) -> np.ndarray:
+        """Encode text to a normalized sentence-transformer embedding (lazy-loads the model on first use)."""
         if not hasattr(self, '_embedding_model'):
             from sentence_transformers import SentenceTransformer
             logger.info("Loading sentence-transformers model (one-time setup)...")
@@ -527,6 +558,7 @@ class ConversationMemory:
         return results
     
     def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
+        """Deduplicate results by embedding_ref, sort by relevance_score descending, and return the top_k."""
         seen_hashes = set()
         deduped = []
         results.sort(key=lambda x: x['relevance_score'], reverse=True)
@@ -538,6 +570,7 @@ class ConversationMemory:
         return deduped[:top_k]
     
     def _text_search(self, query: str, top_k: int) -> List[Dict]:
+        """Fallback word-overlap search when embeddings are unavailable; returns up to top_k matches."""
         query_terms = set(query.lower().split())
         scored = []
         for u in self.understandings:
@@ -549,6 +582,7 @@ class ConversationMemory:
         return [u.to_dict() for u, _ in scored[:top_k]]
     
     def _save(self):
+        """Persist understandings, ADRs, and embedding state as JSON files under storage_path."""
         understandings_file = self.storage_path / "understandings.json"
         with open(understandings_file, 'w') as f:
             json.dump([u.to_dict() for u in self.understandings], f, indent=2)
@@ -564,6 +598,7 @@ class ConversationMemory:
         logger.debug(f"Memory saved to {self.storage_path}")
     
     def _load(self):
+        """Load understandings, ADRs, and embedding state from JSON files under storage_path (no-op if missing)."""
         understandings_file = self.storage_path / "understandings.json"
         if understandings_file.exists():
             with open(understandings_file, 'r') as f:
@@ -590,6 +625,7 @@ class ConversationMemory:
                     self.embeddings = MultiScaleEmbedding()
 
     def _recall_holochain(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Recall understandings from the Holochain backend matching `query`; returns up to top_k dicts."""
         try:
             results = self.hc_client.call_zome(
                 'memory_coordinator',
@@ -607,6 +643,7 @@ class ConversationMemory:
             return []
 
     def _holochain_understanding_to_dict(self, understanding: Dict) -> Dict:
+        """Normalize a Holochain understanding record into the local Understanding dict shape."""
         return {
             'content': understanding['content'],
             'agent_id': str(understanding['agent']),
@@ -625,11 +662,13 @@ class HolochainClient:
     """A simple client for interacting with Holochain zomes."""
 
     def __init__(self, app_port: int = 8888, app_id: str = "rose-forest"):
+        """Initialize a client targeting the Holochain conductor at (app_port, app_id)."""
         self.app_port = app_port
         self.app_id = app_id
         logger.info(f"Initialized HolochainClient for app '{app_id}' on port {app_port}")
 
     def call_zome(self, zome: str, function: str, payload: Dict) -> Any:
+        """Invoke `function` on `zome` with the given payload via the `hc call` CLI and return the parsed result."""
         import subprocess
         cmd = [
             'hc', 'call',

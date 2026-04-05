@@ -45,6 +45,7 @@ from packages.orchestrator.consensus_gate import (
 def mock_voter(name: str, vote: int, rationale: str = "test") -> Voter:
     """Build a Voter that always casts the same vote."""
     def _v(_claim: Claim) -> Vote:
+        """Return the fixed Vote regardless of the claim."""
         return Vote(voter=name, vote=vote, rationale=rationale)
     return _v
 
@@ -53,6 +54,7 @@ def sample_claim(
     blast: BlastRadius = BlastRadius.MODULE,
     proposal_type: ProposalType = ProposalType.CODE_CHANGE,
 ) -> Claim:
+    """Build a minimal valid Claim for tests, parameterized by blast radius and proposal type."""
     return Claim(
         proposer="agent-test",
         proposal_type=proposal_type,
@@ -167,7 +169,9 @@ def test_early_exit_on_first_rejection():
     called = []
 
     def spy_voter(name: str, vote_val: int):
+        """Build a Voter that records its invocation in the shared `called` list."""
         def _v(_c):
+            """Record invocation and return the configured Vote."""
             called.append(name)
             return Vote(voter=name, vote=vote_val, rationale="spy")
         return _v
@@ -276,6 +280,7 @@ def test_tally_direct():
 
 
 def _run_all():
+    """Run every test in this module sequentially and return an exit code (0 on success)."""
     tests = [
         test_vector_1_unanimous_approval,
         test_vector_2_single_rejection_vetoes,

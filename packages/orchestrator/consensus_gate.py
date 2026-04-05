@@ -179,6 +179,7 @@ def default_adr_writer(adr_dir: Path) -> Callable[[Decision, Claim], str]:
     """
 
     def _write(decision: Decision, claim: Claim) -> str:
+        """Write the decision as a markdown stub and return the written file path."""
         decisions_dir = adr_dir / "decisions"
         decisions_dir.mkdir(parents=True, exist_ok=True)
         date_part = decision.decided_at[:10]  # YYYY-MM-DD
