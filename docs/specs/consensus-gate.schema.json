@@ -20,6 +20,7 @@
         "id": {
           "type": "string",
           "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
           "description": "UUID v7 (time-sortable)"
         },
         "proposer": {
@@ -104,7 +105,9 @@
       "properties": {
         "claim_id": {
           "type": "string",
-          "format": "uuid"
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "description": "UUID v7 of the Claim this decision concerns"
         },
         "outcome": {
           "type": "string",
@@ -112,6 +115,7 @@
         },
         "votes": {
           "type": "array",
+          "minItems": 1,
           "items": { "$ref": "#/definitions/Vote" }
         },
         "decided_at": {

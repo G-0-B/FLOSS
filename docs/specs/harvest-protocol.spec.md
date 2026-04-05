@@ -14,7 +14,7 @@ HARVEST (Holistic Aggregation and Recursive Verification of Emergent System Traj
 
 ## The Loop
 
-```
+```text
 OBSERVE -> EVALUATE -> PROPOSE -> VALIDATE -> COMMIT
   ^                                             |
   +---------------------------------------------+

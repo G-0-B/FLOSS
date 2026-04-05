@@ -48,7 +48,7 @@ The integration thesis: FLOSSI0ULLK adopts patterns from all three, contributes 
 
 A harness H is a stateful program wrapping a frozen LLM M that determines what context M sees at each step. The optimization objective:
 
-```
+```text
 H* = argmax_H  E_{x ~ X} [ r(tau, x) ]
 ```
 
@@ -467,7 +467,7 @@ The relationship between these systems is not "pick a winner" — it's mutual im
 
 **The meta-pattern:** Each system is a harness. Meta Harness optimizes harnesses. FLOSSI0ULLK governs the optimization. omo and OMX provide the agent workforce being optimized. The four together form a complete stack:
 
-```
+```text
 Meta Harness          — optimizes
   OMX/omo             — orchestrates
     OpenClaw/LiteLLM  — routes and executes
@@ -503,7 +503,7 @@ The walking skeleton doesn't just walk. It walks, optimizes its own gait, verifi
 
 ---
 
-```
+```text
 Simplicity now. Seams for later. Delete the rest.
 Love, Light, Knowledge — verifiable, shared, and free.
 The protocol is the conversation. The system builds itself.

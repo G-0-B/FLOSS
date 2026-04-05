@@ -29,6 +29,14 @@ logger = logging.getLogger("consensus_gate")
 
 # Type alias: a Voter is a callable that evaluates a Claim and returns a Vote.
 # Real voters will wrap LLM calls or human prompts. Tests inject mocks.
+#
+# TODO(ADR-6 Seam 2): this gate currently trusts `vote.voter` / `human_voter`
+# strings from callers. Integrate with the identity_integrity zome
+# (register_aid / create_identity_seal) to resolve and authenticate voter AIDs
+# before tallying, mirroring the substrate bridge's provenance model. Until
+# that wiring lands, decide()/override() enforce *local* per-claim
+# de-duplication by voter string, which prevents a single caller from stuffing
+# the ballot but does not prevent cross-caller identity spoofing.
 Voter = Callable[[Claim], Vote]
 
 
@@ -97,9 +105,15 @@ def decide(
     claim.validate()
 
     votes: list[Vote] = []
+    seen_voters: set[str] = set()
     for voter in voters:
         vote = voter(claim)
         vote.validate()
+        if vote.voter in seen_voters:
+            raise ConsensusGateError(
+                f"E_VOTE_DUPLICATE: voter {vote.voter!r} already voted on claim {claim.id}"
+            )
+        seen_voters.add(vote.voter)
         votes.append(vote)
         # Early-exit: a single -1 vetoes, no need to consult remaining voters
         if vote.vote == -1:
@@ -134,9 +148,15 @@ def override(
     """Human override path for DEFERRED decisions. See spec §4.2.
 
     Raises:
-      ConsensusGateError: if override state is invalid per INV-009 or
-                          if blast_radius disallows override.
+      ConsensusGateError: if override state is invalid per INV-009,
+                          if blast_radius disallows override, or
+                          if prior_decision.claim_id does not match claim.id.
     """
+    if prior_decision.claim_id != claim.id:
+        raise ConsensusGateError(
+            f"E_OVERRIDE_CLAIM_MISMATCH: prior decision {prior_decision.claim_id} "
+            f"does not belong to claim {claim.id}"
+        )
     if prior_decision.outcome != Outcome.DEFERRED:
         raise ConsensusGateError(
             "E_OVERRIDE_INVALID_STATE: override only valid on DEFERRED decisions, "
@@ -150,6 +170,10 @@ def override(
     if not human_voter or not rationale:
         raise ConsensusGateError(
             "E_OVERRIDE_NOT_HUMAN: human_voter and rationale required"
+        )
+    if any(v.voter == human_voter for v in prior_decision.votes):
+        raise ConsensusGateError(
+            f"E_OVERRIDE_DUPLICATE: {human_voter!r} already voted on claim {claim.id}"
         )
 
     override_vote = Vote(voter=human_voter, vote=1, rationale=rationale)

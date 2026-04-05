@@ -28,7 +28,7 @@
 
 - Draft 2020-12 (`$schema: "https://json-schema.org/draft/2020-12/schema"`)
 - Located in `docs/specs/`
-- Spec-code linkage: RoseNode's `model_card_hash` = SHA-256 of spec prose
+- Spec-code linkage: RoseNode's `model_card_hash` records **both** SHA-256 and BLAKE3 digests of the spec prose; provenance records MUST include both digests for verifiable integrity (per FLOSS provenance requirements)
 
 ## General
 

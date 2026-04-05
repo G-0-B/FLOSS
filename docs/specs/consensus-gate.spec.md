@@ -76,11 +76,14 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 
 ### 3.2 Semantic
 
-6. **INV-006:** `Decision.outcome == APPROVED` requires at least 3 votes AND all votes ≥ 0 AND at least 2 votes = +1
+6. **INV-006:** `Decision.outcome == APPROVED` requires the blast-radius quorum to be met, all votes ≥ 0, and:
+   - `Local`: at least 1 vote = +1
+   - `Module` / `System`: at least 2 votes = +1
+   - `Substrate`: all votes = +1 (unanimous)
 7. **INV-007:** `Decision.outcome == REJECTED` requires at least 1 vote = -1
 8. **INV-008:** `Decision.outcome == DEFERRED` means quorum reached with mix of 0 and +1 but insufficient +1 for approval
 9. **INV-009:** `Decision.outcome == OVERRIDDEN` requires `override_by` to be a registered human identity
-10. **INV-010:** No Claim may be decided twice (decisions are immutable)
+10. **INV-010:** No Claim may be decided twice; a DEFERRED decision MAY be superseded by an override, which replaces (not appends to) the lifecycle state
 
 ### 3.3 Provenance
 
@@ -95,30 +98,38 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 ### 4.1 Tallying Logic
 
 ```
-TALLY votes:
+TALLY votes, claim:
   IF any vote == -1:
     RETURN REJECTED
-  IF len(votes) < quorum_min (default 3):
+  IF claim.blast_radius == Substrate:
+    IF all votes == +1 AND len(votes) >= quorum_min(Substrate):
+      RETURN APPROVED
+    RETURN DEFERRED
+  IF len(votes) < quorum_min(claim.blast_radius):
     RETURN DEFERRED (insufficient quorum)
   IF count(votes == +1) >= 2 AND all votes >= 0:
     RETURN APPROVED
-  ELSE:
-    RETURN DEFERRED
+  IF claim.blast_radius == Local AND count(votes == +1) >= 1:
+    RETURN APPROVED
+  RETURN DEFERRED
 ```
 
 ### 4.2 Override Path
 
-When `outcome == DEFERRED` due to +1/+1/0 pattern, a registered human voter may issue an override:
+Override is a **superseding transition** on a `DEFERRED` decision, not a second decision on the same claim (see INV-010). A registered human voter supplies an override rationale and the gate emits a new `Decision` with `outcome=OVERRIDDEN` that replaces the prior `DEFERRED` record in the claim's lifecycle state:
 
 ```
-OVERRIDE claim:
-  REQUIRE human_identity(override_voter)
-  REQUIRE prior_decision.outcome == DEFERRED
-  REQUIRE override_rationale non-empty
-  RECORD new Decision with outcome=OVERRIDDEN, override_by=human_id
+OVERRIDE prior_decision, claim, human_voter, rationale:
+  REQUIRE prior_decision.claim_id == claim.id        # E_OVERRIDE_CLAIM_MISMATCH
+  REQUIRE prior_decision.outcome == DEFERRED         # E_OVERRIDE_INVALID_STATE
+  REQUIRE OVERRIDE_ALLOWED[claim.blast_radius]       # E_OVERRIDE_NOT_ALLOWED (non-substrate only)
+  REQUIRE human_voter, rationale non-empty           # E_OVERRIDE_NOT_HUMAN
+  REQUIRE human_voter not in prior_decision.votes    # E_OVERRIDE_DUPLICATE
+  EMIT superseding Decision with outcome=OVERRIDDEN, override_by=human_voter,
+       votes=prior_decision.votes + [override_vote]
 ```
 
-Override is itself recorded as its own ADR for provenance.
+`Substrate` blast radius never exposes an override path; any attempt raises `E_OVERRIDE_NOT_ALLOWED`. Override is itself recorded as its own ADR for provenance.
 
 ### 4.3 Blast Radius Gates
 
@@ -138,8 +149,12 @@ Override is itself recorded as its own ADR for provenance.
 - **E_VOTE_INVALID_RANGE:** Vote value not in {-1, 0, +1}
 - **E_VOTE_UNKNOWN_VOTER:** Voter not in registered voter set
 - **E_DECISION_IMMUTABLE:** Attempt to re-decide an already-decided claim
-- **E_OVERRIDE_NOT_HUMAN:** Override attempted by non-human voter
+- **E_OVERRIDE_NOT_HUMAN:** Override attempted by non-human voter (missing `human_voter`/`rationale`)
 - **E_OVERRIDE_INVALID_STATE:** Override attempted on non-DEFERRED decision
+- **E_OVERRIDE_NOT_ALLOWED:** Override attempted on a blast radius that disallows it (e.g. `Substrate`)
+- **E_OVERRIDE_CLAIM_MISMATCH:** `prior_decision.claim_id` does not match `claim.id`
+- **E_OVERRIDE_DUPLICATE:** Override voter has already cast a vote on this claim
+- **E_VOTE_DUPLICATE:** Two voters with the same identity in one `decide()` call
 - **E_QUORUM_INSUFFICIENT:** Blast radius requires more voters than available
 
 ---
@@ -162,20 +177,20 @@ Votes: [+1, +1, -1]
 Expected: outcome=REJECTED (INV-007)
 ```
 
-### 6.3 Deferred via Abstention
+### 6.3a Approval With One Abstention
 
 ```
 Claim: { proposal_type: "AdrChange", blast_radius: "System", summary: "promote to Accepted" }
 Votes: [+1, +1, 0]
-Expected: outcome=DEFERRED (no -1, but also not 2+ votes = +1 with all non-negative AND satisfying approval rule? Wait: all >= 0, 2 are +1 -> APPROVED per INV-006)
+Expected: outcome=APPROVED (quorum=3 met, 2 votes = +1, all votes ≥ 0 — INV-006)
 ```
 
-Correction: `[+1, +1, 0]` IS approved per INV-006 (2 votes = +1, all votes ≥ 0). Deferred requires fewer than 2 votes = +1.
+### 6.3b Deferred Via Too Many Abstentions
 
 ```
 Claim: { proposal_type: "AdrChange", blast_radius: "System", summary: "promote to Accepted" }
 Votes: [+1, 0, 0]
-Expected: outcome=DEFERRED (only 1 vote = +1)
+Expected: outcome=DEFERRED (quorum met but only 1 vote = +1)
 ```
 
 ### 6.4 Substrate Change Requires Unanimous

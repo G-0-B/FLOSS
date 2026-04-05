@@ -1,7 +1,7 @@
-# ADR Index — FLOSSIOULLK / ARF Ecosystem
+# ADR Index — FLOSSI0ULLK / ARF Ecosystem
 
 **Version:** 1.0.0
-**Updated:** 2026-03-05
+**Updated:** 2026-04-04
 **Truth Status:** Specified
 
 ---

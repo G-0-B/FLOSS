@@ -163,7 +163,7 @@ Prove that OpenClaw, LocalAI, and Khoj can form a minimal working pipeline: user
 
 ### Architecture
 
-```
+```text
 [User] → [Telegram/WhatsApp/Slack]
          ↓
     [OpenClaw Gateway]  ← controls local machine

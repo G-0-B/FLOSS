@@ -8,6 +8,8 @@ See docs/adr/ADR-6-four-system-integration.md for context.
 
 from __future__ import annotations
 
+import os
+import time
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -75,8 +77,22 @@ def _utcnow_iso() -> str:
 
 
 def _new_id() -> str:
-    """UUID v4 (v7 stdlib support lands in Py 3.14). Still unique + time-correlated enough."""
-    return str(uuid.uuid4())
+    """Return a new UUID v7 string (INV-001, spec §3.1).
+
+    Uses :func:`uuid.uuid7` when available (Python 3.14+) and falls back to an
+    inline RFC 9562 §5.7 implementation otherwise. v7 is time-sortable, which
+    the consensus gate relies on for ADR ordering.
+    """
+    uuid7 = getattr(uuid, "uuid7", None)
+    if uuid7 is not None:
+        return str(uuid7())
+    # RFC 9562 §5.7 UUIDv7: 48-bit unix_ts_ms | 4-bit ver(0b0111) | 12-bit rand_a
+    #                       | 2-bit var(0b10) | 62-bit rand_b
+    ts_ms = int(time.time() * 1000) & ((1 << 48) - 1)
+    rand_a = int.from_bytes(os.urandom(2), "big") & 0x0FFF
+    rand_b = int.from_bytes(os.urandom(8), "big") & ((1 << 62) - 1)
+    v = (ts_ms << 80) | (0x7 << 76) | (rand_a << 64) | (0x2 << 62) | rand_b
+    return str(uuid.UUID(int=v))
 
 
 @dataclass(frozen=True)
@@ -102,7 +118,35 @@ class Claim:
     submitted_at: str = field(default_factory=_utcnow_iso)
 
     def validate(self) -> None:
-        """Enforce spec invariants INV-001 through INV-005."""
+        """Enforce spec invariants INV-001 through INV-005.
+
+        Checks type/format of wire-format fields (id, submitted_at, enums) before
+        checking content invariants, so bad inputs fail fast rather than leaking
+        into QUORUM_MIN / .value / ADR-filename construction downstream.
+        """
+        # INV-001 (spec §3.1): id MUST be a valid UUID v7 (time-sortable).
+        try:
+            claim_uuid = uuid.UUID(self.id)
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise ValueError("E_CLAIM_INVALID_SCHEMA: id must be a valid UUID") from exc
+        if claim_uuid.version != 7:
+            raise ValueError(
+                f"E_CLAIM_INVALID_SCHEMA: id must be UUID v7, got v{claim_uuid.version}"
+            )
+        if not isinstance(self.proposal_type, ProposalType):
+            raise ValueError(
+                "E_CLAIM_INVALID_SCHEMA: proposal_type must be a ProposalType member"
+            )
+        if not isinstance(self.blast_radius, BlastRadius):
+            raise ValueError(
+                "E_CLAIM_INVALID_SCHEMA: blast_radius must be a BlastRadius member"
+            )
+        try:
+            datetime.fromisoformat(self.submitted_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                "E_CLAIM_INVALID_SCHEMA: submitted_at must be ISO 8601"
+            ) from exc
         if not self.proposer:
             raise ValueError("E_CLAIM_INVALID_SCHEMA: proposer required")
         if not (1 <= len(self.summary) <= 200):

@@ -259,6 +259,116 @@ def test_adr_writer_produces_file(tmp_path_factory=None):
         assert "a" in content and "b" in content
 
 
+def test_override_rejects_claim_id_mismatch():
+    """override() must reject a prior_decision whose claim_id doesn't match the claim (provenance guard)."""
+    claim_a = sample_claim(blast=BlastRadius.MODULE)
+    claim_b = sample_claim(blast=BlastRadius.MODULE)
+    voters = [mock_voter("a", 1), mock_voter("b", 0)]
+    deferred_a = decide(claim_a, voters)
+    assert deferred_a.outcome == Outcome.DEFERRED
+    assert deferred_a.claim_id == claim_a.id
+
+    try:
+        # Attempt to attach decision_a's votes to claim_b via override
+        override(deferred_a, claim_b, "human-x", "wrong claim")
+    except ConsensusGateError as e:
+        assert "E_OVERRIDE_CLAIM_MISMATCH" in str(e)
+    else:
+        raise AssertionError("expected ConsensusGateError for claim_id mismatch")
+
+
+def test_decide_rejects_duplicate_voters():
+    """decide() must reject ballot stuffing: same voter string on same claim."""
+    claim = sample_claim(blast=BlastRadius.SYSTEM)
+    # Both voters use the same name
+    voters = [mock_voter("dup", 1), mock_voter("dup", 1), mock_voter("c", 1)]
+
+    try:
+        decide(claim, voters)
+    except ConsensusGateError as e:
+        assert "E_VOTE_DUPLICATE" in str(e)
+    else:
+        raise AssertionError("expected ConsensusGateError for duplicate voter")
+
+
+def test_override_rejects_duplicate_human_voter():
+    """override() must reject a human_voter who already voted in the prior decision."""
+    claim = sample_claim(blast=BlastRadius.MODULE)
+    voters = [mock_voter("human-anthony", 1), mock_voter("b", 0)]
+    deferred = decide(claim, voters)
+    assert deferred.outcome == Outcome.DEFERRED
+
+    try:
+        override(deferred, claim, human_voter="human-anthony", rationale="double-vote")
+    except ConsensusGateError as e:
+        assert "E_OVERRIDE_DUPLICATE" in str(e)
+    else:
+        raise AssertionError("expected ConsensusGateError for duplicate override voter")
+
+
+def test_claim_validate_rejects_non_uuidv7():
+    """Claim.validate() must reject a non-UUID id (INV-001)."""
+    claim = sample_claim()
+    claim.id = "not-a-uuid"
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for non-UUID id")
+
+
+def test_claim_validate_rejects_uuid4():
+    """Claim.validate() must reject a UUIDv4 (spec requires v7 for time-sortability)."""
+    import uuid as _uuid
+    claim = sample_claim()
+    claim.id = str(_uuid.uuid4())
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+        assert "v7" in str(e).lower() or "uuid" in str(e).lower()
+    else:
+        raise AssertionError("expected ValueError for UUIDv4")
+
+
+def test_claim_validate_rejects_bad_submitted_at():
+    """Claim.validate() must reject a non-ISO 8601 submitted_at."""
+    claim = sample_claim()
+    claim.submitted_at = "yesterday"
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for bad submitted_at")
+
+
+def test_claim_validate_rejects_bad_proposal_type():
+    """Claim.validate() must reject a raw string in place of a ProposalType enum."""
+    claim = sample_claim()
+    # Bypass __init__ typing to simulate wire-format deserialization that skipped conversion
+    object.__setattr__(claim, "proposal_type", "CodeChange")
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for string proposal_type")
+
+
+def test_claim_validate_rejects_bad_blast_radius():
+    """Claim.validate() must reject a raw string in place of a BlastRadius enum."""
+    claim = sample_claim()
+    object.__setattr__(claim, "blast_radius", "Module")
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for string blast_radius")
+
+
 def test_tally_direct():
     """Exercise tally() without voter mocks."""
     claim = sample_claim(blast=BlastRadius.MODULE)
@@ -297,6 +407,14 @@ def _run_all():
         test_invalid_vote_range_raises,
         test_claim_summary_length,
         test_adr_writer_produces_file,
+        test_override_rejects_claim_id_mismatch,
+        test_decide_rejects_duplicate_voters,
+        test_override_rejects_duplicate_human_voter,
+        test_claim_validate_rejects_non_uuidv7,
+        test_claim_validate_rejects_uuid4,
+        test_claim_validate_rejects_bad_submitted_at,
+        test_claim_validate_rejects_bad_proposal_type,
+        test_claim_validate_rejects_bad_blast_radius,
         test_tally_direct,
     ]
     passed = 0

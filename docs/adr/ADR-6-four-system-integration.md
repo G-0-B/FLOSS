@@ -58,7 +58,7 @@ Integrate FLOSSI0ULLK with the three other systems via **five discrete, independ
 
 ### Stack Composition
 
-```
+```text
 Meta Harness          — optimizes the harness
   OMX/omo             — orchestrates the agents
     OpenClaw/LiteLLM  — routes and executes
@@ -106,14 +106,14 @@ This ADR moves from Proposed → Accepted when:
 
 1. **Seam 1 operational:** Consensus-gate hook accepts a Claim, routes to 3 mock voters, returns decision, writes ADR stub
 2. **Reversibility proven:** Hook can be disabled without breaking the hosting agent (omo continues running without MetaCoordinator)
-3. **Symbolic validation:** Each Claim validates against `claim-schema.json` before vote routing
+3. **Symbolic validation:** Each Claim validates against `docs/specs/consensus-gate.schema.json` before vote routing
 4. **Provenance preserved:** Decision ADR records voter identities, votes, and rationale
 
 This ADR moves from Accepted → Validated when:
 
 1. At least 1 real structural change has been gated through the hook in a working agent session
 2. A Claim has been rejected (returned -1 from at least one voter) and execution blocked
-3. Human override path has been exercised on a +1/+1/0 decision
+3. Human override path has been exercised on a DEFERRED decision (e.g. the +1/0 Module case from spec §6.5)
 
 ## Consequences
 
@@ -141,7 +141,7 @@ This ADR moves from Accepted → Validated when:
 - `docs/adr/ADR-3-metaprompt-kernelization.md` — Metaprompt as harness pre-configuration
 - `docs/adr/ADR-4-spec-driven-development.md` — spec-first applies to seam contracts
 - `docs/adr/ADR-5-cognitive-virology-pattern.md` — FLOSSI0ULLK IS a harness
-- `docs/specs/consensus-gate.spec.md` — Seam 1 contract (to be created)
+- `docs/specs/consensus-gate.spec.md` — Seam 1 contract
 
 ### External References
 

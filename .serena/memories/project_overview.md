@@ -1,7 +1,7 @@
-# FLOSSIOULLK Project Overview
+# FLOSSI0ULLK Project Overview
 
 ## Purpose
-FLOSSIOULLK (Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love Light and Knowledge) is a Holochain-based decentralized knowledge commons. It's an agent-centric, verifiable knowledge system for scientific discovery, ethical AI alignment, and distributed intelligence coordination.
+FLOSSI0ULLK (Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love Light and Knowledge) is a Holochain-based decentralized knowledge commons. It's an agent-centric, verifiable knowledge system for scientific discovery, ethical AI alignment, and distributed intelligence coordination.
 
 ## Tech Stack
 - **Holochain 0.4.4** (hdi 0.5.1, hdk 0.4.1): Agent-centric DHT substrate

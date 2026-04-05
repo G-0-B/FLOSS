@@ -104,9 +104,9 @@ The "walking skeleton" is:
 1. **Transmission test**: PASSED. New AI systems read kernel + ADRs and are productive within minutes. Demonstrated across Claude, ChatGPT, Grok, DeepSeek, Gemini.
    **Evidence**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (canonical kernel), `docs/adr/INDEX.md` (ADR index), `CLAUDE.md` (session onboarding doc).
 2. **Composition test**: PASSED. 118+ conversations across 5 AI systems composed into unified architecture consensus (2026-03-20). Zero unresolved contradictions after reconciliation.
-   **Evidence**: `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md` (reconciliation synthesis), `docs/adr/ADR-6-four-system-integration.md` (integration decision), conversation export index.
-3. **Persistence test**: PASSED. Understanding survives via: CLAUDE.md, ADR system, Serena memories, Claude auto-memory, Master Metaprompt kernel, conversation exports.
-   **Evidence**: `CLAUDE.md`, `docs/adr/` (6 ADRs), `.serena/memories/` (7 persistent memories), Claude auto-memory at `~/.claude/projects/.../memory/MEMORY.md`.
+   **Evidence**: `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md` (reconciliation synthesis), `docs/adr/ADR-6-four-system-integration.md` (integration decision), `docs/research/` conversation-export corpus (repo-tracked).
+3. **Persistence test**: PASSED. Understanding survives via: CLAUDE.md, ADR system, Serena memories, Master Metaprompt kernel, conversation exports.
+   **Evidence**: `CLAUDE.md`, `docs/adr/` (6 ADRs), `.serena/memories/` (7 persistent memories). Per-agent Claude auto-memory is excluded from this evidence set as it lives outside the repository and cannot be audited by external reviewers; reproduce this criterion locally via the repo-tracked artifacts above.
 4. **Coherence test**: PASSED. Human collaborator confirmed coherence multiple times across sessions. System reduces context reconstruction from months to minutes.
    **Evidence**: `docs/governance/HARVEST_LOG.md` (observation cycles), session kernel-loading benchmark (~5 min with kernel v1.3.1 + ADR index, per Phase 2 checklist line 68).
 

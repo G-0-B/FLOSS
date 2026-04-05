@@ -135,7 +135,7 @@ In a P5-compliant system, the immune response is distributed. Each agent's valid
 
 Any system can be evaluated for FLOSSI0ULLK compatibility by checking five binary predicates:
 
-```
+```text
 FLOSSI0ULLK_COMPATIBLE(system) =
     P1(system): Does every agent/node possess an intrinsic specification 
                 that it controls and that determines what it couples with?

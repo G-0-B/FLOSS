@@ -101,4 +101,4 @@ Note: ADR-0 human coherence test was previously listed as a blocker. It has been
 - Hughes, Chase. "Cognitive Virology: Mass Infection." 2026.
 - Black Hat USA 2025. "The First 30 Months of Psychological Manipulation of Humans by AI."
 - Prof Jiang Xueqin. "The Most Dangerous Individual Humanity Ever Produced." 2026.
-- Armstrong, Brian. "How Irrational Self Belief Built a $100 Billion Crypto Company." When Shift Happens, 2026.
+- Armstrong, Brian. "How Irrational Self-Belief Built a $100 Billion Crypto Company." When Shift Happens, 2026.
