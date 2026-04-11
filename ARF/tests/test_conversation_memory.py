@@ -13,12 +13,14 @@ import tempfile
 from pathlib import Path
 import sys
 import json
+import hashlib
 
 # Add ARF to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from conversation_memory import ConversationMemory
+from conversation_memory import ConversationMemory, Understanding
 from embedding_frames_of_scale import MultiScaleEmbedding
+from ontology.predicates import STATED
 
 
 # ============================================================================
@@ -468,6 +470,94 @@ class TestOntologyValidation:
         assert stats['total_attempts'] == 3
         assert stats['validation_passed'] == 2
         assert stats['validation_skipped'] == 1
+
+    def test_understanding_hash_ignores_embedding_ref(self):
+        """Changing embedding_ref should not change the understanding hash."""
+        understanding = Understanding(
+            content="Stable content",
+            agent_id="test-agent",
+            timestamp="2026-04-10T00:00:00",
+            context="Unit test",
+            metadata={"source": "test"},
+        )
+
+        original_hash = understanding.hash()
+        understanding.embedding_ref = "embedding-123"
+
+        assert understanding.hash() == original_hash
+
+    def test_extract_triple_fallback_uses_full_sha256(self, temp_memory):
+        """Fallback triples should use the full SHA-256 provenance id."""
+        content = "Some content without clear pattern"
+
+        triple = temp_memory._extract_triple({"content": content})
+        expected_hash = hashlib.sha256(content.encode()).hexdigest()
+
+        assert triple == (
+            "test-agent",
+            STATED,
+            f"understanding_sha256:{expected_hash}",
+        )
+
+    def test_holochain_transmit_skip_validation_preserves_semantic_fields(self, temp_storage):
+        """Holochain transmit should respect skip_validation stats and forward semantic fields."""
+        class DummyHolochainClient:
+            def __init__(self):
+                self.calls = []
+
+            def call_zome(self, zome, function, payload):
+                self.calls.append((zome, function, payload))
+                return "action-hash-123"
+
+        storage_path = temp_storage / "holochain-memory"
+        memory = ConversationMemory(
+            agent_id="test-agent",
+            storage_path=str(storage_path),
+            backend="holochain",
+        )
+        memory.hc_client = DummyHolochainClient()
+
+        perspectives = [{"hash": "perspective-1", "name": "Shared view"}]
+        semantic_context = {
+            "schema": "rdf",
+            "ontology_refs": ["flossi://ontology/core"],
+            "interpretation_rules": [],
+        }
+        language_address = {
+            "dna_hash": "dna-1",
+            "expression_hash": "expr-1",
+        }
+
+        ref = memory.transmit(
+            {
+                "content": "Freeform coordination note",
+                "context": "Bridge metadata end-to-end",
+                "perspectives": perspectives,
+                "semantic_context": semantic_context,
+                "language_address": language_address,
+            },
+            skip_validation=True,
+        )
+
+        assert ref == "action-hash-123"
+        assert memory.validation_stats["total_attempts"] == 1
+        assert memory.validation_stats["validation_skipped"] == 1
+        assert memory.validation_stats["validation_passed"] == 0
+        assert memory.validation_stats["validation_failed"] == 0
+
+        assert memory.hc_client.calls == [
+            (
+                "memory_coordinator",
+                "transmit_understanding",
+                {
+                    "content": "Freeform coordination note",
+                    "context": "Bridge metadata end-to-end",
+                    "perspectives": perspectives,
+                    "semantic_context": semantic_context,
+                    "language_address": language_address,
+                },
+            )
+        ]
 
     def test_transmit_missing_content_raises_error(self, temp_memory):
         """Test that transmit raises error for missing content."""

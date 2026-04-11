@@ -100,9 +100,15 @@ class Understanding:
         """Return this Understanding as a plain dict (via dataclasses.asdict)."""
         return asdict(self)
 
+    def to_hash_dict(self) -> Dict:
+        """Return the stable identity payload used for provenance hashes."""
+        payload = self.to_dict()
+        payload.pop('embedding_ref', None)
+        return payload
+
     def hash(self) -> str:
         """Return a SHA-256 hex digest of the canonicalized dict form (stable across runs)."""
-        content_str = json.dumps(self.to_dict(), sort_keys=True)
+        content_str = json.dumps(self.to_hash_dict(), sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()
 
 
@@ -208,36 +214,101 @@ class ConversationMemory:
         else:
             return self._transmit_file(understanding_dict, skip_validation)
 
+    def _prepare_understanding_for_storage(
+        self, understanding_dict: Dict[str, Any], skip_validation: bool = False
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Tuple[str, str, str]], Optional[str]]:
+        """Normalize understanding metadata and preflight validation before persistence."""
+        prepared = dict(understanding_dict)
+        metadata = dict(prepared.get('metadata', {}))
+        prepared['metadata'] = metadata
+
+        triple = self._extract_triple(prepared)
+        if triple is None:
+            logger.warning(f"Could not extract triple from understanding: {understanding_dict}")
+            if not skip_validation:
+                logger.error("Validation required but triple extraction failed")
+                self.validation_stats['validation_failed'] += 1
+                return None, None, None
+
+        validation_mode = 'skipped' if skip_validation else 'passed'
+        if skip_validation:
+            if triple:
+                logger.info(f"Skipping validation for triple: {triple}")
+        elif triple:
+            raw_content = prepared.get('content', '')
+            provided_context = prepared.get('context', '')
+            full_context = f"Content: {raw_content}\nContext: {provided_context}"
+
+            is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
+            if not is_valid:
+                logger.error(f"Ontology validation failed: {error_msg}")
+                self.validation_stats['validation_failed'] += 1
+                return None, None, None
+
+            logger.debug(f"Validation passed for triple: {triple}")
+            if committee_result:
+                metadata['committee_validation'] = committee_result
+
+        if self.pattern_matcher:
+            full_text = f"{prepared.get('content', '')} {prepared.get('context', '')}"
+            detected_patterns = self.pattern_matcher.match(full_text)
+            if detected_patterns:
+                metadata['patterns'] = detected_patterns
+                logger.info(f"Detected patterns: {[p['pattern'] for p in detected_patterns]}")
+
+        return prepared, triple, validation_mode
+
+    def _record_validation_outcome(self, validation_mode: Optional[str]) -> None:
+        """Update validation counters after a successful persistence operation."""
+        if validation_mode == 'passed':
+            self.validation_stats['validation_passed'] += 1
+        elif validation_mode == 'skipped':
+            self.validation_stats['validation_skipped'] += 1
+
+    def _build_holochain_payload(self, understanding_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Return the subset of understanding fields supported by the Holochain zome API."""
+        payload = {
+            'content': understanding_dict['content'],
+            'context': understanding_dict.get('context'),
+            'perspectives': understanding_dict.get('perspectives'),
+            'semantic_context': understanding_dict.get('semantic_context'),
+            'language_address': understanding_dict.get('language_address'),
+        }
+        return {key: value for key, value in payload.items() if value is not None}
+
     def _transmit_holochain(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
         """Transmit an Understanding to the Holochain backend via memory_coordinator zome."""
         if self.budget_manager:
             self.budget_manager.check_budget()
 
+        self.validation_stats['total_attempts'] += 1
+
         if 'content' not in understanding_dict:
             raise ValueError("Understanding must have 'content' field")
+
+        prepared_understanding, triple, validation_mode = self._prepare_understanding_for_storage(
+            understanding_dict, skip_validation
+        )
+        if prepared_understanding is None:
+            return None
 
         try:
             result = self.hc_client.call_zome(
                 'memory_coordinator',
                 'transmit_understanding',
-                {
-                    'content': understanding_dict['content'],
-                    'context': understanding_dict.get('context'),
-                }
+                self._build_holochain_payload(prepared_understanding)
             )
-            logger.info(f"Transmitted understanding to Holochain: {result}")
-            self.validation_stats['total_attempts'] += 1
-            self.validation_stats['validation_passed'] += 1
+            logger.info(f"Transmitted understanding to Holochain with triple: {triple}")
+            self._record_validation_outcome(validation_mode)
             
             # Record usage (approximate)
             if self.budget_manager:
-                tokens = len(understanding_dict['content']) // 4
+                tokens = len(prepared_understanding['content']) // 4
                 self.budget_manager.record_usage(tokens)
                 
             return result
         except Exception as e:
             logger.error(f"Failed to transmit to Holochain: {e}")
-            self.validation_stats['total_attempts'] += 1
             self.validation_stats['validation_failed'] += 1
             return None
 
@@ -251,56 +322,20 @@ class ConversationMemory:
         if 'content' not in understanding_dict:
             raise ValueError("Understanding must have 'content' field")
 
-        triple = self._extract_triple(understanding_dict)
-        if triple is None:
-            logger.warning(f"Could not extract triple from understanding: {understanding_dict}")
-            if not skip_validation:
-                logger.error("Validation required but triple extraction failed")
-                self.validation_stats['validation_failed'] += 1
-                return None
-
-        committee_result = None
-        if skip_validation:
-            self.validation_stats['validation_skipped'] += 1
-            if triple:
-                logger.info(f"Skipping validation for triple: {triple}")
-        elif triple:
-            # Combine content and context for the validator
-            raw_content = understanding_dict.get('content', '')
-            provided_context = understanding_dict.get('context', '')
-            full_context = f"Content: {raw_content}\nContext: {provided_context}"
-            
-            is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
-            if not is_valid:
-                logger.error(f"Ontology validation failed: {error_msg}")
-                self.validation_stats['validation_failed'] += 1
-                return None
-            else:
-                logger.debug(f"Validation passed for triple: {triple}")
-                self.validation_stats['validation_passed'] += 1
-                if committee_result:
-                    if 'metadata' not in understanding_dict:
-                        understanding_dict['metadata'] = {}
-                    understanding_dict['metadata']['committee_validation'] = committee_result
-
-        # Detect Patterns
-        if self.pattern_matcher:
-            full_text = f"{understanding_dict.get('content', '')} {understanding_dict.get('context', '')}"
-            detected_patterns = self.pattern_matcher.match(full_text)
-            if detected_patterns:
-                if 'metadata' not in understanding_dict:
-                    understanding_dict['metadata'] = {}
-                understanding_dict['metadata']['patterns'] = detected_patterns
-                logger.info(f"Detected patterns: {[p['pattern'] for p in detected_patterns]}")
+        prepared_understanding, triple, validation_mode = self._prepare_understanding_for_storage(
+            understanding_dict, skip_validation
+        )
+        if prepared_understanding is None:
+            return None
 
         understanding = Understanding(
-            content=understanding_dict['content'],
+            content=prepared_understanding['content'],
             agent_id=self.agent_id,
             timestamp=datetime.now().isoformat(),
-            context=understanding_dict.get('context'),
-            is_decision=understanding_dict.get('is_decision', False),
-            coherence_score=understanding_dict.get('coherence', 0.0),
-            metadata=understanding_dict.get('metadata', {})
+            context=prepared_understanding.get('context'),
+            is_decision=prepared_understanding.get('is_decision', False),
+            coherence_score=prepared_understanding.get('coherence', 0.0),
+            metadata=prepared_understanding.get('metadata', {})
         )
 
         if self.embeddings is not None:
@@ -334,6 +369,7 @@ class ConversationMemory:
 
         self._save()
         logger.info(f"Transmitted understanding with triple: {triple}")
+        self._record_validation_outcome(validation_mode)
         
         # Record usage (approximate)
         if self.budget_manager:
@@ -383,8 +419,8 @@ class ConversationMemory:
         if match:
             return (match.group(1).strip(), CAPABLE_OF, match.group(2).strip())
 
-        content_hash = hashlib.md5(content.encode()).hexdigest()[:8]
-        return (self.agent_id, STATED, f"understanding_{content_hash}")
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        return (self.agent_id, STATED, f"understanding_sha256:{content_hash}")
 
     def _validate_triple(self, triple: Tuple[str, str, str], context: str = "") -> Tuple[bool, Optional[str], Optional[Dict]]:
         """Validate a triple via committee (if enabled) then basic predicate/shape checks.
@@ -644,17 +680,27 @@ class ConversationMemory:
 
     def _holochain_understanding_to_dict(self, understanding: Dict) -> Dict:
         """Normalize a Holochain understanding record into the local Understanding dict shape."""
+        metadata = dict(understanding.get('metadata', {}))
+        metadata.update({
+            'triple': understanding['triple'],
+            'content_hash': understanding['content_hash'],
+        })
+        for key in ('perspectives', 'semantic_context', 'language_address'):
+            if understanding.get(key) is not None:
+                metadata[key] = understanding.get(key)
+
         return {
             'content': understanding['content'],
-            'agent_id': str(understanding['agent']),
-            'timestamp': str(understanding['created_at']),
+            'agent_id': str(understanding.get('agent', understanding.get('agent_id', self.agent_id))),
+            'timestamp': str(understanding.get('created_at', understanding.get('timestamp', ''))),
             'context': understanding.get('context'),
-            'is_decision': False,
-            'coherence_score': understanding['triple']['confidence'],
-            'metadata': {
-                'triple': understanding['triple'],
-                'content_hash': understanding['content_hash'],
-            },
+            'is_decision': bool(understanding.get('is_decision', metadata.get('is_decision', False))),
+            'coherence_score': understanding.get(
+                'coherence_score',
+                understanding.get('coherence', understanding['triple']['confidence'])
+            ),
+            'metadata': metadata,
+            'embedding_ref': understanding.get('embedding_ref'),
         }
 
 
