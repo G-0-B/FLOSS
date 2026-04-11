@@ -99,7 +99,7 @@ The "walking skeleton" is:
 
 ## Validation Criteria
 
-**How we know this works**:
+**How we know this works**: Each PASSED criterion below includes an **Evidence** subsection mapping the claim to verifiable repo-tracked artifacts and validation traces.
 
 1. **Transmission test**: PASSED. New AI systems read kernel + ADRs and are productive within minutes. Demonstrated across Claude, ChatGPT, Grok, DeepSeek, Gemini.
    **Evidence**:
