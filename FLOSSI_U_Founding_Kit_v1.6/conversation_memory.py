@@ -401,20 +401,23 @@ class ConversationMemory:
                                 
                             return (subject, predicate, obj)
 
-        # Fallback patterns
-        is_a_pattern = r'(\S+(?:-\S+)*)\s+is\s+an?\s+([\w\s-]+?)(?:\s*$|[.,;!?])'
+        # Fallback patterns use non-overlapping token classes to avoid regex backtracking.
+        subject_pattern = r'([^\s-]+(?:-[^\s-]+)*)'
+        hyphenated_word_pattern = r'[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*'
+
+        is_a_pattern = rf'{subject_pattern}\s+is\s+an?\s+({hyphenated_word_pattern}(?:\s+{hyphenated_word_pattern})*)(?:\s*$|[.,;!?])'
         match = re.search(is_a_pattern, content, re.IGNORECASE)
         if match:
             subject = match.group(1).strip()
             obj = match.group(2).strip().replace(' ', '-')
             return (subject, IS_A, obj)
 
-        improves_pattern = r'(\S+(?:-\S+)*)\s+improves(?:\s+upon)?\s+(\S+(?:-\S+)*)'
+        improves_pattern = rf'{subject_pattern}\s+improves(?:\s+upon)?\s+{subject_pattern}'
         match = re.search(improves_pattern, content, re.IGNORECASE)
         if match:
             return (match.group(1).strip(), IMPROVES_UPON, match.group(2).strip())
 
-        capable_pattern = r'(\S+(?:-\S+)*)\s+(?:can|is capable of)\s+(\w+)'
+        capable_pattern = rf'{subject_pattern}\s+(?:can|is capable of)\s+([A-Za-z0-9_]+)'
         match = re.search(capable_pattern, content, re.IGNORECASE)
         if match:
             return (match.group(1).strip(), CAPABLE_OF, match.group(2).strip())

@@ -499,6 +499,18 @@ class TestOntologyValidation:
             f"understanding_sha256:{expected_hash}",
         )
 
+    def test_extract_triple_fallback_regexes_handle_hyphenated_tokens(self, temp_memory):
+        """Fallback regexes should still extract hyphenated subjects and objects."""
+        assert temp_memory._extract_triple(
+            {"content": "meta-agent is a large language model"}
+        ) == ("meta-agent", "is_a", "large-language-model")
+        assert temp_memory._extract_triple(
+            {"content": "meta-agent improves upon proto-agent"}
+        ) == ("meta-agent", "improves_upon", "proto-agent")
+        assert temp_memory._extract_triple(
+            {"content": "meta-agent is capable of planning"}
+        ) == ("meta-agent", "capable_of", "planning")
+
     def test_holochain_transmit_skip_validation_preserves_semantic_fields(self, temp_storage):
         """Holochain transmit should respect skip_validation stats and forward semantic fields."""
         class DummyHolochainClient:
