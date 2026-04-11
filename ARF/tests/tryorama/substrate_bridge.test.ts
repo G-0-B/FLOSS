@@ -39,6 +39,19 @@ interface TripleResult {
   predicate: string;
   object: string;
   confidence: number;
+  author: AgentPubKey;
+  created_at: unknown;
+}
+
+function assertTimestampLike(value: unknown, label: string): void {
+  const isTimestampLike =
+    typeof value === "number" ||
+    typeof value === "string" ||
+    (Array.isArray(value) &&
+      value.length === 2 &&
+      value.every((part) => typeof part === "number"));
+
+  assert.ok(isTimestampLike, `${label} should include a timestamp-like created_at field`);
 }
 
 // ─────────────────────────────────────────────────────
@@ -269,6 +282,15 @@ describe("Substrate Bridge Validation", () => {
         Math.abs(bySubject[0].confidence - 0.88) < 0.01,
         "Confidence should be preserved"
       );
+      assert.deepEqual(
+        bySubject[0].author,
+        alice.cells[0].cell_id[1],
+        "Subject query should preserve Alice's provenance author"
+      );
+      assertTimestampLike(
+        bySubject[0].created_at,
+        "Subject query result"
+      );
 
       // Also query by predicate
       const byPredicate = await bobCall<TripleResult[]>("query_triples", {
@@ -282,6 +304,17 @@ describe("Substrate Bridge Validation", () => {
       assert.ok(
         byPredicate.some((r) => r.subject === "rose_forest"),
         "Predicate query should include Alice's triple"
+      );
+      const predicateMatch = byPredicate.find((r) => r.subject === "rose_forest");
+      assert.ok(predicateMatch, "Predicate query should return the authored triple");
+      assert.deepEqual(
+        predicateMatch!.author,
+        alice.cells[0].cell_id[1],
+        "Predicate query should preserve Alice's provenance author"
+      );
+      assertTimestampLike(
+        predicateMatch!.created_at,
+        "Predicate query result"
       );
     });
   });
@@ -347,6 +380,23 @@ describe("Substrate Bridge Validation", () => {
         hashes[1],
         "Conflicting triples should have different ActionHashes"
       );
+
+      const aliceResult = results.find((r) => r.object === "coordination_protocol");
+      const bobResult = results.find((r) => r.object === "memetic_system");
+      assert.ok(aliceResult, "Alice's conflicting triple should be query-visible");
+      assert.ok(bobResult, "Bob's conflicting triple should be query-visible");
+      assert.deepEqual(
+        aliceResult!.author,
+        alice.cells[0].cell_id[1],
+        "Alice's conflicting triple should preserve Alice as author"
+      );
+      assert.deepEqual(
+        bobResult!.author,
+        bob.cells[0].cell_id[1],
+        "Bob's conflicting triple should preserve Bob as author"
+      );
+      assertTimestampLike(aliceResult!.created_at, "Alice conflicting result");
+      assertTimestampLike(bobResult!.created_at, "Bob conflicting result");
     });
   });
 
@@ -400,6 +450,14 @@ describe("Substrate Bridge Validation", () => {
         2,
         "Both triples should be visible"
       );
+      for (const result of aliceResults) {
+        assert.ok(result.author, "Alice query results should include author provenance");
+        assertTimestampLike(result.created_at, "Alice query result");
+      }
+      for (const result of bobResults) {
+        assert.ok(result.author, "Bob query results should include author provenance");
+        assertTimestampLike(result.created_at, "Bob query result");
+      }
 
       // Both agents can retrieve each other's records
       const aliceReadsBob = await aliceCall<HcRecord | null>(

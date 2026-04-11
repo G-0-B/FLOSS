@@ -159,13 +159,13 @@ def override(
         )
     if prior_decision.outcome != Outcome.DEFERRED:
         raise ConsensusGateError(
-            "E_OVERRIDE_INVALID_STATE: override only valid on DEFERRED decisions, "
-            "got %s" % prior_decision.outcome
+            f"E_OVERRIDE_INVALID_STATE: override only valid on DEFERRED decisions, "
+            f"got {prior_decision.outcome}"
         )
     if not OVERRIDE_ALLOWED[claim.blast_radius]:
         raise ConsensusGateError(
-            "E_OVERRIDE_NOT_ALLOWED: blast_radius %s does not permit override"
-            % claim.blast_radius.value
+            f"E_OVERRIDE_NOT_ALLOWED: blast_radius {claim.blast_radius.value} "
+            f"does not permit override"
         )
     if not human_voter or not rationale:
         raise ConsensusGateError(

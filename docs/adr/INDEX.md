@@ -14,16 +14,16 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 
 ## Active ADRs
 
-| ADR | Title | Status | Date | File |
-|-----|-------|--------|------|------|
-| **ADR-0** | Recognition Protocol | **Validated** | 2025-11-01 | `ADR-0-recognition-protocol.md` |
-| **ADR-0.1** | Cross-AI Transmission Validation | Validated | 2025-11-02 | `ADR-0.1-cross-ai-validation.md` |
-| **ADR-1** | Carrier Equivalence Principle | Proposed | 2026-01-05 | `ADR-1-carrier-equivalence.md` |
-| **ADR-2** | Holochain Substrate Decision | Proposed | 2026-03-05 | `ADR-2-holochain-substrate.md` |
-| **ADR-3** | Metaprompt Kernelization | Proposed | 2026-01-12 | `ADR-3-metaprompt-kernelization.md` |
-| **ADR-4** | Specification-Driven Development | Accepted | 2025-12-15 | `ADR-4-spec-driven-development.md` |
-| **ADR-5** | Cognitive Virology as Architectural Pattern | Specified | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
-| **ADR-6** | Four-System Meta-Orchestration Integration | Proposed | 2026-04-04 | `ADR-6-four-system-integration.md` |
+| ADR | Title | Decision Status | Truth Status | Date | File |
+|-----|-------|-----------------|--------------|------|------|
+| **ADR-0** | Recognition Protocol | Legacy: Validated | — | 2025-11-01 | `ADR-0-recognition-protocol.md` |
+| **ADR-0.1** | Cross-AI Transmission Validation | Legacy: Validated | — | 2025-11-02 | `ADR-0.1-cross-ai-validation.md` |
+| **ADR-1** | Carrier Equivalence Principle | Proposed | — | 2026-01-05 | `ADR-1-carrier-equivalence.md` |
+| **ADR-2** | Holochain Substrate Decision | Proposed | Specified | 2026-03-05 | `ADR-2-holochain-substrate.md` |
+| **ADR-3** | Metaprompt Kernelization | Proposed | — | 2026-01-12 | `ADR-3-metaprompt-kernelization.md` |
+| **ADR-4** | Specification-Driven Development | Accepted | — | 2025-12-15 | `ADR-4-spec-driven-development.md` |
+| **ADR-5** | Cognitive Virology as Architectural Pattern | Specified | Specified | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
+| **ADR-6** | Four-System Meta-Orchestration Integration | Proposed | Specified | 2026-04-04 | `ADR-6-four-system-integration.md` |
 
 ---
 
@@ -42,7 +42,8 @@ Previous documents used inconsistent numbering. This index resolves conflicts:
 ## Rules
 
 Per Project Spine v0.5 Section 6:
-- ADRs document decisions + rationale + supersession chain
-- Every ADR must carry a truth status label (Verified/Specified/Aspirational/Unverified)
-- ADR changes follow friction tiers (Low/Medium/High)
-- New ADRs should reference this index and update it
+- ADRs document decisions + rationale + supersession chain.
+- `Decision Status` captures the ADR lifecycle (`Proposed`, `Accepted`, `Rejected`, `Superseded`). Some legacy ADRs still use a single legacy status label and are marked explicitly until normalized.
+- `Truth Status` captures evidence level (`Verified`, `Specified`, `Aspirational`, `Unverified`) when the ADR defines it explicitly.
+- ADR changes follow friction tiers (`Low`, `Medium`, `High`).
+- New ADRs should reference this index and update it.

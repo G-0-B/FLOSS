@@ -210,6 +210,8 @@ class Vote:
 
     def validate(self) -> None:
         """Enforce spec invariants INV-002, INV-005."""
+        if isinstance(self.vote, bool) or not isinstance(self.vote, int):
+            raise ValueError(f"E_VOTE_INVALID_RANGE: {self.vote} not in (-1, 0, +1)")
         if self.vote not in (-1, 0, 1):
             raise ValueError(f"E_VOTE_INVALID_RANGE: {self.vote} not in (-1, 0, +1)")
         if not self.voter:
@@ -234,12 +236,45 @@ class Decision:
     override_by: Optional[str] = None
 
     def validate(self) -> None:
-        """Enforce spec invariant INV-009."""
+        """Enforce wire-format invariants before serializing or storing a decision."""
+        try:
+            claim_uuid = uuid.UUID(self.claim_id)
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: claim_id must be a valid UUID"
+            ) from exc
+        if claim_uuid.version != 7:
+            raise ValueError(
+                f"E_DECISION_INVALID_SCHEMA: claim_id must be UUID v7, got v{claim_uuid.version}"
+            )
+        if not isinstance(self.outcome, Outcome):
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: outcome must be an Outcome member"
+            )
+        if not isinstance(self.votes, list):
+            raise ValueError("E_DECISION_INVALID_SCHEMA: votes must be a list")
+        for idx, vote in enumerate(self.votes):
+            if not isinstance(vote, Vote):
+                raise ValueError(
+                    f"E_DECISION_INVALID_SCHEMA: votes[{idx}] must be a Vote"
+                )
+            vote.validate()
+        try:
+            datetime.fromisoformat(self.decided_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError) as exc:
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: decided_at must be ISO 8601"
+            ) from exc
         if self.outcome == Outcome.OVERRIDDEN and not self.override_by:
             raise ValueError("E_OVERRIDE_NOT_HUMAN: OVERRIDDEN requires override_by")
+        if self.outcome != Outcome.OVERRIDDEN and self.override_by is not None:
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: override_by only allowed for OVERRIDDEN"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize Decision to a plain dict (outcome as .value; optional fields omitted when None)."""
+        self.validate()
         d = {
             "claim_id": self.claim_id,
             "outcome": self.outcome.value,

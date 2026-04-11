@@ -178,6 +178,48 @@ describe("KnowledgeTriple Holochain Integration", () => {
     });
   });
 
+  test("assert_triple accepts negative confidence in signed range", async () => {
+    await runScenario(async (scenario: Scenario) => {
+      const alice = await scenario.addPlayerWithApp({ path: hAppPath });
+      const call = getZomeCaller(alice.cells[0], ZOME);
+
+      await call<ActionHash>("assert_triple", {
+        subject: "entity_a",
+        predicate: "contradicts",
+        object: "entity_b",
+        confidence: -0.8,
+      });
+
+      const results = await call<Array<{
+        hash: ActionHash;
+        subject: string;
+        predicate: string;
+        object: string;
+        confidence: number;
+        author: unknown;
+        created_at: unknown;
+      }>>("query_triples", {
+        subject: "entity_a",
+      });
+
+      assert.equal(results.length, 1, "Should retrieve one signed-negative triple");
+      assert.equal(results[0].confidence, -0.8, "Negative confidence should round-trip exactly");
+
+      const schemaPayload = {
+        subject: results[0].subject,
+        predicate: results[0].predicate,
+        object: results[0].object,
+        confidence: results[0].confidence,
+        source: results[0].author,
+        created_at: results[0].created_at,
+      };
+      assert.ok(
+        validateKnowledgeTriple(schemaPayload),
+        `Retrieved triple should still satisfy schema: ${JSON.stringify(validateKnowledgeTriple.errors)}`
+      );
+    });
+  });
+
   test("query_triples retrieves by predicate", async () => {
     await runScenario(async (scenario: Scenario) => {
       const alice = await scenario.addPlayerWithApp({ path: hAppPath });

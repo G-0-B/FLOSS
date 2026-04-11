@@ -75,18 +75,21 @@ Note: ADR-0 human coherence test was previously listed as a blocker. It has been
 
 ## Consequences
 
-### Immediate (NOW)
+### Positive
 
-- This ADR preserves the architectural insight without pretending it's buildable today
-- HARVEST Protocol formalized as the minimal self-observation loop (see `docs/specs/harvest-protocol.spec.md`)
-- ADR fitness metric: track how quickly new AI systems absorb each ADR
-- ADR-0 coherence test: **PASSED** (all 4 validation criteria met as of 2026-03-20 — no longer a blocker)
+- This ADR preserves the architectural insight without pretending it's buildable today.
+- HARVEST Protocol formalized as the minimal self-observation loop (NOW; see `docs/specs/harvest-protocol.spec.md`).
+- ADR fitness metric: track how quickly new AI systems absorb each ADR (NOW).
+- ADR-0 coherence test: **PASSED** (all 4 validation criteria met as of 2026-03-20; positive validation signal, no longer a blocker).
 
-### Deferred (LATER)
+### Negative
 
-- OpenClaw as MetaCoordinator orchestration layer (validation spike in progress)
-- Self-derivative computation on actual ADR propagation data
-- Formal consent-gate at Entry stage (the mechanism that distinguishes beneficial from parasitic memetics)
+- Formal consent-gate at Entry stage remains unresolved (LATER); without it, the consent-first claim is still aspirational.
+
+### Neutral
+
+- OpenClaw as MetaCoordinator orchestration layer remains a validation spike in progress (LATER).
+- Self-derivative computation on actual ADR propagation data remains deferred until the observation loop has enough evidence.
 
 ## Related Documents
 

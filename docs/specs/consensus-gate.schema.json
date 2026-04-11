@@ -139,6 +139,11 @@
           },
           "then": {
             "required": ["override_by"]
+          },
+          "else": {
+            "not": {
+              "required": ["override_by"]
+            }
           }
         }
       ]

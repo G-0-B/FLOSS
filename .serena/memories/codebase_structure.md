@@ -1,6 +1,6 @@
 # Codebase Structure
 
-```
+```text
 FLOSS/
 ├── ARF/                              # Agent Runtime Framework (main codebase)
 │   ├── dnas/rose_forest/             # PRIMARY Holochain DNA

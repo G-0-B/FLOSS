@@ -97,7 +97,7 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 
 ### 4.1 Tallying Logic
 
-```
+```text
 TALLY votes, claim:
   IF any vote == -1:
     RETURN REJECTED
@@ -118,7 +118,7 @@ TALLY votes, claim:
 
 Override is a **superseding transition** on a `DEFERRED` decision, not a second decision on the same claim (see INV-010). A registered human voter supplies an override rationale and the gate emits a new `Decision` with `outcome=OVERRIDDEN` that replaces the prior `DEFERRED` record in the claim's lifecycle state:
 
-```
+```text
 OVERRIDE prior_decision, claim, human_voter, rationale:
   REQUIRE prior_decision.claim_id == claim.id        # E_OVERRIDE_CLAIM_MISMATCH
   REQUIRE prior_decision.outcome == DEFERRED         # E_OVERRIDE_INVALID_STATE
@@ -163,7 +163,7 @@ OVERRIDE prior_decision, claim, human_voter, rationale:
 
 ### 6.1 Unanimous Approval
 
-```
+```text
 Claim: { proposal_type: "CodeChange", blast_radius: "Module", summary: "fix typo" }
 Votes: [+1, +1, +1]
 Expected: outcome=APPROVED
@@ -171,7 +171,7 @@ Expected: outcome=APPROVED
 
 ### 6.2 Single Rejection Vetoes
 
-```
+```text
 Claim: { proposal_type: "SpecChange", blast_radius: "System", summary: "remove invariant" }
 Votes: [+1, +1, -1]
 Expected: outcome=REJECTED (INV-007)
@@ -179,7 +179,7 @@ Expected: outcome=REJECTED (INV-007)
 
 ### 6.3a Approval With One Abstention
 
-```
+```text
 Claim: { proposal_type: "AdrChange", blast_radius: "System", summary: "promote to Accepted" }
 Votes: [+1, +1, 0]
 Expected: outcome=APPROVED (quorum=3 met, 2 votes = +1, all votes ≥ 0 — INV-006)
@@ -187,7 +187,7 @@ Expected: outcome=APPROVED (quorum=3 met, 2 votes = +1, all votes ≥ 0 — INV-
 
 ### 6.3b Deferred Via Too Many Abstentions
 
-```
+```text
 Claim: { proposal_type: "AdrChange", blast_radius: "System", summary: "promote to Accepted" }
 Votes: [+1, 0, 0]
 Expected: outcome=DEFERRED (quorum met but only 1 vote = +1)
@@ -195,7 +195,7 @@ Expected: outcome=DEFERRED (quorum met but only 1 vote = +1)
 
 ### 6.4 Substrate Change Requires Unanimous
 
-```
+```text
 Claim: { proposal_type: "CodeChange", blast_radius: "Substrate", summary: "change DNA entry format" }
 Votes: [+1, +1, 0]
 Expected: outcome=DEFERRED (substrate requires all +1, no override)
@@ -203,7 +203,7 @@ Expected: outcome=DEFERRED (substrate requires all +1, no override)
 
 ### 6.5 Human Override on Deferred
 
-```
+```text
 Claim: { proposal_type: "ConfigChange", blast_radius: "Module" }
 Votes: [+1, 0]
 Decision: outcome=DEFERRED
@@ -213,7 +213,7 @@ Expected: outcome=OVERRIDDEN, adr_ref recorded
 
 ### 6.6 Insufficient Quorum
 
-```
+```text
 Claim: { proposal_type: "CodeChange", blast_radius: "System" }
 Votes: [+1, +1]  # Only 2 voters, System requires 3
 Expected: outcome=DEFERRED (E_QUORUM_INSUFFICIENT context)

@@ -21,7 +21,7 @@ FLOSSI0ULLK (Free Libre Open Source Singularity of Infinite Overflowing Uncondit
 1. **Symbolic-First**: Logic validates, neural assists. Never the reverse.
 2. **Spec-Driven Development (SDD)**: Spec → tests → code
 3. **Agent-Centricity**: Identity, not servers, is the organizing principle
-4. **Now/Later/Never**: Ship simplest thing solving validated pain today
+4. **Now/Later/Never**: Ship simplest thing solving validated pain today.
 
 ## Current State (as of 2026-04)
 

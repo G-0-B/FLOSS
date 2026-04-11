@@ -75,8 +75,8 @@ Each layer is replaceable. Each seam is independently reversible. No layer is tr
 1. When an agent proposes a structural change (AST diff > threshold), omo's hook system fires a `consensus-requested` event
 2. Hook serializes proposed change as a Claim with `truth_status: "Unverified"`
 3. Claim is sent to MetaCoordinator via MCP context sync
-4. Execution blocks until ternary vote received (+1/+1/+1 unanimous, or +1/+1/0 with human override)
-5. Decision recorded as ADR with provenance
+4. Execution blocks until ternary vote received (+1/+1/+1 unanimous, or +1/+1/0 with human override for non-substrate claims only)
+5. Decision recorded as ADR with provenance; substrate-affecting claims require unanimous +1/+1/+1 and cannot be overridden by a human voter
 
 **Why first:** Establishes the MCP communication channel that Seams 2-5 also depend on. Smallest blast radius. Fastest validation loop.
 
@@ -114,6 +114,7 @@ This ADR moves from Accepted → Validated when:
 1. At least 1 real structural change has been gated through the hook in a working agent session
 2. A Claim has been rejected (returned -1 from at least one voter) and execution blocked
 3. Human override path has been exercised on a DEFERRED decision (e.g. the +1/0 Module case from spec §6.5)
+4. Substrate-affecting claim path demonstrates override rejection and requires unanimous +1/+1/+1
 
 ## Consequences
 

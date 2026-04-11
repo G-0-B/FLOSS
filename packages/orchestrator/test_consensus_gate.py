@@ -225,6 +225,16 @@ def test_invalid_vote_range_raises():
         raise AssertionError("expected ValueError")
 
 
+def test_boolean_vote_rejected():
+    """Boolean votes must not pass int-based range validation."""
+    try:
+        Vote(voter="bad", vote=True, rationale="bool is not a vote").validate()
+    except ValueError as e:
+        assert "E_VOTE_INVALID_RANGE" in str(e)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_claim_summary_length():
     """Summary > 200 chars raises."""
     try:
@@ -412,6 +422,73 @@ def test_claim_to_dict_serializes_validated_evidence():
     ]
 
 
+def test_decision_validate_rejects_string_outcome():
+    """Decision.validate() must reject raw string outcomes."""
+    claim = sample_claim()
+    decision = Decision(
+        claim_id=claim.id,
+        outcome="APPROVED",  # type: ignore[arg-type]
+        votes=[Vote(voter="a", vote=1, rationale="ok")],
+    )
+    try:
+        decision.validate()
+    except ValueError as e:
+        assert "E_DECISION_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for string outcome")
+
+
+def test_decision_validate_rejects_non_vote_entries():
+    """Decision.validate() must reject dict-like vote payloads."""
+    claim = sample_claim()
+    decision = Decision(
+        claim_id=claim.id,
+        outcome=Outcome.APPROVED,
+        votes=[{"voter": "a", "vote": 1, "rationale": "ok"}],  # type: ignore[list-item]
+    )
+    try:
+        decision.validate()
+    except ValueError as e:
+        assert "E_DECISION_INVALID_SCHEMA" in str(e)
+        assert "votes[0]" in str(e)
+    else:
+        raise AssertionError("expected ValueError for malformed votes")
+
+
+def test_decision_validate_rejects_override_by_without_overridden():
+    """override_by must be absent unless the decision outcome is OVERRIDDEN."""
+    claim = sample_claim()
+    decision = Decision(
+        claim_id=claim.id,
+        outcome=Outcome.APPROVED,
+        votes=[Vote(voter="a", vote=1, rationale="ok")],
+        override_by="human-x",
+    )
+    try:
+        decision.validate()
+    except ValueError as e:
+        assert "E_DECISION_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for stray override_by")
+
+
+def test_decision_to_dict_validates_before_serializing():
+    """Decision.to_dict() must fail on malformed wire-format payloads."""
+    claim = sample_claim()
+    decision = Decision(
+        claim_id=claim.id,
+        outcome=Outcome.APPROVED,
+        votes=[Vote(voter="a", vote=1, rationale="ok")],
+        decided_at="not-a-timestamp",
+    )
+    try:
+        decision.to_dict()
+    except ValueError as e:
+        assert "E_DECISION_INVALID_SCHEMA" in str(e)
+    else:
+        raise AssertionError("expected ValueError for invalid decided_at")
+
+
 def test_tally_direct():
     """Exercise tally() without voter mocks."""
     claim = sample_claim(blast=BlastRadius.MODULE)
@@ -448,6 +525,7 @@ def _run_all():
         test_override_rejects_non_deferred,
         test_override_rejects_substrate,
         test_invalid_vote_range_raises,
+        test_boolean_vote_rejected,
         test_claim_summary_length,
         test_adr_writer_produces_file,
         test_override_rejects_claim_id_mismatch,
@@ -461,6 +539,10 @@ def _run_all():
         test_claim_validate_rejects_non_evidence_ref_entries,
         test_claim_validate_rejects_blank_evidence_ref,
         test_claim_to_dict_serializes_validated_evidence,
+        test_decision_validate_rejects_string_outcome,
+        test_decision_validate_rejects_non_vote_entries,
+        test_decision_validate_rejects_override_by_without_overridden,
+        test_decision_to_dict_validates_before_serializing,
         test_tally_direct,
     ]
     passed = 0

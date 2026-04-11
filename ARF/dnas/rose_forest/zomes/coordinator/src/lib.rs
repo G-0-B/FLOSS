@@ -121,6 +121,8 @@ pub struct TripleResult {
     pub predicate: String,
     pub object: String,
     pub confidence: f32,
+    pub author: AgentPubKey,
+    pub created_at: Timestamp,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -151,6 +153,8 @@ pub fn query_triples(input: QueryTriplesInput) -> ExternResult<Vec<TripleResult>
         predicate: t.predicate,
         object: t.object,
         confidence: t.confidence,
+        author: t.source,
+        created_at: t.created_at,
     }).collect())
 }
 

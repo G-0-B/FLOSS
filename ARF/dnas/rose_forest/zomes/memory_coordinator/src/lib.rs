@@ -52,6 +52,18 @@ pub struct Understanding {
     /// Extracted knowledge triple
     pub triple: KnowledgeTriple,
 
+    /// Whether this understanding records a decision.
+    pub is_decision: bool,
+
+    /// Coherence score supplied by the caller or derived locally.
+    pub coherence_score: f32,
+
+    /// Optional committee-validation outcome captured at write time.
+    pub committee_validation: Option<CommitteeValidation>,
+
+    /// Interaction patterns detected during preflight analysis.
+    pub patterns: Vec<DetectedPattern>,
+
     /// When this was created
     pub created_at: Timestamp,
 
@@ -124,6 +136,25 @@ pub struct InterpretationRule {
     pub content: String,
 }
 
+/// Committee-validation metadata captured by the Python coordinator.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct CommitteeValidation {
+    pub accepted: bool,
+    pub yes_votes: u32,
+    pub no_votes: u32,
+    pub total_votes: u32,
+    pub confidence: f32,
+    pub reasoning: Vec<String>,
+}
+
+/// Pattern-detection metadata captured during understanding preparation.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct DetectedPattern {
+    pub pattern: String,
+    pub confidence: f32,
+    pub details: String,
+}
+
 /// Represents an Architecture Decision Record (ADR).
 ///
 /// ADRs are a key component of "Specification-Driven Development" (SDD),
@@ -188,6 +219,10 @@ pub struct CompositionStats {
 pub struct UnderstandingInput {
     pub content: String,
     pub context: Option<String>,
+    pub is_decision: Option<bool>,
+    pub coherence_score: Option<f32>,
+    pub committee_validation: Option<CommitteeValidation>,
+    pub patterns: Option<Vec<DetectedPattern>>,
 
     // AD4M semantic layer fields
     pub perspectives: Option<Vec<PerspectiveHash>>,
@@ -245,6 +280,10 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
         content: input.content.clone(),
         context: input.context,
         triple: triple.clone(),
+        is_decision: input.is_decision.unwrap_or(false),
+        coherence_score: input.coherence_score.unwrap_or(0.0),
+        committee_validation: input.committee_validation,
+        patterns: input.patterns.unwrap_or_default(),
         created_at: sys_time()?,
         agent: agent_key.clone(),
         content_hash: hash_content(&input.content),
@@ -422,6 +461,10 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
                 content: understanding.content.clone(),
                 context: understanding.context.clone(),
                 triple: understanding.triple.clone(),
+                is_decision: understanding.is_decision,
+                coherence_score: understanding.coherence_score,
+                committee_validation: understanding.committee_validation.clone(),
+                patterns: understanding.patterns.clone(),
                 created_at: sys_time()?,
                 agent: my_agent.clone(),
                 content_hash: understanding.content_hash.clone(),
@@ -636,6 +679,10 @@ pub fn publish_with_perspective(input: PublishWithPerspectiveInput) -> ExternRes
     let understanding_input = UnderstandingInput {
         content: input.content,
         context: input.context,
+        is_decision: None,
+        coherence_score: None,
+        committee_validation: None,
+        patterns: None,
         perspectives: Some(vec![input.perspective]),
         semantic_context: input.semantic_context,
         language_address: input.language_address,

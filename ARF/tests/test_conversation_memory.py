@@ -15,11 +15,12 @@ from pathlib import Path
 import sys
 import json
 import hashlib
+from datetime import datetime, timezone
 
 # Add ARF to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from conversation_memory import ConversationMemory, Understanding
+from conversation_memory import ConversationMemory, Understanding, DEFAULT_EMBEDDING_LEVEL
 from embedding_frames_of_scale import MultiScaleEmbedding
 from ontology.predicates import STATED
 
@@ -540,11 +541,32 @@ class TestOntologyValidation:
             "dna_hash": "dna-1",
             "expression_hash": "expr-1",
         }
+        committee_validation = {
+            "accepted": True,
+            "yes_votes": 3,
+            "no_votes": 0,
+            "total_votes": 3,
+            "confidence": 0.97,
+            "reasoning": ["validator-a: aligned"],
+        }
+        patterns = [
+            {
+                "pattern": "Consensus Building",
+                "confidence": 0.84,
+                "details": "Detected from discussion flow",
+            }
+        ]
 
         ref = memory.transmit(
             {
                 "content": "Freeform coordination note",
                 "context": "Bridge metadata end-to-end",
+                "is_decision": True,
+                "coherence": 0.72,
+                "metadata": {
+                    "committee_validation": committee_validation,
+                    "patterns": patterns,
+                },
                 "perspectives": perspectives,
                 "semantic_context": semantic_context,
                 "language_address": language_address,
@@ -558,19 +580,97 @@ class TestOntologyValidation:
         assert memory.validation_stats["validation_passed"] == 0
         assert memory.validation_stats["validation_failed"] == 0
 
-        assert memory.hc_client.calls == [
-            (
-                "memory_coordinator",
-                "transmit_understanding",
-                {
-                    "content": "Freeform coordination note",
-                    "context": "Bridge metadata end-to-end",
-                    "perspectives": perspectives,
-                    "semantic_context": semantic_context,
-                    "language_address": language_address,
-                },
-            )
+        assert len(memory.hc_client.calls) == 1
+        zome, function, payload = memory.hc_client.calls[0]
+        assert zome == "memory_coordinator"
+        assert function == "transmit_understanding"
+        assert payload["content"] == "Freeform coordination note"
+        assert payload["context"] == "Bridge metadata end-to-end"
+        assert payload["is_decision"] is True
+        assert payload["coherence_score"] == 0.72
+        assert payload["committee_validation"] == committee_validation
+        assert payload["patterns"] == patterns
+        assert payload["perspectives"] == perspectives
+        assert payload["semantic_context"] == semantic_context
+        assert payload["language_address"] == language_address
+
+    def test_holochain_understanding_round_trip_preserves_semantic_fields(self, temp_storage):
+        """Holochain recall should preserve stored semantic metadata without fallback degradation."""
+        memory = ConversationMemory(
+            agent_id="test-agent",
+            storage_path=str(temp_storage / "holochain-roundtrip"),
+            backend="holochain",
+        )
+
+        committee_validation = {
+            "accepted": True,
+            "yes_votes": 2,
+            "no_votes": 1,
+            "total_votes": 3,
+            "confidence": 0.75,
+            "reasoning": ["validator-a: yes", "validator-b: no"],
+        }
+        patterns = [
+            {
+                "pattern": "Consensus Building",
+                "confidence": 0.91,
+                "details": "Strong convergence",
+            }
         ]
+        holochain_understanding = {
+            "content": "Consensus decision logged",
+            "context": "Round-trip preservation check",
+            "triple": {
+                "subject": "agent_a",
+                "predicate": "stated",
+                "object": "understanding_sha256:abc",
+                "confidence": 0.11,
+            },
+            "created_at": "2026-04-11T12:00:00+00:00",
+            "agent": "agent-key-1",
+            "content_hash": "hash-123",
+            "is_decision": True,
+            "coherence_score": 0.93,
+            "committee_validation": committee_validation,
+            "patterns": patterns,
+            "perspectives": [{"hash": "perspective-1", "name": "Shared view"}],
+            "semantic_context": {
+                "schema": "rdf",
+                "ontology_refs": ["flossi://ontology/core"],
+                "interpretation_rules": [],
+            },
+            "language_address": {
+                "dna_hash": "dna-1",
+                "expression_hash": "expr-1",
+            },
+        }
+
+        normalized = memory._holochain_understanding_to_dict(holochain_understanding)
+
+        assert normalized["is_decision"] is True
+        assert normalized["coherence_score"] == 0.93
+        assert normalized["metadata"]["committee_validation"] == committee_validation
+        assert normalized["metadata"]["patterns"] == patterns
+        assert normalized["metadata"]["perspectives"] == holochain_understanding["perspectives"]
+        assert normalized["metadata"]["semantic_context"] == holochain_understanding["semantic_context"]
+        assert normalized["metadata"]["language_address"] == holochain_understanding["language_address"]
+
+    def test_file_backend_uses_utc_timestamps_and_shared_embedding_level(self, temp_storage, monkeypatch):
+        """File-backed understandings and exports should use UTC timestamps and the shared embedding level."""
+        memory = ConversationMemory(agent_id="test-agent", storage_path=temp_storage)
+        monkeypatch.setattr(memory, "_encode_text", lambda _: np.array([1.0, 0.0, 0.0]))
+
+        ref = memory.transmit({"content": "Python is a programming language"})
+
+        assert ref is not None
+        stored = memory.understandings[-1]
+        stored_ts = datetime.fromisoformat(stored.timestamp)
+        export_ts = datetime.fromisoformat(memory.export_for_composition()["exported_at"])
+
+        assert stored_ts.tzinfo == timezone.utc
+        assert export_ts.tzinfo == timezone.utc
+        assert DEFAULT_EMBEDDING_LEVEL in memory.embeddings.levels
+        assert f"understanding-{len(memory.understandings)-1}" in memory.embeddings.levels[DEFAULT_EMBEDDING_LEVEL]
 
     def test_prepare_understanding_logs_stable_reference_only(self, temp_memory, monkeypatch, caplog):
         """Validation failures should log only a stable reference, never raw payload content."""
@@ -599,8 +699,9 @@ class TestOntologyValidation:
         with pytest.raises(ValueError, match="must have 'content' field"):
             temp_memory.transmit({'context': 'no content here'})
 
-    def test_transmit_stores_triple_in_metadata(self, temp_memory):
+    def test_transmit_stores_triple_in_metadata(self, temp_memory, monkeypatch):
         """Test that extracted triple is stored in embedding metadata."""
+        monkeypatch.setattr(temp_memory, "_encode_text", lambda _: np.array([1.0, 0.0, 0.0]))
         understanding = {'content': 'Python is a programming language'}
         ref = temp_memory.transmit(understanding)
 
@@ -609,8 +710,8 @@ class TestOntologyValidation:
         if temp_memory.embeddings:
             # Get the last added embedding
             embedding_key = f"understanding-{len(temp_memory.understandings)-1}"
-            if 'default' in temp_memory.embeddings.levels:
-                embeddings_at_level = temp_memory.embeddings.levels['default']
+            if DEFAULT_EMBEDDING_LEVEL in temp_memory.embeddings.levels:
+                embeddings_at_level = temp_memory.embeddings.levels[DEFAULT_EMBEDDING_LEVEL]
                 if embedding_key in embeddings_at_level:
                     metadata = embeddings_at_level[embedding_key].metadata
                     assert 'triple' in metadata

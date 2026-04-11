@@ -447,7 +447,7 @@ This architecture separates concerns to avoid the one-size-fits-all trap. The ke
 
 4. **LLM non-determinism in consensus**: When LLM agents participate in BFT consensus, their non-deterministic outputs create novel failure modes distinct from classical Byzantine faults. What verification approaches can provide probabilistic guarantees?
 
-5. **FLOSSIOULLK integration path**: Bridging Holochain's agent-centric trust (DNA validation, Warrants, membranes) with AD4M's semantic spanning layer (Perspectives, Languages, Social DNA) creates a viable foundation for the FLOSSIOULLK/ARF architecture. The critical engineering gap is bridging Holochain's Rust-based validation with AD4M's Deno/V8 Language runtime at scale, and validating the full stack under adversarial conditions using Wind Tunnel.
+5. **FLOSSI0ULLK integration path**: Bridging Holochain's agent-centric trust (DNA validation, Warrants, membranes) with AD4M's semantic spanning layer (Perspectives, Languages, Social DNA) creates a viable foundation for the FLOSSI0ULLK/ARF architecture. The critical engineering gap is bridging Holochain's Rust-based validation with AD4M's Deno/V8 Language runtime at scale, and validating the full stack under adversarial conditions using Wind Tunnel.
 
 6. **Value alignment at the protocol layer**: The [argument that decentralized architecture inherently embodies anti-monopolistic values](https://arxiv.org/html/2506.09656v1) deserves rigorous testing. Does the choice of coordination mechanism measurably affect the values expressed by the resulting agent network? Can Social DNA encode ethical constraints that meaningfully constrain LLM agent behavior?
 

@@ -104,7 +104,7 @@ Per cross-system critique, all integration references carry explicit truth statu
 
 | Component | Standalone Status | FLOSSI0ULLK Integration Status |
 |-----------|------------------|-------------------------------|
-| Holochain 0.4.x | **Verified** (production releases) | **Verified** (Rose Forest DNA compiles, tests pass) |
+| Holochain 0.4.x (current Rose Forest deployment target; 0.6.1/0.7.x are roadmap milestones) | **Verified** (production releases) | **Verified** (Rose Forest DNA compiles, tests pass) |
 | AD4M v0.10.1 | **Verified** (production release) | **Aspirational** (designed but not validated) |
 | KERI/Signify | **Verified** (GLEIF vLEI production) | **Specified** (identity_integrity zome exists with `AutonomousIdentifier`/`KeyEventLog`/`IdentitySeal` + `register_aid`/`create_identity_seal`/`rotate_key`; not production-validated in FLOSSI0ULLK context) |
 | hREA/ValueFlows | **Verified** (reference implementations) | **Specified** (`hrea_coordinator`/`hrea_integrity` zomes exist; DICE attribution not production-validated) |

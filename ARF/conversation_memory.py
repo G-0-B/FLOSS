@@ -38,7 +38,7 @@ import hashlib
 import re
 import asyncio
 import yaml
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field, asdict
@@ -83,6 +83,11 @@ except ImportError:
     logging.warning("BudgetManager not available")
 
 logger = logging.getLogger(__name__)
+DEFAULT_EMBEDDING_LEVEL = "default"
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 @dataclass
 class Understanding:
@@ -275,13 +280,24 @@ class ConversationMemory:
             self.validation_stats['validation_skipped'] += 1
 
     def _build_holochain_payload(self, understanding_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Return the subset of understanding fields supported by the Holochain zome API."""
+        """Return the full understanding payload supported by the Holochain zome API."""
+        metadata = dict(understanding_dict.get('metadata', {}))
         payload = {
             'content': understanding_dict['content'],
             'context': understanding_dict.get('context'),
-            'perspectives': understanding_dict.get('perspectives'),
-            'semantic_context': understanding_dict.get('semantic_context'),
-            'language_address': understanding_dict.get('language_address'),
+            'is_decision': understanding_dict.get('is_decision'),
+            'coherence_score': understanding_dict.get(
+                'coherence_score',
+                understanding_dict.get('coherence'),
+            ),
+            'committee_validation': understanding_dict.get(
+                'committee_validation',
+                metadata.get('committee_validation'),
+            ),
+            'patterns': understanding_dict.get('patterns', metadata.get('patterns')),
+            'perspectives': understanding_dict.get('perspectives', metadata.get('perspectives')),
+            'semantic_context': understanding_dict.get('semantic_context', metadata.get('semantic_context')),
+            'language_address': understanding_dict.get('language_address', metadata.get('language_address')),
         }
         return {key: value for key, value in payload.items() if value is not None}
 
@@ -338,10 +354,13 @@ class ConversationMemory:
         understanding = Understanding(
             content=prepared_understanding['content'],
             agent_id=self.agent_id,
-            timestamp=datetime.now().isoformat(),
+            timestamp=_utc_now_iso(),
             context=prepared_understanding.get('context'),
             is_decision=prepared_understanding.get('is_decision', False),
-            coherence_score=prepared_understanding.get('coherence', 0.0),
+            coherence_score=prepared_understanding.get(
+                'coherence_score',
+                prepared_understanding.get('coherence', 0.0),
+            ),
             metadata=prepared_understanding.get('metadata', {})
         )
 
@@ -358,7 +377,7 @@ class ConversationMemory:
             self.embeddings.add(
                 key=f"understanding-{len(self.understandings)}",
                 vector=vector,
-                level='default',
+                level=DEFAULT_EMBEDDING_LEVEL,
                 metadata=metadata
             )
             understanding.embedding_ref = understanding.hash()
@@ -506,7 +525,11 @@ class ConversationMemory:
             results = self._deduplicate_and_rank(results, top_k)
         else:
             # Just finest granularity
-            results = self._search_at_level(query_vector, level="level_0", top_k=top_k)
+            results = self._search_at_level(
+                query_vector,
+                level=DEFAULT_EMBEDDING_LEVEL,
+                top_k=top_k,
+            )
         
         return results
     
@@ -516,7 +539,7 @@ class ConversationMemory:
             'understandings': [u.to_dict() for u in self.understandings],
             'adrs': self.adrs,
             'embedding_state': self.embeddings.to_dict() if self.embeddings else None,
-            'exported_at': datetime.now().isoformat()
+            'exported_at': _utc_now_iso()
         }
     
     def import_and_compose(self, other_memory_export: Dict) -> None:
@@ -673,20 +696,32 @@ class ConversationMemory:
             'triple': understanding['triple'],
             'content_hash': understanding['content_hash'],
         })
+        if understanding.get('committee_validation') is not None:
+            metadata['committee_validation'] = understanding['committee_validation']
+        if understanding.get('patterns') is not None:
+            metadata['patterns'] = understanding['patterns']
         for key in ('perspectives', 'semantic_context', 'language_address'):
             if understanding.get(key) is not None:
                 metadata[key] = understanding.get(key)
+
+        coherence_score = understanding.get('coherence_score')
+        if coherence_score is None:
+            coherence_score = understanding.get('coherence')
+        if coherence_score is None:
+            # Legacy Holochain entries stored only the extracted triple.
+            coherence_score = understanding['triple']['confidence']
+
+        is_decision = understanding.get('is_decision')
+        if is_decision is None:
+            is_decision = metadata.get('is_decision', False)
 
         return {
             'content': understanding['content'],
             'agent_id': str(understanding.get('agent', understanding.get('agent_id', self.agent_id))),
             'timestamp': str(understanding.get('created_at', understanding.get('timestamp', ''))),
             'context': understanding.get('context'),
-            'is_decision': bool(understanding.get('is_decision', metadata.get('is_decision', False))),
-            'coherence_score': understanding.get(
-                'coherence_score',
-                understanding.get('coherence', understanding['triple']['confidence'])
-            ),
+            'is_decision': bool(is_decision),
+            'coherence_score': coherence_score,
             'metadata': metadata,
             'embedding_ref': understanding.get('embedding_ref'),
         }
@@ -713,18 +748,18 @@ class HolochainClient:
 
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30,
+                cmd, capture_output=True, text=True, timeout=30, check=False,
             )
             if result.returncode != 0:
                 raise RuntimeError(f"Holochain call failed: {result.stderr}")
             return json.loads(result.stdout)
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Holochain call timed out")
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse Holochain response: {e}")
-        except FileNotFoundError:
+        except subprocess.TimeoutExpired as err:
+            raise RuntimeError("Holochain call timed out") from err
+        except json.JSONDecodeError as err:
+            raise RuntimeError(f"Failed to parse Holochain response: {err}") from err
+        except FileNotFoundError as err:
             logger.warning("'hc' command not found - Holochain backend unavailable")
-            raise RuntimeError("Holochain CLI not found.")
+            raise RuntimeError("Holochain CLI not found.") from err
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

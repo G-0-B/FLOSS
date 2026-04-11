@@ -4,7 +4,7 @@ version: "2.0.0"
 kind: "technical_report"
 status: "active"
 supersedes: ["1.0.0"]
-truth_status: "verified"
+truth_status: "mixed"
 updated: "2026-03-23"
 evidence_sources:
   - "Perplexity Deep Research task (March 2026) — primary source for v2.0.0"
@@ -198,7 +198,7 @@ Filecoin: 3.0 EiB capacity at ~$0.19/TB/month. F3 Fast Finality upgrade makes it
 
 ### Integration Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │                   User Interface                     │
 │  OpenClaw (messaging bridge) ←→ OVOS (voice)        │

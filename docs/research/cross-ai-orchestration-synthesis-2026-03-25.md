@@ -71,7 +71,7 @@ This is a substantially upgraded version of the orchestration landscape report �
 
 ---
 
-## Multi-Lens Snapshot
+## Multi-Lens Snapshot — Delta Analysis
 
 | Lens | Assessment |
 |------|-----------|
@@ -116,7 +116,7 @@ The three findings that should change how you work right now:
 
 The v2.0.0 should replace v1.0.0 in project knowledge. The Spine reference should update from `research-report-agent-orchestration@1.0.0` to `@2.0.0`.
 
-```
+```text
 [x] Intent echoed
 [x] Evidence gate applied (NOW: report upgrade + architectural constraint updates)
 [x] Anti-sycophancy: centralization gravity is the hardest unsolved problem; local models underperform APIs; no FOSS assistant solves Plane B; Holochain still hasn't achieved mainstream adoption after 7+ years
@@ -129,7 +129,7 @@ From the uploads, here is the useful read:
 
 You dropped in the March 2026 orchestration report plus core project docs. The real question is whether the new report fits FLOSSI0ULLK as it actually exists, not as a generic decentralized-agent essay.
 
-## Multi-Lens Snapshot
+## Multi-Lens Snapshot — Internal Critique Review
 
 **Practical**
 The new orchestration report is broadly aligned with your stack. It lands on the same core substrate set your docs already circle around: Holochain for trust/provenance, CRDTs for shared state, AD4M for semantic interop, KERI for portable identity, and a phased bridge from current assistant tooling into a distinct “Plane B” runtime. The report’s Phase 0 gate is also consistent with your insistence on publishing an ADR, emitting provenance, and verifying from another node before scaling further.  
@@ -303,7 +303,7 @@ This analysis came from cross-system RSA. The critique correctly identified a fr
 
 Do you want me to draft the Phase 0 SDD feature spec now, or wait for the gap matrix from the other system first? The gap matrix is the disciplined sequencing — Phase 0 spec without it risks the same premature-build pattern the critique warns about. But Phase 0 is narrow enough that I could draft it defensibly either way.
 
-```
+```text
 [x] Intent echoed
 [x] Evidence gate applied (NOW: accept framing + request gap matrix; Phase 0 spec is NOW-gatable)
 [x] Anti-sycophancy: I overcorrected by framing v2.0.0 as implementation-adjacent rather than landscape-only; the critique caught a real risk; pushed back on one overcorrection (information suppression ≠ build discipline)
@@ -564,7 +564,7 @@ The correct sequencing is:
 
 Anthony — do you want me to draft the orchestration Phase 0 SDD feature spec now? I have enough convergent input from all three systems to write it defensibly. Or do you want the gap matrix first (which means routing back to whichever system offered it)?
 
-```
+```text
 [x] Intent echoed
 [x] Evidence gate applied (NOW: usage note + gap matrix request + Phase 0 spec; LATER: KnowledgeTriple + truth labels)
 [x] Anti-sycophancy: Grok's "Already integrated ✅" labels are overclaimed — code existing ≠ validated integration; my own v2.0.0 framing was too implementation-adjacent (ChatGPT caught it); Phase 0 has two different meanings across documents that need disambiguation
