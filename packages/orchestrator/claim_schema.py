@@ -70,6 +70,8 @@ OVERRIDE_ALLOWED: dict[BlastRadius, bool] = {
     BlastRadius.SUBSTRATE: False,
 }
 
+EVIDENCE_TYPES: frozenset[str] = frozenset({"spec", "test", "adr", "url", "commit"})
+
 
 def _utcnow_iso() -> str:
     """ISO 8601 UTC timestamp."""
@@ -102,6 +104,18 @@ class EvidenceRef:
     type: str  # "spec" | "test" | "adr" | "url" | "commit"
     ref: str
 
+    def validate(self) -> None:
+        """Enforce a minimal provenance shape for supporting evidence."""
+        if not isinstance(self.type, str) or not self.type.strip():
+            raise ValueError("E_EVIDENCE_INVALID_SCHEMA: evidence.type required")
+        if self.type not in EVIDENCE_TYPES:
+            raise ValueError(
+                "E_EVIDENCE_INVALID_SCHEMA: evidence.type must be one of "
+                + ", ".join(sorted(EVIDENCE_TYPES))
+            )
+        if not isinstance(self.ref, str) or not self.ref.strip():
+            raise ValueError("E_EVIDENCE_INVALID_SCHEMA: evidence.ref required")
+
 
 @dataclass
 class Claim:
@@ -116,6 +130,22 @@ class Claim:
     truth_status: TruthStatus = TruthStatus.UNVERIFIED
     id: str = field(default_factory=_new_id)
     submitted_at: str = field(default_factory=_utcnow_iso)
+
+    def _validate_evidence(self) -> None:
+        """Reject malformed evidence payloads before routing or serialization."""
+        if not isinstance(self.evidence, list):
+            raise ValueError("E_CLAIM_INVALID_SCHEMA: evidence must be a list")
+        for idx, evidence in enumerate(self.evidence):
+            if not isinstance(evidence, EvidenceRef):
+                raise ValueError(
+                    f"E_CLAIM_INVALID_SCHEMA: evidence[{idx}] must be an EvidenceRef"
+                )
+            try:
+                evidence.validate()
+            except ValueError as exc:
+                raise ValueError(
+                    f"E_CLAIM_INVALID_SCHEMA: evidence[{idx}] is invalid"
+                ) from exc
 
     def validate(self) -> None:
         """Enforce spec invariants INV-001 through INV-005.
@@ -153,6 +183,7 @@ class Claim:
             raise ValueError("E_CLAIM_INVALID_SCHEMA: summary must be 1..200 chars")
         if not self.body:
             raise ValueError("E_CLAIM_INVALID_SCHEMA: body required")
+        self._validate_evidence()
         if self.truth_status != TruthStatus.UNVERIFIED:
             raise ValueError(
                 "E_CLAIM_INVALID_SCHEMA: truth_status must be Unverified on submission"
@@ -160,6 +191,7 @@ class Claim:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize Claim to a plain dict (enums rendered as their .value strings)."""
+        self.validate()
         d = asdict(self)
         d["proposal_type"] = self.proposal_type.value
         d["blast_radius"] = self.blast_radius.value

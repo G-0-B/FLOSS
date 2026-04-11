@@ -23,6 +23,7 @@ from packages.orchestrator.claim_schema import (
     BlastRadius,
     Claim,
     Decision,
+    EvidenceRef,
     Outcome,
     ProposalType,
     Vote,
@@ -369,6 +370,48 @@ def test_claim_validate_rejects_bad_blast_radius():
         raise AssertionError("expected ValueError for string blast_radius")
 
 
+def test_claim_validate_rejects_non_evidence_ref_entries():
+    """Claim.validate() must reject evidence entries that bypassed dataclass typing."""
+    claim = sample_claim()
+    claim.evidence = [{"type": "spec", "ref": "docs/specs/consensus-gate.spec.md"}]
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+        assert "evidence[0]" in str(e)
+    else:
+        raise AssertionError("expected ValueError for non-EvidenceRef entry")
+
+
+def test_claim_validate_rejects_blank_evidence_ref():
+    """Claim.validate() must reject blank provenance references."""
+    claim = sample_claim()
+    claim.evidence = [EvidenceRef(type="spec", ref="  ")]
+    try:
+        claim.validate()
+    except ValueError as e:
+        assert "E_CLAIM_INVALID_SCHEMA" in str(e)
+        assert "evidence[0]" in str(e)
+    else:
+        raise AssertionError("expected ValueError for blank evidence ref")
+
+
+def test_claim_to_dict_serializes_validated_evidence():
+    """Claim.to_dict() should preserve well-formed evidence entries."""
+    claim = sample_claim()
+    claim.evidence = [
+        EvidenceRef(type="spec", ref="docs/specs/consensus-gate.spec.md"),
+        EvidenceRef(type="test", ref="packages/orchestrator/test_consensus_gate.py"),
+    ]
+
+    data = claim.to_dict()
+
+    assert data["evidence"] == [
+        {"type": "spec", "ref": "docs/specs/consensus-gate.spec.md"},
+        {"type": "test", "ref": "packages/orchestrator/test_consensus_gate.py"},
+    ]
+
+
 def test_tally_direct():
     """Exercise tally() without voter mocks."""
     claim = sample_claim(blast=BlastRadius.MODULE)
@@ -415,6 +458,9 @@ def _run_all():
         test_claim_validate_rejects_bad_submitted_at,
         test_claim_validate_rejects_bad_proposal_type,
         test_claim_validate_rejects_bad_blast_radius,
+        test_claim_validate_rejects_non_evidence_ref_entries,
+        test_claim_validate_rejects_blank_evidence_ref,
+        test_claim_to_dict_serializes_validated_evidence,
         test_tally_direct,
     ]
     passed = 0

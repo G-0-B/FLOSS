@@ -10,6 +10,7 @@ import pytest
 import numpy as np
 import shutil
 import tempfile
+import logging
 from pathlib import Path
 import sys
 import json
@@ -570,6 +571,28 @@ class TestOntologyValidation:
                 },
             )
         ]
+
+    def test_prepare_understanding_logs_stable_reference_only(self, temp_memory, monkeypatch, caplog):
+        """Validation failures should log only a stable reference, never raw payload content."""
+        sensitive_understanding = {
+            "content": "Highly sensitive transmission content",
+            "context": "Private resonance context",
+            "metadata": {"origin": "secret-source"},
+        }
+
+        monkeypatch.setattr(temp_memory, "_extract_triple", lambda _: None)
+
+        with caplog.at_level(logging.WARNING):
+            prepared, triple, validation_mode = temp_memory._prepare_understanding_for_storage(
+                sensitive_understanding,
+                skip_validation=False,
+            )
+
+        assert (prepared, triple, validation_mode) == (None, None, None)
+        assert "understanding_sha256:" in caplog.text
+        assert "Highly sensitive transmission content" not in caplog.text
+        assert "Private resonance context" not in caplog.text
+        assert "secret-source" not in caplog.text
 
     def test_transmit_missing_content_raises_error(self, temp_memory):
         """Test that transmit raises error for missing content."""

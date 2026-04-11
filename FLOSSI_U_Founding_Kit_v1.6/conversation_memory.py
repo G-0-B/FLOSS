@@ -214,6 +214,16 @@ class ConversationMemory:
         else:
             return self._transmit_file(understanding_dict, skip_validation)
 
+    def _understanding_log_ref(self, understanding_dict: Dict[str, Any]) -> str:
+        """Return a deterministic reference for logs without exposing raw memory content."""
+        payload = json.dumps(
+            understanding_dict,
+            sort_keys=True,
+            default=str,
+            separators=(",", ":"),
+        )
+        return f"understanding_sha256:{hashlib.sha256(payload.encode()).hexdigest()}"
+
     def _prepare_understanding_for_storage(
         self, understanding_dict: Dict[str, Any], skip_validation: bool = False
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Tuple[str, str, str]], Optional[str]]:
@@ -221,12 +231,19 @@ class ConversationMemory:
         prepared = dict(understanding_dict)
         metadata = dict(prepared.get('metadata', {}))
         prepared['metadata'] = metadata
+        understanding_ref = self._understanding_log_ref(prepared)
 
         triple = self._extract_triple(prepared)
         if triple is None:
-            logger.warning(f"Could not extract triple from understanding: {understanding_dict}")
+            logger.warning(
+                "Could not extract triple from understanding_ref=%s",
+                understanding_ref,
+            )
             if not skip_validation:
-                logger.error("Validation required but triple extraction failed")
+                logger.error(
+                    "Validation required but triple extraction failed for understanding_ref=%s",
+                    understanding_ref,
+                )
                 self.validation_stats['validation_failed'] += 1
                 return None, None, None
 
@@ -241,7 +258,11 @@ class ConversationMemory:
 
             is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
             if not is_valid:
-                logger.error(f"Ontology validation failed: {error_msg}")
+                logger.error(
+                    "Ontology validation failed for understanding_ref=%s: %s",
+                    understanding_ref,
+                    error_msg,
+                )
                 self.validation_stats['validation_failed'] += 1
                 return None, None, None
 
