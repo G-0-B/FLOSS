@@ -86,3 +86,11 @@ memory_backup/
 .claude/worktrees/
 *.stackdump
 nul
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+*_api_key*
+*secret*

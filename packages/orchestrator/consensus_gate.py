@@ -16,8 +16,12 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .claim_schema import (
+    APPROVE_THRESHOLD,
+    CERTAINTY_LIMIT,
     OVERRIDE_ALLOWED,
+    POLARIZATION_THRESHOLD,
     QUORUM_MIN,
+    REJECT_THRESHOLD,
     BlastRadius,
     Claim,
     Decision,
@@ -44,46 +48,45 @@ class ConsensusGateError(Exception):
     """Raised for gate-protocol violations (not invariant violations)."""
 
 
-def tally(claim: Claim, votes: list[Vote]) -> Outcome:
-    """Apply spec §4.1 tallying logic to produce an Outcome.
+def tally(claim: Claim, votes: list[Vote]) -> tuple[Outcome, float, float]:
+    """Apply analog tally logic (spec §4.2). Returns (outcome, mean, variance).
 
-    Rules (in order):
-      1. Any -1 vote => REJECTED (INV-007)
-      2. Substrate blast radius requires ALL +1 (no 0/abstain)
-      3. Quorum minimum not met => DEFERRED
-      4. >= 2 votes == +1 AND all votes >= 0 => APPROVED (INV-006)
-      5. Otherwise => DEFERRED
+    Steps (in order — do not reorder):
+      1. Conflict check: σ² > θ_polarization → CONFLICT (runs before quorum)
+      2. Quorum check: n < QUORUM_MIN → DEFERRED
+      3. Direction check: μ > θ_approve → APPROVED; μ < θ_reject → REJECTED; else DEFERRED
+
+    CONFLICT overrides the quorum check by design. If two agents vote [0.9, -0.9],
+    a third vote won't resolve the fight — it determines a winner. Human intervention
+    is needed before more votes are collected, not after.
+
+    Returns the outcome plus the computed mean and variance so callers can store them
+    in Decision.tally_mean / Decision.tally_variance for auditability.
     """
     if not votes:
-        return Outcome.DEFERRED
+        return Outcome.DEFERRED, 0.0, 0.0
 
-    # Rule 1: any rejection vetoes
-    if any(v.vote == -1 for v in votes):
-        return Outcome.REJECTED
+    weights = [v.weight for v in votes]
+    n = len(weights)
+    mean = sum(weights) / n
+    variance = sum((w - mean) ** 2 for w in weights) / n  # population variance
 
-    # Rule 2: substrate requires unanimous +1
-    if claim.blast_radius == BlastRadius.SUBSTRATE:
-        if all(v.vote == 1 for v in votes) and len(votes) >= QUORUM_MIN[BlastRadius.SUBSTRATE]:
-            return Outcome.APPROVED
-        return Outcome.DEFERRED
+    br = claim.blast_radius
 
-    # Rule 3: quorum check
-    quorum_required = QUORUM_MIN[claim.blast_radius]
-    if len(votes) < quorum_required:
-        return Outcome.DEFERRED
+    # Step 1 — Conflict check (variance runs regardless of quorum)
+    if variance > POLARIZATION_THRESHOLD[br]:
+        return Outcome.CONFLICT, mean, variance
 
-    # Rule 4: approval requires >=2 yes votes with no rejections
-    # (rejections already excluded above, so we only need to check >=2 yes)
-    approvals = sum(1 for v in votes if v.vote == 1)
-    if approvals >= 2:
-        return Outcome.APPROVED
+    # Step 2 — Quorum check
+    if n < QUORUM_MIN[br]:
+        return Outcome.DEFERRED, mean, variance
 
-    # Local blast with single voter: 1 approval is enough (quorum_min=1)
-    if claim.blast_radius == BlastRadius.LOCAL and approvals >= 1:
-        return Outcome.APPROVED
-
-    # Rule 5: default
-    return Outcome.DEFERRED
+    # Step 3 — Direction check
+    if mean > APPROVE_THRESHOLD[br]:
+        return Outcome.APPROVED, mean, variance
+    if mean < REJECT_THRESHOLD[br]:
+        return Outcome.REJECTED, mean, variance
+    return Outcome.DEFERRED, mean, variance
 
 
 def decide(
@@ -115,18 +118,17 @@ def decide(
             )
         seen_voters.add(vote.voter)
         votes.append(vote)
-        # Early-exit: a single -1 vetoes, no need to consult remaining voters
-        if vote.vote == -1:
-            logger.info(
-                "Claim %s vetoed by voter %s: %s",
-                claim.id,
-                vote.voter,
-                vote.rationale,
-            )
-            break
+    # All voters consulted before tallying — CONFLICT requires the full vote set.
+    # No early-exit: a single strong dissenter cannot suppress other voters' signals.
 
-    outcome = tally(claim, votes)
-    decision = Decision(claim_id=claim.id, outcome=outcome, votes=votes)
+    outcome, mean, variance = tally(claim, votes)
+    decision = Decision(
+        claim_id=claim.id,
+        outcome=outcome,
+        votes=votes,
+        tally_mean=mean,
+        tally_variance=variance,
+    )
 
     if adr_writer is not None:
         try:
@@ -176,7 +178,7 @@ def override(
             f"E_OVERRIDE_DUPLICATE: {human_voter!r} already voted on claim {claim.id}"
         )
 
-    override_vote = Vote(voter=human_voter, vote=1, rationale=rationale)
+    override_vote = Vote(voter=human_voter, weight=CERTAINTY_LIMIT, rationale=rationale)
     override_vote.validate()
 
     decision = Decision(
@@ -226,7 +228,7 @@ def default_adr_writer(adr_dir: Path) -> Callable[[Decision, Claim], str]:
             "",
         ]
         for v in decision.votes:
-            lines.append(f"- **{v.voter}** ({v.vote:+d}) @ {v.voted_at}")
+            lines.append(f"- **{v.voter}** ({v.weight:+.4f}) @ {v.voted_at}")
             lines.append(f"  - {v.rationale}")
 
         if decision.override_by:

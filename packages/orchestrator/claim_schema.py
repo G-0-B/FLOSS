@@ -8,6 +8,7 @@ See docs/adr/ADR-6-four-system-integration.md for context.
 
 from __future__ import annotations
 
+import math
 import os
 import time
 import uuid
@@ -46,9 +47,10 @@ class TruthStatus(str, Enum):
 
 
 class Outcome(str, Enum):
-    """Terminal outcome of a Decision (spec §4.5)."""
+    """Terminal outcome of a Decision (spec §4.5, analog vote model)."""
 
     APPROVED = "APPROVED"
+    CONFLICT = "CONFLICT"
     DEFERRED = "DEFERRED"
     REJECTED = "REJECTED"
     OVERRIDDEN = "OVERRIDDEN"
@@ -71,6 +73,35 @@ OVERRIDE_ALLOWED: dict[BlastRadius, bool] = {
 }
 
 EVIDENCE_TYPES: frozenset[str] = frozenset({"spec", "test", "adr", "url", "commit"})
+
+CERTAINTY_LIMIT: float = 0.999
+"""Asymptotic upper bound for vote weights.
+
+The valid domain for Vote.weight is the CLOSED interval [-CERTAINTY_LIMIT, CERTAINTY_LIMIT].
+Weights of exactly ±0.999 are permitted — they represent maximum support/opposition.
+Absolute ±1.0 is forbidden (1.0 > CERTAINTY_LIMIT fails the range check).
+"""
+
+# Tally thresholds per blast radius (spec §4.3, analog vote model)
+APPROVE_THRESHOLD: dict[BlastRadius, float] = {
+    BlastRadius.LOCAL: 0.30,
+    BlastRadius.MODULE: 0.50,
+    BlastRadius.SYSTEM: 0.60,
+    BlastRadius.SUBSTRATE: 0.85,
+}
+REJECT_THRESHOLD: dict[BlastRadius, float] = {
+    BlastRadius.LOCAL: -0.30,
+    BlastRadius.MODULE: -0.40,
+    BlastRadius.SYSTEM: -0.50,
+    BlastRadius.SUBSTRATE: -0.85,
+}
+POLARIZATION_THRESHOLD: dict[BlastRadius, float] = {
+    BlastRadius.LOCAL: 0.60,
+    BlastRadius.MODULE: 0.50,
+    BlastRadius.SYSTEM: 0.40,
+    BlastRadius.SUBSTRATE: 0.25,
+}
+# QUORUM_MIN and OVERRIDE_ALLOWED already defined above — preserved as-is.
 
 
 def _utcnow_iso() -> str:
@@ -201,19 +232,35 @@ class Claim:
 
 @dataclass
 class Vote:
-    """A single voter's ternary evaluation of a Claim."""
+    """A single voter's analog evaluation of a Claim.
+
+    weight is a float in the closed interval [-CERTAINTY_LIMIT, CERTAINTY_LIMIT].
+    Positive = support, negative = opposition, near-zero = abstain.
+    Absolute ±1.0 is forbidden (1.0 > CERTAINTY_LIMIT); ±0.999 is the maximum signal.
+    Integer values are rejected even if numerically in range — callers must pass float.
+    """
 
     voter: str
-    vote: int  # -1, 0, +1
+    weight: float  # ∈ [-CERTAINTY_LIMIT, CERTAINTY_LIMIT]
     rationale: str
     voted_at: str = field(default_factory=_utcnow_iso)
 
     def validate(self) -> None:
-        """Enforce spec invariants INV-002, INV-005."""
-        if isinstance(self.vote, bool) or not isinstance(self.vote, int):
-            raise ValueError(f"E_VOTE_INVALID_RANGE: {self.vote} not in (-1, 0, +1)")
-        if self.vote not in (-1, 0, 1):
-            raise ValueError(f"E_VOTE_INVALID_RANGE: {self.vote} not in (-1, 0, +1)")
+        """Enforce spec invariants: finite float in [-CERTAINTY_LIMIT, CERTAINTY_LIMIT].
+
+        The valid domain is the CLOSED interval [-0.999, 0.999]. Weights of exactly
+        ±CERTAINTY_LIMIT are permitted. Absolute ±1.0 is forbidden (fails range check).
+        Integer types are rejected — pass float(1) not 1.
+        """
+        if not isinstance(self.weight, float) or not math.isfinite(self.weight):
+            raise ValueError(
+                f"E_VOTE_INVALID_RANGE: weight must be a finite float, got {self.weight!r}"
+            )
+        if not (-CERTAINTY_LIMIT <= self.weight <= CERTAINTY_LIMIT):
+            raise ValueError(
+                f"E_VOTE_INVALID_RANGE: weight {self.weight} outside "
+                f"[-{CERTAINTY_LIMIT}, {CERTAINTY_LIMIT}]"
+            )
         if not self.voter:
             raise ValueError("E_VOTE_INVALID_SCHEMA: voter required")
         if not (1 <= len(self.rationale) <= 1000):
@@ -234,6 +281,8 @@ class Decision:
     decided_at: str = field(default_factory=_utcnow_iso)
     adr_ref: Optional[str] = None
     override_by: Optional[str] = None
+    tally_mean: Optional[float] = None
+    tally_variance: Optional[float] = None
 
     def validate(self) -> None:
         """Enforce wire-format invariants before serializing or storing a decision."""
@@ -271,6 +320,10 @@ class Decision:
             raise ValueError(
                 "E_DECISION_INVALID_SCHEMA: override_by only allowed for OVERRIDDEN"
             )
+        if self.outcome == Outcome.CONFLICT and self.override_by is not None:
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: override_by not valid for CONFLICT outcome"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize Decision to a plain dict (outcome as .value; optional fields omitted when None)."""
@@ -285,4 +338,8 @@ class Decision:
             d["adr_ref"] = self.adr_ref
         if self.override_by is not None:
             d["override_by"] = self.override_by
+        if self.tally_mean is not None:
+            d["tally_mean"] = self.tally_mean
+        if self.tally_variance is not None:
+            d["tally_variance"] = self.tally_variance
         return d

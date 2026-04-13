@@ -1,4 +1,6 @@
-AGPL-3.0 + Carrier Equivalence
+SPDX-License-Identifier: AGPL-3.0-or-later
 
-You are free to use, study, modify, and share - as long as any improvements flow back into the commons.
-Love, light, and knowledge are not to be hoarded.
+This work is licensed under the GNU Affero General Public License, version 3
+or later. See https://www.gnu.org/licenses/agpl-3.0.html for the full license text.
+
+Additional terms: see LEGAL_DEFINITIONS.md (Carrier Equivalence addendum).
