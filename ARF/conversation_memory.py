@@ -33,6 +33,7 @@ License: Compassion Clause or compatible FOSS
 """
 
 from __future__ import annotations
+from collections.abc import Mapping
 import json
 import hashlib
 import re
@@ -88,6 +89,12 @@ DEFAULT_EMBEDDING_LEVEL = "default"
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _normalize_metadata(raw_metadata: Any) -> Dict[str, Any]:
+    """Return a shallow metadata dict, falling back to empty metadata for invalid values."""
+    return dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
+
 
 @dataclass
 class Understanding:
@@ -222,7 +229,7 @@ class ConversationMemory:
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Tuple[str, str, str]], Optional[str]]:
         """Normalize understanding metadata and preflight validation before persistence."""
         prepared = dict(understanding_dict)
-        metadata = dict(prepared.get('metadata', {}))
+        metadata = _normalize_metadata(prepared.get('metadata'))
         prepared['metadata'] = metadata
         understanding_ref = self._understanding_log_ref(prepared)
 
@@ -281,7 +288,7 @@ class ConversationMemory:
 
     def _build_holochain_payload(self, understanding_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Return the full understanding payload supported by the Holochain zome API."""
-        metadata = dict(understanding_dict.get('metadata', {}))
+        metadata = _normalize_metadata(understanding_dict.get('metadata'))
         payload = {
             'content': understanding_dict['content'],
             'context': understanding_dict.get('context'),
@@ -691,7 +698,8 @@ class ConversationMemory:
             return []
 
     def _holochain_understanding_to_dict(self, understanding: Dict) -> Dict:
-        metadata = dict(understanding.get('metadata', {}))
+        """Normalize a Holochain understanding record into the file-backend dictionary shape."""
+        metadata = _normalize_metadata(understanding.get('metadata'))
         metadata.update({
             'triple': understanding['triple'],
             'content_hash': understanding['content_hash'],
@@ -760,6 +768,7 @@ class HolochainClient:
         except FileNotFoundError as err:
             logger.warning("'hc' command not found - Holochain backend unavailable")
             raise RuntimeError("Holochain CLI not found.") from err
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

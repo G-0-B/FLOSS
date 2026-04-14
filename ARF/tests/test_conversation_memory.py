@@ -655,6 +655,53 @@ class TestOntologyValidation:
         assert normalized["metadata"]["semantic_context"] == holochain_understanding["semantic_context"]
         assert normalized["metadata"]["language_address"] == holochain_understanding["language_address"]
 
+    def test_prepare_understanding_normalizes_invalid_metadata(self, temp_memory, monkeypatch):
+        """Storage prep should coerce null or malformed metadata into an empty dict."""
+        monkeypatch.setattr(temp_memory, "_extract_triple", lambda _: ("agent", "stated", "claim"))
+        monkeypatch.setattr(temp_memory, "_validate_triple", lambda *_: (True, None, None))
+
+        prepared, triple, validation_mode = temp_memory._prepare_understanding_for_storage(
+            {
+                "content": "Agent stated claim",
+                "context": "Malformed metadata should not break storage prep",
+                "metadata": None,
+            },
+            skip_validation=False,
+        )
+
+        assert prepared is not None
+        assert prepared["metadata"] == {}
+        assert triple == ("agent", "stated", "claim")
+        assert validation_mode == "passed"
+
+    def test_holochain_understanding_round_trip_normalizes_invalid_metadata(self, temp_storage):
+        """Recall normalization should preserve usable fields when Holochain metadata is malformed."""
+        memory = ConversationMemory(
+            agent_id="test-agent",
+            storage_path=str(temp_storage / "holochain-invalid-metadata"),
+            backend="holochain",
+        )
+
+        normalized = memory._holochain_understanding_to_dict(
+            {
+                "content": "Consensus decision logged",
+                "context": "Malformed metadata round-trip check",
+                "triple": {
+                    "subject": "agent_a",
+                    "predicate": "stated",
+                    "object": "understanding_sha256:abc",
+                    "confidence": 0.11,
+                },
+                "created_at": "2026-04-11T12:00:00+00:00",
+                "agent": "agent-key-1",
+                "content_hash": "hash-123",
+                "metadata": None,
+            }
+        )
+
+        assert normalized["metadata"]["triple"]["predicate"] == "stated"
+        assert normalized["metadata"]["content_hash"] == "hash-123"
+
     def test_file_backend_uses_utc_timestamps_and_shared_embedding_level(self, temp_storage, monkeypatch):
         """File-backed understandings and exports should use UTC timestamps and the shared embedding level."""
         memory = ConversationMemory(agent_id="test-agent", storage_path=temp_storage)
