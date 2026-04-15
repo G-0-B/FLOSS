@@ -24,6 +24,8 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 | **ADR-4** | Specification-Driven Development | Accepted | — | 2025-12-15 | `ADR-4-spec-driven-development.md` |
 | **ADR-5** | Cognitive Virology as Architectural Pattern | Specified | Specified | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
 | **ADR-6** | Four-System Meta-Orchestration Integration | Proposed | Specified | 2026-04-04 | `ADR-6-four-system-integration.md` |
+| **ADR-7** | AGPL Integration via MCP | Accepted | — | 2026-04-15 | `ADR-7-agpl-mcp-integration.md` |
+| **ADR-MCP-ORCHESTRATOR** | Local Agent Node | Accepted | — | 2026-04-10 | `ADR-MCP-ORCHESTRATOR.md` |
 
 ---
 
