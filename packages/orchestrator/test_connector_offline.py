@@ -7,7 +7,7 @@ a conductor with the rose_forest hApp installed.
 """
 import json
 import pytest
-from holochain_connector import (
+from packages.orchestrator.holochain_connector import (
     RoseNodeInput,
     SearchInput,
     SearchResult,
