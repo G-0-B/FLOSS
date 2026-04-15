@@ -65,10 +65,10 @@ Agorai Bridge (127.0.0.1:3100)
    - Register Claude via `agorai agent add claude --type cli`
    - Register a DeepSeek or Ollama model via `agorai agent add deepseek --type openai-compat`
 
-3. **Handle Licensing (ADR-7)**
-   - If FLOSS integrates Agorai as a dependency, the AGPL copyleft may propagate
-   - Options: (a) accept AGPL for the integration layer, (b) negotiate dual-license with Steven Johnson, (c) use Agorai as a separate service (AGPL only applies to the service itself, not callers via API/MCP)
-   - **Recommendation**: option (c) --- run Agorai as a standalone bridge service, communicate via MCP. This avoids AGPL propagation.
+3. **Handle Licensing (ADR-7: Embracing AGPL-3.0 Copyleft Cascade)**
+   - ADR-7 explicitly accepts the AGPL cascade for the FLOSSI0ULLK core. Path B (direct code porting of AIngram/Agorai domain logic into Python) and Path C (Rust integrity zome ports) are legally unblocked.
+   - A stewardship carve-out via formal Steward Vote remains available for humanitarian/medical/educational use cases that cannot open-source.
+   - **First-move recommendation**: still run Agorai as a standalone bridge service as a *pragmatic* starting point — it's the cheapest way to validate the wiring end-to-end before committing to code ports. The arm's-length posture is now a convenience, not a license requirement. Once wiring is proven, direct porting of high-value modules (Keryx rule-based orchestrator, visibility-tier logic) is on the table.
 
 4. **Wire agorai-connect into FLOSS MCP server**
    - Run `agorai-connect proxy` as a subprocess from FLOSS metacoordinator
