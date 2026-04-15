@@ -1,4 +1,4 @@
-# DESIGN.md — metacoordinator-mcp
+# DESIGN.md — metacoordinator_mcp
 
 > MCP server wrapping the FLOSSI0ULLK consensus gate as tools for AI agents.
 
@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-`metacoordinator-mcp` is an MCP (Model Context Protocol) server that exposes the FLOSSI0ULLK consensus gate as a set of tools consumable by AI agents. It adds:
+`metacoordinator_mcp` is an MCP (Model Context Protocol) server that exposes the FLOSSI0ULLK consensus gate as a set of tools consumable by AI agents. It adds:
 
 - **State management** — persistent tracking of claims, votes, decisions, and voter configurations
 - **LiteLLM multi-model routing** — parallel invocation of diverse LLM voters (Claude, GPT-4o, Gemini, DeepSeek, Ollama locals)
@@ -193,7 +193,7 @@ class VoterConfig:
 
 ## 6. AIngram/Agorai Integration Paths
 
-This section maps the integration surface between metacoordinator-mcp and two related open-source projects.
+This section maps the integration surface between metacoordinator_mcp and two related open-source projects.
 
 ### AIngram
 
@@ -273,7 +273,7 @@ In `.claude/settings.json`:
     "metacoordinator": {
       "command": "python",
       "args": ["-m", "metacoordinator_mcp.server"],
-      "cwd": "packages/metacoordinator-mcp"
+      "cwd": "packages/metacoordinator_mcp"
     }
   }
 }

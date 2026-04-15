@@ -331,7 +331,7 @@ C2 is a hard gate: all 16 tests (plus new CONFLICT vectors) must pass before the
 | Step | Task | Gate condition | Time |
 |------|------|----------------|------|
 | P1 | **Implement cell directory writer** — `packages/source_chain/` | C2 passing | 3h |
-| P2 | **Build MCP gateway** — `packages/metacoordinator-mcp/` | P1 complete | 4h |
+| P2 | **Build MCP gateway** — `packages/metacoordinator_mcp/` | P1 complete | 4h |
 | P3 | **Wire Claude Code hooks** — `.claude/settings.json` | P2 complete | 1h |
 
 ---

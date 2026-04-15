@@ -1,22 +1,24 @@
-# ADR-7: AGPL Integration via MCP
+# ADR-7: Embracing AGPL-3.0 Copyleft Cascade
 
 ## Status
 Accepted (2026-04-15)
 
 ## Context
-The FLOSSI0ULLK architecture envisions multi-agent collaboration and governance utilizing powerful complementary tools like AIngram and Agorai. Both of these projects are licensed under the AGPL-3.0 (GNU Affero General Public License). FLOSSI0ULLK itself aims for an Apache-2.0 / GPL-compatible posture (with the Compassion Clause).
+The FLOSSI0ULLK architecture (Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge) is fundamentally a commons. Integrating with AGPL-3.0 licensed external services (like AIngram and Agorai) by porting their code would trigger the AGPL copyleft clause, forcing the derived FLOSSI0ULLK codebase to adopt the AGPL license.
 
-Directly porting or tightly coupling AGPL-3.0 code into the core FLOSSI0ULLK Python/Rust packages (`metacoordinator_mcp`, `ARF`, etc.) would trigger the AGPL copyleft clause, forcing the entire derived codebase to adopt the AGPL license. This presents a potential misalignment with the broader interoperability goals of the project.
+Initially, we considered isolating these services behind MCP/API boundaries to avoid this cascade and maintain a looser Apache-2.0 / GPL-compatible posture. However, this defensive posture fundamentally misaligns with the core philosophy of the project. 
+
+AGPL-3.0 is the strongest copyleft license available, specifically designed to close the SaaS loophole. It dictates that anyone running this software over a network and modifying it must share those modifications back to the commons. This cascade is a feature, not a bug. It is the legal embodiment of the "Voluntary Convergence Manifesto" and consent-based governance. It ensures that downstream users who benefit from the orchestrator must contribute back to the provenance substrate.
 
 ## Decision
-We will integrate with AGPL-licensed external services (specifically AIngram and Agorai) **strictly over the Model Context Protocol (MCP)** or standard HTTP APIs, running them as standalone, isolated bridge services or satellite contributors.
+We explicitly accept and embrace the AGPL-3.0 copyleft cascade for the FLOSSI0ULLK core orchestration and consensus layers.
 
-1. **No Code Porting:** We will not port AIngram's domain modules (like its formal vote lifecycle logic) directly into the FLOSS Python codebase.
-2. **Satellite Architecture:** We will stand up AIngram and Agorai locally (via Docker or local npm global installs) and configure our `metacoordinator_mcp` gateway to treat them as independent agents/services on the network.
-3. **Boundary:** Communication between FLOSSI0ULLK and AGPL services must remain strictly at arm's length (API/MCP borders). This architectural boundary insulates FLOSS from AGPL propagation, as connecting to an AGPL service over a network API does not trigger the copyleft provisions on the caller.
+1. **License Adoption:** The core FLOSSI0ULLK orchestrator and consensus gateway (`metacoordinator_mcp`, `ARF`, etc.) will be licensed under AGPL-3.0 (or later).
+2. **Direct Integration Allowed:** We are no longer artificially constrained to MCP/API boundaries for integrating AIngram, Agorai, or other AGPL-licensed domain logic. We may port their code directly into our Python/Rust codebases where it makes architectural sense.
+3. **Stewardship Carve-Out (Dual-Licensing):** We recognize that strict AGPL may exclude certain high-value, alignment-positive collaborators (e.g., hospitals, educational institutions, or humanitarian organizations that cannot open-source their proprietary patient/student data systems). We reserve the right to offer dual-licensing exceptions or specific carve-outs via a formal Steward Vote for use cases where the spirit of universal flourishing is served, even if the letter of strict open-sourcing cannot be met.
 
 ## Consequences
-- **Positive:** We can leverage 60+ migrations of production-grade governance and multi-agent debate logic (AIngram/Agorai) immediately without polluting the FLOSS license posture.
-- **Positive:** Maintains the modular, agent-centric philosophy of the system (Layer 4 RSA).
-- **Negative:** Adds a runtime dependency (Docker/npm) to utilize these features, introducing more surface area for ops overhead in local developer environments.
-- **Negative:** Substrate philosophy mismatch (AIngram relies on PostgreSQL rather than Holochain) must be navigated at the data boundary; FLOSS will remain Holochain-native, treating AIngram merely as a contributor or specialized oracle.
+- **Positive:** Absolute ideological integrity. The legal framework now perfectly mirrors the architectural and philosophical framework (Layer 0 sovereignty, 1=NONE ALONE ALLONE).
+- **Positive:** Unblocks direct code porting from AIngram (e.g., formal vote lifecycle, trust math) into the Python orchestrator, removing the need for a runtime Docker dependency just to access consensus logic.
+- **Positive:** Provides a mechanism (steward vote) to grant exceptions for medical, academic, and humanitarian use cases, ensuring the license protects the commons without blocking genuine flourishing.
+- **Negative:** Commercial entities building closed-source SaaS platforms on top of FLOSSI0ULLK will be legally prohibited from doing so without a dual-license agreement. This is an intended consequence, but will reduce adoption among proprietary software developers.

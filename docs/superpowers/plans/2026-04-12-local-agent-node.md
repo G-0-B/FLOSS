@@ -32,10 +32,10 @@ If the file does not exist, complete **Task 0 (F2)** below before proceeding to 
 | Create | `packages/source_chain/cell.py` | `CellDirectory` — append, read, lock |
 | Create | `packages/source_chain/tests/__init__.py` | Package marker |
 | Create | `packages/source_chain/tests/test_cell.py` | Unit tests for CellDirectory |
-| Create | `packages/metacoordinator-mcp/__init__.py` | Package marker |
-| Create | `packages/metacoordinator-mcp/server.py` | FastMCP server wiring |
-| Create | `packages/metacoordinator-mcp/tools.py` | 5 MCP tool handlers |
-| Create | `packages/metacoordinator-mcp/tests/test_tools.py` | Unit tests for tool handlers |
+| Create | `packages/metacoordinator_mcp/__init__.py` | Package marker |
+| Create | `packages/metacoordinator_mcp/server.py` | FastMCP server wiring |
+| Create | `packages/metacoordinator_mcp/tools.py` | 5 MCP tool handlers |
+| Create | `packages/metacoordinator_mcp/tests/test_tools.py` | Unit tests for tool handlers |
 | Create | `FLOSS/.claude/settings.json` | PostToolUse agent hook for blast-radius detection |
 
 ---
@@ -1803,11 +1803,11 @@ git commit -m "feat(P1): CellDirectory — file-based source chain writer with a
 **Gate:** P1 complete.
 
 **Files:**
-- Create: `packages/metacoordinator-mcp/__init__.py`
-- Create: `packages/metacoordinator-mcp/server.py`
-- Create: `packages/metacoordinator-mcp/tools.py`
-- Create: `packages/metacoordinator-mcp/tests/__init__.py`
-- Create: `packages/metacoordinator-mcp/tests/test_tools.py`
+- Create: `packages/metacoordinator_mcp/__init__.py`
+- Create: `packages/metacoordinator_mcp/server.py`
+- Create: `packages/metacoordinator_mcp/tools.py`
+- Create: `packages/metacoordinator_mcp/tests/__init__.py`
+- Create: `packages/metacoordinator_mcp/tests/test_tools.py`
 
 The MCP gateway is a **router, not a controller** (spec §5). It exposes 5 tools:
 
@@ -1826,9 +1826,9 @@ pip install mcp
 
 - [ ] **Step 1: Write failing tests**
 
-Create `packages/metacoordinator-mcp/tests/__init__.py` (empty).
+Create `packages/metacoordinator_mcp/tests/__init__.py` (empty).
 
-Create `packages/metacoordinator-mcp/tests/test_tools.py`:
+Create `packages/metacoordinator_mcp/tests/test_tools.py`:
 
 ```python
 """Tests for MCP gateway tool handlers (spec §5.2)."""
@@ -1942,18 +1942,18 @@ def test_cast_vote_rejects_weight_above_limit():
 
 ```bash
 cd C:/~shit/FLOSS
-python -m pytest packages/metacoordinator-mcp/tests/test_tools.py -v 2>&1 | head -10
+python -m pytest packages/metacoordinator_mcp/tests/test_tools.py -v 2>&1 | head -10
 ```
 
 Expected: `ModuleNotFoundError`
 
-- [ ] **Step 3: Create `packages/metacoordinator-mcp/__init__.py`**
+- [ ] **Step 3: Create `packages/metacoordinator_mcp/__init__.py`**
 
 ```python
 """MCP gateway — router/switch for FLOSSIØULLK consensus protocol."""
 ```
 
-- [ ] **Step 4: Implement `packages/metacoordinator-mcp/tools.py`**
+- [ ] **Step 4: Implement `packages/metacoordinator_mcp/tools.py`**
 
 ```python
 """
@@ -2107,7 +2107,7 @@ class GatewayTools:
         return _ok(pending)
 ```
 
-- [ ] **Step 5: Implement `packages/metacoordinator-mcp/server.py`**
+- [ ] **Step 5: Implement `packages/metacoordinator_mcp/server.py`**
 
 ```python
 """
@@ -2193,7 +2193,7 @@ if __name__ == "__main__":
 
 ```bash
 cd C:/~shit/FLOSS
-python -m pytest packages/metacoordinator-mcp/tests/test_tools.py -v
+python -m pytest packages/metacoordinator_mcp/tests/test_tools.py -v
 ```
 
 Expected: all 7 tests PASS.
@@ -2201,7 +2201,7 @@ Expected: all 7 tests PASS.
 - [ ] **Step 7: Commit P2**
 
 ```bash
-git add packages/metacoordinator-mcp/
+git add packages/metacoordinator_mcp/
 git commit -m "feat(P2): MCP gateway — 5 consensus tools, router not controller"
 ```
 
@@ -2276,7 +2276,7 @@ python -m pytest packages/orchestrator/ -v -k "serial"
 
 # Physical track
 python -m pytest packages/source_chain/tests/ -v
-python -m pytest packages/metacoordinator-mcp/tests/ -v
+python -m pytest packages/metacoordinator_mcp/tests/ -v
 
 # All together
 python -m pytest packages/ -v
