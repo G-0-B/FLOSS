@@ -1,6 +1,7 @@
+"""Shared context synchronization primitives for metacoordinator tests."""
+
 import time
-from typing import Dict, List, Any, Optional
-import uuid
+from typing import Any, Dict, List, Optional
 
 # --- Mock MCP Implementation ---
 # Since the actual 'mcp' library is not available in the environment,
@@ -8,6 +9,8 @@ import uuid
 
 
 class MockMCPClient:
+    """Minimal in-memory MCP client used by the context sync prototype."""
+
     def __init__(self, agent_id: str, server: "MockMCPServer"):
         self.agent_id = agent_id
         self.server = server
@@ -22,14 +25,18 @@ class MockMCPClient:
         print(f"[{self.agent_id}] Context updated. Keys: {list(context_update.keys())}")
 
     def read_context(self, key: str) -> Optional[Any]:
+        """Read a single context value from the local client cache."""
         return self.local_context.get(key)
 
 
 class MockMCPServer:
+    """Minimal in-memory MCP server that tracks connected mock clients."""
+
     def __init__(self):
         self.clients: Dict[str, MockMCPClient] = {}
 
     def connect(self, agent_id: str) -> MockMCPClient:
+        """Create and register a mock client for the given agent id."""
         client = MockMCPClient(agent_id, self)
         self.clients[agent_id] = client
         return client
@@ -84,9 +91,10 @@ class ContextSyncEngine:
         for agent_id, client in self.agents.items():
             if agent_id != source_agent:
                 client.update_context({key: update_packet})
-            else:
-                # Update source's local context directly to reflect the "server" state
-                client.local_context[key] = update_packet
+                continue
+
+            # Update source's local context directly to reflect the "server" state.
+            client.local_context[key] = update_packet
 
     def handle_byzantine_update(self, key: str, value: Any, source_agent: str):
         """Detect and handle potentially malicious updates"""
@@ -144,4 +152,5 @@ class ContextSyncEngine:
         return winner
 
     def get_global_context(self) -> Dict[str, Any]:
+        """Return the full shared context map tracked by the sync engine."""
         return self.shared_context

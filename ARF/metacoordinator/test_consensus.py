@@ -1,15 +1,9 @@
-"""
-Test suite for consensus engine with ternary voting.
-"""
+"""Test suite for the consensus engine with ternary voting."""
 
 import sys
-import os
 
-# Add the parent directory to sys.path to import the module
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from metacoordinator.consensus import ConsensusEngine, RFC, Vote, TaskType
-from metacoordinator.context_sync import ContextSyncEngine
+from ARF.metacoordinator.consensus import ConsensusEngine, RFC, Vote
+from ARF.metacoordinator.context_sync import ContextSyncEngine
 
 
 def test_voting_strategy_reasoning_task():
