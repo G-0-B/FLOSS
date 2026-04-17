@@ -97,7 +97,6 @@ class ContextSyncEngine:
 
     def handle_byzantine_update(self, key: str, value: Any, source_agent: str):
         """Detect and handle potentially malicious updates"""
-
         # Check if agent is registered
         if source_agent not in self.agents:
             raise ValueError(f"Unknown agent {source_agent} attempted update")

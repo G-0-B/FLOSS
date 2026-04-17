@@ -9,6 +9,7 @@ from metacoordinator.context_sync import ContextSyncEngine
 
 
 def test_basic_sync():
+    """Verify a broadcast from one agent appears in another agent's context."""
     print("\n--- Testing Basic Synchronization ---")
     engine = ContextSyncEngine()
 
@@ -32,6 +33,7 @@ def test_basic_sync():
 
 
 def test_late_joiner():
+    """Verify a late-joining agent receives the current shared context snapshot."""
     print("\n--- Testing Late Joiner ---")
     engine = ContextSyncEngine()
 
@@ -53,11 +55,13 @@ def test_late_joiner():
 
 
 def test_conflict_resolution():
+    """Verify later timestamps win when the engine resolves concurrent updates."""
     print("\n--- Testing Conflict Resolution (Simulation) ---")
     engine = ContextSyncEngine()
 
     # We manually simulate a conflict by creating two updates with close timestamps
-    # In the engine.broadcast_update, it's serial, so we test the logic function directly.
+    # In engine.broadcast_update it is serial, so we test the logic helper
+    # directly instead of trying to force a concurrent path through the API.
 
     update_1 = {
         "value": "Value 1",

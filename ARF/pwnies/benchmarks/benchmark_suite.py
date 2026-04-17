@@ -10,6 +10,7 @@ Phase 4.1: Performance Optimization
 """
 
 import asyncio
+from importlib import import_module
 import time
 import logging
 import statistics
@@ -20,8 +21,12 @@ import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from desktop_pony_swarm.core.swarm import PonySwarm
+if __package__ in {None, ""}:
+    PonySwarm = import_module("desktop_pony_swarm.core.swarm").PonySwarm
+else:
+    PonySwarm = import_module(
+        f"{__package__.split('.', 1)[0]}.desktop_pony_swarm.core.swarm"
+    ).PonySwarm
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +150,10 @@ class BenchmarkSuite:
             expected_keywords=["recursion", "function", "itself", "calls"],
         ),
         BenchmarkQuery(
-            query="A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
+            query=(
+                "A bat and a ball cost $1.10 in total. The bat costs $1.00 "
+                "more than the ball. How much does the ball cost?"
+            ),
             complexity="medium",
             expected_latency=15.0,
             description="Classic reasoning puzzle",
@@ -169,21 +177,30 @@ class BenchmarkSuite:
 
     LARGE_QUERIES = [
         BenchmarkQuery(
-            query="Write a short story (3-4 sentences) about a robot learning to appreciate art.",
+            query=(
+                "Write a short story (3-4 sentences) about a robot learning to "
+                "appreciate art."
+            ),
             complexity="large",
             expected_latency=20.0,
             description="Creative writing",
             expected_keywords=["robot", "art"],
         ),
         BenchmarkQuery(
-            query="Design a solution for reducing traffic congestion in a large city. Consider multiple approaches.",
+            query=(
+                "Design a solution for reducing traffic congestion in a large "
+                "city. Consider multiple approaches."
+            ),
             complexity="large",
             expected_latency=20.0,
             description="Complex problem-solving",
             expected_keywords=["traffic", "transport", "solution"],
         ),
         BenchmarkQuery(
-            query="Explain quantum entanglement to a 10-year-old, then explain how it's used in quantum computing.",
+            query=(
+                "Explain quantum entanglement to a 10-year-old, then explain "
+                "how it's used in quantum computing."
+            ),
             complexity="large",
             expected_latency=20.0,
             description="Multi-part explanation",
@@ -214,7 +231,8 @@ class BenchmarkSuite:
         """Returns a list of benchmark queries for a specific complexity level.
 
         Args:
-            complexity: The complexity level to filter by ("micro", "medium", or "large").
+            complexity: The complexity level to filter by ("micro", "medium",
+                or "large").
 
         Returns:
             A list of `BenchmarkQuery` objects for the specified complexity level.

@@ -21,6 +21,7 @@ def test_concurrent_updates():
 
     # Concurrent updates to same key
     def update_worker(agent_id):
+        """Flood the shared key from one agent to stress concurrent writes."""
         for i in range(100):
             engine.broadcast_update(
                 key="shared_counter", value=i, source_agent=agent_id

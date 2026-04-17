@@ -4,9 +4,7 @@ from .patterns import InteractionPattern
 
 
 class PatternMixer:
-    """
-    Mixes two interaction patterns to create a new hybrid pattern.
-    """
+    """Mixes two interaction patterns to create a new hybrid pattern."""
 
     @staticmethod
     def mix(
@@ -56,11 +54,10 @@ class PatternMixer:
         )
 
     async def mix_with_llm(
-        self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, llm_client
+        self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, _llm_client
     ) -> InteractionPattern:
         """
         Uses an LLM to creatively mix patterns.
         (Placeholder for future implementation)
         """
-        del llm_client
         return self.mix(pattern_a, pattern_b, strategy="append")

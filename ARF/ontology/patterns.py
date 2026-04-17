@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class InteractionPattern:
-    """
-    Represents a reusable interaction pattern.
-    """
+    """Represents a reusable interaction pattern."""
 
     name: str
     description: str
@@ -23,6 +21,7 @@ class InteractionPattern:
     examples: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
+        """Serialize the pattern to a plain dictionary for storage or transport."""
         return {
             "name": self.name,
             "description": self.description,
@@ -34,7 +33,10 @@ class InteractionPattern:
 # Standard Patterns Registry
 SOCRATIC_METHOD = InteractionPattern(
     name="Socratic Method",
-    description="A form of cooperative argumentative dialogue between individuals, based on asking and answering questions to stimulate critical thinking.",
+    description=(
+        "A form of cooperative argumentative dialogue between individuals, "
+        "based on asking and answering questions to stimulate critical thinking."
+    ),
     structure=[
         "Teacher asks a probing question.",
         "Student provides an initial answer.",
@@ -47,7 +49,10 @@ SOCRATIC_METHOD = InteractionPattern(
 
 DEBATE = InteractionPattern(
     name="Debate",
-    description="A formal discussion on a particular topic in a public meeting or legislative assembly, in which opposing arguments are put forward.",
+    description=(
+        "A formal discussion on a particular topic in a public meeting or "
+        "legislative assembly, in which opposing arguments are put forward."
+    ),
     structure=[
         "Proponent states a thesis.",
         "Opponent provides a counter-argument.",
