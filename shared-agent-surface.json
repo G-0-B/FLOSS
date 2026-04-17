@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.1.0",
+  "manifest_version": "0.1.1",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
   "mcp_source": ".mcp.json",
@@ -28,6 +28,63 @@
     },
     "opencode": {
       "settings_path": "opworkers/opencode.jsonc"
+    },
+    "vibe": {
+      "config_path": ".vibe/config.toml",
+      "agents_dir": ".vibe/agents",
+      "launcher_path": "vibe-floss.ps1",
+      "env_path": "FLOSS/.env",
+      "python_exe": "C:/Python313/python.exe",
+      "active_model": "devstral-small",
+      "context_warnings": true,
+      "enable_auto_update": true,
+      "skill_paths": [
+        "FLOSS/skill-corpus"
+      ],
+      "enabled_skills": [
+        "flossi0ullk-*"
+      ],
+      "mcp_servers": [
+        "serena",
+        "flossiullk-consensus"
+      ],
+      "server_overrides": {
+        "serena": {
+          "args": [
+            "--from",
+            "git+https://github.com/oraios/serena",
+            "serena",
+            "start-mcp-server",
+            "--project",
+            "${repo_root}",
+            "--enable-web-dashboard=false",
+            "--open-web-dashboard=false"
+          ],
+          "startup_timeout_sec": 20,
+          "tool_timeout_sec": 120
+        },
+        "flossiullk-consensus": {
+          "startup_timeout_sec": 20,
+          "tool_timeout_sec": 120,
+          "sampling_enabled": false
+        }
+      },
+      "agents": [
+        {
+          "name": "flossi0ullk-explore",
+          "display_name": "FLOSSI0ULLK Explore",
+          "description": "Read-only FLOSSI0ULLK explorer using AGENTS.md, shared skills, grep, and read_file.",
+          "safety": "safe",
+          "auto_approve": true,
+          "active_model": "devstral-small",
+          "system_prompt_id": "explore",
+          "enabled_tools": [
+            "grep",
+            "read_file",
+            "ask_user_question"
+          ]
+        }
+      ]
     }
   }
 }

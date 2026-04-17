@@ -7,6 +7,9 @@ Canonical source of truth:
 Current projections:
   - `.gemini/settings.json`
   - `opworkers/opencode.jsonc`
+  - `.vibe/config.toml`
+  - `.vibe/agents/*.toml`
+  - `vibe-floss.ps1`
   - mirror `.mcp.json` copies declared by the manifest
   - `.agent-surface/context/*` when `shared-context-surface.json` is present
   - `.agent-surface/hooks/*` and configured native hook projections such as:
@@ -31,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import textwrap
 from typing import Any
 
 from materialize_shared_context_surface import (
@@ -140,6 +144,50 @@ def normalized_json(payload: dict[str, Any]) -> str:
     return json.dumps(
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     )
+
+
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(merged.get(key), dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def substitute_templates(value: Any, replacements: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        updated = value
+        for key, replacement in replacements.items():
+            updated = updated.replace(f"${{{key}}}", replacement)
+        return updated
+    if isinstance(value, list):
+        return [substitute_templates(item, replacements) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: substitute_templates(item, replacements) for key, item in value.items()
+        }
+    return value
+
+
+def toml_scalar(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    raise SharedSurfaceError(f"Unsupported TOML scalar value: {value!r}")
+
+
+def toml_list(values: list[Any]) -> str:
+    return "[" + ", ".join(toml_scalar(value) for value in values) + "]"
+
+
+def toml_inline_table(mapping: dict[str, Any]) -> str:
+    rendered = ", ".join(f"{key} = {toml_scalar(value)}" for key, value in mapping.items())
+    return "{ " + rendered + " }"
 
 
 def resolve_manifest(workspace_root: Path, manifest_path: Path) -> dict[str, Any]:
@@ -268,6 +316,300 @@ def build_opencode_payload(
     return payload
 
 
+def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
+    path = Path(raw_path).expanduser()
+    if path.is_absolute():
+        return path
+    return (workspace_root / path).resolve()
+
+
+def build_vibe_server_spec(
+    workspace_root: Path,
+    name: str,
+    server: dict[str, Any],
+    override: dict[str, Any] | None,
+) -> dict[str, Any]:
+    replacements = {
+        "workspace_root": workspace_root.as_posix(),
+        "repo_root": (workspace_root / "FLOSS").resolve().as_posix(),
+    }
+    merged = deep_merge(server, override or {})
+    merged = substitute_templates(merged, replacements)
+
+    command = merged.get("command")
+    url = merged.get("url")
+    if isinstance(command, str) and command.strip():
+        transport = str(merged.get("transport", "stdio")).strip() or "stdio"
+    elif isinstance(url, str) and url.strip():
+        transport = str(merged.get("transport", "http")).strip() or "http"
+    else:
+        raise SharedSurfaceError(
+            f"Vibe MCP server {name!r} must define either `command` or `url`"
+        )
+
+    spec: dict[str, Any] = {"name": name, "transport": transport}
+    if transport == "stdio":
+        if not isinstance(command, str) or not command.strip():
+            raise SharedSurfaceError(
+                f"Vibe MCP server {name!r} requires a string `command` for stdio transport"
+            )
+        args = merged.get("args", [])
+        if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
+            raise SharedSurfaceError(
+                f"Vibe MCP server {name!r} stdio args must be a list of strings"
+            )
+        env = merged.get("env")
+        if env is not None and (
+            not isinstance(env, dict)
+            or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in env.items()
+            )
+        ):
+            raise SharedSurfaceError(
+                f"Vibe MCP server {name!r} stdio env must be a string map"
+            )
+        spec["command"] = command
+        spec["args"] = args
+        if env:
+            spec["env"] = env
+    else:
+        if not isinstance(url, str) or not url.strip():
+            raise SharedSurfaceError(
+                f"Vibe MCP server {name!r} requires a string `url` for HTTP transport"
+            )
+        spec["url"] = url
+        headers = merged.get("headers")
+        if headers is not None:
+            if not isinstance(headers, dict) or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in headers.items()
+            ):
+                raise SharedSurfaceError(
+                    f"Vibe MCP server {name!r} HTTP headers must be a string map"
+                )
+            spec["headers"] = headers
+
+    for field_name in (
+        "startup_timeout_sec",
+        "tool_timeout_sec",
+        "sampling_enabled",
+        "prompt",
+        "api_key_env",
+        "api_key_header",
+        "api_key_format",
+    ):
+        if field_name in merged:
+            spec[field_name] = merged[field_name]
+
+    return spec
+
+
+def build_vibe_config(
+    workspace_root: Path,
+    shared_mcp: dict[str, Any],
+    vibe_cfg: dict[str, Any],
+) -> str:
+    skill_paths = [
+        resolve_manifest_path(workspace_root, raw_path).as_posix()
+        for raw_path in vibe_cfg.get("skill_paths", [])
+    ]
+    enabled_skills = vibe_cfg.get("enabled_skills", [])
+    mcp_names = vibe_cfg.get("mcp_servers") or list(shared_mcp.keys())
+    if not isinstance(mcp_names, list) or not all(
+        isinstance(item, str) for item in mcp_names
+    ):
+        raise SharedSurfaceError("Vibe target field `mcp_servers` must be a list of names")
+    overrides = vibe_cfg.get("server_overrides", {})
+    if overrides and not isinstance(overrides, dict):
+        raise SharedSurfaceError("Vibe target field `server_overrides` must be an object")
+
+    server_specs: list[dict[str, Any]] = []
+    for name in mcp_names:
+        if name not in shared_mcp:
+            raise SharedSurfaceError(
+                f"Vibe target references unknown shared MCP server {name!r}"
+            )
+        override = overrides.get(name)
+        if override is not None and not isinstance(override, dict):
+            raise SharedSurfaceError(
+                f"Vibe server override for {name!r} must be a JSON object"
+            )
+        server_specs.append(
+            build_vibe_server_spec(workspace_root, name, shared_mcp[name], override)
+        )
+
+    lines = [
+        f"active_model = {toml_scalar(vibe_cfg.get('active_model', 'devstral-small'))}",
+        f"context_warnings = {toml_scalar(bool(vibe_cfg.get('context_warnings', True)))}",
+        f"enable_auto_update = {toml_scalar(bool(vibe_cfg.get('enable_auto_update', True)))}",
+    ]
+    if skill_paths:
+        lines.append(f"skill_paths = {toml_list(skill_paths)}")
+    if enabled_skills:
+        if not isinstance(enabled_skills, list) or not all(
+            isinstance(item, str) for item in enabled_skills
+        ):
+            raise SharedSurfaceError(
+                "Vibe target field `enabled_skills` must be a list of strings"
+            )
+        lines.append(f"enabled_skills = {toml_list(enabled_skills)}")
+
+    for spec in server_specs:
+        lines.extend(["", "[[mcp_servers]]"])
+        lines.append(f"name = {toml_scalar(spec['name'])}")
+        lines.append(f"transport = {toml_scalar(spec['transport'])}")
+        if spec["transport"] == "stdio":
+            lines.append(f"command = {toml_scalar(spec['command'])}")
+            if spec.get("args"):
+                lines.append(f"args = {toml_list(spec['args'])}")
+            if spec.get("env"):
+                lines.append(f"env = {toml_inline_table(spec['env'])}")
+        else:
+            lines.append(f"url = {toml_scalar(spec['url'])}")
+            if spec.get("headers"):
+                lines.append(f"headers = {toml_inline_table(spec['headers'])}")
+        for field_name in (
+            "startup_timeout_sec",
+            "tool_timeout_sec",
+            "sampling_enabled",
+            "prompt",
+            "api_key_env",
+            "api_key_header",
+            "api_key_format",
+        ):
+            if field_name in spec:
+                value = spec[field_name]
+                if field_name in {"startup_timeout_sec", "tool_timeout_sec"} and isinstance(
+                    value, int
+                ):
+                    value = float(value)
+                lines.append(f"{field_name} = {toml_scalar(value)}")
+
+    return "\n".join(lines) + "\n"
+
+
+def build_vibe_agent(agent_spec: dict[str, Any]) -> str:
+    if not isinstance(agent_spec.get("name"), str) or not agent_spec["name"].strip():
+        raise SharedSurfaceError("Every Vibe agent spec must define a non-empty `name`")
+
+    lines = [
+        f"display_name = {toml_scalar(agent_spec.get('display_name', agent_spec['name']))}",
+        f"description = {toml_scalar(agent_spec.get('description', ''))}",
+        f"safety = {toml_scalar(agent_spec.get('safety', 'safe'))}",
+    ]
+    for field_name in (
+        "agent_type",
+        "auto_approve",
+        "active_model",
+        "system_prompt_id",
+    ):
+        if field_name in agent_spec:
+            lines.append(f"{field_name} = {toml_scalar(agent_spec[field_name])}")
+
+    enabled_tools = agent_spec.get("enabled_tools")
+    if enabled_tools is not None:
+        if not isinstance(enabled_tools, list) or not all(
+            isinstance(item, str) for item in enabled_tools
+        ):
+            raise SharedSurfaceError(
+                f"Vibe agent {agent_spec['name']!r} field `enabled_tools` must be a list of strings"
+            )
+        lines.append(f"enabled_tools = {toml_list(enabled_tools)}")
+
+    disabled_tools = agent_spec.get("disabled_tools")
+    if disabled_tools is not None:
+        if not isinstance(disabled_tools, list) or not all(
+            isinstance(item, str) for item in disabled_tools
+        ):
+            raise SharedSurfaceError(
+                f"Vibe agent {agent_spec['name']!r} field `disabled_tools` must be a list of strings"
+            )
+        lines.append(f"disabled_tools = {toml_list(disabled_tools)}")
+
+    return "\n".join(lines) + "\n"
+
+
+def build_vibe_launcher(workspace_root: Path, vibe_cfg: dict[str, Any]) -> str:
+    env_rel = str(vibe_cfg.get("env_path", "FLOSS/.env"))
+    python_exe = str(vibe_cfg.get("python_exe", "C:/Python313/python.exe"))
+    script = f"""
+    $ErrorActionPreference = "Stop"
+
+    $workspaceRoot = "{workspace_root}"
+    $envFile = Join-Path $workspaceRoot "{env_rel.replace('/', '\\')}"
+    $vibeExe = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
+    $pythonExe = "{python_exe}"
+
+    if (-not (Test-Path $vibeExe)) {{
+        throw "vibe.exe not found at $vibeExe"
+    }}
+
+    if (Test-Path $envFile) {{
+        foreach ($rawLine in Get-Content $envFile) {{
+            $line = $rawLine.Trim()
+            if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {{
+                continue
+            }}
+            $key, $value = $line.Split("=", 2)
+            $key = $key.Trim()
+            $value = $value.Trim()
+            if ($key) {{
+                [Environment]::SetEnvironmentVariable($key, $value, "Process")
+            }}
+        }}
+    }}
+
+    if (Test-Path $pythonExe) {{
+        $trustScript = @'
+from pathlib import Path
+import json
+import tomllib
+
+workspace = Path(r"{workspace_root}").resolve()
+path = Path.home() / ".vibe" / "trusted_folders.toml"
+trusted = []
+untrusted = []
+if path.exists():
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        data = {{}}
+    trusted = [str(Path(item).expanduser().resolve()) for item in data.get("trusted", [])]
+    untrusted = [str(Path(item).expanduser().resolve()) for item in data.get("untrusted", [])]
+workspace_str = str(workspace)
+if workspace_str not in trusted:
+    trusted.append(workspace_str)
+untrusted = [item for item in untrusted if item != workspace_str]
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(
+    "trusted = " + json.dumps(trusted) + "\\n"
+    + "untrusted = " + json.dumps(untrusted) + "\\n",
+    encoding="utf-8",
+)
+'@
+        $trustScript | & $pythonExe -
+    }}
+
+    $argList = [System.Collections.Generic.List[string]]::new()
+    $hasWorkdir = $false
+    foreach ($arg in $args) {{
+        if ($arg -eq "--workdir") {{
+            $hasWorkdir = $true
+        }}
+        $argList.Add($arg)
+    }}
+    if (-not $hasWorkdir) {{
+        $argList.Add("--workdir")
+        $argList.Add($workspaceRoot)
+    }}
+
+    & $vibeExe @argList
+    exit $LASTEXITCODE
+    """
+    return textwrap.dedent(script).strip() + "\n"
+
+
 def check_or_write(
     path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool
 ) -> tuple[str, bool]:
@@ -353,6 +695,46 @@ def materialize(
         )
         results.append(message)
         drift_found = drift_found or changed
+
+    vibe_cfg = targets.get("vibe")
+    if isinstance(vibe_cfg, dict) and vibe_cfg.get("config_path"):
+        vibe_config_path = workspace_root / str(vibe_cfg["config_path"])
+        vibe_config = build_vibe_config(workspace_root, shared_mcp, vibe_cfg)
+        message, changed = check_or_write_text(
+            vibe_config_path, vibe_config, check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
+
+        agents_dir_raw = vibe_cfg.get("agents_dir")
+        if agents_dir_raw is not None and not isinstance(agents_dir_raw, str):
+            raise SharedSurfaceError("Vibe target field `agents_dir` must be a string")
+        agents_dir = workspace_root / str(agents_dir_raw or ".vibe/agents")
+        for agent_spec in vibe_cfg.get("agents", []):
+            if not isinstance(agent_spec, dict):
+                raise SharedSurfaceError("Vibe target `agents` entries must be objects")
+            agent_name = str(agent_spec.get("name", "")).strip()
+            if not agent_name:
+                raise SharedSurfaceError("Vibe target agents require a non-empty `name`")
+            agent_path = agents_dir / f"{agent_name}.toml"
+            content = build_vibe_agent(agent_spec)
+            message, changed = check_or_write_text(
+                agent_path, content, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+
+        launcher_raw = vibe_cfg.get("launcher_path")
+        if launcher_raw is not None:
+            if not isinstance(launcher_raw, str) or not launcher_raw.strip():
+                raise SharedSurfaceError("Vibe target field `launcher_path` must be a non-empty string")
+            launcher_path = workspace_root / launcher_raw
+            launcher_content = build_vibe_launcher(workspace_root, vibe_cfg)
+            message, changed = check_or_write_text(
+                launcher_path, launcher_content, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
 
     if DEFAULT_CONTEXT_MANIFEST_PATH.exists():
         context_results, context_drift = materialize_context_surface(

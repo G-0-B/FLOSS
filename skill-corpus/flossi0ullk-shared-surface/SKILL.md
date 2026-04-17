@@ -1,6 +1,6 @@
 ---
 name: flossi0ullk-shared-surface
-description: Use when changing or extending the shared FLOSSI0ULLK agent surface: MCP servers, context manifests, skill manifests, materializers, or agent-native projections for Codex, Gemini, Claude-adjacent tooling, or OpenCode.
+description: "Use when changing or extending the shared FLOSSI0ULLK agent surface: MCP servers, context manifests, skill manifests, materializers, or agent-native projections for Codex, Gemini, Claude-adjacent tooling, or OpenCode."
 ---
 
 # FLOSSI0ULLK Shared Surface
@@ -33,4 +33,3 @@ The shared surface is generated, not hand-curated per client.
 Open only what you need:
 
 - `references/surface-map.md`
-

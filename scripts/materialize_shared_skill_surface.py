@@ -22,6 +22,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE_ROOT = REPO_ROOT.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-skill-surface.json"
@@ -63,18 +65,21 @@ def parse_frontmatter(skill_md: Path) -> dict[str, str]:
     if len(parts) < 3:
         raise SkillSurfaceError(f"{skill_md} must contain closing YAML frontmatter")
     raw_frontmatter = parts[1]
-    payload: dict[str, str] = {}
-    for line in raw_frontmatter.splitlines():
-        stripped = line.strip()
-        if not stripped or ":" not in stripped:
-            continue
-        key, value = stripped.split(":", 1)
-        payload[key.strip()] = value.strip().strip('"').strip("'")
-    if not payload.get("name") or not payload.get("description"):
+    try:
+        payload = yaml.safe_load(raw_frontmatter)
+    except yaml.YAMLError as exc:
+        raise SkillSurfaceError(f"Invalid YAML frontmatter in {skill_md}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise SkillSurfaceError(f"{skill_md} frontmatter must parse to a YAML mapping")
+
+    name = payload.get("name")
+    description = payload.get("description")
+    if not isinstance(name, str) or not isinstance(description, str):
         raise SkillSurfaceError(
-            f"{skill_md} frontmatter must include `name` and `description`"
+            f"{skill_md} frontmatter must include string `name` and `description`"
         )
-    return payload
+    return {"name": name, "description": description}
 
 
 def resolve_skill_entry(workspace_root: Path, entry: dict[str, Any]) -> dict[str, Any]:

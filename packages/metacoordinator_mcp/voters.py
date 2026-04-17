@@ -318,6 +318,7 @@ def make_flowith_voter(
 _CREDENTIAL_ENV_BY_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cerebras/", ("CEREBRAS_API_KEY",)),
     ("groq/", ("GROQ_API_KEY",)),
+    ("mistral/", ("MISTRAL_API_KEY",)),
     ("gemini/", ("GOOGLE_API_KEY", "GEMINI_API_KEY")),
     ("openrouter/", ("OPENROUTER_API_KEY",)),
     ("xai/", ("XAI_API_KEY",)),

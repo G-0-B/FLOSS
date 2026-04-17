@@ -17,6 +17,9 @@ OpenCode, and future peers.
 - `OpenCode` is already wired to the same local consensus MCP.
 - `Gemini CLI` is authenticated and now sees the same project MCP via
   `C:\~shit\.gemini\settings.json`.
+- `Mistral Vibe` is now installed and project-scoped through generated
+  `.vibe/config.toml`, `.vibe/agents/flossi0ullk-explore.toml`, and
+  `vibe-floss.ps1`, with shared skills and MCP sourced from canon.
 - `Serena` is installed, project-scoped via `FLOSS/.serena/project.yml`, and
   registered on the shared MCP surface for Claude, Gemini, and OpenCode.
 - `Flowith` has a live programmatic LLM surface: the local credential file at
@@ -213,6 +216,14 @@ Use this shape instead:
   - Shared execution path:
     - `FLOSS/scripts/hook_post_write.py`
     - `FLOSS/scripts/hook_bg_round.py`
+- Shared Vibe surface
+  - Canonical manifest target: `FLOSS/shared-agent-surface.json` `targets.vibe`
+  - Generated config: `.vibe/config.toml`
+  - Generated agents: `.vibe/agents/*.toml`
+  - Generated launcher: `vibe-floss.ps1`
+  - Shared inputs:
+    - MCP from root `.mcp.json`
+    - skills from `FLOSS/skill-corpus/`
 - Metaharness operating doctrine
   - Canonical doc: `FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md`
 

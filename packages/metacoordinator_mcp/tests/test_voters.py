@@ -29,6 +29,7 @@ ENV_KEYS = (
     "GEMINI_API_KEY",
     "GOOGLE_API_KEY",
     "GROQ_API_KEY",
+    "MISTRAL_API_KEY",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
     "XAI_API_KEY",
@@ -135,10 +136,21 @@ def test_profile_alias_resolves_to_underlying_registry_profile():
     }
 
 
+def test_mistral_profile_enables_when_api_key_is_present():
+    with patched_env(MISTRAL_API_KEY="test-mistral-key"):
+        resolved = resolve_default_voter_specs(profile="mistral-free")
+    assert resolved == {
+        "mistral-open-nemo": "mistral/open-mistral-nemo",
+        "mistral-ministral-8b": "mistral/ministral-8b-2410",
+        "mistral-devstral-small": "mistral/devstral-small-2507",
+    }
+
+
 def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist():
     with patched_env(
         CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
+        MISTRAL_API_KEY="test-mistral-key",
         FLOWITH_API_KEY="flo-test-key",
         FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
     ):
@@ -147,6 +159,7 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
         "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "mistral-devstral-small": "mistral/devstral-small-2507",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",
     }
@@ -156,6 +169,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
     with patched_env(
         CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
+        MISTRAL_API_KEY="test-mistral-key",
         FLOWITH_API_KEY="flo-test-key",
         FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
         OPENAI_API_KEY="test-openai-key",
@@ -165,6 +179,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
         "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "mistral-devstral-small": "mistral/devstral-small-2507",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",
         "openai-gpt-4.1-mini": "openai/gpt-4.1-mini",
@@ -181,6 +196,7 @@ def _run_all() -> int:
         test_flowith_profile_enables_when_api_key_is_present,
         test_flowith_profile_reports_missing_credentials_cleanly,
         test_profile_alias_resolves_to_underlying_registry_profile,
+        test_mistral_profile_enables_when_api_key_is_present,
         test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist,
         test_diverse_plus_profile_adds_optional_openai_lane_when_available,
     ]

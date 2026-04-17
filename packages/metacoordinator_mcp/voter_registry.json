@@ -3,6 +3,7 @@
     "default": "balanced",
     "free": "balanced",
     "subscriptions": "flowith",
+    "mistral-free": "mistral",
     "roi": "diverse",
     "provider-diverse": "diverse",
     "roi-plus": "diverse-plus"
@@ -22,6 +23,11 @@
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat"
     },
+    "mistral": {
+      "mistral-open-nemo": "mistral/open-mistral-nemo",
+      "mistral-ministral-8b": "mistral/ministral-8b-2410",
+      "mistral-devstral-small": "mistral/devstral-small-2507"
+    },
     "amplified": {
       "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
@@ -32,6 +38,7 @@
       "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
       "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "mistral-devstral-small": "mistral/devstral-small-2507",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat"
     },
@@ -39,6 +46,7 @@
       "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
       "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "mistral-devstral-small": "mistral/devstral-small-2507",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat",
       "openai-gpt-4.1-mini": "openai/gpt-4.1-mini"
