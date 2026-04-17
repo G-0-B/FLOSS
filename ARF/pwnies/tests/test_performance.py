@@ -21,15 +21,14 @@ from ARF.pwnies.benchmarks.benchmark_suite import BenchmarkSuite, BenchmarkQuery
 from ARF.pwnies.desktop_pony_swarm.core.swarm import PonySwarm
 from ARF.pwnies.desktop_pony_swarm.core.adaptive_params import (
     AdaptiveParameterSelector,
-    ComplexityEstimator
+    ComplexityEstimator,
 )
-
 
 # Baseline performance targets (from roadmap)
 BASELINE_LATENCY = {
-    'micro': 10.0,   # Target: <10s for simple queries
-    'medium': 15.0,  # Target: <15s for reasoning queries
-    'large': 20.0,   # Target: <20s for complex queries
+    "micro": 10.0,  # Target: <10s for simple queries
+    "medium": 15.0,  # Target: <15s for reasoning queries
+    "large": 20.0,  # Target: <20s for complex queries
 }
 
 # Minimum diversity to maintain quality
@@ -61,22 +60,19 @@ class TestPerformanceRegression:
 
         for query in queries:
             result = await benchmark_suite.run_single_benchmark(
-                query,
-                N=2,  # Use fast config for micro queries
-                K=1,
-                T=2
+                query, N=2, K=1, T=2  # Use fast config for micro queries
             )
 
             # Check latency
-            assert result.latency < BASELINE_LATENCY['micro'], (
+            assert result.latency < BASELINE_LATENCY["micro"], (
                 f"Micro query exceeded target latency: "
                 f"{result.latency:.2f}s > {BASELINE_LATENCY['micro']}s"
             )
 
             # Check diversity
-            assert result.diversity >= MIN_DIVERSITY, (
-                f"Diversity too low: {result.diversity:.4f}"
-            )
+            assert (
+                result.diversity >= MIN_DIVERSITY
+            ), f"Diversity too low: {result.diversity:.4f}"
 
     @pytest.mark.asyncio
     async def test_medium_query_latency(self, benchmark_suite):
@@ -85,22 +81,19 @@ class TestPerformanceRegression:
 
         for query in queries:
             result = await benchmark_suite.run_single_benchmark(
-                query,
-                N=4,  # Use balanced config
-                K=2,
-                T=3
+                query, N=4, K=2, T=3  # Use balanced config
             )
 
             # Check latency
-            assert result.latency < BASELINE_LATENCY['medium'], (
+            assert result.latency < BASELINE_LATENCY["medium"], (
                 f"Medium query exceeded target latency: "
                 f"{result.latency:.2f}s > {BASELINE_LATENCY['medium']}s"
             )
 
             # Check diversity
-            assert result.diversity >= MIN_DIVERSITY, (
-                f"Diversity too low: {result.diversity:.4f}"
-            )
+            assert (
+                result.diversity >= MIN_DIVERSITY
+            ), f"Diversity too low: {result.diversity:.4f}"
 
     @pytest.mark.asyncio
     async def test_large_query_latency(self, benchmark_suite):
@@ -109,22 +102,19 @@ class TestPerformanceRegression:
 
         for query in queries:
             result = await benchmark_suite.run_single_benchmark(
-                query,
-                N=6,  # Use complex config
-                K=3,
-                T=4
+                query, N=6, K=3, T=4  # Use complex config
             )
 
             # Check latency
-            assert result.latency < BASELINE_LATENCY['large'], (
+            assert result.latency < BASELINE_LATENCY["large"], (
                 f"Large query exceeded target latency: "
                 f"{result.latency:.2f}s > {BASELINE_LATENCY['large']}s"
             )
 
             # Check diversity
-            assert result.diversity >= MIN_DIVERSITY, (
-                f"Diversity too low: {result.diversity:.4f}"
-            )
+            assert (
+                result.diversity >= MIN_DIVERSITY
+            ), f"Diversity too low: {result.diversity:.4f}"
 
     @pytest.mark.asyncio
     async def test_parallel_optimization(self):
@@ -138,9 +128,7 @@ class TestPerformanceRegression:
             optimized_time = time.time() - start
 
         # In mock mode, parallel should be very fast
-        assert optimized_time < 5.0, (
-            f"Optimized swarm too slow: {optimized_time:.2f}s"
-        )
+        assert optimized_time < 5.0, f"Optimized swarm too slow: {optimized_time:.2f}s"
 
     def test_adaptive_param_selection(self):
         """Test adaptive parameter selection."""
@@ -149,9 +137,9 @@ class TestPerformanceRegression:
         # Test simple query -> simple params
         simple_query = "What is 2 + 2?"
         params = selector.select_parameters(simple_query)
-        assert params.N == 2 and params.K == 1 and params.T == 2, (
-            f"Wrong params for simple query: {params}"
-        )
+        assert (
+            params.N == 2 and params.K == 1 and params.T == 2
+        ), f"Wrong params for simple query: {params}"
 
         # Test complex query -> complex params
         complex_query = (
@@ -160,9 +148,9 @@ class TestPerformanceRegression:
             "consciousness, identity, and the nature of existence."
         )
         params = selector.select_parameters(complex_query)
-        assert params.N >= 4 and params.T >= 3, (
-            f"Wrong params for complex query: {params}"
-        )
+        assert (
+            params.N >= 4 and params.T >= 3
+        ), f"Wrong params for complex query: {params}"
 
     def test_complexity_estimation(self):
         """Test complexity estimator."""
@@ -195,7 +183,7 @@ class TestPerformanceRegression:
             query="What is recursion?",
             complexity="medium",
             expected_latency=15.0,
-            expected_keywords=["recursion", "function", "itself"]
+            expected_keywords=["recursion", "function", "itself"],
         )
 
         result = await benchmark_suite.run_single_benchmark(query, N=4, K=2, T=3)
@@ -297,9 +285,9 @@ class TestAdaptiveParameters:
         """Test that parameter selector initializes correctly."""
         selector = AdaptiveParameterSelector()
 
-        assert selector.configs['simple']
-        assert selector.configs['medium']
-        assert selector.configs['complex']
+        assert selector.configs["simple"]
+        assert selector.configs["medium"]
+        assert selector.configs["complex"]
 
     def test_parameter_selection_consistency(self):
         """Test that same query gets same parameters."""
@@ -321,11 +309,11 @@ class TestAdaptiveParameters:
         selector = AdaptiveParameterSelector()
 
         new_params = RSAParams(N=8, K=4, T=5)
-        selector.update_config('complex', new_params)
+        selector.update_config("complex", new_params)
 
-        assert selector.configs['complex'].N == 8
-        assert selector.configs['complex'].K == 4
-        assert selector.configs['complex'].T == 5
+        assert selector.configs["complex"].N == 8
+        assert selector.configs["complex"].K == 4
+        assert selector.configs["complex"].T == 5
 
 
 # Marker for slow tests

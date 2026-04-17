@@ -103,7 +103,7 @@ def test_semantic_similarity(temp_memory):
 def test_transmit_and_recall(temp_memory):
     """Test that we can transmit and recall understandings"""
     # Transmit some understandings
-    ref1 = temp_memory.transmit(
+    temp_memory.transmit(
         {
             "content": "Dogs are loyal pets that love their owners",
             "context": "Test context",
@@ -111,7 +111,7 @@ def test_transmit_and_recall(temp_memory):
         }
     )
 
-    ref2 = temp_memory.transmit(
+    temp_memory.transmit(
         {
             "content": "Cars are vehicles with four wheels",
             "context": "Test context",
@@ -119,7 +119,7 @@ def test_transmit_and_recall(temp_memory):
         }
     )
 
-    ref3 = temp_memory.transmit(
+    temp_memory.transmit(
         {
             "content": "Puppies are young dogs that are very playful",
             "context": "Test context",

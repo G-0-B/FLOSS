@@ -23,6 +23,7 @@ class RSAParams:
         K: The aggregation size (how many responses to sample).
         T: The number of refinement iterations.
     """
+
     N: int  # Number of ponies
     K: int  # Aggregation size
     T: int  # Number of iterations
@@ -48,32 +49,77 @@ class ComplexityEstimator:
 
     # Keyword patterns for different complexity levels
     MATH_KEYWORDS = [
-        'calculate', 'compute', 'multiply', 'divide', 'add', 'subtract',
-        'sum', 'difference', 'product', 'quotient', 'equals', 'solve',
-        r'\d+\s*[+\-*/]\s*\d+',  # Basic arithmetic expressions
-        r'\b\d+\b',  # Numbers
+        "calculate",
+        "compute",
+        "multiply",
+        "divide",
+        "add",
+        "subtract",
+        "sum",
+        "difference",
+        "product",
+        "quotient",
+        "equals",
+        "solve",
+        r"\d+\s*[+\-*/]\s*\d+",  # Basic arithmetic expressions
+        r"\b\d+\b",  # Numbers
     ]
 
     REASONING_KEYWORDS = [
-        'explain', 'why', 'how', 'because', 'therefore', 'thus',
-        'compare', 'contrast', 'analyze', 'evaluate', 'justify',
-        'reason', 'logic', 'argument', 'conclusion', 'premise',
-        'if', 'then', 'when', 'would', 'should', 'could'
+        "explain",
+        "why",
+        "how",
+        "because",
+        "therefore",
+        "thus",
+        "compare",
+        "contrast",
+        "analyze",
+        "evaluate",
+        "justify",
+        "reason",
+        "logic",
+        "argument",
+        "conclusion",
+        "premise",
+        "if",
+        "then",
+        "when",
+        "would",
+        "should",
+        "could",
     ]
 
     CREATIVE_KEYWORDS = [
-        'write', 'create', 'design', 'imagine', 'story', 'narrative',
-        'poem', 'essay', 'article', 'describe', 'invent', 'compose',
-        'generate', 'brainstorm', 'explore', 'multiple approaches',
-        'various ways', 'different methods', 'consider all'
+        "write",
+        "create",
+        "design",
+        "imagine",
+        "story",
+        "narrative",
+        "poem",
+        "essay",
+        "article",
+        "describe",
+        "invent",
+        "compose",
+        "generate",
+        "brainstorm",
+        "explore",
+        "multiple approaches",
+        "various ways",
+        "different methods",
+        "consider all",
     ]
 
     def __init__(self):
         """Initializes the ComplexityEstimator."""
         self.compiled_patterns = {
-            'math': [re.compile(p, re.IGNORECASE) for p in self.MATH_KEYWORDS],
-            'reasoning': [re.compile(p, re.IGNORECASE) for p in self.REASONING_KEYWORDS],
-            'creative': [re.compile(p, re.IGNORECASE) for p in self.CREATIVE_KEYWORDS],
+            "math": [re.compile(p, re.IGNORECASE) for p in self.MATH_KEYWORDS],
+            "reasoning": [
+                re.compile(p, re.IGNORECASE) for p in self.REASONING_KEYWORDS
+            ],
+            "creative": [re.compile(p, re.IGNORECASE) for p in self.CREATIVE_KEYWORDS],
         }
 
     def estimate_complexity(self, query: str) -> float:
@@ -94,7 +140,7 @@ class ComplexityEstimator:
         # Base complexity from length
         char_count = len(query)
         word_count = len(query.split())
-        sentence_count = len(re.split(r'[.!?]+', query))
+        sentence_count = len(re.split(r"[.!?]+", query))
 
         # Length-based scoring
         if char_count < 50:
@@ -122,16 +168,15 @@ class ComplexityEstimator:
 
         # Keyword matching
         math_matches = sum(
-            1 for pattern in self.compiled_patterns['math']
-            if pattern.search(query)
+            1 for pattern in self.compiled_patterns["math"] if pattern.search(query)
         )
         reasoning_matches = sum(
-            1 for pattern in self.compiled_patterns['reasoning']
+            1
+            for pattern in self.compiled_patterns["reasoning"]
             if pattern.search(query)
         )
         creative_matches = sum(
-            1 for pattern in self.compiled_patterns['creative']
-            if pattern.search(query)
+            1 for pattern in self.compiled_patterns["creative"] if pattern.search(query)
         )
 
         # Math keywords reduce complexity (well-defined problems)
@@ -176,15 +221,15 @@ class AdaptiveParameterSelector:
     # Default parameter configurations for different complexity levels
     # These can be updated based on parameter sweep results
     DEFAULT_CONFIGS = {
-        'simple': RSAParams(N=2, K=1, T=2),      # Fast, minimal overhead
-        'medium': RSAParams(N=4, K=2, T=3),      # Balanced (original default)
-        'complex': RSAParams(N=6, K=3, T=4),     # High quality, slower
+        "simple": RSAParams(N=2, K=1, T=2),  # Fast, minimal overhead
+        "medium": RSAParams(N=4, K=2, T=3),  # Balanced (original default)
+        "complex": RSAParams(N=6, K=3, T=4),  # High quality, slower
     }
 
     def __init__(
         self,
         configs: Optional[Dict[str, RSAParams]] = None,
-        complexity_thresholds: Optional[Dict[str, float]] = None
+        complexity_thresholds: Optional[Dict[str, float]] = None,
     ):
         """Initializes the AdaptiveParameterSelector.
 
@@ -202,12 +247,14 @@ class AdaptiveParameterSelector:
 
         # Complexity thresholds
         self.thresholds = complexity_thresholds or {
-            'simple': 20.0,   # complexity < 20: simple
-            'medium': 60.0,   # 20 <= complexity < 60: medium
+            "simple": 20.0,  # complexity < 20: simple
+            "medium": 60.0,  # 20 <= complexity < 60: medium
             # complexity >= 60: complex
         }
 
-        logger.info(f"Initialized AdaptiveParameterSelector with configs: {self.configs}")
+        logger.info(
+            f"Initialized AdaptiveParameterSelector with configs: {self.configs}"
+        )
 
     def select_parameters(self, query: str) -> RSAParams:
         """Selects the optimal RSA parameters for a given query.
@@ -225,12 +272,12 @@ class AdaptiveParameterSelector:
         complexity = self.estimator.estimate_complexity(query)
 
         # Select configuration based on thresholds
-        if complexity < self.thresholds['simple']:
-            config_level = 'simple'
-        elif complexity < self.thresholds['medium']:
-            config_level = 'medium'
+        if complexity < self.thresholds["simple"]:
+            config_level = "simple"
+        elif complexity < self.thresholds["medium"]:
+            config_level = "medium"
         else:
-            config_level = 'complex'
+            config_level = "complex"
 
         params = self.configs[config_level]
 
@@ -265,11 +312,11 @@ class AdaptiveParameterSelector:
             A dictionary summarizing the selector's current settings.
         """
         return {
-            'configs': {
-                level: {'N': p.N, 'K': p.K, 'T': p.T}
+            "configs": {
+                level: {"N": p.N, "K": p.K, "T": p.T}
                 for level, p in self.configs.items()
             },
-            'thresholds': self.thresholds
+            "thresholds": self.thresholds,
         }
 
 
@@ -312,7 +359,7 @@ if __name__ == "__main__":
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Test queries
@@ -327,9 +374,9 @@ if __name__ == "__main__":
 
     selector = AdaptiveParameterSelector()
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ADAPTIVE PARAMETER SELECTION - TEST")
-    print("="*80)
+    print("=" * 80)
 
     for query in test_queries:
         print(f"\nQuery: {query[:70]}...")
@@ -338,4 +385,4 @@ if __name__ == "__main__":
         print(f"Complexity: {complexity:.1f}/100")
         print(f"Selected: {params}")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)

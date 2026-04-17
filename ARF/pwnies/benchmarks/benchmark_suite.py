@@ -118,21 +118,21 @@ class BenchmarkSuite:
             complexity="micro",
             expected_latency=10.0,
             description="Simple arithmetic",
-            expected_keywords=["4183", "4,183", "multiply"]
+            expected_keywords=["4183", "4,183", "multiply"],
         ),
         BenchmarkQuery(
             query="Calculate 256 + 384",
             complexity="micro",
             expected_latency=10.0,
             description="Basic addition",
-            expected_keywords=["640"]
+            expected_keywords=["640"],
         ),
         BenchmarkQuery(
             query="What is the square root of 144?",
             complexity="micro",
             expected_latency=10.0,
             description="Square root calculation",
-            expected_keywords=["12"]
+            expected_keywords=["12"],
         ),
     ]
 
@@ -142,28 +142,28 @@ class BenchmarkSuite:
             complexity="medium",
             expected_latency=15.0,
             description="Conceptual explanation",
-            expected_keywords=["recursion", "function", "itself", "calls"]
+            expected_keywords=["recursion", "function", "itself", "calls"],
         ),
         BenchmarkQuery(
             query="A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
             complexity="medium",
             expected_latency=15.0,
             description="Classic reasoning puzzle",
-            expected_keywords=["0.05", "5 cents", "five cents"]
+            expected_keywords=["0.05", "5 cents", "five cents"],
         ),
         BenchmarkQuery(
             query="What are the key differences between Python and JavaScript?",
             complexity="medium",
             expected_latency=15.0,
             description="Comparative analysis",
-            expected_keywords=["python", "javascript", "syntax", "typing"]
+            expected_keywords=["python", "javascript", "syntax", "typing"],
         ),
         BenchmarkQuery(
             query="How does a binary search algorithm work?",
             complexity="medium",
             expected_latency=15.0,
             description="Algorithm explanation",
-            expected_keywords=["binary", "search", "divide", "sorted"]
+            expected_keywords=["binary", "search", "divide", "sorted"],
         ),
     ]
 
@@ -173,21 +173,21 @@ class BenchmarkSuite:
             complexity="large",
             expected_latency=20.0,
             description="Creative writing",
-            expected_keywords=["robot", "art"]
+            expected_keywords=["robot", "art"],
         ),
         BenchmarkQuery(
             query="Design a solution for reducing traffic congestion in a large city. Consider multiple approaches.",
             complexity="large",
             expected_latency=20.0,
             description="Complex problem-solving",
-            expected_keywords=["traffic", "transport", "solution"]
+            expected_keywords=["traffic", "transport", "solution"],
         ),
         BenchmarkQuery(
             query="Explain quantum entanglement to a 10-year-old, then explain how it's used in quantum computing.",
             complexity="large",
             expected_latency=20.0,
             description="Multi-part explanation",
-            expected_keywords=["quantum", "entangle", "computing"]
+            expected_keywords=["quantum", "entangle", "computing"],
         ),
     ]
 
@@ -202,7 +202,9 @@ class BenchmarkSuite:
         """
         self.use_mock = use_mock
         self.results: List[BenchmarkResult] = []
-        logger.info(f"Initialized BenchmarkSuite [{'MOCK' if use_mock else 'REAL'} mode]")
+        logger.info(
+            f"Initialized BenchmarkSuite [{'MOCK' if use_mock else 'REAL'} mode]"
+        )
 
     def get_all_queries(self) -> List[BenchmarkQuery]:
         """Returns a list of all benchmark queries in the suite."""
@@ -228,11 +230,7 @@ class BenchmarkSuite:
             raise ValueError(f"Unknown complexity: {complexity}")
 
     async def run_single_benchmark(
-        self,
-        query: BenchmarkQuery,
-        N: int = 4,
-        K: int = 2,
-        T: int = 3
+        self, query: BenchmarkQuery, N: int = 4, K: int = 2, T: int = 3
     ) -> BenchmarkResult:
         """Runs a single benchmark query with a given set of RSA parameters.
 
@@ -251,11 +249,7 @@ class BenchmarkSuite:
         async with PonySwarm(num_ponies=N, use_mock=self.use_mock) as swarm:
             start_time = time.time()
 
-            result = await swarm.recursive_self_aggregation(
-                query=query.query,
-                K=K,
-                T=T
-            )
+            result = await swarm.recursive_self_aggregation(query=query.query, K=K, T=T)
 
             latency = time.time() - start_time
 
@@ -263,10 +257,10 @@ class BenchmarkSuite:
                 query=query.query,
                 complexity=query.complexity,
                 latency=latency,
-                response=result['response'],
-                diversity=result['metrics']['avg_diversity'],
-                num_generations=result['metrics']['total_generations'],
-                params={'N': N, 'K': K, 'T': T}
+                response=result["response"],
+                diversity=result["metrics"]["avg_diversity"],
+                num_generations=result["metrics"]["total_generations"],
+                params={"N": N, "K": K, "T": T},
             )
 
             self.results.append(benchmark_result)
@@ -289,7 +283,7 @@ class BenchmarkSuite:
         complexity_filter: Optional[str] = None,
         N: int = 4,
         K: int = 2,
-        T: int = 3
+        T: int = 3,
     ) -> Dict[str, Any]:
         """Runs the full benchmark suite or a filtered subset.
 
@@ -307,7 +301,9 @@ class BenchmarkSuite:
             A dictionary containing aggregated metrics and a list of the
             individual `BenchmarkResult` objects.
         """
-        logger.info(f"Running benchmark suite (complexity={complexity_filter or 'all'})")
+        logger.info(
+            f"Running benchmark suite (complexity={complexity_filter or 'all'})"
+        )
 
         if complexity_filter:
             queries = self.get_queries_by_complexity(complexity_filter)
@@ -327,25 +323,31 @@ class BenchmarkSuite:
         # Group by complexity
         by_complexity = {}
         for complexity in ["micro", "medium", "large"]:
-            complexity_results = [r for r in suite_results if r.complexity == complexity]
+            complexity_results = [
+                r for r in suite_results if r.complexity == complexity
+            ]
             if complexity_results:
                 by_complexity[complexity] = {
-                    'count': len(complexity_results),
-                    'avg_latency': statistics.mean([r.latency for r in complexity_results]),
-                    'max_latency': max([r.latency for r in complexity_results]),
-                    'avg_diversity': statistics.mean([r.diversity for r in complexity_results]),
+                    "count": len(complexity_results),
+                    "avg_latency": statistics.mean(
+                        [r.latency for r in complexity_results]
+                    ),
+                    "max_latency": max([r.latency for r in complexity_results]),
+                    "avg_diversity": statistics.mean(
+                        [r.diversity for r in complexity_results]
+                    ),
                 }
 
         summary = {
-            'total_queries': len(suite_results),
-            'params': {'N': N, 'K': K, 'T': T},
-            'avg_latency': statistics.mean(latencies),
-            'median_latency': statistics.median(latencies),
-            'max_latency': max(latencies),
-            'min_latency': min(latencies),
-            'avg_diversity': statistics.mean(diversities),
-            'by_complexity': by_complexity,
-            'results': suite_results
+            "total_queries": len(suite_results),
+            "params": {"N": N, "K": K, "T": T},
+            "avg_latency": statistics.mean(latencies),
+            "median_latency": statistics.median(latencies),
+            "max_latency": max(latencies),
+            "min_latency": min(latencies),
+            "avg_diversity": statistics.mean(diversities),
+            "by_complexity": by_complexity,
+            "results": suite_results,
         }
 
         return summary
@@ -353,7 +355,7 @@ class BenchmarkSuite:
     def compare_baselines(
         self,
         baseline_results: List[BenchmarkResult],
-        current_results: List[BenchmarkResult]
+        current_results: List[BenchmarkResult],
     ) -> Dict[str, Any]:
         """Compares a set of current benchmark results against a baseline set.
 
@@ -379,11 +381,11 @@ class BenchmarkSuite:
         improvement = (baseline_avg - current_avg) / baseline_avg
 
         return {
-            'baseline_avg_latency': baseline_avg,
-            'current_avg_latency': current_avg,
-            'improvement_pct': improvement * 100,
-            'meets_30pct_target': improvement >= 0.30,
-            'latency_reduction': baseline_avg - current_avg
+            "baseline_avg_latency": baseline_avg,
+            "current_avg_latency": current_avg,
+            "improvement_pct": improvement * 100,
+            "meets_30pct_target": improvement >= 0.30,
+            "latency_reduction": baseline_avg - current_avg,
         }
 
     def generate_report(self, summary: Dict[str, Any]) -> str:
@@ -396,30 +398,34 @@ class BenchmarkSuite:
             A formatted string containing the benchmark report.
         """
         report = []
-        report.append("\n" + "="*80)
+        report.append("\n" + "=" * 80)
         report.append("PONY SWARM BENCHMARK REPORT")
-        report.append("="*80)
-        report.append(f"\nParameters: N={summary['params']['N']}, "
-                     f"K={summary['params']['K']}, T={summary['params']['T']}")
+        report.append("=" * 80)
+        report.append(
+            f"\nParameters: N={summary['params']['N']}, "
+            f"K={summary['params']['K']}, T={summary['params']['T']}"
+        )
         report.append(f"Mode: {'MOCK' if self.use_mock else 'REAL INFERENCE'}")
         report.append(f"\nTotal Queries: {summary['total_queries']}")
         report.append(f"Average Latency: {summary['avg_latency']:.2f}s")
         report.append(f"Median Latency: {summary['median_latency']:.2f}s")
-        report.append(f"Range: {summary['min_latency']:.2f}s - {summary['max_latency']:.2f}s")
+        report.append(
+            f"Range: {summary['min_latency']:.2f}s - {summary['max_latency']:.2f}s"
+        )
         report.append(f"Average Diversity: {summary['avg_diversity']:.4f}")
 
-        report.append("\n" + "-"*80)
+        report.append("\n" + "-" * 80)
         report.append("BY COMPLEXITY")
-        report.append("-"*80)
+        report.append("-" * 80)
 
-        for complexity, metrics in summary['by_complexity'].items():
+        for complexity, metrics in summary["by_complexity"].items():
             report.append(f"\n{complexity.upper()}:")
             report.append(f"  Queries: {metrics['count']}")
             report.append(f"  Avg Latency: {metrics['avg_latency']:.2f}s")
             report.append(f"  Max Latency: {metrics['max_latency']:.2f}s")
             report.append(f"  Avg Diversity: {metrics['avg_diversity']:.4f}")
 
-        report.append("\n" + "="*80)
+        report.append("\n" + "=" * 80)
 
         return "\n".join(report)
 
@@ -432,7 +438,7 @@ async def main():
     parser.add_argument(
         "--complexity",
         choices=["micro", "medium", "large"],
-        help="Filter by complexity level"
+        help="Filter by complexity level",
     )
     parser.add_argument("--N", type=int, default=4, help="Number of ponies")
     parser.add_argument("--K", type=int, default=2, help="Aggregation size")
@@ -440,7 +446,7 @@ async def main():
     parser.add_argument(
         "--real",
         action="store_true",
-        help="Use real Horde.AI (slow, default is mock mode)"
+        help="Use real Horde.AI (slow, default is mock mode)",
     )
 
     args = parser.parse_args()
@@ -448,15 +454,12 @@ async def main():
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     suite = BenchmarkSuite(use_mock=not args.real)
     summary = await suite.run_suite(
-        complexity_filter=args.complexity,
-        N=args.N,
-        K=args.K,
-        T=args.T
+        complexity_filter=args.complexity, N=args.N, K=args.K, T=args.T
     )
 
     print(suite.generate_report(summary))

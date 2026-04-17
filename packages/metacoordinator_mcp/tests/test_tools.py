@@ -19,6 +19,7 @@ DNA_HASH = "b" * 64
 
 
 def _approval_voter_factory():
+    """Return a deterministic approving voter roster for gateway tests."""
     return [
         lambda claim: Vote(
             voter="groq-reviewer",
@@ -29,6 +30,7 @@ def _approval_voter_factory():
 
 
 def make_gateway(tmp: str, voter_factory=None) -> GatewayTools:
+    """Construct a test gateway rooted in a temporary source-chain directory."""
     return GatewayTools(
         base_dir=Path(tmp),
         dna_hash=DNA_HASH,
@@ -288,6 +290,7 @@ def test_run_consensus_round_returns_json_error_on_write_failure():
         )
 
         def fail_append_entry(*args, **kwargs):
+            """Simulate a source-chain append failure from the storage layer."""
             raise OSError("disk full")
 
         gw._cell.append_entry = fail_append_entry
@@ -303,6 +306,7 @@ def test_run_consensus_round_returns_json_error_on_write_failure():
 
 
 def _run_all():
+    """Run the standalone gateway test bundle without invoking pytest."""
     tests = [
         test_submit_claim_returns_entry_hash,
         test_cast_vote_returns_entry_hash,

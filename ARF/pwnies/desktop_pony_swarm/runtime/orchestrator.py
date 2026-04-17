@@ -32,7 +32,8 @@ class SwarmRuntime:
         """
         # Start the conductor using the helper script
         self.conductor_process = await asyncio.create_subprocess_exec(
-            'node', 'ARF/tests/tryorama/start_conductor.js',
+            "node",
+            "ARF/tests/tryorama/start_conductor.js",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

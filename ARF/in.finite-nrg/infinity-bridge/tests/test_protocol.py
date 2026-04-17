@@ -3,13 +3,14 @@
 Integration tests for Infinity Bridge protocol
 Tests discovery, subscription, streaming, and correlation
 """
+
 import pytest
 import asyncio
 import sys
 import os
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from orchestrator.discovery import MockBridgeDiscovery, BridgeInfo
 from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
@@ -125,7 +126,7 @@ class TestStreamSubscription:
 
         # Verify timestamps are increasing
         for i in range(1, len(samples)):
-            assert samples[i].timestamp_ns >= samples[i-1].timestamp_ns
+            assert samples[i].timestamp_ns >= samples[i - 1].timestamp_ns
 
         await stream.close()
 
@@ -151,7 +152,9 @@ class TestStreamSubscription:
             assert sample is not None
 
         avg_latency = sum(latencies) / len(latencies)
-        assert avg_latency < 50, f"Average latency {avg_latency:.1f}ms exceeds 50ms requirement"
+        assert (
+            avg_latency < 50
+        ), f"Average latency {avg_latency:.1f}ms exceeds 50ms requirement"
 
         await stream.close()
 
@@ -182,10 +185,12 @@ class TestMCPServer:
         assert len(resources) > 0, "Should have at least one resource"
 
         for resource in resources:
-            assert resource['uri'].startswith('bridge://'), "Resource URI should use bridge:// scheme"
-            assert 'name' in resource
-            assert 'description' in resource
-            assert 'mime_type' in resource
+            assert resource["uri"].startswith(
+                "bridge://"
+            ), "Resource URI should use bridge:// scheme"
+            assert "name" in resource
+            assert "description" in resource
+            assert "mime_type" in resource
 
         await server.stop()
 
@@ -206,7 +211,9 @@ class TestMCPServer:
 
         server.subscribe_to_stream = mock_subscribe
 
-        stream = await server.subscribe_to_stream("acoustic-esp32-001", "acoustic/spectrum")
+        stream = await server.subscribe_to_stream(
+            "acoustic-esp32-001", "acoustic/spectrum"
+        )
 
         assert stream is not None, "Subscription should succeed"
         assert stream.connected, "Stream should be connected"
@@ -258,7 +265,9 @@ class TestPerformanceMetrics:
         discovery_time_ms = (time.time() - t0) * 1000
 
         assert len(bridges) > 0, "Should discover bridges"
-        assert discovery_time_ms < 1000, f"Discovery took {discovery_time_ms:.1f}ms (>1s)"
+        assert (
+            discovery_time_ms < 1000
+        ), f"Discovery took {discovery_time_ms:.1f}ms (>1s)"
 
     @pytest.mark.asyncio
     async def test_stream_latency_requirement(self):
@@ -340,7 +349,9 @@ class TestCorrelation:
 
         # Get acoustic and vibration bridges
         acoustic_bridge = next((b for b in bridges if "acoustic" in b.bridge_id), None)
-        vibration_bridge = next((b for b in bridges if "vibration" in b.bridge_id), None)
+        vibration_bridge = next(
+            (b for b in bridges if "vibration" in b.bridge_id), None
+        )
 
         assert acoustic_bridge is not None, "Need acoustic bridge"
         assert vibration_bridge is not None, "Need vibration bridge"
@@ -360,7 +371,9 @@ class TestCorrelation:
         assert vibration_sample is not None
 
         # Check time synchronization
-        time_diff_ms = abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+        time_diff_ms = (
+            abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+        )
         assert time_diff_ms < 50, f"Time sync {time_diff_ms:.2f}ms exceeds 50ms"
 
         await acoustic_stream.close()

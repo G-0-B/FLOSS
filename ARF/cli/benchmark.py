@@ -29,6 +29,7 @@ from conversation_memory import ConversationMemory
 
 try:
     from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+
     SWARM_AVAILABLE = True
 except ImportError:
     SWARM_AVAILABLE = False
@@ -39,8 +40,12 @@ console = Console()
 
 @app.command()
 def run(
-    suite: str = typer.Option("memory", "--suite", "-s", help="Benchmark suite: memory, swarm, or all"),
-    iterations: int = typer.Option(10, "--iterations", "-i", help="Number of iterations"),
+    suite: str = typer.Option(
+        "memory", "--suite", "-s", help="Benchmark suite: memory, swarm, or all"
+    ),
+    iterations: int = typer.Option(
+        10, "--iterations", "-i", help="Number of iterations"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Runs a specified benchmark suite to test the performance of the ARF.
@@ -81,12 +86,16 @@ def run(
             sys.exit(1)
 
         if json_output:
-            print(json.dumps({
-                "success": True,
-                "suite": suite,
-                "iterations": iterations,
-                "results": results,
-            }))
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "suite": suite,
+                        "iterations": iterations,
+                        "results": results,
+                    }
+                )
+            )
         else:
             console.print("\n[bold green]Benchmark Complete[/bold green]")
 
@@ -127,10 +136,13 @@ def _benchmark_memory(iterations: int, json_output: bool) -> dict:
     # Benchmark transmit
     for i in range(iterations):
         start = time.time()
-        memory.transmit({
-            "content": f"Benchmark test {i}",
-            "coherence": 0.9,
-        }, skip_validation=True)
+        memory.transmit(
+            {
+                "content": f"Benchmark test {i}",
+                "coherence": 0.9,
+            },
+            skip_validation=True,
+        )
         elapsed = time.time() - start
         results["transmit_times"].append(elapsed)
 
@@ -152,6 +164,7 @@ def _benchmark_memory(iterations: int, json_output: bool) -> dict:
 
     # Calculate statistics
     import statistics
+
     results["transmit_avg"] = statistics.mean(results["transmit_times"])
     results["transmit_median"] = statistics.median(results["transmit_times"])
     results["recall_avg"] = statistics.mean(results["recall_times"])
@@ -166,12 +179,12 @@ def _benchmark_memory(iterations: int, json_output: bool) -> dict:
         table.add_row(
             "transmit",
             f"{results['transmit_avg'] * 1000:.2f}",
-            f"{results['transmit_median'] * 1000:.2f}"
+            f"{results['transmit_median'] * 1000:.2f}",
         )
         table.add_row(
             "recall",
             f"{results['recall_avg'] * 1000:.2f}",
-            f"{results['recall_median'] * 1000:.2f}"
+            f"{results['recall_median'] * 1000:.2f}",
         )
 
         console.print(table)
@@ -214,17 +227,15 @@ def _benchmark_swarm(iterations: int, json_output: bool) -> dict:
                 start = time.time()
 
                 result = await swarm.recursive_self_aggregation(
-                    query=query,
-                    K=2,
-                    T=2  # Reduced for benchmarking
+                    query=query, K=2, T=2  # Reduced for benchmarking
                 )
 
                 elapsed = time.time() - start
                 results["query_times"].append(elapsed)
 
-                if result.get('iterations'):
-                    final_iter = result['iterations'][-1]
-                    results["diversity_scores"].append(final_iter.get('diversity', 0))
+                if result.get("iterations"):
+                    final_iter = result["iterations"][-1]
+                    results["diversity_scores"].append(final_iter.get("diversity", 0))
 
                 if progress:
                     progress.advance(task)
@@ -236,6 +247,7 @@ def _benchmark_swarm(iterations: int, json_output: bool) -> dict:
 
     # Calculate statistics
     import statistics
+
     results["query_avg"] = statistics.mean(results["query_times"])
     results["query_median"] = statistics.median(results["query_times"])
     if results["diversity_scores"]:
@@ -266,7 +278,11 @@ def list_suites():
     """
     suites = [
         ("memory", "Conversation memory operations", "Available"),
-        ("swarm", "Pony swarm performance", "Available" if SWARM_AVAILABLE else "Unavailable"),
+        (
+            "swarm",
+            "Pony swarm performance",
+            "Available" if SWARM_AVAILABLE else "Unavailable",
+        ),
         ("all", "All benchmark suites", "Available"),
     ]
 

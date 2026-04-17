@@ -3,12 +3,13 @@
 Infinity Bridge Demo
 Demonstrates discovery, subscription, and data streaming
 """
+
 import asyncio
 import sys
 import os
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
 from orchestrator.discovery import MockBridgeDiscovery
@@ -162,10 +163,14 @@ async def demo_correlation():
     server.subscribe_to_stream = mock_subscribe
 
     print("\n1. Subscribing to acoustic stream...")
-    acoustic_stream = await server.subscribe_to_stream("acoustic-esp32-001", "acoustic/spectrum")
+    acoustic_stream = await server.subscribe_to_stream(
+        "acoustic-esp32-001", "acoustic/spectrum"
+    )
 
     print("2. Subscribing to vibration stream...")
-    vibration_stream = await server.subscribe_to_stream("vibration-rp2040-001", "vibration/time_series")
+    vibration_stream = await server.subscribe_to_stream(
+        "vibration-rp2040-001", "vibration/time_series"
+    )
 
     if acoustic_stream and vibration_stream:
         print("✓ Both streams connected\n")
@@ -181,7 +186,9 @@ async def demo_correlation():
             print(f"✓ Vibration sample at {vibration_sample.timestamp_ns} ns")
 
             # Calculate time sync quality
-            time_diff_ms = abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+            time_diff_ms = (
+                abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+            )
             print(f"\nTime synchronization: {time_diff_ms:.2f} ms")
 
             if time_diff_ms < 50:
@@ -193,17 +200,22 @@ async def demo_correlation():
             print("\n4. Computing cross-correlation...")
 
             # Take first N bins for correlation
-            N = min(len(acoustic_sample.frequencies), len(vibration_sample.frequencies), 256)
+            N = min(
+                len(acoustic_sample.frequencies), len(vibration_sample.frequencies), 256
+            )
             acoustic_data = acoustic_sample.frequencies[:N]
             vibration_data = vibration_sample.frequencies[:N]
 
             # Simple correlation coefficient
             import statistics
+
             acoustic_mean = statistics.mean(acoustic_data)
             vibration_mean = statistics.mean(vibration_data)
 
-            numerator = sum((a - acoustic_mean) * (v - vibration_mean)
-                          for a, v in zip(acoustic_data, vibration_data))
+            numerator = sum(
+                (a - acoustic_mean) * (v - vibration_mean)
+                for a, v in zip(acoustic_data, vibration_data)
+            )
 
             acoustic_std = statistics.stdev(acoustic_data)
             vibration_std = statistics.stdev(vibration_data)
@@ -236,6 +248,7 @@ async def demo_performance_metrics():
 
     # Measure discovery time
     import time
+
     print("\n1. Testing bridge discovery latency...")
     t0 = time.time()
     await server.start()

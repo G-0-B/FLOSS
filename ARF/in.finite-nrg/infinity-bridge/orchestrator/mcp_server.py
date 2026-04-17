@@ -2,6 +2,7 @@
 Infinity Bridge MCP Server
 Exposes bridges as MCP resources for AI agents
 """
+
 import asyncio
 import json
 import struct
@@ -14,6 +15,7 @@ from discovery import BridgeDiscovery, BridgeInfo, MockBridgeDiscovery
 @dataclass
 class StreamSample:
     """A single sample from a bridge stream"""
+
     bridge_id: str
     stream_type: str
     timestamp_ns: int
@@ -54,20 +56,17 @@ class BridgeStream:
 
                 # Connect
                 await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    self.socket.connect,
-                    (host, port)
+                    None, self.socket.connect, (host, port)
                 )
 
                 # Send subscription request
-                request = {
-                    "type": "subscribe",
-                    "stream": self.stream_type
-                }
+                request = {"type": "subscribe", "stream": self.stream_type}
                 self.socket.send(json.dumps(request).encode() + b"\n")
 
                 self.connected = True
-                print(f"[BridgeStream] Connected to {self.bridge.bridge_id}/{self.stream_type}")
+                print(
+                    f"[BridgeStream] Connected to {self.bridge.bridge_id}/{self.stream_type}"
+                )
                 return True
 
         except Exception as e:
@@ -105,7 +104,7 @@ class BridgeStream:
             num_freqs = data_len // 4
             frequencies = []
             for i in range(num_freqs):
-                freq = struct.unpack("<f", data[i*4:(i+1)*4])[0]
+                freq = struct.unpack("<f", data[i * 4 : (i + 1) * 4])[0]
                 frequencies.append(freq)
 
             sample = StreamSample(
@@ -114,7 +113,7 @@ class BridgeStream:
                 timestamp_ns=timestamp_ns,
                 sample_rate_hz=sample_rate_hz,
                 frequencies=frequencies,
-                raw_data=data
+                raw_data=data,
             )
 
             return sample
@@ -244,7 +243,9 @@ class InfinityBridgeMCPServer:
             resource_uri = f"bridge://{bridge.bridge_id}/{capability}"
             print(f"[MCPServer] Registered resource: {resource_uri}")
 
-    async def subscribe_to_stream(self, bridge_id: str, stream_type: str) -> Optional[BridgeStream]:
+    async def subscribe_to_stream(
+        self, bridge_id: str, stream_type: str
+    ) -> Optional[BridgeStream]:
         """
         Subscribe to a bridge stream
 
@@ -279,16 +280,20 @@ class InfinityBridgeMCPServer:
 
         for bridge in self.discovery.list_bridges():
             for capability in bridge.capabilities:
-                resources.append({
-                    "uri": f"bridge://{bridge.bridge_id}/{capability}",
-                    "name": f"{bridge.bridge_id} - {capability}",
-                    "description": f"Data stream from {bridge.bridge_id}",
-                    "mime_type": "application/octet-stream"
-                })
+                resources.append(
+                    {
+                        "uri": f"bridge://{bridge.bridge_id}/{capability}",
+                        "name": f"{bridge.bridge_id} - {capability}",
+                        "description": f"Data stream from {bridge.bridge_id}",
+                        "mime_type": "application/octet-stream",
+                    }
+                )
 
         return resources
 
-    async def read_resource(self, uri: str, num_samples: int = 10) -> List[StreamSample]:
+    async def read_resource(
+        self, uri: str, num_samples: int = 10
+    ) -> List[StreamSample]:
         """
         Read from an MCP resource
 
@@ -362,7 +367,7 @@ class MockBridgeStream(BridgeStream):
             stream_type=self.stream_type,
             timestamp_ns=int(time.time() * 1e9),
             sample_rate_hz=44100,
-            frequencies=frequencies
+            frequencies=frequencies,
         )
 
         await asyncio.sleep(0.02)  # Simulate 50Hz update rate

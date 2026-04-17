@@ -97,12 +97,14 @@ def info():
     # Check for key dependencies
     try:
         import numpy
+
         info_data["numpy_available"] = True
     except ImportError:
         info_data["numpy_available"] = False
 
     try:
         import sentence_transformers
+
         info_data["embeddings_available"] = True
     except ImportError:
         info_data["embeddings_available"] = False
@@ -122,8 +124,12 @@ def info():
 @app.callback()
 def main(
     ctx: typer.Context,
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress output except errors"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Suppress output except errors"
+    ),
 ):
     """The main callback for the ARF CLI application.
 

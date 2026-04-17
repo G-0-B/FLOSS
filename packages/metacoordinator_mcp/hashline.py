@@ -632,6 +632,124 @@ def verify_tool_edit(
     }
 
 
+def _append_hashline_block(
+    lines: list[str], heading: str, hashlines: list[str]
+) -> None:
+    """Append a titled fingerprint block when hashline evidence is present."""
+    if not hashlines:
+        return
+    lines.append(heading)
+    lines.extend(hashlines)
+
+
+def _append_match_block(
+    lines: list[str],
+    heading: str,
+    matches: list[dict[str, Any]],
+) -> None:
+    """Append matched snippet locations together with their hashline evidence."""
+    if not matches:
+        return
+    lines.append(heading)
+    for match in matches:
+        lines.append(f"- lines {match['span']}")
+        lines.extend(match["hashlines"])
+
+
+def _append_checkpoint_section(lines: list[str], checkpoint: dict[str, Any]) -> None:
+    """Render the pre-write checkpoint section of the verification report."""
+    if not checkpoint:
+        return
+
+    lines.append("")
+    lines.append("Pre-write checkpoint:")
+    metadata_fields = [
+        ("signature", "Signature"),
+        ("created_at", "Created"),
+        ("consumed_at", "Consumed"),
+        ("session_id", "Session"),
+    ]
+    for key, label in metadata_fields:
+        value = checkpoint.get(key)
+        if value:
+            lines.append(f"{label}: {value}")
+
+    lines.append(f"Assessment: {checkpoint.get('status', 'UNKNOWN')}")
+    lines.append(
+        f"Reason: {checkpoint.get('reason', 'No checkpoint reason recorded.')}"
+    )
+
+    digest_fields = [
+        ("pre_write_sha256", "Pre-write SHA256"),
+        ("exact_expected_post_sha256", "Exact expected post SHA256"),
+    ]
+    for key, label in digest_fields:
+        value = checkpoint.get(key)
+        if value:
+            lines.append(f"{label}: {value}")
+
+    exact_post_reason = checkpoint.get("exact_expected_post_reason")
+    if exact_post_reason:
+        lines.append(f"Exact post-image basis: {exact_post_reason}")
+
+    _append_hashline_block(
+        lines,
+        "Pre-write fingerprint:",
+        checkpoint.get("pre_write_hashlines") or [],
+    )
+    _append_hashline_block(
+        lines,
+        "Exact expected post fingerprint:",
+        checkpoint.get("exact_expected_post_hashlines") or [],
+    )
+
+
+def _append_check_section(
+    lines: list[str],
+    idx: int,
+    check: dict[str, Any],
+) -> None:
+    """Render one verification sub-check and its evidence blocks."""
+    lines.append("")
+    lines.append(
+        f"Check {idx}: {check.get('kind', 'unknown')} -> "
+        f"{check.get('status', 'UNKNOWN')}"
+    )
+    lines.append(f"Reason: {check.get('reason', 'No reason recorded.')}")
+
+    _append_hashline_block(
+        lines,
+        "Expected old fingerprint:",
+        check.get("expected_old_hashlines") or [],
+    )
+    _append_hashline_block(
+        lines,
+        "Expected new fingerprint:",
+        check.get("expected_new_hashlines") or [],
+    )
+    _append_match_block(lines, "Matched new locations:", check.get("matched_new") or [])
+    _append_match_block(lines, "Matched old locations:", check.get("matched_old") or [])
+
+    for sub_idx, subcheck in enumerate(check.get("subchecks") or []):
+        if sub_idx >= 3:
+            break
+        lines.append(
+            f"Subcheck {sub_idx + 1}: {subcheck.get('status', 'UNKNOWN')} - "
+            f"{subcheck.get('reason', 'No reason recorded.')}"
+        )
+
+    _append_hashline_block(
+        lines,
+        "Expected file fingerprint:",
+        check.get("expected_hashlines") or [],
+    )
+    _append_hashline_block(
+        lines,
+        "Actual file fingerprint:",
+        check.get("actual_hashlines") or [],
+    )
+
+
 def render_verification_section(result: dict[str, Any]) -> str:
     """Render a compact human-readable verification report section."""
     lines = [
@@ -643,90 +761,8 @@ def render_verification_section(result: dict[str, Any]) -> str:
     if file_sha:
         lines.append(f"File SHA256: {file_sha}")
 
-    checkpoint = result.get("checkpoint") or {}
-    if checkpoint:
-        lines.append("")
-        lines.append("Pre-write checkpoint:")
-        if checkpoint.get("signature"):
-            lines.append(f"Signature: {checkpoint['signature']}")
-        if checkpoint.get("created_at"):
-            lines.append(f"Created: {checkpoint['created_at']}")
-        if checkpoint.get("consumed_at"):
-            lines.append(f"Consumed: {checkpoint['consumed_at']}")
-        if checkpoint.get("session_id"):
-            lines.append(f"Session: {checkpoint['session_id']}")
-        lines.append(f"Assessment: {checkpoint.get('status', 'UNKNOWN')}")
-        lines.append(
-            f"Reason: {checkpoint.get('reason', 'No checkpoint reason recorded.')}"
-        )
-        pre_write_sha256 = checkpoint.get("pre_write_sha256")
-        if pre_write_sha256:
-            lines.append(f"Pre-write SHA256: {pre_write_sha256}")
-        exact_expected_post_sha256 = checkpoint.get("exact_expected_post_sha256")
-        if exact_expected_post_sha256:
-            lines.append(f"Exact expected post SHA256: {exact_expected_post_sha256}")
-        if checkpoint.get("exact_expected_post_reason"):
-            lines.append(
-                "Exact post-image basis: " f"{checkpoint['exact_expected_post_reason']}"
-            )
-        pre_write_hashlines = checkpoint.get("pre_write_hashlines") or []
-        if pre_write_hashlines:
-            lines.append("Pre-write fingerprint:")
-            lines.extend(pre_write_hashlines)
-        exact_expected_post_hashlines = (
-            checkpoint.get("exact_expected_post_hashlines") or []
-        )
-        if exact_expected_post_hashlines:
-            lines.append("Exact expected post fingerprint:")
-            lines.extend(exact_expected_post_hashlines)
-
+    _append_checkpoint_section(lines, result.get("checkpoint") or {})
     for idx, check in enumerate(result.get("checks", []), start=1):
-        lines.append("")
-        lines.append(
-            f"Check {idx}: {check.get('kind', 'unknown')} -> "
-            f"{check.get('status', 'UNKNOWN')}"
-        )
-        lines.append(f"Reason: {check.get('reason', 'No reason recorded.')}")
-
-        expected_old = check.get("expected_old_hashlines") or []
-        if expected_old:
-            lines.append("Expected old fingerprint:")
-            lines.extend(expected_old)
-
-        expected_new = check.get("expected_new_hashlines") or []
-        if expected_new:
-            lines.append("Expected new fingerprint:")
-            lines.extend(expected_new)
-
-        matched_new = check.get("matched_new") or []
-        if matched_new:
-            lines.append("Matched new locations:")
-            for match in matched_new:
-                lines.append(f"- lines {match['span']}")
-                lines.extend(match["hashlines"])
-
-        matched_old = check.get("matched_old") or []
-        if matched_old:
-            lines.append("Matched old locations:")
-            for match in matched_old:
-                lines.append(f"- lines {match['span']}")
-                lines.extend(match["hashlines"])
-
-        subchecks = check.get("subchecks") or []
-        for sub_idx, subcheck in enumerate(subchecks[:3], start=1):
-            lines.append(
-                f"Subcheck {sub_idx}: {subcheck.get('status', 'UNKNOWN')} - "
-                f"{subcheck.get('reason', 'No reason recorded.')}"
-            )
-
-        expected_hashlines = check.get("expected_hashlines") or []
-        if expected_hashlines:
-            lines.append("Expected file fingerprint:")
-            lines.extend(expected_hashlines)
-
-        actual_hashlines = check.get("actual_hashlines") or []
-        if actual_hashlines:
-            lines.append("Actual file fingerprint:")
-            lines.extend(actual_hashlines)
+        _append_check_section(lines, idx, check)
 
     return "\n".join(lines)

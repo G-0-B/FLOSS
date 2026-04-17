@@ -55,8 +55,7 @@ def mock_memory(temp_data_dir: Path) -> ConversationMemory:
     Uses temporary storage that's automatically cleaned up.
     """
     return ConversationMemory(
-        agent_id="test_agent",
-        storage_path=str(temp_data_dir / "memory.json")
+        agent_id="test_agent", storage_path=str(temp_data_dir / "memory.json")
     )
 
 
@@ -64,8 +63,7 @@ def mock_memory(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_alice(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'alice'."""
     return ConversationMemory(
-        agent_id="alice",
-        storage_path=str(temp_data_dir / "memory_alice.json")
+        agent_id="alice", storage_path=str(temp_data_dir / "memory_alice.json")
     )
 
 
@@ -73,8 +71,7 @@ def mock_memory_alice(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_bob(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'bob'."""
     return ConversationMemory(
-        agent_id="bob",
-        storage_path=str(temp_data_dir / "memory_bob.json")
+        agent_id="bob", storage_path=str(temp_data_dir / "memory_bob.json")
     )
 
 
@@ -82,8 +79,7 @@ def mock_memory_bob(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_carol(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'carol'."""
     return ConversationMemory(
-        agent_id="carol",
-        storage_path=str(temp_data_dir / "memory_carol.json")
+        agent_id="carol", storage_path=str(temp_data_dir / "memory_carol.json")
     )
 
 
@@ -95,7 +91,7 @@ def sample_understanding():
         "metadata": {
             "source": "test",
             "timestamp": "2025-11-14T00:00:00Z",
-        }
+        },
     }
 
 
@@ -181,6 +177,7 @@ def mock_holochain_conductor():
     Returns a mock object that simulates conductor operations
     without requiring actual Holochain installation.
     """
+
     class MockConductor:
         def __init__(self):
             self.entries = {}
@@ -214,6 +211,7 @@ def reset_logging():
     Prevents log spam from accumulating across tests.
     """
     import logging
+
     # Clear all handlers from root logger
     root = logging.getLogger()
     for handler in root.handlers[:]:
@@ -232,9 +230,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line(
         "markers", "requires_swarm: marks tests that require pony swarm"
     )

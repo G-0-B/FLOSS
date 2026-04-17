@@ -2,6 +2,7 @@
 Infinity Bridge Discovery Module
 Discovers bridges via Holochain DHT and manages connections
 """
+
 import asyncio
 import json
 from typing import List, Dict, Optional
@@ -13,6 +14,7 @@ import websockets
 @dataclass
 class BridgeInfo:
     """Information about a discovered bridge"""
+
     bridge_id: str
     capabilities: List[str]
     transport: List[str]
@@ -76,7 +78,7 @@ class BridgeDiscovery:
                     "fn_name": "discover_bridges",
                     "payload": None,
                     "provenance": "agent_key_placeholder",
-                }
+                },
             }
 
             # Send request
@@ -84,8 +86,7 @@ class BridgeDiscovery:
 
             # Wait for response with timeout
             response_str = await asyncio.wait_for(
-                self.websocket.recv(),
-                timeout=timeout
+                self.websocket.recv(), timeout=timeout
             )
 
             response = json.loads(response_str)
@@ -99,9 +100,15 @@ class BridgeDiscovery:
                         capabilities=reg["capabilities"],
                         transport=reg["transport"],
                         endpoint=reg["endpoint"],
-                        signature=bytes.fromhex(reg["signature"]) if isinstance(reg["signature"], str) else reg["signature"],
-                        timestamp=datetime.fromisoformat(reg.get("timestamp", datetime.now().isoformat())),
-                        holochain_hash=reg.get("hash")
+                        signature=(
+                            bytes.fromhex(reg["signature"])
+                            if isinstance(reg["signature"], str)
+                            else reg["signature"]
+                        ),
+                        timestamp=datetime.fromisoformat(
+                            reg.get("timestamp", datetime.now().isoformat())
+                        ),
+                        holochain_hash=reg.get("hash"),
                     )
                     bridges.append(bridge)
                     self.discovered_bridges[bridge.bridge_id] = bridge
@@ -116,7 +123,9 @@ class BridgeDiscovery:
             print(f"[BridgeDiscovery] Discovery error: {e}")
             return []
 
-    async def discover_by_capability(self, capability: str, timeout: float = 5.0) -> List[BridgeInfo]:
+    async def discover_by_capability(
+        self, capability: str, timeout: float = 5.0
+    ) -> List[BridgeInfo]:
         """
         Discover bridges with specific capability
 
@@ -140,13 +149,12 @@ class BridgeDiscovery:
                     "fn_name": "discover_by_capability",
                     "payload": capability,
                     "provenance": "agent_key_placeholder",
-                }
+                },
             }
 
             await self.websocket.send(json.dumps(request))
             response_str = await asyncio.wait_for(
-                self.websocket.recv(),
-                timeout=timeout
+                self.websocket.recv(), timeout=timeout
             )
 
             response = json.loads(response_str)
@@ -159,14 +167,22 @@ class BridgeDiscovery:
                         capabilities=reg["capabilities"],
                         transport=reg["transport"],
                         endpoint=reg["endpoint"],
-                        signature=bytes.fromhex(reg["signature"]) if isinstance(reg["signature"], str) else reg["signature"],
-                        timestamp=datetime.fromisoformat(reg.get("timestamp", datetime.now().isoformat())),
-                        holochain_hash=reg.get("hash")
+                        signature=(
+                            bytes.fromhex(reg["signature"])
+                            if isinstance(reg["signature"], str)
+                            else reg["signature"]
+                        ),
+                        timestamp=datetime.fromisoformat(
+                            reg.get("timestamp", datetime.now().isoformat())
+                        ),
+                        holochain_hash=reg.get("hash"),
                     )
                     bridges.append(bridge)
                     self.discovered_bridges[bridge.bridge_id] = bridge
 
-            print(f"[BridgeDiscovery] Found {len(bridges)} bridges with capability '{capability}'")
+            print(
+                f"[BridgeDiscovery] Found {len(bridges)} bridges with capability '{capability}'"
+            )
             return bridges
 
         except Exception as e:
@@ -181,7 +197,9 @@ class BridgeDiscovery:
         """List all cached bridges"""
         return list(self.discovered_bridges.values())
 
-    async def wait_for_bridge(self, bridge_id: str, timeout: float = 30.0, poll_interval: float = 2.0) -> Optional[BridgeInfo]:
+    async def wait_for_bridge(
+        self, bridge_id: str, timeout: float = 30.0, poll_interval: float = 2.0
+    ) -> Optional[BridgeInfo]:
         """
         Wait for a specific bridge to appear
 
@@ -222,7 +240,7 @@ class MockBridgeDiscovery(BridgeDiscovery):
                 transport=["usb_hid", "tcp"],
                 endpoint="tcp://192.168.1.101:9999",
                 signature=b"\x00" * 64,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             ),
             BridgeInfo(
                 bridge_id="vibration-rp2040-001",
@@ -230,7 +248,7 @@ class MockBridgeDiscovery(BridgeDiscovery):
                 transport=["tcp"],
                 endpoint="tcp://192.168.1.102:9999",
                 signature=b"\x00" * 64,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             ),
         ]
 
@@ -243,7 +261,9 @@ class MockBridgeDiscovery(BridgeDiscovery):
         self.discovered_bridges = {b.bridge_id: b for b in self.mock_bridges}
         return self.mock_bridges
 
-    async def discover_by_capability(self, capability: str, timeout: float = 5.0) -> List[BridgeInfo]:
+    async def discover_by_capability(
+        self, capability: str, timeout: float = 5.0
+    ) -> List[BridgeInfo]:
         """Filter mock bridges by capability"""
         matching = [b for b in self.mock_bridges if capability in b.capabilities]
         return matching

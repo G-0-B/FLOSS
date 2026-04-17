@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from pwnies.desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
+
     SWARM_AVAILABLE = True
 except ImportError:
     SWARM_AVAILABLE = False
@@ -37,10 +38,18 @@ console = Console()
 @app.command()
 def query(
     question: str = typer.Argument(..., help="Query for the swarm"),
-    ponies: int = typer.Option(4, "--ponies", "-n", help="Number of ponies (N parameter)"),
-    aggregation_size: int = typer.Option(2, "--aggregation-size", "-k", help="Aggregation size (K parameter)"),
-    iterations: int = typer.Option(3, "--iterations", "-t", help="Number of iterations (T parameter)"),
-    mock: bool = typer.Option(True, "--mock/--real", help="Use mock inference (default) or real Horde.AI"),
+    ponies: int = typer.Option(
+        4, "--ponies", "-n", help="Number of ponies (N parameter)"
+    ),
+    aggregation_size: int = typer.Option(
+        2, "--aggregation-size", "-k", help="Aggregation size (K parameter)"
+    ),
+    iterations: int = typer.Option(
+        3, "--iterations", "-t", help="Number of iterations (T parameter)"
+    ),
+    mock: bool = typer.Option(
+        True, "--mock/--real", help="Use mock inference (default) or real Horde.AI"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Queries the pony swarm using the Recursive Self-Aggregation (RSA) algorithm.
@@ -61,38 +70,46 @@ def query(
 
     try:
         # Run async query
-        result = asyncio.run(_run_swarm_query(
-            question=question,
-            num_ponies=ponies,
-            K=aggregation_size,
-            T=iterations,
-            use_mock=mock,
-            json_output=json_output,
-        ))
+        result = asyncio.run(
+            _run_swarm_query(
+                question=question,
+                num_ponies=ponies,
+                K=aggregation_size,
+                T=iterations,
+                use_mock=mock,
+                json_output=json_output,
+            )
+        )
 
         if json_output:
-            print(json.dumps({
-                "success": True,
-                "query": question,
-                "response": result['response'],
-                "parameters": {
-                    "N": ponies,
-                    "K": aggregation_size,
-                    "T": iterations,
-                },
-                "metrics": result.get('metrics', {}),
-                "is_crisis": result.get('is_crisis', False),
-            }))
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "query": question,
+                        "response": result["response"],
+                        "parameters": {
+                            "N": ponies,
+                            "K": aggregation_size,
+                            "T": iterations,
+                        },
+                        "metrics": result.get("metrics", {}),
+                        "is_crisis": result.get("is_crisis", False),
+                    }
+                )
+            )
         else:
             console.print(f"\n[bold green]Response:[/bold green]")
-            console.print(result['response'])
+            console.print(result["response"])
             console.print()
 
-            if result.get('metrics'):
-                metrics = result['metrics']
-                console.print(f"[dim]Time: {metrics.get('total_time', 0):.2f}s | "
-                            f"Generations: {metrics.get('total_generations', 0)} | "
-                            f"Diversity: {metrics.get('avg_diversity', 0):.3f}[/dim]")
+            if result.get("metrics"):
+                metrics = result["metrics"]
+                console.print(
+                    f"[dim]Time: {metrics.get('total_time', 0):.2f}s | "
+                    f"Generations: {metrics.get('total_generations', 0)} | "
+                    f"Diversity: {metrics.get('avg_diversity', 0):.3f}[/dim]"
+                )
 
         sys.exit(0)
 

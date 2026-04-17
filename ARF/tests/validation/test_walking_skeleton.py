@@ -10,7 +10,7 @@ import sys
 
 # Add parent directories to path
 test_dir = Path(__file__).parent.absolute()
-project_root = test_dir.parent.parent # /mnt/project/
+project_root = test_dir.parent.parent  # /mnt/project/
 pwnies_dir = project_root / "pwnies"
 
 # Add both to path
@@ -20,10 +20,12 @@ for path in [project_root, pwnies_dir]:
 
 SPEC_FILE = Path(__file__).parent.parent.parent / "walking_skeleton_validation.yaml"
 
+
 @pytest.fixture
 def validation_spec():
-    with open(SPEC_FILE, 'r') as f:
+    with open(SPEC_FILE, "r") as f:
         return yaml.safe_load(f)
+
 
 def test_spec_exists(validation_spec):
     """Ensures the validation specification file exists and is valid."""
@@ -31,9 +33,11 @@ def test_spec_exists(validation_spec):
     assert "test_2_composition" in validation_spec
     assert "test_3_persistence" in validation_spec
 
+
 import asyncio
 import numpy as np
 from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+
 
 def test_composition(validation_spec):
     """
@@ -46,9 +50,7 @@ def test_composition(validation_spec):
     async def run_test():
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
             result = await swarm.recursive_self_aggregation(
-                query="What is the core principle of FLOSSI0ULLK?",
-                K=2,
-                T=3
+                query="What is the core principle of FLOSSI0ULLK?", K=2, T=3
             )
             assert result is not None
             assert "response" in result
@@ -58,7 +60,9 @@ def test_composition(validation_spec):
 
     asyncio.run(run_test())
 
+
 from pwnies.desktop_pony_swarm.core.embedding import MultiScaleEmbedding
+
 
 def test_persistence(validation_spec):
     """
@@ -76,13 +80,17 @@ def test_persistence(validation_spec):
             # This is a placeholder for storing the embedding.
             # In a real implementation, the swarm would do this automatically.
             embedding = np.random.rand(384)
-            swarm.embedding_manager.embeddings.add_embedding("community", query1, embedding)
+            swarm.embedding_manager.embeddings.add_embedding(
+                "community", query1, embedding
+            )
 
             # Conversation 2: Retrieve knowledge
             query2 = "What is the main city in France?"
             # Use a mock embedding for the query
             query_embedding = np.random.rand(384)
-            similar = swarm.embedding_manager.query_similar(query_embedding, "community", top_k=1)
+            similar = swarm.embedding_manager.query_similar(
+                query_embedding, "community", top_k=1
+            )
             assert len(similar) > 0
 
     asyncio.run(run_test())

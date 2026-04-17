@@ -16,6 +16,7 @@ if __name__ == "__main__":
         # This is a simplified version of the logic in swarm.py's main function
         # It's intended to be a temporary solution to verify the SwarmRuntime
         from ARF.pwnies.desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
+
         runtime = SwarmRuntime()
         try:
             await runtime.connect()

@@ -34,7 +34,7 @@ def create_backup(source_dir: Path, backup_dir: Path) -> bool:
         if backup_dir.exists():
             logger.warning(f"Backup already exists at {backup_dir}")
             response = input("Overwrite existing backup? (yes/no): ")
-            if response.lower() != 'yes':
+            if response.lower() != "yes":
                 logger.info("Backup cancelled")
                 return False
             shutil.rmtree(backup_dir)
@@ -70,7 +70,7 @@ def rollback(backup_dir: Path, target_dir: Path) -> bool:
         # Confirm rollback
         logger.warning(f"This will replace {target_dir} with backup from {backup_dir}")
         response = input("Continue with rollback? (yes/no): ")
-        if response.lower() != 'yes':
+        if response.lower() != "yes":
             logger.info("Rollback cancelled")
             return False
 
@@ -93,23 +93,23 @@ def main():
     """Main rollback entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Backup or rollback conversation memory")
-    parser.add_argument(
-        'action',
-        choices=['backup', 'rollback'],
-        help="Action to perform"
+    parser = argparse.ArgumentParser(
+        description="Backup or rollback conversation memory"
     )
     parser.add_argument(
-        '--source',
+        "action", choices=["backup", "rollback"], help="Action to perform"
+    )
+    parser.add_argument(
+        "--source",
         type=Path,
         default=Path.home() / ".flossi0ullk",
-        help="Source directory (default: ~/.flossi0ullk)"
+        help="Source directory (default: ~/.flossi0ullk)",
     )
     parser.add_argument(
-        '--backup-dir',
+        "--backup-dir",
         type=Path,
         default=Path.home() / ".flossi0ullk_backup",
-        help="Backup directory (default: ~/.flossi0ullk_backup)"
+        help="Backup directory (default: ~/.flossi0ullk_backup)",
     )
 
     args = parser.parse_args()
@@ -118,7 +118,7 @@ def main():
     logger.info(f"Conversation Memory {args.action.upper()}")
     logger.info("=" * 60)
 
-    if args.action == 'backup':
+    if args.action == "backup":
         # Also check local memory directory
         local_memory = Path(__file__).parent.parent / "memory"
         if not args.source.exists() and local_memory.exists():
@@ -134,7 +134,7 @@ def main():
             logger.error("❌ Backup failed")
             sys.exit(1)
 
-    elif args.action == 'rollback':
+    elif args.action == "rollback":
         # Check for local backup if main backup doesn't exist
         local_backup = Path(__file__).parent.parent / "memory_backup"
         if not args.backup_dir.exists() and local_backup.exists():

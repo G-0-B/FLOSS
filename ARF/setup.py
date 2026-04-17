@@ -63,9 +63,9 @@ extras_require = {
 }
 
 # "all" includes everything
-extras_require["all"] = list(set(
-    dep for extra_deps in extras_require.values() for dep in extra_deps
-))
+extras_require["all"] = list(
+    set(dep for extra_deps in extras_require.values() for dep in extra_deps)
+)
 
 setup(
     name="arf",

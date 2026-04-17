@@ -19,6 +19,7 @@ from packages.metacoordinator_mcp.hashline import (
 
 
 def test_verify_replace_reports_verified_when_new_lands_cleanly():
+    """Replace verification should pass when only the new snippet remains."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         path.write_text("def answer():\n    return 43\n", encoding="utf-8")
@@ -32,6 +33,7 @@ def test_verify_replace_reports_verified_when_new_lands_cleanly():
 
 
 def test_verify_replace_reports_unverified_when_old_and_new_both_exist():
+    """Replace verification should stay ambiguous when both snippets remain."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         path.write_text(
@@ -47,6 +49,7 @@ def test_verify_replace_reports_unverified_when_old_and_new_both_exist():
 
 
 def test_verify_replace_reports_mismatch_when_new_is_absent():
+    """Replace verification should fail when the new snippet never appears."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         path.write_text("def answer():\n    return 42\n", encoding="utf-8")
@@ -59,6 +62,7 @@ def test_verify_replace_reports_mismatch_when_new_is_absent():
 
 
 def test_verify_write_reports_exact_file_match():
+    """Write verification should compare whole-file hashes exactly."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         content = "def answer():\n    return 42\n"
@@ -76,6 +80,7 @@ def test_verify_write_reports_exact_file_match():
 
 
 def test_verify_multiedit_aggregates_subchecks():
+    """Multiedit verification should summarize the status of each sub-edit."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         path.write_text(
@@ -97,6 +102,7 @@ def test_verify_multiedit_aggregates_subchecks():
 
 
 def test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches():
+    """Exact checkpoint post-images should override weaker replace heuristics."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         pre_text = "def answer():\n    return 42\n"
@@ -120,6 +126,7 @@ def test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches(
 
 
 def test_verify_replace_reports_mismatch_when_exact_post_image_diverges():
+    """Checkpoint divergence should promote an otherwise verified edit to mismatch."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         pre_text = "def answer():\n    return 42\n"
@@ -145,6 +152,7 @@ def test_verify_replace_reports_mismatch_when_exact_post_image_diverges():
 
 
 def test_render_verification_section_includes_hashlined_evidence():
+    """Rendered reports should include the headline verification evidence blocks."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         path.write_text("def answer():\n    return 43\n", encoding="utf-8")
@@ -160,6 +168,7 @@ def test_render_verification_section_includes_hashlined_evidence():
 
 
 def _run_all() -> int:
+    """Run the lightweight standalone test bundle without pytest."""
     tests = [
         test_verify_replace_reports_verified_when_new_lands_cleanly,
         test_verify_replace_reports_unverified_when_old_and_new_both_exist,

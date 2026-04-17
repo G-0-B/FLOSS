@@ -50,6 +50,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 @dataclass
 class Embedding:
     """Represents a single embedding vector along with optional metadata.
@@ -65,6 +66,7 @@ class Embedding:
         with the FLOSSI0ULLK principle of **Love**, preserving the
         identity and agency of contributors.
     """
+
     vector: np.ndarray
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
 
@@ -73,6 +75,7 @@ class Embedding:
             raise TypeError("vector must be a numpy.ndarray")
         if self.vector.ndim != 1:
             raise ValueError("vector must be one‑dimensional")
+
 
 class MultiScaleEmbedding:
     """Manages embeddings across multiple scales or reference frames.
@@ -113,7 +116,9 @@ class MultiScaleEmbedding:
       embeddings and any issues encountered.
     """
 
-    def __init__(self, aggregator: Callable[[Iterable[np.ndarray]], np.ndarray] | None = None) -> None:
+    def __init__(
+        self, aggregator: Callable[[Iterable[np.ndarray]], np.ndarray] | None = None
+    ) -> None:
         self.levels: Dict[str, Dict[str, Embedding]] = {}
         self.aggregator: Callable[[Iterable[np.ndarray]], np.ndarray] = (
             aggregator if aggregator is not None else self._default_aggregator
@@ -133,7 +138,13 @@ class MultiScaleEmbedding:
         result = np.sum(vectors, axis=0)
         return result
 
-    def add_embedding(self, level: str, embedding_id: str, vector: np.ndarray, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def add_embedding(
+        self,
+        level: str,
+        embedding_id: str,
+        vector: np.ndarray,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Add an embedding at a given level.
 
         Parameters
@@ -155,12 +166,16 @@ class MultiScaleEmbedding:
         if level not in self.levels:
             self.levels[level] = {}
         if embedding_id in self.levels[level]:
-            raise ValueError(f"Embedding ID '{embedding_id}' already exists in level '{level}'")
+            raise ValueError(
+                f"Embedding ID '{embedding_id}' already exists in level '{level}'"
+            )
         emb = Embedding(vector=vector, metadata=metadata or {})
         self.levels[level][embedding_id] = emb
         logger.debug("Added embedding %s at level %s", embedding_id, level)
 
-    def add_coarse_level(self, coarse_level: str, fine_level: str, grouping: Dict[str, List[str]]) -> None:
+    def add_coarse_level(
+        self, coarse_level: str, fine_level: str, grouping: Dict[str, List[str]]
+    ) -> None:
         """Create a coarse level by aggregating fine‑level embeddings.
 
         Parameters
@@ -200,20 +215,31 @@ class MultiScaleEmbedding:
             children_meta: List[Dict[str, Any]] = []
             for fid in fine_ids:
                 if fid not in fine_embeddings:
-                    raise KeyError(f"Fine embedding ID '{fid}' not found in level '{fine_level}'")
+                    raise KeyError(
+                        f"Fine embedding ID '{fid}' not found in level '{fine_level}'"
+                    )
                 emb = fine_embeddings[fid]
                 vectors.append(emb.vector)
-                children_meta.append({
-                    'id': fid,
-                    'metadata': emb.metadata,
-                })
+                children_meta.append(
+                    {
+                        "id": fid,
+                        "metadata": emb.metadata,
+                    }
+                )
             coarse_vector = self.aggregator(vectors)
             coarse_metadata = {
-                'children': children_meta,
-                'source_level': fine_level,
+                "children": children_meta,
+                "source_level": fine_level,
             }
-            self.levels[coarse_level][coarse_id] = Embedding(vector=coarse_vector, metadata=coarse_metadata)
-            logger.debug("Created coarse embedding %s at level %s from %d children", coarse_id, coarse_level, len(fine_ids))
+            self.levels[coarse_level][coarse_id] = Embedding(
+                vector=coarse_vector, metadata=coarse_metadata
+            )
+            logger.debug(
+                "Created coarse embedding %s at level %s from %d children",
+                coarse_id,
+                coarse_level,
+                len(fine_ids),
+            )
 
     def get_embedding(self, level: str, embedding_id: str) -> Embedding:
         """Retrieve an embedding by level and ID.
@@ -238,7 +264,9 @@ class MultiScaleEmbedding:
         if level not in self.levels:
             raise KeyError(f"Level '{level}' does not exist")
         if embedding_id not in self.levels[level]:
-            raise KeyError(f"Embedding ID '{embedding_id}' not found in level '{level}'")
+            raise KeyError(
+                f"Embedding ID '{embedding_id}' not found in level '{level}'"
+            )
         return self.levels[level][embedding_id]
 
     def get_all_embeddings(self, level: str) -> Dict[str, Embedding]:
@@ -287,17 +315,17 @@ class MultiScaleEmbedding:
             serialized_levels[level_name] = {}
             for emb_id, embedding in embeddings.items():
                 serialized_levels[level_name][emb_id] = {
-                    'vector': embedding.vector.tolist(),
-                    'metadata': embedding.metadata,
+                    "vector": embedding.vector.tolist(),
+                    "metadata": embedding.metadata,
                 }
 
         return {
-            'levels': serialized_levels,
-            'is_default_aggregator': self.aggregator == self._default_aggregator,
+            "levels": serialized_levels,
+            "is_default_aggregator": self.aggregator == self._default_aggregator,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'MultiScaleEmbedding':
+    def from_dict(cls, data: Dict[str, Any]) -> "MultiScaleEmbedding":
         """Reconstruct a MultiScaleEmbedding instance from dictionary representation.
 
         This is the inverse of to_dict(), enabling serialization round-trips.
@@ -336,13 +364,13 @@ class MultiScaleEmbedding:
             raise TypeError(f"Expected dict, got {type(data).__name__}")
 
         # Validate required fields
-        if 'levels' not in data:
+        if "levels" not in data:
             raise ValueError("Missing required field: 'levels'")
 
         # Create instance with appropriate aggregator
         # For now, only support default aggregator in deserialization
         # Custom aggregators would need separate handling
-        is_default = data.get('is_default_aggregator', True)
+        is_default = data.get("is_default_aggregator", True)
         if not is_default:
             logger.warning(
                 "Custom aggregator detected but not supported in deserialization; "
@@ -352,9 +380,11 @@ class MultiScaleEmbedding:
         instance = cls()
 
         # Restore embeddings at each level
-        levels_data = data['levels']
+        levels_data = data["levels"]
         if not isinstance(levels_data, dict):
-            raise TypeError(f"Expected 'levels' to be dict, got {type(levels_data).__name__}")
+            raise TypeError(
+                f"Expected 'levels' to be dict, got {type(levels_data).__name__}"
+            )
 
         for level_name, embeddings_dict in levels_data.items():
             if not isinstance(embeddings_dict, dict):
@@ -371,11 +401,13 @@ class MultiScaleEmbedding:
                         f"got {type(emb_data).__name__}"
                     )
 
-                if 'vector' not in emb_data:
-                    raise ValueError(f"Missing 'vector' field in embedding '{emb_id}' at level '{level_name}'")
+                if "vector" not in emb_data:
+                    raise ValueError(
+                        f"Missing 'vector' field in embedding '{emb_id}' at level '{level_name}'"
+                    )
 
                 # Convert list back to numpy array
-                vector_data = emb_data['vector']
+                vector_data = emb_data["vector"]
                 if isinstance(vector_data, list):
                     try:
                         vector = np.array(vector_data, dtype=np.float32)
@@ -392,7 +424,7 @@ class MultiScaleEmbedding:
                     )
 
                 # Restore metadata (default to empty dict if not present)
-                metadata = emb_data.get('metadata', {})
+                metadata = emb_data.get("metadata", {})
                 if not isinstance(metadata, dict):
                     raise TypeError(
                         f"Expected metadata for '{emb_id}' to be dict, "
@@ -403,8 +435,7 @@ class MultiScaleEmbedding:
                 instance.add_embedding(level_name, emb_id, vector, metadata)
 
         logger.debug(
-            "Deserialized MultiScaleEmbedding with %d levels",
-            len(instance.levels)
+            "Deserialized MultiScaleEmbedding with %d levels", len(instance.levels)
         )
 
         return instance
@@ -428,7 +459,7 @@ class MultiScaleEmbedding:
                 return len(emb.vector)
         return 0
 
-    def items(self, level: str = 'default') -> Iterable[tuple[str, np.ndarray]]:
+    def items(self, level: str = "default") -> Iterable[tuple[str, np.ndarray]]:
         """Iterate over (key, vector) pairs at a given level.
 
         Parameters
@@ -446,7 +477,13 @@ class MultiScaleEmbedding:
         for emb_id, emb in self.levels[level].items():
             yield (emb_id, emb.vector)
 
-    def add(self, key: str, vector: np.ndarray, level: str = 'default', metadata: Optional[Dict[str, Any]] = None) -> None:
+    def add(
+        self,
+        key: str,
+        vector: np.ndarray,
+        level: str = "default",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Add an embedding with a simpler interface.
 
         This is a convenience method for the dictionary-like interface.
@@ -469,7 +506,7 @@ class MultiScaleEmbedding:
         self.levels[level][key] = emb
         logger.debug("Added/updated embedding %s at level %s", key, level)
 
-    def get(self, key: str, level: str = 'default') -> Optional[np.ndarray]:
+    def get(self, key: str, level: str = "default") -> Optional[np.ndarray]:
         """Get an embedding vector by key.
 
         Parameters
@@ -489,7 +526,7 @@ class MultiScaleEmbedding:
         emb = self.levels[level].get(key)
         return emb.vector if emb else None
 
-    def __contains__(self, key: str, level: str = 'default') -> bool:
+    def __contains__(self, key: str, level: str = "default") -> bool:
         """Check if a key exists at the given level.
 
         Parameters
@@ -506,7 +543,7 @@ class MultiScaleEmbedding:
         """
         return level in self.levels and key in self.levels[level]
 
-    def __len__(self, level: str = 'default') -> int:
+    def __len__(self, level: str = "default") -> int:
         """Get the number of embeddings at the given level.
 
         Parameters
@@ -527,11 +564,11 @@ class MultiScaleEmbedding:
 
     def compose(
         self,
-        other: 'MultiScaleEmbedding',
-        strategy: str = 'merge',
+        other: "MultiScaleEmbedding",
+        strategy: str = "merge",
         similarity_threshold: float = 0.95,
-        level: str = 'default'
-    ) -> 'MultiScaleEmbedding':
+        level: str = "default",
+    ) -> "MultiScaleEmbedding":
         """
         Compose embeddings from another MultiScaleEmbedding instance.
 
@@ -566,16 +603,22 @@ class MultiScaleEmbedding:
         """
         # Validate inputs
         if not isinstance(other, MultiScaleEmbedding):
-            raise TypeError(f"Can only compose with MultiScaleEmbedding, got {type(other)}")
+            raise TypeError(
+                f"Can only compose with MultiScaleEmbedding, got {type(other)}"
+            )
 
         # Validate strategy first (before early return)
-        valid_strategies = ['merge', 'average', 'append']
+        valid_strategies = ["merge", "average", "append"]
         if strategy not in valid_strategies:
-            raise ValueError(f"Invalid strategy '{strategy}'. Must be one of {valid_strategies}")
+            raise ValueError(
+                f"Invalid strategy '{strategy}'. Must be one of {valid_strategies}"
+            )
 
         # Check if other has the level we're trying to compose
         if level not in other.levels:
-            logger.debug(f"Other MultiScaleEmbedding has no level '{level}', nothing to compose")
+            logger.debug(
+                f"Other MultiScaleEmbedding has no level '{level}', nothing to compose"
+            )
             return self
 
         # Check dimensions if both have embeddings
@@ -586,16 +629,18 @@ class MultiScaleEmbedding:
                 )
 
         # Execute strategy
-        if strategy == 'merge':
+        if strategy == "merge":
             self._compose_merge(other, similarity_threshold, level)
-        elif strategy == 'average':
+        elif strategy == "average":
             self._compose_average(other, similarity_threshold, level)
-        elif strategy == 'append':
+        elif strategy == "append":
             self._compose_append(other, level)
 
         return self
 
-    def _compose_merge(self, other: 'MultiScaleEmbedding', threshold: float, level: str) -> None:
+    def _compose_merge(
+        self, other: "MultiScaleEmbedding", threshold: float, level: str
+    ) -> None:
         """Merge strategy: add new items, skip duplicates."""
         for key, embedding in other.items(level):
             # Check if we already have a similar embedding
@@ -606,7 +651,9 @@ class MultiScaleEmbedding:
                 existing_norm = existing_emb / (np.linalg.norm(existing_emb) + 1e-10)
                 similarity = np.dot(emb_norm, existing_norm)
                 if similarity > threshold:
-                    logger.debug(f"Skipping '{key}' (duplicate of '{existing_key}', sim={similarity:.3f})")
+                    logger.debug(
+                        f"Skipping '{key}' (duplicate of '{existing_key}', sim={similarity:.3f})"
+                    )
                     is_duplicate = True
                     break
 
@@ -615,7 +662,9 @@ class MultiScaleEmbedding:
                 self.add(key, embedding, level)
                 logger.debug(f"Added '{key}' from composition")
 
-    def _compose_average(self, other: 'MultiScaleEmbedding', threshold: float, level: str) -> None:
+    def _compose_average(
+        self, other: "MultiScaleEmbedding", threshold: float, level: str
+    ) -> None:
         """Average strategy: blend embeddings for duplicates."""
         for key, embedding in other.items(level):
             # Find most similar existing embedding
@@ -640,13 +689,15 @@ class MultiScaleEmbedding:
                 if norm > 1e-10:
                     averaged = averaged / norm
                 self.add(best_match, averaged, level)
-                logger.debug(f"Averaged '{key}' with '{best_match}' (sim={best_similarity:.3f})")
+                logger.debug(
+                    f"Averaged '{key}' with '{best_match}' (sim={best_similarity:.3f})"
+                )
             else:
                 # Add as new item
                 self.add(key, embedding, level)
                 logger.debug(f"Added '{key}' (no match found)")
 
-    def _compose_append(self, other: 'MultiScaleEmbedding', level: str) -> None:
+    def _compose_append(self, other: "MultiScaleEmbedding", level: str) -> None:
         """Append strategy: keep all items with unique keys."""
         for key, embedding in other.items(level):
             # Ensure unique key
@@ -677,13 +728,13 @@ class MultiScaleEmbedding:
             result[level] = {}
             for emb_id, emb in embeddings.items():
                 result[level][emb_id] = {
-                    'vector': emb.vector.tolist(),
-                    'metadata': emb.metadata
+                    "vector": emb.vector.tolist(),
+                    "metadata": emb.metadata,
                 }
         return result
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> 'MultiScaleEmbedding':
+    def from_dict(data: Dict[str, Any]) -> "MultiScaleEmbedding":
         """Load embeddings from a dictionary.
 
         Parameters
@@ -700,8 +751,8 @@ class MultiScaleEmbedding:
         for level, embeddings in data.items():
             mse.levels[level] = {}
             for emb_id, emb_data in embeddings.items():
-                vector = np.array(emb_data['vector'])
-                metadata = emb_data.get('metadata', {})
+                vector = np.array(emb_data["vector"])
+                metadata = emb_data.get("metadata", {})
                 mse.levels[level][emb_id] = Embedding(vector=vector, metadata=metadata)
         logger.debug(f"Loaded MultiScaleEmbedding with {len(mse.levels)} level(s)")
         return mse

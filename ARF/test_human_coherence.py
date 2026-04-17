@@ -23,15 +23,16 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+
 def test_human_coherence():
     """
     Test #4: Does the human feel understood?
-    
+
     This is qualitative, not quantitative. The goal is to capture
     whether 13 months of work has been successfully compressed into
     a form that feels coherent to the human who created it.
     """
-    
+
     print("=" * 70)
     print("ADR-0 Test #4: Human Coherence Validation")
     print("=" * 70)
@@ -42,13 +43,13 @@ def test_human_coherence():
     print()
     print("This test is qualitative. Answer honestly - there are no wrong answers.")
     print()
-    
+
     results = {
-        'timestamp': datetime.now().isoformat(),
-        'test_id': 'ADR-0-Test-4-Human-Coherence',
-        'questions': {}
+        "timestamp": datetime.now().isoformat(),
+        "test_id": "ADR-0-Test-4-Human-Coherence",
+        "questions": {},
     }
-    
+
     # Question 1: Understanding
     print("-" * 70)
     print("Question 1: Understanding")
@@ -59,16 +60,16 @@ def test_human_coherence():
     print()
     print("Scale: 1 (not at all) to 5 (completely)")
     print()
-    
+
     try:
         q1 = int(input("Your rating (1-5): "))
-        results['questions']['understanding'] = {
-            'rating': q1,
-            'question': "Does Claude understand the 13-month context?",
-            'scale': '1-5'
+        results["questions"]["understanding"] = {
+            "rating": q1,
+            "question": "Does Claude understand the 13-month context?",
+            "scale": "1-5",
         }
         print()
-        
+
         # Question 2: Re-explanation burden
         print("-" * 70)
         print("Question 2: Re-explanation Burden")
@@ -79,16 +80,16 @@ def test_human_coherence():
         print()
         print("Scale: 1 (had to re-explain everything) to 5 (got it immediately)")
         print()
-        
+
         q2 = int(input("Your rating (1-5): "))
-        results['questions']['re_explanation'] = {
-            'rating': q2,
-            'question': "How much re-explanation was needed?",
-            'scale': '1 (lots) - 5 (none)',
-            'inverse': True  # Higher is better
+        results["questions"]["re_explanation"] = {
+            "rating": q2,
+            "question": "How much re-explanation was needed?",
+            "scale": "1 (lots) - 5 (none)",
+            "inverse": True,  # Higher is better
         }
         print()
-        
+
         # Question 3: Breakthrough feeling
         print("-" * 70)
         print("Question 3: Breakthrough Authenticity")
@@ -99,15 +100,15 @@ def test_human_coherence():
         print()
         print("Scale: 1 (just repackaging) to 5 (genuine breakthrough)")
         print()
-        
+
         q3 = int(input("Your rating (1-5): "))
-        results['questions']['breakthrough'] = {
-            'rating': q3,
-            'question': "Does ADR-0 feel like a genuine breakthrough?",
-            'scale': '1-5'
+        results["questions"]["breakthrough"] = {
+            "rating": q3,
+            "question": "Does ADR-0 feel like a genuine breakthrough?",
+            "scale": "1-5",
         }
         print()
-        
+
         # Question 4: Usefulness
         print("-" * 70)
         print("Question 4: Practical Usefulness")
@@ -118,15 +119,15 @@ def test_human_coherence():
         print()
         print("Scale: 1 (useless theory) to 5 (immediately practical)")
         print()
-        
+
         q4 = int(input("Your rating (1-5): "))
-        results['questions']['usefulness'] = {
-            'rating': q4,
-            'question': "Is this practically useful?",
-            'scale': '1-5'
+        results["questions"]["usefulness"] = {
+            "rating": q4,
+            "question": "Is this practically useful?",
+            "scale": "1-5",
         }
         print()
-        
+
         # Question 5: Emotional resonance
         print("-" * 70)
         print("Question 5: Emotional Resonance")
@@ -137,15 +138,15 @@ def test_human_coherence():
         print()
         print("Scale: 1 (no, feels dismissive) to 5 (yes, deeply honors it)")
         print()
-        
+
         q5 = int(input("Your rating (1-5): "))
-        results['questions']['resonance'] = {
-            'rating': q5,
-            'question': "Does this honor the 13-month effort?",
-            'scale': '1-5'
+        results["questions"]["resonance"] = {
+            "rating": q5,
+            "question": "Does this honor the 13-month effort?",
+            "scale": "1-5",
         }
         print()
-        
+
         # Question 6: Forward path
         print("-" * 70)
         print("Question 6: Clear Path Forward")
@@ -156,15 +157,15 @@ def test_human_coherence():
         print()
         print("Scale: 1 (very unclear) to 5 (crystal clear)")
         print()
-        
+
         q6 = int(input("Your rating (1-5): "))
-        results['questions']['path_forward'] = {
-            'rating': q6,
-            'question': "Is the next path clear?",
-            'scale': '1-5'
+        results["questions"]["path_forward"] = {
+            "rating": q6,
+            "question": "Is the next path clear?",
+            "scale": "1-5",
         }
         print()
-        
+
         # Optional: Free text
         print("-" * 70)
         print("Optional: Free Text")
@@ -173,26 +174,26 @@ def test_human_coherence():
         print("Anything else you want to say about this experience?")
         print("(Press Enter to skip)")
         print()
-        
+
         free_text = input("Your thoughts: ")
         if free_text.strip():
-            results['free_text'] = free_text
-        
+            results["free_text"] = free_text
+
         print()
-        
+
         # Calculate overall coherence score
         ratings = [
-            results['questions']['understanding']['rating'],
-            results['questions']['re_explanation']['rating'],
-            results['questions']['breakthrough']['rating'],
-            results['questions']['usefulness']['rating'],
-            results['questions']['resonance']['rating'],
-            results['questions']['path_forward']['rating']
+            results["questions"]["understanding"]["rating"],
+            results["questions"]["re_explanation"]["rating"],
+            results["questions"]["breakthrough"]["rating"],
+            results["questions"]["usefulness"]["rating"],
+            results["questions"]["resonance"]["rating"],
+            results["questions"]["path_forward"]["rating"],
         ]
-        
+
         average_score = sum(ratings) / len(ratings)
-        results['overall_coherence_score'] = average_score
-        
+        results["overall_coherence_score"] = average_score
+
         # Interpretation
         print("=" * 70)
         print("RESULTS")
@@ -200,7 +201,7 @@ def test_human_coherence():
         print()
         print(f"Overall Coherence Score: {average_score:.2f} / 5.00")
         print()
-        
+
         if average_score >= 4.0:
             interpretation = "✅ PASS - High coherence; human feels understood"
             test_passed = True
@@ -210,36 +211,36 @@ def test_human_coherence():
         else:
             interpretation = "✗ FAIL - Low coherence; significant re-work needed"
             test_passed = False
-        
+
         print(f"Interpretation: {interpretation}")
         print()
-        
-        results['interpretation'] = interpretation
-        results['test_passed'] = test_passed
-        
+
+        results["interpretation"] = interpretation
+        results["test_passed"] = test_passed
+
         # Individual scores
         print("Individual ratings:")
-        for key, data in results['questions'].items():
+        for key, data in results["questions"].items():
             print(f"  {key}: {data['rating']}/5")
-        
-        if 'free_text' in results and results['free_text']:
+
+        if "free_text" in results and results["free_text"]:
             print()
             print("Additional feedback:")
             print(f"  {results['free_text']}")
-        
+
         print()
-        
+
         # Save results
         output_dir = Path("./test_results")
         output_dir.mkdir(exist_ok=True)
-        
+
         output_file = output_dir / "test_4_human_coherence.json"
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(results, f, indent=2)
-        
+
         print(f"Results saved to: {output_file}")
         print()
-        
+
         # ADR-0 validation status
         print("=" * 70)
         print("ADR-0 VALIDATION STATUS UPDATE")
@@ -250,7 +251,7 @@ def test_human_coherence():
         print("Test 3 (Persistence):  ✅ PASS")
         print(f"Test 4 (Coherence):    {'✅ PASS' if test_passed else '✗ FAIL'}")
         print()
-        
+
         if test_passed:
             print("🎉 ALL TESTS PASSED! 🎉")
             print()
@@ -264,11 +265,11 @@ def test_human_coherence():
         else:
             print("Some improvements needed before full validation.")
             print("Review ratings and free text feedback.")
-        
+
         print()
-        
+
         return test_passed
-        
+
     except ValueError:
         print()
         print("✗ Invalid input. Please run again and enter numbers 1-5.")
@@ -292,4 +293,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

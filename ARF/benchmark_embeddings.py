@@ -34,7 +34,9 @@ def run_benchmark():
 
     # Initialize memory
     print("Initializing ConversationMemory...")
-    memory = ConversationMemory(agent_id="benchmark-test", storage_path="./benchmark_temp")
+    memory = ConversationMemory(
+        agent_id="benchmark-test", storage_path="./benchmark_temp"
+    )
 
     # Test texts of varying lengths
     texts = [
@@ -42,7 +44,7 @@ def run_benchmark():
         "This is a medium length text for testing",
         " ".join(["Sample text"] * 10),  # ~20 words
         " ".join(["Sample text"] * 50),  # ~100 words
-        " ".join(["Sample text"] * 100), # ~200 words
+        " ".join(["Sample text"] * 100),  # ~200 words
     ]
 
     print(f"Testing with {len(texts)} texts of varying lengths...\n")
@@ -94,6 +96,7 @@ def run_benchmark():
 
     # Cleanup
     import shutil
+
     if Path("./benchmark_temp").exists():
         shutil.rmtree("./benchmark_temp")
 
