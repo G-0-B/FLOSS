@@ -1,28 +1,50 @@
 use hdk::prelude::*;
-use rose_forest_integrity::{KnowledgeTriple, EntryTypes, LinkTypes};
+use rose_forest_integrity::{EntryTypes, KnowledgeTriple, LinkTypes};
 
 /// Valid predicates from the base and AI/ML ontologies.
 /// These define the vocabulary of relationships in the knowledge graph.
 /// New predicates require an ADR and integrity zome update.
-pub const BASE_PREDICATES: &[&str] = &[
-    "is_a", "part_of", "related_to", "has_property",
-];
+pub const BASE_PREDICATES: &[&str] = &["is_a", "part_of", "related_to", "has_property"];
 
-pub const AI_ML_PREDICATES: &[&str] = &[
-    "trained_on", "improves_upon", "capable_of", "evaluated_on",
-];
+pub const AI_ML_PREDICATES: &[&str] =
+    &["trained_on", "improves_upon", "capable_of", "evaluated_on"];
 
 pub const KNOWLEDGE_PREDICATES: &[&str] = &[
-    "relates_to", "supports", "contradicts",
-    "heals", "releases", "neutralizes", "recalibrates",
+    "relates_to",
+    "supports",
+    "contradicts",
+    "heals",
+    "releases",
+    "neutralizes",
+    "recalibrates",
 ];
 
 /// Domain/range constraints for predicates.
 /// Returns (allowed_subject_types, allowed_object_types) or None if unconstrained.
 pub fn domain_range(predicate: &str) -> Option<(&[&str], &[&str])> {
     match predicate {
-        "is_a" => Some((&["Entity", "AIModel", "Dataset", "Capability", "Benchmark", "TrainingRun", "Agent"],
-                        &["Entity", "AIModel", "Dataset", "Capability", "Benchmark", "TrainingRun", "Agent", "Thing", "Concept"])),
+        "is_a" => Some((
+            &[
+                "Entity",
+                "AIModel",
+                "Dataset",
+                "Capability",
+                "Benchmark",
+                "TrainingRun",
+                "Agent",
+            ],
+            &[
+                "Entity",
+                "AIModel",
+                "Dataset",
+                "Capability",
+                "Benchmark",
+                "TrainingRun",
+                "Agent",
+                "Thing",
+                "Concept",
+            ],
+        )),
         "trained_on" => Some((&["AIModel"], &["Dataset"])),
         "improves_upon" => Some((&["AIModel"], &["AIModel"])),
         "capable_of" => Some((&["AIModel", "Agent"], &["Capability"])),
@@ -36,8 +58,13 @@ pub fn domain_range(predicate: &str) -> Option<(&[&str], &[&str])> {
 /// eventually need DHT lookups for TypeAssertions.
 pub fn infer_type(entity_id: &str) -> String {
     let lower = entity_id.to_lowercase();
-    if lower.contains("gpt") || lower.contains("claude") || lower.contains("llama")
-        || lower.contains("gemini") || lower.contains("mistral") || lower.contains("_model") {
+    if lower.contains("gpt")
+        || lower.contains("claude")
+        || lower.contains("llama")
+        || lower.contains("gemini")
+        || lower.contains("mistral")
+        || lower.contains("_model")
+    {
         "AIModel".to_string()
     } else if lower.contains("_dataset") || lower.contains("_data") {
         "Dataset".to_string()
@@ -86,9 +113,10 @@ pub fn create_triple(
 ) -> ExternResult<ActionHash> {
     // Domain/range validation (coordinator-level, beyond what integrity validates)
     if let Err(reason) = check_domain_range(&predicate, &subject, &object) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("E_ONTOLOGY_VIOLATION: {}", reason)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "E_ONTOLOGY_VIOLATION: {}",
+            reason
+        ))));
     }
 
     let now = sys_time()?;
@@ -105,11 +133,21 @@ pub fn create_triple(
 
     // Index by subject for pattern queries
     let subject_path = Path::from(format!("triples.subject.{}", subject));
-    create_link(subject_path.path_entry_hash()?, hash.clone(), LinkTypes::TriplesBySubject, ())?;
+    create_link(
+        subject_path.path_entry_hash()?,
+        hash.clone(),
+        LinkTypes::TriplesBySubject,
+        (),
+    )?;
 
     // Index by predicate for relationship queries
     let predicate_path = Path::from(format!("triples.predicate.{}", predicate));
-    create_link(predicate_path.path_entry_hash()?, hash.clone(), LinkTypes::TriplesByPredicate, ())?;
+    create_link(
+        predicate_path.path_entry_hash()?,
+        hash.clone(),
+        LinkTypes::TriplesByPredicate,
+        (),
+    )?;
 
     Ok(hash)
 }
@@ -118,7 +156,8 @@ pub fn create_triple(
 pub fn query_by_subject(subject: &str) -> ExternResult<Vec<(ActionHash, KnowledgeTriple)>> {
     let path = Path::from(format!("triples.subject.{}", subject));
     let links = get_links(
-        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesBySubject)?.build()
+        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesBySubject)?
+            .build(),
     )?;
     fetch_triples_from_links(links)
 }
@@ -127,7 +166,8 @@ pub fn query_by_subject(subject: &str) -> ExternResult<Vec<(ActionHash, Knowledg
 pub fn query_by_predicate(predicate: &str) -> ExternResult<Vec<(ActionHash, KnowledgeTriple)>> {
     let path = Path::from(format!("triples.predicate.{}", predicate));
     let links = get_links(
-        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesByPredicate)?.build()
+        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesByPredicate)?
+            .build(),
     )?;
     fetch_triples_from_links(links)
 }
@@ -135,10 +175,15 @@ pub fn query_by_predicate(predicate: &str) -> ExternResult<Vec<(ActionHash, Know
 fn fetch_triples_from_links(links: Vec<Link>) -> ExternResult<Vec<(ActionHash, KnowledgeTriple)>> {
     let mut results = Vec::new();
     for link in links {
-        let target_hash = link.target.into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
+        let target_hash =
+            link.target
+                .into_action_hash()
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid action hash".into()
+                )))?;
         if let Some(record) = get(target_hash.clone(), GetOptions::default())? {
-            if let Some(triple) = record.entry()
+            if let Some(triple) = record
+                .entry()
                 .to_app_option::<KnowledgeTriple>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {

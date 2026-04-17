@@ -17,14 +17,12 @@ pub fn consume_budget(agent: &AgentPubKey, cost: f32) -> ExternResult<()> {
     let mut budget_state = get_budget_state(agent)?;
 
     if budget_state.remaining_ru < cost {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "E_BUDGET_EXCEEDED: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
-                cost,
-                budget_state.remaining_ru,
-                budget_state.window_start.as_seconds() + BUDGET_WINDOW_SECONDS
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "E_BUDGET_EXCEEDED: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
+            cost,
+            budget_state.remaining_ru,
+            budget_state.window_start.as_seconds() + BUDGET_WINDOW_SECONDS
+        ))));
     }
 
     budget_state.remaining_ru -= cost;
@@ -39,7 +37,7 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
 
     let path = Path::from(format!("agent_budget.{}", agent_address));
     let links = get_links(
-        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AgentBudget)?.build()
+        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AgentBudget)?.build(),
     )?;
 
     let mut latest_budget: Option<BudgetEntry> = None;
@@ -48,7 +46,9 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     for link in links {
         if let Some(record) = get(link.target.clone(), GetOptions::default())? {
             if let Some(budget_entry) = record.entry().to_app_option::<BudgetEntry>()? {
-                if latest_timestamp.is_none() || budget_entry.window_start > latest_timestamp.unwrap() {
+                if latest_timestamp.is_none()
+                    || budget_entry.window_start > latest_timestamp.unwrap()
+                {
                     latest_budget = Some(budget_entry);
                     latest_timestamp = Some(budget_entry.window_start);
                 }
@@ -57,7 +57,9 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     }
 
     match latest_budget {
-        Some(budget) if (now.as_seconds() - budget.window_start.as_seconds()) < BUDGET_WINDOW_SECONDS => {
+        Some(budget)
+            if (now.as_seconds() - budget.window_start.as_seconds()) < BUDGET_WINDOW_SECONDS =>
+        {
             Ok(BudgetState {
                 agent: agent_address,
                 remaining_ru: budget.remaining_ru,
@@ -77,7 +79,11 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     }
 }
 
-fn create_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
+fn create_budget_entry(
+    agent: &AgentPubKey,
+    remaining_ru: f32,
+    window_start: Timestamp,
+) -> ExternResult<ActionHash> {
     let budget_entry = BudgetEntry {
         agent: agent.clone(),
         remaining_ru,
@@ -85,11 +91,20 @@ fn create_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Tim
     };
     let hash = create_entry(&budget_entry)?;
     let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
+    create_link(
+        path.path_entry_hash()?,
+        hash.clone(),
+        LinkTypes::AgentBudget,
+        (),
+    )?;
     Ok(hash)
 }
 
-fn update_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
+fn update_budget_entry(
+    agent: &AgentPubKey,
+    remaining_ru: f32,
+    window_start: Timestamp,
+) -> ExternResult<ActionHash> {
     let budget_entry = BudgetEntry {
         agent: agent.clone(),
         remaining_ru,
@@ -97,7 +112,12 @@ fn update_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Tim
     };
     let hash = create_entry(&budget_entry)?;
     let path = Path::from(format!("agent_budget.{}", agent.clone()));
-    create_link(path.path_entry_hash()?, hash.clone(), LinkTypes::AgentBudget, ())?;
+    create_link(
+        path.path_entry_hash()?,
+        hash.clone(),
+        LinkTypes::AgentBudget,
+        (),
+    )?;
     Ok(hash)
 }
 
