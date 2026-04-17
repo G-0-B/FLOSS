@@ -186,7 +186,9 @@ def toml_list(values: list[Any]) -> str:
 
 
 def toml_inline_table(mapping: dict[str, Any]) -> str:
-    rendered = ", ".join(f"{key} = {toml_scalar(value)}" for key, value in mapping.items())
+    rendered = ", ".join(
+        f"{key} = {toml_scalar(value)}" for key, value in mapping.items()
+    )
     return "{ " + rendered + " }"
 
 
@@ -354,7 +356,9 @@ def build_vibe_server_spec(
                 f"Vibe MCP server {name!r} requires a string `command` for stdio transport"
             )
         args = merged.get("args", [])
-        if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
+        if not isinstance(args, list) or not all(
+            isinstance(item, str) for item in args
+        ):
             raise SharedSurfaceError(
                 f"Vibe MCP server {name!r} stdio args must be a list of strings"
             )
@@ -419,10 +423,14 @@ def build_vibe_config(
     if not isinstance(mcp_names, list) or not all(
         isinstance(item, str) for item in mcp_names
     ):
-        raise SharedSurfaceError("Vibe target field `mcp_servers` must be a list of names")
+        raise SharedSurfaceError(
+            "Vibe target field `mcp_servers` must be a list of names"
+        )
     overrides = vibe_cfg.get("server_overrides", {})
     if overrides and not isinstance(overrides, dict):
-        raise SharedSurfaceError("Vibe target field `server_overrides` must be an object")
+        raise SharedSurfaceError(
+            "Vibe target field `server_overrides` must be an object"
+        )
 
     server_specs: list[dict[str, Any]] = []
     for name in mcp_names:
@@ -480,9 +488,10 @@ def build_vibe_config(
         ):
             if field_name in spec:
                 value = spec[field_name]
-                if field_name in {"startup_timeout_sec", "tool_timeout_sec"} and isinstance(
-                    value, int
-                ):
+                if field_name in {
+                    "startup_timeout_sec",
+                    "tool_timeout_sec",
+                } and isinstance(value, int):
                     value = float(value)
                 lines.append(f"{field_name} = {toml_scalar(value)}")
 
@@ -715,7 +724,9 @@ def materialize(
                 raise SharedSurfaceError("Vibe target `agents` entries must be objects")
             agent_name = str(agent_spec.get("name", "")).strip()
             if not agent_name:
-                raise SharedSurfaceError("Vibe target agents require a non-empty `name`")
+                raise SharedSurfaceError(
+                    "Vibe target agents require a non-empty `name`"
+                )
             agent_path = agents_dir / f"{agent_name}.toml"
             content = build_vibe_agent(agent_spec)
             message, changed = check_or_write_text(
@@ -727,7 +738,9 @@ def materialize(
         launcher_raw = vibe_cfg.get("launcher_path")
         if launcher_raw is not None:
             if not isinstance(launcher_raw, str) or not launcher_raw.strip():
-                raise SharedSurfaceError("Vibe target field `launcher_path` must be a non-empty string")
+                raise SharedSurfaceError(
+                    "Vibe target field `launcher_path` must be a non-empty string"
+                )
             launcher_path = workspace_root / launcher_raw
             launcher_content = build_vibe_launcher(workspace_root, vibe_cfg)
             message, changed = check_or_write_text(

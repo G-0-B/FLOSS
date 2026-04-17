@@ -68,7 +68,9 @@ def parse_frontmatter(skill_md: Path) -> dict[str, str]:
     try:
         payload = yaml.safe_load(raw_frontmatter)
     except yaml.YAMLError as exc:
-        raise SkillSurfaceError(f"Invalid YAML frontmatter in {skill_md}: {exc}") from exc
+        raise SkillSurfaceError(
+            f"Invalid YAML frontmatter in {skill_md}: {exc}"
+        ) from exc
 
     if not isinstance(payload, dict):
         raise SkillSurfaceError(f"{skill_md} frontmatter must parse to a YAML mapping")

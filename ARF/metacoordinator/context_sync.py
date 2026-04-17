@@ -71,7 +71,6 @@ class ContextSyncEngine:
 
     def broadcast_update(self, key: str, value: Any, source_agent: str):
         """Broadcast context update to all agents"""
-
         # Create a versioned value wrapper
         current_val = self.shared_context.get(key)
         new_version = (current_val["version"] + 1) if current_val else 1

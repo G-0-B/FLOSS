@@ -1,13 +1,14 @@
 """Preview: How consensus engine will use context sync"""
 
+from importlib import import_module
+from pathlib import Path
 import sys
-import os
 
-# Add the parent directory to sys.path to import the module
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from metacoordinator.context_sync import ContextSyncEngine
-from typing import Dict, Any
+if __package__ in {None, ""}:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    ContextSyncEngine = import_module("metacoordinator.context_sync").ContextSyncEngine
+else:
+    ContextSyncEngine = import_module(f"{__package__}.context_sync").ContextSyncEngine
 
 
 class ConsensusPreview:
@@ -18,7 +19,6 @@ class ConsensusPreview:
 
     def simulate_rfc_workflow(self):
         """Show how RFC will flow through system"""
-
         # Agent A proposes RFC
         rfc_id = "RFC-001"
         self.context.broadcast_update(

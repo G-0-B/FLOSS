@@ -280,13 +280,12 @@ class ConsensusEngine:
             )
 
         # Too many abstentions - need more information
-        elif abstain / total > 0.4:
+        if abstain / total > 0.4:
             # Request clarification from proposer
             return None
 
         # No clear consensus yet - continue deliberation
-        else:
-            return None
+        return None
 
     def _evaluate_consensus(
         self, rfc: RFC, votes: Dict[str, VoteCast]
@@ -324,8 +323,7 @@ class ConsensusEngine:
             )
 
         # Continue deliberation
-        else:
-            return None
+        return None
 
     def _synthesize_rationale(self, votes: Dict[str, VoteCast], outcome: str) -> str:
         """

@@ -188,13 +188,21 @@ def extract_markdown_view(
         if stripped.startswith(("-", "*", "+")):
             flush_paragraph()
             bullet_text = clean_markdown_fragment(stripped[1:].strip())
-            if bullet_text and bullet_text not in {"-", "--"} and len(bullets) < max_bullets:
+            if (
+                bullet_text
+                and bullet_text not in {"-", "--"}
+                and len(bullets) < max_bullets
+            ):
                 bullets.append(bullet_text)
             continue
         if stripped[0].isdigit() and ". " in stripped:
             flush_paragraph()
             bullet_text = clean_markdown_fragment(stripped.split(". ", 1)[1])
-            if bullet_text and bullet_text not in {"-", "--"} and len(bullets) < max_bullets:
+            if (
+                bullet_text
+                and bullet_text not in {"-", "--"}
+                and len(bullets) < max_bullets
+            ):
                 bullets.append(bullet_text)
             continue
         paragraph_lines.append(clean_markdown_fragment(stripped))
