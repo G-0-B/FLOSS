@@ -179,10 +179,14 @@ def mock_holochain_conductor():
     """
 
     class MockConductor:
+        """Minimal in-memory conductor stub for integration-style tests."""
+
         def __init__(self):
+            """Initialize the mock conductor state."""
             self.entries = {}
 
         def create_entry(self, entry_type: str, content: dict):
+            """Create a mock entry and return its generated hash."""
             entry_hash = f"mock_hash_{len(self.entries)}"
             self.entries[entry_hash] = {
                 "type": entry_type,
@@ -191,9 +195,11 @@ def mock_holochain_conductor():
             return entry_hash
 
         def get_entry(self, entry_hash: str):
+            """Fetch a mock entry by its generated hash."""
             return self.entries.get(entry_hash)
 
         def query_entries(self, entry_type: str):
+            """Return all mock entries matching the requested type."""
             return [
                 (hash, entry)
                 for hash, entry in self.entries.items()
