@@ -17,7 +17,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 def run_benchmark():
     """Benchmark model load time, encode speed, and basic semantic similarity.
 
-    This keeps the local embedding path honest about latency and obvious semantic regressions.
+    This keeps the local embedding path honest about latency and obvious
+    semantic regressions.
     """
     from conversation_memory import ConversationMemory
 

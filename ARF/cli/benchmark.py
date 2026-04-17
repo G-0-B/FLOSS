@@ -10,29 +10,47 @@ Examples:
     arf benchmark list-suites
 """
 
-import sys
-import json
-import time
 import asyncio
+import json
+import sys
+import time
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.progress import BarColumn, Progress, TextColumn, TimeRemainingColumn
 from rich.table import Table
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-from conversation_memory import ConversationMemory
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
 
-try:
-    from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
 
-    SWARM_AVAILABLE = True
-except ImportError:
-    SWARM_AVAILABLE = False
+def _get_conversation_memory():
+    """Import ConversationMemory lazily after local path bootstrap."""
+    from conversation_memory import ConversationMemory
+
+    return ConversationMemory
+
+
+def _get_pony_swarm():
+    """Import PonySwarm lazily so local bootstrap stays lint-clean."""
+    try:
+        from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+    except ImportError:
+        return None
+
+    return PonySwarm
+
+
+def _swarm_available() -> bool:
+    """Report whether the optional pony swarm dependency is importable."""
+    return _get_pony_swarm() is not None
+
 
 app = typer.Typer(help="Benchmarking operations")
 console = Console()
@@ -65,7 +83,7 @@ def run(
             results["memory"] = _benchmark_memory(iterations, json_output)
 
         if suite in ("swarm", "all"):
-            if not SWARM_AVAILABLE:
+            if not _swarm_available():
                 error_msg = "Swarm benchmark unavailable: pony swarm module not found"
                 if json_output:
                     print(json.dumps({"success": False, "error": error_msg}))
@@ -131,6 +149,7 @@ def _benchmark_memory(iterations: int, json_output: bool) -> dict:
         task = None
 
     # Create test memory
+    ConversationMemory = _get_conversation_memory()
     memory = ConversationMemory(agent_id="benchmark")
 
     # Benchmark transmit
@@ -221,6 +240,10 @@ def _benchmark_swarm(iterations: int, json_output: bool) -> dict:
     ]
 
     async def run_benchmarks():
+        """Run the benchmark loop inside a single managed swarm session."""
+        PonySwarm = _get_pony_swarm()
+        if PonySwarm is None:
+            raise RuntimeError("Pony swarm module not available")
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
             for i in range(iterations):
                 query = queries[i % len(queries)]
@@ -281,7 +304,7 @@ def list_suites():
         (
             "swarm",
             "Pony swarm performance",
-            "Available" if SWARM_AVAILABLE else "Unavailable",
+            "Available" if _swarm_available() else "Unavailable",
         ),
         ("all", "All benchmark suites", "Available"),
     ]

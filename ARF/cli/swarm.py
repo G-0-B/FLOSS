@@ -10,26 +10,37 @@ Examples:
     arf swarm run --query "Complex reasoning task" --aggregation-size 2
 """
 
-import sys
-import json
 import asyncio
+import json
+import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-try:
-    from pwnies.desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
 
-    SWARM_AVAILABLE = True
-except ImportError:
-    SWARM_AVAILABLE = False
+
+def _get_swarm_runtime():
+    """Import SwarmRuntime lazily after local path bootstrap."""
+    try:
+        from pwnies.desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
+    except ImportError:
+        return None
+
+    return SwarmRuntime
+
+
+def _swarm_available() -> bool:
+    """Report whether the optional swarm runtime dependency is importable."""
+    return _get_swarm_runtime() is not None
+
 
 app = typer.Typer(help="Pony swarm operations")
 console = Console()
@@ -60,8 +71,11 @@ def query(
     emergent capabilities. The command's parameters (N, K, T) allow for fine-tuning
     the RSA process, enabling experimentation and optimization.
     """
-    if not SWARM_AVAILABLE:
-        error_msg = "Pony swarm module not available. Install dependencies or check pwnies/ directory."
+    if not _swarm_available():
+        error_msg = (
+            "Pony swarm module not available. "
+            "Install dependencies or check pwnies/ directory."
+        )
         if json_output:
             print(json.dumps({"success": False, "error": error_msg}))
         else:
@@ -130,6 +144,9 @@ async def _run_swarm_query(
     json_output: bool,
 ):
     """Helper to run swarm query asynchronously"""
+    SwarmRuntime = _get_swarm_runtime()
+    if SwarmRuntime is None:
+        raise RuntimeError("Pony swarm module not available")
     runtime = SwarmRuntime()
     runtime.start()
     # This is a placeholder for the actual query.

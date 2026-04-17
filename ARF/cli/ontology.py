@@ -10,20 +10,31 @@ Examples:
     arf ontology list-predicates --json
 """
 
-import sys
 import json
 import re
+import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-from conversation_memory import ConversationMemory
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
+
+
+def _get_conversation_memory():
+    """Import ConversationMemory lazily after local path bootstrap."""
+    from conversation_memory import ConversationMemory
+
+    return ConversationMemory
+
 
 app = typer.Typer(help="Ontology operations")
 console = Console()
@@ -51,7 +62,8 @@ def parse_triple(triple_str: str) -> Tuple[str, str, str]:
 
     if not match:
         raise ValueError(
-            f"Invalid triple format: {triple_str}. Expected: (subject, predicate, object)"
+            "Invalid triple format: "
+            f"{triple_str}. Expected: (subject, predicate, object)"
         )
 
     return (
@@ -81,10 +93,11 @@ def validate(
         subject, predicate, obj = parse_triple(triple)
 
         # Create a temporary memory instance for validation
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id="validator", validate_ontology=True)
 
         # Validate using the internal method
-        is_valid, error_msg = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory._validate_triple((subject, predicate, obj))
 
         if json_output:
             print(
@@ -142,8 +155,9 @@ def infer(
         subject, predicate, obj = parse_triple(triple)
 
         # For now, just validate (full inference in Phase 7)
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id="inference", validate_ontology=True)
-        is_valid, error_msg = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory._validate_triple((subject, predicate, obj))
 
         if not is_valid:
             if json_output:

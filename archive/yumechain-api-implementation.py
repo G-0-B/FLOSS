@@ -30,7 +30,9 @@ with open("yumechain_schema.json", "r") as f:
 
 app = FastAPI(
     title="YumeiCHAIN AI Knowledge Exchange API",
-    description="A RESTful API for AI-to-AI knowledge sharing in the YumeiCHAIN ecosystem",
+    description=(
+        "A RESTful API for AI-to-AI knowledge sharing in the YumeiCHAIN ecosystem"
+    ),
     version="0.1.0",
 )
 

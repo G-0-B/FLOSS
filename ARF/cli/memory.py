@@ -11,20 +11,30 @@ Examples:
     arf memory stats --json
 """
 
-import sys
 import json
+import sys
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich.syntax import Syntax
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-from conversation_memory import ConversationMemory
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
+
+
+def _get_conversation_memory():
+    """Import ConversationMemory lazily after local path bootstrap."""
+    from conversation_memory import ConversationMemory
+
+    return ConversationMemory
+
 
 app = typer.Typer(help="Conversation memory operations")
 console = Console()
@@ -61,6 +71,7 @@ def transmit(
     """
     try:
         # Initialize memory
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id=agent, backend=backend)
 
         # Build understanding dict
@@ -133,6 +144,7 @@ def recall(
     """
     try:
         # Initialize memory
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id=agent, backend=backend)
 
         # Recall
@@ -155,7 +167,10 @@ def recall(
                 console.print(f"[yellow]No results found for query: {query}[/yellow]")
             else:
                 console.print(
-                    f"[green]Found {len(results)} result(s) for query: {query}[/green]\n"
+                    (
+                        f"[green]Found {len(results)} result(s) "
+                        f"for query: {query}[/green]\n"
+                    )
                 )
 
                 for i, result in enumerate(results, 1):
@@ -213,6 +228,7 @@ def compose(
             sys.exit(1)
 
         # Initialize target memory
+        ConversationMemory = _get_conversation_memory()
         target_memory = ConversationMemory(agent_id=agent, backend=backend)
 
         # Compose from each source
@@ -266,6 +282,7 @@ def stats(
     """
     try:
         # Initialize memory
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id=agent, backend=backend)
 
         # Gather stats
@@ -328,6 +345,7 @@ def export(
     """
     try:
         # Initialize memory
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id=agent, backend=backend)
 
         # Export

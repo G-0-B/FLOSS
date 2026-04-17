@@ -21,20 +21,18 @@ Every library MUST have a CLI for observability and testing.
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-# Import subcommands
-from cli.memory import app as memory_app
-from cli.swarm import app as swarm_app
-from cli.ontology import app as ontology_app
-from cli.benchmark import app as benchmark_app
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
 
 # Main app
 app = typer.Typer(
@@ -44,13 +42,23 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Add subcommands
-app.add_typer(memory_app, name="memory", help="Conversation memory operations")
-app.add_typer(swarm_app, name="swarm", help="Pony swarm operations")
-app.add_typer(ontology_app, name="ontology", help="Ontology operations")
-app.add_typer(benchmark_app, name="benchmark", help="Benchmarking operations")
-
 console = Console()
+
+
+def _register_subcommands() -> None:
+    """Import and attach subcommand apps after local path bootstrap."""
+    from cli.benchmark import app as benchmark_app
+    from cli.memory import app as memory_app
+    from cli.ontology import app as ontology_app
+    from cli.swarm import app as swarm_app
+
+    app.add_typer(memory_app, name="memory", help="Conversation memory operations")
+    app.add_typer(swarm_app, name="swarm", help="Pony swarm operations")
+    app.add_typer(ontology_app, name="ontology", help="Ontology operations")
+    app.add_typer(benchmark_app, name="benchmark", help="Benchmarking operations")
+
+
+_register_subcommands()
 
 
 @app.command()
@@ -84,7 +92,6 @@ def info():
     to quickly assess the health and configuration of the system.
     """
     import json
-    from pathlib import Path
 
     # Gather system info
     info_data = {
