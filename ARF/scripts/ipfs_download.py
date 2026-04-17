@@ -1,13 +1,12 @@
-# scripts/ipfs_download.py
 #!/usr/bin/env python3
 """Download all large files from IPFS manifest"""
 
 import sys
+from importlib import import_module
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from ARF.storage.ipfs.adapter import IPFSStorageAdapter
+IPFSStorageAdapter = import_module("ARF.storage.ipfs.adapter").IPFSStorageAdapter
 
 if __name__ == "__main__":
     adapter = IPFSStorageAdapter()

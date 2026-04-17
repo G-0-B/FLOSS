@@ -43,9 +43,9 @@ def create_backup(source_dir: Path, backup_dir: Path) -> bool:
             shutil.copytree(source_dir, backup_dir)
             logger.info(f"Backup created at {backup_dir}")
             return True
-        else:
-            logger.warning(f"Source directory {source_dir} does not exist")
-            return False
+
+        logger.warning(f"Source directory {source_dir} does not exist")
+        return False
     except Exception as e:
         logger.error(f"Error creating backup: {e}", exc_info=True)
         return False

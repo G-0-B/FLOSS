@@ -7,6 +7,7 @@ for unit and integration tests.
 Phase 4 Post-Merge Enhancement
 """
 
+from importlib import import_module
 import pytest
 import tempfile
 import shutil
@@ -16,8 +17,7 @@ import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from conversation_memory import ConversationMemory
+ConversationMemory = import_module("conversation_memory").ConversationMemory
 
 
 @pytest.fixture(scope="session")

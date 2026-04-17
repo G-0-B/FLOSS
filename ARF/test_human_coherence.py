@@ -32,7 +32,6 @@ def test_human_coherence():
     whether 13 months of work has been successfully compressed into
     a form that feels coherent to the human who created it.
     """
-
     print("=" * 70)
     print("ADR-0 Test #4: Human Coherence Validation")
     print("=" * 70)

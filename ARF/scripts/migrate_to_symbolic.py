@@ -14,6 +14,7 @@ import logging
 import json
 import time
 import argparse
+from importlib import import_module
 from pathlib import Path
 from typing import Dict, List, Tuple
 from dataclasses import dataclass, asdict
@@ -21,8 +22,7 @@ import sys
 
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from conversation_memory import ConversationMemory
+ConversationMemory = import_module("conversation_memory").ConversationMemory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -189,7 +189,8 @@ def migrate_memory_store(
                         stats.holochain_synced += 1
                         if message == "Already migrated":
                             message = "Locally migrated, now synced to Holochain"
-                            # Move from already_migrated to successfully_migrated if we just did work?
+                            # Move from already_migrated to successfully_migrated
+                            # if we just did work?
                             # Or just track holochain_synced separately.
                     else:
                         success = False
@@ -202,10 +203,7 @@ def migrate_memory_store(
                     message = "Already migrated and synced"
 
         if success:
-            if (
-                message == "Already migrated"
-                or message == "Already migrated and synced"
-            ):
+            if message in {"Already migrated", "Already migrated and synced"}:
                 stats.already_migrated += 1
             else:
                 stats.successfully_migrated += 1

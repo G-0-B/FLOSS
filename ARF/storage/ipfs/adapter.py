@@ -19,12 +19,14 @@ class IPFSStorageAdapter:
         self.manifest = self._load_manifest()
 
     def _load_manifest(self) -> Dict:
+        """Load the local large-file manifest from disk."""
         if self.manifest_path.exists():
             with open(self.manifest_path) as f:
                 return yaml.safe_load(f) or {"files": []}
         return {"files": []}
 
     def _save_manifest(self):
+        """Persist the local large-file manifest to disk."""
         self.manifest_path.parent.mkdir(exist_ok=True)
         with open(self.manifest_path, "w") as f:
             yaml.dump(self.manifest, f, default_flow_style=False)
