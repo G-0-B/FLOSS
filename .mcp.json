@@ -21,7 +21,6 @@
       ],
       "env": {
         "PYTHONPATH": "C:/~shit/FLOSS",
-        "FLOSS_AGENT_DIR": "C:/Users/kalis/.floss_agent",
         "FLOSS_DNA_HASH": "0000000000000000000000000000000000000000000000000000000000000000"
       }
     }

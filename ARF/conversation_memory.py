@@ -214,7 +214,8 @@ class ConversationMemory:
         else:
             return self._transmit_file(understanding_dict, skip_validation)
 
-    def _understanding_log_ref(self, understanding_dict: Dict[str, Any]) -> str:
+    @staticmethod
+    def _understanding_log_ref(understanding_dict: Dict[str, Any]) -> str:
         """Return a deterministic reference for logs without exposing raw memory content."""
         payload = json.dumps(
             understanding_dict,
@@ -250,13 +251,16 @@ class ConversationMemory:
         validation_mode = 'skipped' if skip_validation else 'passed'
         if skip_validation:
             if triple:
-                logger.info(f"Skipping validation for triple: {triple}")
+                logger.info("Skipping validation for triple: %s", triple)
         elif triple:
             raw_content = prepared.get('content', '')
             provided_context = prepared.get('context', '')
             full_context = f"Content: {raw_content}\nContext: {provided_context}"
 
-            is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
+            is_valid, error_msg, committee_result = self._validate_triple(
+                triple,
+                full_context,
+            )
             if not is_valid:
                 logger.error(
                     "Ontology validation failed for understanding_ref=%s: %s",

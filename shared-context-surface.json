@@ -154,8 +154,8 @@
         "ledger"
       ],
       "roots": [
-        "C:/Users/kalis/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/source_chain",
-        "C:/Users/kalis/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/head.json"
+        "~/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/source_chain",
+        "~/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/head.json"
       ]
     },
     {
@@ -175,8 +175,8 @@
         "failure"
       ],
       "roots": [
-        "C:/Users/kalis/.floss_agent/traces/consensus",
-        "C:/Users/kalis/.floss_agent/hook.log"
+        "~/.floss_agent/traces/consensus",
+        "~/.floss_agent/hook.log"
       ]
     },
     {

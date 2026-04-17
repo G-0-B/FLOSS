@@ -13,12 +13,27 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from packages.metacoordinator_mcp.tools import GatewayTools
+from packages.orchestrator.claim_schema import Vote
 
 DNA_HASH = "b" * 64
 
 
-def make_gateway(tmp: str) -> GatewayTools:
-    return GatewayTools(base_dir=Path(tmp), dna_hash=DNA_HASH)
+def _approval_voter_factory():
+    return [
+        lambda claim: Vote(
+            voter="groq-reviewer",
+            weight=0.8,
+            rationale=f"Approve {claim.id}",
+        )
+    ]
+
+
+def make_gateway(tmp: str, voter_factory=None) -> GatewayTools:
+    return GatewayTools(
+        base_dir=Path(tmp),
+        dna_hash=DNA_HASH,
+        voter_factory=voter_factory,
+    )
 
 
 def test_submit_claim_returns_entry_hash():
@@ -136,6 +151,89 @@ def test_cast_vote_rejects_invalid_proposal_type():
         assert "error" in result
 
 
+def test_run_consensus_round_finds_old_claim_beyond_500_entries():
+    """run_consensus_round() can still locate a buried claim on a long chain."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(gw.submit_claim(
+            proposer="claude", proposal_type="CodeChange",
+            summary="old claim", body="body", blast_radius="Local",
+        ))
+        for i in range(501):
+            gw.submit_claim(
+                proposer="noise", proposal_type="CodeChange",
+                summary=f"noise {i}", body="body", blast_radius="Local",
+            )
+        decision = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert decision["claim_id"] == claim_result["claim_id"]
+        assert decision["outcome"] == "APPROVED"
+
+
+def test_run_consensus_round_detects_buried_existing_decision():
+    """Idempotency check still sees older decisions after 500 newer entries."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(gw.submit_claim(
+            proposer="claude", proposal_type="CodeChange",
+            summary="already decided", body="body", blast_radius="Local",
+        ))
+        gw._cell.append_entry(
+            entry_type="decision",
+            author_did="metacoordinator",
+            content={"claim_id": claim_result["claim_id"], "outcome": "APPROVED"},
+        )
+        for i in range(501):
+            gw.submit_claim(
+                proposer="noise", proposal_type="CodeChange",
+                summary=f"noise {i}", body="body", blast_radius="Local",
+            )
+        result = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert "error" in result
+        assert "E_ALREADY_DECIDED" in result["error"]
+
+
+def test_get_decision_finds_buried_decision():
+    """get_decision() traverses past the last 500 entries when needed."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp)
+        claim_result = json.loads(gw.submit_claim(
+            proposer="claude", proposal_type="CodeChange",
+            summary="buried decision", body="body", blast_radius="Local",
+        ))
+        gw._cell.append_entry(
+            entry_type="decision",
+            author_did="metacoordinator",
+            content={"claim_id": claim_result["claim_id"], "outcome": "APPROVED"},
+        )
+        for i in range(501):
+            gw.submit_claim(
+                proposer="noise", proposal_type="CodeChange",
+                summary=f"noise {i}", body="body", blast_radius="Local",
+            )
+        decision = json.loads(gw.get_decision(claim_result["claim_id"]))
+        assert decision["claim_id"] == claim_result["claim_id"]
+        assert decision["outcome"] == "APPROVED"
+
+
+def test_run_consensus_round_returns_json_error_on_write_failure():
+    """Chain write failures are surfaced as parseable JSON errors."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(gw.submit_claim(
+            proposer="claude", proposal_type="CodeChange",
+            summary="write failure", body="body", blast_radius="Local",
+        ))
+
+        def fail_append_entry(*args, **kwargs):
+            raise OSError("disk full")
+
+        gw._cell.append_entry = fail_append_entry
+        result = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert "error" in result
+        assert "E_CHAIN_WRITE_FAILED" in result["error"]
+        assert "disk full" in result["error"]
+
+
 # ---------------------------------------------------------------------------
 # CLI runner
 # ---------------------------------------------------------------------------
@@ -151,6 +249,10 @@ def _run_all():
         test_submit_claim_rejects_invalid_blast_radius,
         test_cast_vote_rejects_weight_above_limit,
         test_cast_vote_rejects_invalid_proposal_type,
+        test_run_consensus_round_finds_old_claim_beyond_500_entries,
+        test_run_consensus_round_detects_buried_existing_decision,
+        test_get_decision_finds_buried_decision,
+        test_run_consensus_round_returns_json_error_on_write_failure,
     ]
     passed = failed = 0
     for t in tests:

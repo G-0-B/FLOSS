@@ -488,7 +488,8 @@ class TestOntologyValidation:
 
         assert understanding.hash() == original_hash
 
-    def test_extract_triple_fallback_uses_full_sha256(self, temp_memory):
+    @staticmethod
+    def test_extract_triple_fallback_uses_full_sha256(temp_memory):
         """Fallback triples should use the full SHA-256 provenance id."""
         content = "Some content without clear pattern"
 
@@ -501,7 +502,8 @@ class TestOntologyValidation:
             f"understanding_sha256:{expected_hash}",
         )
 
-    def test_extract_triple_fallback_regexes_handle_hyphenated_tokens(self, temp_memory):
+    @staticmethod
+    def test_extract_triple_fallback_regexes_handle_hyphenated_tokens(temp_memory):
         """Fallback regexes should still extract hyphenated subjects and objects."""
         assert temp_memory._extract_triple(
             {"content": "meta-agent is a large language model"}
@@ -655,7 +657,8 @@ class TestOntologyValidation:
         assert normalized["metadata"]["semantic_context"] == holochain_understanding["semantic_context"]
         assert normalized["metadata"]["language_address"] == holochain_understanding["language_address"]
 
-    def test_prepare_understanding_normalizes_invalid_metadata(self, temp_memory, monkeypatch):
+    @staticmethod
+    def test_prepare_understanding_normalizes_invalid_metadata(temp_memory, monkeypatch):
         """Storage prep should coerce null or malformed metadata into an empty dict."""
         monkeypatch.setattr(temp_memory, "_extract_triple", lambda _: ("agent", "stated", "claim"))
         monkeypatch.setattr(temp_memory, "_validate_triple", lambda *_: (True, None, None))
@@ -674,7 +677,8 @@ class TestOntologyValidation:
         assert triple == ("agent", "stated", "claim")
         assert validation_mode == "passed"
 
-    def test_holochain_understanding_round_trip_normalizes_invalid_metadata(self, temp_storage):
+    @staticmethod
+    def test_holochain_understanding_round_trip_normalizes_invalid_metadata(temp_storage):
         """Recall normalization should preserve usable fields when Holochain metadata is malformed."""
         memory = ConversationMemory(
             agent_id="test-agent",
@@ -702,7 +706,8 @@ class TestOntologyValidation:
         assert normalized["metadata"]["triple"]["predicate"] == "stated"
         assert normalized["metadata"]["content_hash"] == "hash-123"
 
-    def test_file_backend_uses_utc_timestamps_and_shared_embedding_level(self, temp_storage, monkeypatch):
+    @staticmethod
+    def test_file_backend_uses_utc_timestamps_and_shared_embedding_level(temp_storage, monkeypatch):
         """File-backed understandings and exports should use UTC timestamps and the shared embedding level."""
         memory = ConversationMemory(agent_id="test-agent", storage_path=temp_storage)
         monkeypatch.setattr(memory, "_encode_text", lambda _: np.array([1.0, 0.0, 0.0]))
@@ -719,7 +724,8 @@ class TestOntologyValidation:
         assert DEFAULT_EMBEDDING_LEVEL in memory.embeddings.levels
         assert f"understanding-{len(memory.understandings)-1}" in memory.embeddings.levels[DEFAULT_EMBEDDING_LEVEL]
 
-    def test_prepare_understanding_logs_stable_reference_only(self, temp_memory, monkeypatch, caplog):
+    @staticmethod
+    def test_prepare_understanding_logs_stable_reference_only(temp_memory, monkeypatch, caplog):
         """Validation failures should log only a stable reference, never raw payload content."""
         sensitive_understanding = {
             "content": "Highly sensitive transmission content",

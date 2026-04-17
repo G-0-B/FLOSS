@@ -87,23 +87,22 @@ class CellDirectory:
         Returns:
             64-character lowercase hex SHA256 digest (the entry's filename stem).
         """
-        prev = previous_hash if previous_hash is not None else self.head_hash()
-        entry: dict[str, Any] = {
-            "id": str(self._new_uuid()),
-            "type": entry_type,
-            "author_did": author_did,
-            "previous_hash": prev,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "content": content,
-        }
-        # canonical_serialize produces byte-identical output across Python/Rust/TS.
-        # The SHA256 of those bytes IS the filename — no separate hashing step.
-        serialized = canonical_serialize(entry)
-        h = _entry_hash(entry)
-        entry_path = self._chain_dir / f"{h}.json"
-
         self._acquire_lock()
         try:
+            prev = previous_hash if previous_hash is not None else self.head_hash()
+            entry: dict[str, Any] = {
+                "id": str(self._new_uuid()),
+                "type": entry_type,
+                "author_did": author_did,
+                "previous_hash": prev,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "content": content,
+            }
+            # canonical_serialize produces byte-identical output across Python/Rust/TS.
+            # The SHA256 of those bytes IS the filename — no separate hashing step.
+            serialized = canonical_serialize(entry)
+            h = _entry_hash(entry)
+            entry_path = self._chain_dir / f"{h}.json"
             entry_path.write_bytes(serialized)
             self._head_path.write_text(
                 json.dumps({"head": h}, separators=(",", ":")),
@@ -114,11 +113,15 @@ class CellDirectory:
 
         return h
 
-    def read_chain(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Return up to `limit` entries in reverse-chronological order (newest first).
+    def read_chain(self, limit: Optional[int] = 50) -> list[dict[str, Any]]:
+        """Return source chain entries in reverse-chronological order (newest first).
 
         Traverses via previous_hash links starting from head. Stops at the
         genesis entry (previous_hash=null) or when `limit` is reached.
+
+        Args:
+            limit: Maximum number of entries to return. Pass None to traverse
+                the full visible chain from head to genesis.
         """
         head = self.head_hash()
         if head is None:
@@ -126,7 +129,7 @@ class CellDirectory:
 
         results: list[dict[str, Any]] = []
         current: Optional[str] = head
-        while current and len(results) < limit:
+        while current and (limit is None or len(results) < limit):
             path = self._chain_dir / f"{current}.json"
             if not path.exists():
                 break

@@ -193,7 +193,7 @@ class GatewayTools:
         Scans the chain for the most recent entry of type "decision" whose
         content.claim_id matches. Returns null JSON if not yet decided.
         """
-        entries = self._cell.read_chain(limit=500)
+        entries = self._cell.read_chain(limit=None)
         for entry in entries:
             if (
                 entry.get("type") == "decision"
@@ -211,7 +211,7 @@ class GatewayTools:
 
         Returns JSON list of {"claim_id": "<uuid>", "summary": "<text>"}.
         """
-        entries = self._cell.read_chain(limit=500)
+        entries = self._cell.read_chain(limit=None)
         decided_claim_ids = {
             e["content"]["claim_id"]
             for e in entries
@@ -252,7 +252,7 @@ class GatewayTools:
         Returns JSON: the full Decision.to_dict() (outcome, votes, tally_mean,
         tally_variance, etc.). On lookup or validation failure: {"error": ...}.
         """
-        entries = self._cell.read_chain(limit=500)
+        entries = self._cell.read_chain(limit=None)
 
         claim_entry: Optional[dict[str, Any]] = None
         for e in entries:
@@ -303,17 +303,20 @@ class GatewayTools:
         # under the system author. If a chain write fails mid-way we accept
         # a partial record — the next list_pending call will see it as
         # still-pending because the decision entry is the last to land.
-        for vote in decision.votes:
-            self._cell.append_entry(
-                entry_type="vote",
-                author_did=vote.voter,
-                content={"claim_id": claim_id, **vote.to_dict()},
-            )
+        try:
+            for vote in decision.votes:
+                self._cell.append_entry(
+                    entry_type="vote",
+                    author_did=vote.voter,
+                    content={"claim_id": claim_id, **vote.to_dict()},
+                )
 
-        self._cell.append_entry(
-            entry_type="decision",
-            author_did="metacoordinator",
-            content=decision.to_dict(),
-        )
+            self._cell.append_entry(
+                entry_type="decision",
+                author_did="metacoordinator",
+                content=decision.to_dict(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            return _err(f"E_CHAIN_WRITE_FAILED: {type(exc).__name__}: {exc}")
 
         return _ok(decision.to_dict())

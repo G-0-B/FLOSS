@@ -81,6 +81,37 @@ def test_subsequent_entry_links_to_previous():
         assert data["previous_hash"] == h1
 
 
+def test_append_reads_head_after_lock_acquisition():
+    """append_entry() links to the latest head visible once the lock is held."""
+    with tempfile.TemporaryDirectory() as tmp:
+        base_dir = Path(tmp)
+        seed = CellDirectory(base_dir=base_dir, dna_hash=DNA_HASH)
+        genesis_hash = seed.append_entry("genesis", "did:key:ztest", {"n": 1})
+
+        class RaceCell(CellDirectory):
+            def __init__(self, base_dir: Path, dna_hash: str) -> None:
+                super().__init__(base_dir=base_dir, dna_hash=dna_hash)
+                self.injected_hash: str | None = None
+
+            def _acquire_lock(self) -> None:
+                if self.injected_hash is None:
+                    helper = CellDirectory(base_dir=base_dir, dna_hash=DNA_HASH)
+                    self.injected_hash = helper.append_entry(
+                        "claim",
+                        "did:key:zhelper",
+                        {"n": 2},
+                    )
+                return super()._acquire_lock()
+
+        cell = RaceCell(base_dir=base_dir, dna_hash=DNA_HASH)
+        h3 = cell.append_entry("vote", "did:key:ztest", {"n": 3})
+        entry_path = base_dir / "cells" / DNA_HASH / "source_chain" / f"{h3}.json"
+        data = json.loads(entry_path.read_bytes())
+        assert cell.injected_hash is not None
+        assert data["previous_hash"] == cell.injected_hash
+        assert data["previous_hash"] != genesis_hash
+
+
 def test_head_json_updated_after_append():
     """head.json always points to the latest entry hash."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -182,6 +213,7 @@ def _run_all():
         test_entry_file_has_canonical_fields,
         test_first_entry_has_null_previous_hash,
         test_subsequent_entry_links_to_previous,
+        test_append_reads_head_after_lock_acquisition,
         test_head_json_updated_after_append,
         test_head_hash_returns_none_for_empty_chain,
         test_head_hash_matches_latest,
