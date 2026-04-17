@@ -619,6 +619,14 @@ class ConversationMemory:
 
         return (True, None, None)
 
+    def validate_triple(
+        self,
+        triple: Tuple[str, str, str],
+        context: str = "",
+    ) -> Tuple[bool, Optional[str], Optional[Dict]]:
+        """Validate a triple via the supported ontology validation path."""
+        return self._validate_triple(triple, context)
+
     def get_validation_stats(self) -> Dict[str, int]:
         """Return a copy of the running validation counters."""
         return self.validation_stats.copy()

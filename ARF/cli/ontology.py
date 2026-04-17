@@ -97,7 +97,7 @@ def validate(
         memory = ConversationMemory(agent_id="validator", validate_ontology=True)
 
         # Validate using the internal method
-        is_valid, error_msg, _ = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory.validate_triple((subject, predicate, obj))
 
         if json_output:
             print(
@@ -157,7 +157,7 @@ def infer(
         # For now, just validate (full inference in Phase 7)
         ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id="inference", validate_ontology=True)
-        is_valid, error_msg, _ = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory.validate_triple((subject, predicate, obj))
 
         if not is_valid:
             if json_output:

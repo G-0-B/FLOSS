@@ -403,7 +403,8 @@ class MultiScaleEmbedding:
 
                 if "vector" not in emb_data:
                     raise ValueError(
-                        f"Missing 'vector' field in embedding '{emb_id}' at level '{level_name}'"
+                        "Missing 'vector' field in embedding "
+                        f"'{emb_id}' at level '{level_name}'"
                     )
 
                 # Convert list back to numpy array
@@ -413,7 +414,8 @@ class MultiScaleEmbedding:
                         vector = np.array(vector_data, dtype=np.float32)
                     except (ValueError, TypeError) as e:
                         raise ValueError(
-                            f"Failed to convert vector for '{emb_id}' at level '{level_name}': {e}"
+                            "Failed to convert vector for "
+                            f"'{emb_id}' at level '{level_name}': {e}"
                         ) from e
                 elif isinstance(vector_data, np.ndarray):
                     vector = vector_data.astype(np.float32)
@@ -625,7 +627,8 @@ class MultiScaleEmbedding:
         if self.dimension > 0 and other.dimension > 0:
             if self.dimension != other.dimension:
                 raise ValueError(
-                    f"Dimension mismatch: self has {self.dimension}, other has {other.dimension}"
+                    "Dimension mismatch: "
+                    f"self has {self.dimension}, other has {other.dimension}"
                 )
 
         # Execute strategy
@@ -652,7 +655,10 @@ class MultiScaleEmbedding:
                 similarity = np.dot(emb_norm, existing_norm)
                 if similarity > threshold:
                     logger.debug(
-                        f"Skipping '{key}' (duplicate of '{existing_key}', sim={similarity:.3f})"
+                        "Skipping '%s' (duplicate of '%s', sim=%.3f)",
+                        key,
+                        existing_key,
+                        similarity,
                     )
                     is_duplicate = True
                     break
@@ -710,49 +716,3 @@ class MultiScaleEmbedding:
             self.add(unique_key, embedding, level)
             if unique_key != key:
                 logger.debug(f"Added '{key}' as '{unique_key}' (key conflict)")
-
-    # =========================================================================
-    # Serialization methods
-    # =========================================================================
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Export embeddings to a dictionary for serialization.
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary containing all levels and embeddings
-        """
-        result = {}
-        for level, embeddings in self.levels.items():
-            result[level] = {}
-            for emb_id, emb in embeddings.items():
-                result[level][emb_id] = {
-                    "vector": emb.vector.tolist(),
-                    "metadata": emb.metadata,
-                }
-        return result
-
-    @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "MultiScaleEmbedding":
-        """Load embeddings from a dictionary.
-
-        Parameters
-        ----------
-        data:
-            Dictionary from to_dict()
-
-        Returns
-        -------
-        MultiScaleEmbedding
-            New instance with loaded embeddings
-        """
-        mse = MultiScaleEmbedding()
-        for level, embeddings in data.items():
-            mse.levels[level] = {}
-            for emb_id, emb_data in embeddings.items():
-                vector = np.array(emb_data["vector"])
-                metadata = emb_data.get("metadata", {})
-                mse.levels[level][emb_id] = Embedding(vector=vector, metadata=metadata)
-        logger.debug(f"Loaded MultiScaleEmbedding with {len(mse.levels)} level(s)")
-        return mse

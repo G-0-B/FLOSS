@@ -29,13 +29,12 @@ class BudgetState:
     estimated_cost: float = 0.0
 
     def to_dict(self):
+        """Return the budget state as a plain dictionary."""
         return asdict(self)
 
 
 class BudgetExceededError(Exception):
     """Raised when budget limits are exceeded."""
-
-    pass
 
 
 class BudgetManager:
@@ -60,22 +59,23 @@ class BudgetManager:
 
         self.state = self._load_state()
         logger.info(
-            f"Initialized BudgetManager for {agent_id}. Used: {self.state.tokens_used} tokens."
+            "Initialized BudgetManager for %s. Used: %s tokens.",
+            agent_id,
+            self.state.tokens_used,
         )
 
     def check_budget(self):
-        """
-        Checks if the budget allows for further operations.
-        Raises BudgetExceededError if limits are reached.
-        """
+        """Raise BudgetExceededError when any configured limit is exceeded."""
         if self.state.tokens_used >= self.config.max_tokens_per_session:
             raise BudgetExceededError(
-                f"Token limit exceeded: {self.state.tokens_used}/{self.config.max_tokens_per_session}"
+                "Token limit exceeded: "
+                f"{self.state.tokens_used}/{self.config.max_tokens_per_session}"
             )
 
         if self.state.estimated_cost >= self.config.max_cost_per_session:
             raise BudgetExceededError(
-                f"Cost limit exceeded: ${self.state.estimated_cost}/${self.config.max_cost_per_session}"
+                "Cost limit exceeded: "
+                f"${self.state.estimated_cost}/${self.config.max_cost_per_session}"
             )
 
         # Check warnings
@@ -86,9 +86,7 @@ class BudgetManager:
             )
 
     def record_usage(self, tokens: int, cost: float = 0.0):
-        """
-        Records resource usage.
-        """
+        """Record additional token and cost usage."""
         self.state.tokens_used += tokens
         self.state.estimated_cost += cost
         self._save_state()
@@ -103,6 +101,7 @@ class BudgetManager:
         logger.info("Budget reset.")
 
     def _load_state(self) -> BudgetState:
+        """Load any persisted budget state from disk."""
         if self.state_file.exists():
             try:
                 with open(self.state_file, "r") as f:
@@ -113,5 +112,6 @@ class BudgetManager:
         return BudgetState()
 
     def _save_state(self):
+        """Persist the current budget state to disk."""
         with open(self.state_file, "w") as f:
             json.dump(self.state.to_dict(), f, indent=2)
