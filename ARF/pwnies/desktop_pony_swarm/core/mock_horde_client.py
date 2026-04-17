@@ -106,11 +106,11 @@ class MockHordeClient:
         """Detect which pony is responding based on prompt."""
         if "Pinkie Pie" in prompt:
             return "Pinkie Pie"
-        elif "Rainbow Dash" in prompt:
+        if "Rainbow Dash" in prompt:
             return "Rainbow Dash"
-        elif "Twilight Sparkle" in prompt:
+        if "Twilight Sparkle" in prompt:
             return "Twilight Sparkle"
-        elif "Fluttershy" in prompt:
+        if "Fluttershy" in prompt:
             return "Fluttershy"
         return "Generic Pony"
 
@@ -192,11 +192,13 @@ I think the answer is 9 sheep...
         """Mock response about FLOSSI0ULLK."""
         responses = {
             "Pinkie Pie": """FLOSSI0ULLK! That's such a fun word to say!
-It stands for: Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge!
+It stands for: Free Libre Open Source Singularity of Infinite Overflowing
+Unconditional Love, Light, and Knowledge!
 It's all about: Love ❤️ + Light ☀️ + Knowledge 📚
 And making sure EVERYONE can access it, not just some ponies!
 It's like throwing a party where EVERYPONY is invited! 🎉""",
-            "Rainbow Dash": """FLOSSI0ULLK? That's the acronym for that big coordination project!
+            "Rainbow Dash": """FLOSSI0ULLK? That's the acronym for that big
+coordination project!
 Free Libre Open Source Singularity - basically means no one owns it
 Infinite Love Light Knowledge - the values driving it
 It's about getting different intelligences working together
@@ -204,7 +206,8 @@ Instead of competing or fighting, we collaborate!
 Pretty cool if you ask me. 😎""",
             "Twilight Sparkle": """FLOSSI0ULLK: An excellent research initiative!
 
-Definition: Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge
+Definition: Free Libre Open Source Singularity of Infinite Overflowing
+Unconditional Love, Light, and Knowledge
 
 Core Principles:
 1. Love: Dignity, consent, individual sovereignty

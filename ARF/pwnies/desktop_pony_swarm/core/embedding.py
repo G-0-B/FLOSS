@@ -4,16 +4,20 @@ Swarm embedding manager using MultiScaleEmbedding framework.
 Integrates with ../embedding_frames_of_scale.py
 """
 
+from importlib import import_module
 import logging
 import statistics
-from typing import List, Dict, Any
-import numpy as np
-import sys
 from pathlib import Path
+import sys
+from typing import Any, Dict, List
+
+import numpy as np
 
 # Add parent directory to path to import embedding_frames_of_scale
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from embedding_frames_of_scale import MultiScaleEmbedding
+embedding_module = import_module("embedding_frames_of_scale")
+Embedding = embedding_module.Embedding
+MultiScaleEmbedding = embedding_module.MultiScaleEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -140,8 +144,6 @@ class SwarmEmbeddingManager:
                 coarse_vector = np.sum(vectors, axis=0)
 
                 # Add directly to community level
-                from embedding_frames_of_scale import Embedding
-
                 self.embeddings.levels["community"][community_id] = Embedding(
                     vector=coarse_vector,
                     metadata={

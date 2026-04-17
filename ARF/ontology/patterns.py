@@ -84,9 +84,7 @@ STANDARD_PATTERNS = {
 
 
 class PatternMatcher:
-    """
-    Matches interaction patterns in conversation history.
-    """
+    """Matches interaction patterns in conversation history."""
 
     def __init__(self, patterns: Dict[str, InteractionPattern] = None):
         self.patterns = patterns or STANDARD_PATTERNS

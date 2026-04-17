@@ -8,18 +8,25 @@ Phase 4.1: Performance Optimization
 """
 
 import asyncio
-import time
-import logging
-import json
 import itertools
-from typing import Dict, Any, List, Tuple
-from dataclasses import dataclass, asdict
-from pathlib import Path
+import json
+import logging
+from importlib import import_module
 import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+if __package__ in {None, ""}:
+    benchmark_module = import_module("benchmarks.benchmark_suite")
+else:
+    benchmark_module = import_module(f"{__package__}.benchmark_suite")
 
-from benchmarks.benchmark_suite import BenchmarkSuite, BenchmarkQuery, BenchmarkResult
+BenchmarkSuite = benchmark_module.BenchmarkSuite
+BenchmarkQuery = benchmark_module.BenchmarkQuery
+BenchmarkResult = benchmark_module.BenchmarkResult
 
 logger = logging.getLogger(__name__)
 
@@ -333,12 +340,11 @@ class ParameterSweep:
 
         if metric == "latency":
             return min(results, key=lambda r: r.avg_latency)
-        elif metric == "diversity":
+        if metric == "diversity":
             return max(results, key=lambda r: r.avg_diversity)
-        elif metric == "quality":
+        if metric == "quality":
             return max(results, key=lambda r: r.avg_quality)
-        else:
-            raise ValueError(f"Unknown metric: {metric}")
+        raise ValueError(f"Unknown metric: {metric}")
 
     def save_results(self, filename: str = "sweep_results.json"):
         """Saves the sweep results to a JSON file.

@@ -11,7 +11,6 @@ from pathlib import Path
 
 def check_setup():
     """Check if Desktop Pony Swarm is properly set up."""
-
     print("=" * 80)
     print("🔍 DESKTOP PONY SWARM - Setup Diagnostic")
     print("=" * 80)

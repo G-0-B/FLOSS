@@ -201,7 +201,8 @@ class ComplexityEstimator:
         logger.debug(
             f"Complexity estimation: score={score:.1f}, "
             f"chars={char_count}, words={word_count}, sentences={sentence_count}, "
-            f"math={math_matches}, reasoning={reasoning_matches}, creative={creative_matches}"
+            f"math={math_matches}, reasoning={reasoning_matches}, "
+            f"creative={creative_matches}"
         )
 
         return score
@@ -282,7 +283,8 @@ class AdaptiveParameterSelector:
         params = self.configs[config_level]
 
         logger.info(
-            f"Selected {config_level} config for query (complexity={complexity:.1f}): {params}"
+            f"Selected {config_level} config for query "
+            f"(complexity={complexity:.1f}): {params}"
         )
 
         return params
@@ -294,7 +296,8 @@ class AdaptiveParameterSelector:
         the results of automated parameter sweeps.
 
         Args:
-            level: The complexity level to update ('simple', 'medium', or 'complex').
+            level: The complexity level to update ('simple', 'medium', or
+                'complex').
             params: The new `RSAParams` to use for this level.
         """
         if level not in self.configs:
@@ -366,10 +369,20 @@ if __name__ == "__main__":
     test_queries = [
         "What is 47 * 89?",
         "Explain the concept of recursion using a simple analogy.",
-        "Write a short story about a robot learning to appreciate art. Consider multiple narrative approaches and explore the themes of consciousness and creativity.",
+        (
+            "Write a short story about a robot learning to appreciate art. "
+            "Consider multiple narrative approaches and explore the themes of "
+            "consciousness and creativity."
+        ),
         "Calculate 256 + 384",
-        "Compare and contrast Python and JavaScript in terms of syntax, performance, and use cases.",
-        "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
+        (
+            "Compare and contrast Python and JavaScript in terms of syntax, "
+            "performance, and use cases."
+        ),
+        (
+            "A bat and a ball cost $1.10 in total. The bat costs $1.00 more "
+            "than the ball. How much does the ball cost?"
+        ),
     ]
 
     selector = AdaptiveParameterSelector()

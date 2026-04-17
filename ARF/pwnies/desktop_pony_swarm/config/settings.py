@@ -1,6 +1,4 @@
-"""
-Configuration for desktop pony swarm.
-"""
+"""Configuration for desktop pony swarm."""
 
 from dataclasses import dataclass
 from typing import List

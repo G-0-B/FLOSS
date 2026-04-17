@@ -240,12 +240,11 @@ class BenchmarkSuite:
         complexity = complexity.lower()
         if complexity == "micro":
             return self.MICRO_QUERIES
-        elif complexity == "medium":
+        if complexity == "medium":
             return self.MEDIUM_QUERIES
-        elif complexity == "large":
+        if complexity == "large":
             return self.LARGE_QUERIES
-        else:
-            raise ValueError(f"Unknown complexity: {complexity}")
+        raise ValueError(f"Unknown complexity: {complexity}")
 
     async def run_single_benchmark(
         self, query: BenchmarkQuery, N: int = 4, K: int = 2, T: int = 3
@@ -350,7 +349,7 @@ class BenchmarkSuite:
                     "avg_latency": statistics.mean(
                         [r.latency for r in complexity_results]
                     ),
-                    "max_latency": max([r.latency for r in complexity_results]),
+                    "max_latency": max(r.latency for r in complexity_results),
                     "avg_diversity": statistics.mean(
                         [r.diversity for r in complexity_results]
                     ),
