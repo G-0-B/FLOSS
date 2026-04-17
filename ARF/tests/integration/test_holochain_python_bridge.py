@@ -59,9 +59,8 @@ class MockHolochainClient:
             if function == "get_all_understandings":
                 return self._mock_get_all()
 
-        if zome == "ontology_integrity":
-            if function == "validate_triple":
-                return self._mock_validate_triple(payload)
+        if zome == "ontology_integrity" and function == "validate_triple":
+            return self._mock_validate_triple(payload)
 
         return {"error": f"Unknown zome function: {zome}.{function}"}
 
@@ -461,7 +460,7 @@ async def test_holochain_ontology_inference():
 
     From Phase 7.1: Inference Engine Expansion
     """
-    pass
+    return None
 
 
 # ============================================================================
@@ -478,7 +477,7 @@ async def test_holochain_with_pony_swarm_intent():
     """
     # Future: Swarm results should be stored in Holochain DHT
     # Future: Multiple swarms coordinate via shared memory
-    pass
+    return None
 
 
 @pytest.mark.asyncio
@@ -490,7 +489,7 @@ async def test_holochain_with_infinity_bridge_intent():
     """
     # Future: Bridges register capabilities in DHT
     # Future: Orchestrator discovers bridges via DHT
-    pass
+    return None
 
 
 if __name__ == "__main__":

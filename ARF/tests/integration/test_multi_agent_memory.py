@@ -124,9 +124,7 @@ def test_three_agent_composition(alice_memory, bob_memory, carol_memory):
 
 
 def test_multi_agent_deduplication(alice_memory, bob_memory):
-    """
-    Test that duplicate transmissions across agents are properly handled.
-    """
+    """Test that duplicate transmissions across agents are properly handled."""
     # Both agents transmit the same understanding
     content = "GPT-4 is a large language model"
 
@@ -144,7 +142,9 @@ def test_multi_agent_deduplication(alice_memory, bob_memory):
 
     # Import both
     carol.import_and_compose(alice_export)
-    stats = carol.import_and_compose(bob_export)
+    stats = carol.import_and_compose(
+        bob_export
+    )  # pylint: disable=assignment-from-no-return
 
     # Should detect duplicates
     assert stats.get("duplicates_skipped", 0) >= 0
@@ -155,9 +155,7 @@ def test_multi_agent_deduplication(alice_memory, bob_memory):
 
 
 def test_composition_with_embeddings(alice_memory, bob_memory):
-    """
-    Test that embedding frames are properly composed across agents.
-    """
+    """Test that embedding frames are properly composed across agents."""
     # Transmit related understandings
     alice_memory.transmit(
         {"content": "Neural networks learn from data", "coherence": 0.9}
@@ -189,9 +187,7 @@ def test_composition_with_embeddings(alice_memory, bob_memory):
 
 
 def test_multi_agent_adr_tracking(alice_memory, bob_memory, carol_memory):
-    """
-    Test that ADRs (Architecture Decision Records) are tracked across agents.
-    """
+    """Test that ADRs (Architecture Decision Records) are tracked across agents."""
     # Alice makes a decision
     alice_memory.transmit(
         {
@@ -255,7 +251,9 @@ def test_parallel_composition(temp_dir):
     # Compose all agents' memories
     for agent in agents:
         export = agent.export_for_composition()
-        stats = coordinator.import_and_compose(export)
+        stats = coordinator.import_and_compose(
+            export
+        )  # pylint: disable=assignment-from-no-return
         assert stats["new_understandings"] >= 1
 
     # Coordinator should have all 5 understandings
@@ -268,9 +266,7 @@ def test_parallel_composition(temp_dir):
 
 
 def test_triple_extraction_consistency(alice_memory, bob_memory):
-    """
-    Test that triple extraction works consistently across agents.
-    """
+    """Test that triple extraction works consistently across agents."""
     # Both agents transmit structured knowledge
     alice_memory.transmit({"content": "GPT-4 is a LLM", "coherence": 0.95})
 
@@ -291,9 +287,7 @@ def test_triple_extraction_consistency(alice_memory, bob_memory):
 
 
 def test_composition_preserves_metadata(alice_memory, bob_memory):
-    """
-    Test that metadata (context, coherence, timestamps) is preserved during composition.
-    """
+    """Test metadata preservation during composition."""
     # Alice transmits with rich metadata
     alice_memory.transmit(
         {
@@ -319,9 +313,7 @@ def test_composition_preserves_metadata(alice_memory, bob_memory):
 
 
 def test_empty_composition(alice_memory, bob_memory):
-    """
-    Test that composing with an agent that has no memories handles gracefully.
-    """
+    """Test that empty composition is handled gracefully."""
     # Bob has no transmissions
     bob_export = bob_memory.export_for_composition()
 
@@ -333,9 +325,7 @@ def test_empty_composition(alice_memory, bob_memory):
 
 
 def test_composition_with_validation(temp_dir):
-    """
-    Test composition with ontology validation enabled.
-    """
+    """Test composition with ontology validation enabled."""
     # Create memories with validation
     alice_path = temp_dir / "alice_validated"
     alice = ConversationMemory(
@@ -352,7 +342,9 @@ def test_composition_with_validation(temp_dir):
 
     # Export and compose
     alice_export = alice.export_for_composition()
-    stats = bob.import_and_compose(alice_export)
+    stats = bob.import_and_compose(
+        alice_export
+    )  # pylint: disable=assignment-from-no-return
 
     # Should succeed with validation
     assert stats["new_understandings"] >= 1

@@ -140,9 +140,7 @@ def test_invalid_triple_rejection(validated_memory):
 
 
 def test_validation_disabled_accepts_all(unvalidated_memory):
-    """
-    Test that with validation disabled, all content is accepted.
-    """
+    """Test that validation-disabled mode accepts all content."""
     # This should succeed even though it's not a valid ontological triple
     ref = unvalidated_memory.transmit(
         {"content": "Random content that doesn't form a valid triple", "coherence": 0.8}
@@ -161,9 +159,7 @@ def test_validation_disabled_accepts_all(unvalidated_memory):
 
 
 def test_validation_stats_tracking(validated_memory):
-    """
-    Test that validation statistics are properly tracked.
-    """
+    """Test that validation statistics are properly tracked."""
     # Transmit several items
     validated_memory.transmit({"content": "GPT-4 is a LLM", "coherence": 0.95})
     validated_memory.transmit({"content": "Claude is a chatbot", "coherence": 0.9})
