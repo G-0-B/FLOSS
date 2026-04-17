@@ -273,6 +273,7 @@ class MockBridgeDiscovery(BridgeDiscovery):
 if __name__ == "__main__":
     # Test discovery
     async def test_discovery():
+        """Run the discovery module smoke test."""
         print("=== Infinity Bridge Discovery Test ===")
 
         # Use mock discovery for testing

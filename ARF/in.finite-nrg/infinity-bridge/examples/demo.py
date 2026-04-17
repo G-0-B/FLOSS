@@ -85,6 +85,7 @@ async def demo_streaming():
 
     # Override with mock stream for demo
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the demo server."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)
@@ -163,6 +164,7 @@ async def demo_correlation():
 
     # Mock stream override
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the correlation demo."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)
@@ -273,6 +275,7 @@ async def demo_performance_metrics():
 
     # Mock stream override
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the performance demo."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)

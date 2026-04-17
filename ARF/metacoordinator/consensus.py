@@ -46,6 +46,7 @@ class RFC:
     systems_governance: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize the RFC into a JSON-safe dictionary."""
         return {
             "id": self.id,
             "title": self.title,
@@ -72,6 +73,7 @@ class VoteCast:
     confidence: float = 1.0  # 0.0-1.0, how confident in this vote
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize the vote into a JSON-safe dictionary."""
         return {
             "agent_id": self.agent_id,
             "vote": self.vote.value,
@@ -99,6 +101,7 @@ class ADR:
     outcome_notes: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize the ADR into a JSON-safe dictionary."""
         return {
             "rfc_id": self.rfc_id,
             "decision": self.decision,

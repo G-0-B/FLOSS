@@ -202,6 +202,7 @@ class TestMCPServer:
 
         # Mock stream for testing
         async def mock_subscribe(bridge_id: str, stream_type: str):
+            """Create a mock stream subscription for the test server."""
             bridge = server.discovery.get_bridge(bridge_id)
             if bridge:
                 stream = MockBridgeStream(bridge, stream_type)
@@ -229,6 +230,7 @@ class TestMCPServer:
 
         # Mock stream for testing
         async def mock_subscribe(bridge_id: str, stream_type: str):
+            """Create a mock stream subscription for the resource read test."""
             bridge = server.discovery.get_bridge(bridge_id)
             if bridge:
                 stream = MockBridgeStream(bridge, stream_type)
@@ -397,6 +399,7 @@ class TestEndToEnd:
 
         # 3. Subscribe to stream
         async def mock_subscribe(bridge_id: str, stream_type: str):
+            """Create a mock stream subscription for the end-to-end test."""
             bridge = server.discovery.get_bridge(bridge_id)
             if bridge:
                 stream = MockBridgeStream(bridge, stream_type)

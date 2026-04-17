@@ -180,6 +180,7 @@ class InfinityBridgeCLI:
             mock_stream_cls = self._dependencies["MockBridgeStream"]
 
             async def mock_subscribe(bid: str, stype: str):
+                """Create a mock stream subscription for CLI testing."""
                 bridge = self.server.discovery.get_bridge(bid)
                 if bridge:
                     stream = mock_stream_cls(bridge, stype)

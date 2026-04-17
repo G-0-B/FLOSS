@@ -343,6 +343,7 @@ class MockBridgeStream(BridgeStream):
     """Mock stream that generates synthetic data"""
 
     async def connect(self) -> bool:
+        """Mark the mock stream as connected without opening a socket."""
         self.connected = True
         return True
 
@@ -378,6 +379,7 @@ class MockBridgeStream(BridgeStream):
 if __name__ == "__main__":
     # Test MCP server
     async def test_mcp_server():
+        """Run the MCP server smoke test with mock bridges."""
         print("=== Infinity Bridge MCP Server Test ===")
 
         # Create server with mock discovery
@@ -398,6 +400,7 @@ if __name__ == "__main__":
 
         # Monkey-patch to use mock stream
         async def mock_subscribe(bridge_id: str, stream_type: str):
+            """Create a mock stream subscription for the test server."""
             bridge = server.discovery.get_bridge(bridge_id)
             if bridge:
                 stream = MockBridgeStream(bridge, stream_type)

@@ -477,6 +477,7 @@ class MockHolochainConnector(HolochainConnector):
 if __name__ == "__main__":
     # Test Holochain connector
     async def test_connector():
+        """Run the connector module smoke test."""
         print("=== Holochain Connector Test ===\n")
 
         # Use mock connector for testing
