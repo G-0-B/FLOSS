@@ -181,7 +181,9 @@ class ConsensusEngine:
         """
         if rfc_id in self.adrs:
             print(
-                f"⚠️ Vote from {agent_id} received for finalized RFC {rfc_id}. Vote recorded but decision stands."
+                "⚠️ Vote from "
+                f"{agent_id} received for finalized RFC {rfc_id}. "
+                "Vote recorded but decision stands."
             )
             return None
 
@@ -232,11 +234,11 @@ class ConsensusEngine:
             if len(votes) < 2:
                 return None
             return self._evaluate_voting(rfc, votes)
-        else:
-            # Consensus strategy: require at least 3 votes
-            if len(votes) < 3:
-                return None
-            return self._evaluate_consensus(rfc, votes)
+
+        # Consensus strategy: require at least 3 votes
+        if len(votes) < 3:
+            return None
+        return self._evaluate_consensus(rfc, votes)
 
     def _evaluate_voting(self, rfc: RFC, votes: Dict[str, VoteCast]) -> Optional[ADR]:
         """
@@ -267,7 +269,7 @@ class ConsensusEngine:
             )
 
         # Strong rejection (>50%)
-        elif reject / total > 0.5:
+        if reject / total > 0.5:
             return ADR(
                 rfc_id=rfc.id,
                 decision="REJECTED",
@@ -311,7 +313,7 @@ class ConsensusEngine:
             )
 
         # Any significant rejection (>20%) requires rework
-        elif reject / total > 0.20:
+        if reject / total > 0.20:
             return ADR(
                 rfc_id=rfc.id,
                 decision="REQUIRES_REWORK",
