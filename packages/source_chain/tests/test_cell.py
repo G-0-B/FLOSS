@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).parent
@@ -13,7 +15,8 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.source_chain.cell import CellDirectory
+from packages.source_chain import cell as cell_module
+from packages.source_chain.cell import CellDirectory, CellDirectoryError
 
 
 DNA_HASH = "a" * 64  # 64-char hex string simulating a real dna_hash
@@ -110,6 +113,47 @@ def test_append_reads_head_after_lock_acquisition():
         assert cell.injected_hash is not None
         assert data["previous_hash"] == cell.injected_hash
         assert data["previous_hash"] != genesis_hash
+
+
+def test_release_lock_only_removes_owned_lock():
+    """A non-owner must not be able to delete another writer's lock file."""
+    with tempfile.TemporaryDirectory() as tmp:
+        owner = make_cell(tmp)
+        owner._acquire_lock()
+
+        intruder = make_cell(tmp)
+        intruder._lock_token = "not-the-owner"
+        intruder._release_lock()
+
+        lock_path = Path(tmp) / "cells" / DNA_HASH / ".lock"
+        assert lock_path.exists()
+
+        owner._release_lock()
+        assert not lock_path.exists()
+
+
+def test_acquire_lock_times_out_without_deleting_stale_lock():
+    """Waiters should time out rather than force-delete an aged lock file."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cell = make_cell(tmp)
+        lock_path = Path(tmp) / "cells" / DNA_HASH / ".lock"
+        lock_path.write_text("stale-owner", encoding="utf-8")
+        stale_at = time.time() - 30
+        os.utime(lock_path, (stale_at, stale_at))
+
+        original_timeout = cell_module._LOCK_TIMEOUT
+        cell_module._LOCK_TIMEOUT = 0.01
+        try:
+            try:
+                cell._acquire_lock()
+                raise AssertionError("Expected CellDirectoryError")
+            except CellDirectoryError:
+                pass
+        finally:
+            cell_module._LOCK_TIMEOUT = original_timeout
+
+        assert lock_path.exists()
+        assert lock_path.read_text(encoding="utf-8") == "stale-owner"
 
 
 def test_head_json_updated_after_append():
@@ -214,6 +258,8 @@ def _run_all():
         test_first_entry_has_null_previous_hash,
         test_subsequent_entry_links_to_previous,
         test_append_reads_head_after_lock_acquisition,
+        test_release_lock_only_removes_owned_lock,
+        test_acquire_lock_times_out_without_deleting_stale_lock,
         test_head_json_updated_after_append,
         test_head_hash_returns_none_for_empty_chain,
         test_head_hash_matches_latest,

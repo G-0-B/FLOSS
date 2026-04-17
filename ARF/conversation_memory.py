@@ -448,7 +448,9 @@ class ConversationMemory:
             obj = match.group(2).strip().replace(' ', '-')
             return (subject, IS_A, obj)
 
-        improves_pattern = rf'{subject_pattern}\s+improves(?:\s+upon)?\s+{subject_pattern}'
+        improves_pattern = (
+            rf"{subject_pattern}\s+improves(?:\s+upon)?\s+{subject_pattern}"
+        )
         match = re.search(improves_pattern, content, re.IGNORECASE)
         if match:
             return (match.group(1).strip(), IMPROVES_UPON, match.group(2).strip())

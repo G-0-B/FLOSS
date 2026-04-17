@@ -33,7 +33,7 @@ from typing import Any, Optional
 from packages.orchestrator.serialization import canonical_serialize, entry_hash as _entry_hash
 
 
-_LOCK_TIMEOUT = 5.0  # seconds before a stale lock is overwritten with a warning
+_LOCK_TIMEOUT = 5.0  # seconds before waiters give up and surface a lock timeout
 
 
 class CellDirectoryError(Exception):
@@ -52,6 +52,7 @@ class CellDirectory:
         self._chain_dir = self._cell_dir / "source_chain"
         self._head_path = self._cell_dir / "head.json"
         self._lock_path = self._cell_dir / ".lock"
+        self._lock_token: Optional[str] = None
         self._ensure_dirs()
 
     # ------------------------------------------------------------------
@@ -149,42 +150,44 @@ class CellDirectory:
         CREATE_NEW on Windows. Both raise FileExistsError if the file exists,
         making this genuinely atomic without any platform-specific imports.
 
-        Stale lock detection: if .lock mtime exceeds _LOCK_TIMEOUT, the lock
-        is removed and creation is retried — handles processes that crashed
-        while holding the lock.
+        Lock timeout is advisory only: waiters do NOT delete an existing lock
+        based solely on age, because a slow but still-live writer is
+        indistinguishable from a crashed one without heartbeats. If the timeout
+        elapses, callers receive a CellDirectoryError and can decide how to
+        recover out-of-band.
         """
         deadline = time.monotonic() + _LOCK_TIMEOUT
         while True:
             try:
-                fd = open(self._lock_path, "x")  # atomic: raises FileExistsError if exists
-                fd.close()
+                token = str(uuid.uuid4())
+                with open(self._lock_path, "x", encoding="utf-8") as fd:
+                    fd.write(token)
+                self._lock_token = token
                 return
             except FileExistsError:
-                # Check whether the existing lock is stale
                 try:
                     age = time.time() - self._lock_path.stat().st_mtime
-                    if age > _LOCK_TIMEOUT:
-                        import warnings
-                        warnings.warn(
-                            f"Removing stale lock at {self._lock_path} (age={age:.1f}s). "
-                            "A prior process may have crashed.",
-                            RuntimeWarning,
-                            stacklevel=3,
-                        )
-                        self._lock_path.unlink(missing_ok=True)
-                        continue
                 except FileNotFoundError:
                     continue  # another waiter cleared it between our checks
                 if time.monotonic() >= deadline:
                     raise CellDirectoryError(
                         f"Timed out acquiring lock on {self._lock_path} after "
-                        f"{_LOCK_TIMEOUT}s. Investigate the holding process."
+                        f"{_LOCK_TIMEOUT}s (existing lock age={age:.1f}s). "
+                        "Investigate the holding process before manual cleanup."
                     )
                 time.sleep(0.05)
 
     def _release_lock(self) -> None:
-        """Release the .lock file. Safe to call even if the lock was never created."""
-        self._lock_path.unlink(missing_ok=True)
+        """Release our .lock file if we still own it."""
+        try:
+            if self._lock_token is None:
+                return
+            if self._lock_path.read_text(encoding="utf-8") == self._lock_token:
+                self._lock_path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass
+        finally:
+            self._lock_token = None
 
     # ------------------------------------------------------------------
     # Internal helpers

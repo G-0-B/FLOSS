@@ -473,7 +473,8 @@ class TestOntologyValidation:
         assert stats['validation_passed'] == 2
         assert stats['validation_skipped'] == 1
 
-    def test_understanding_hash_ignores_embedding_ref(self):
+    @staticmethod
+    def test_understanding_hash_ignores_embedding_ref():
         """Changing embedding_ref should not change the understanding hash."""
         understanding = Understanding(
             content="Stable content",
@@ -518,10 +519,13 @@ class TestOntologyValidation:
     def test_holochain_transmit_skip_validation_preserves_semantic_fields(self, temp_storage):
         """Holochain transmit should respect skip_validation stats and forward semantic fields."""
         class DummyHolochainClient:
+            """Capture zome calls without needing a live Holochain runtime."""
+
             def __init__(self):
                 self.calls = []
 
             def call_zome(self, zome, function, payload):
+                """Record the zome call and return a stable fake action hash."""
                 self.calls.append((zome, function, payload))
                 return "action-hash-123"
 
@@ -596,7 +600,8 @@ class TestOntologyValidation:
         assert payload["semantic_context"] == semantic_context
         assert payload["language_address"] == language_address
 
-    def test_holochain_understanding_round_trip_preserves_semantic_fields(self, temp_storage):
+    @staticmethod
+    def test_holochain_understanding_round_trip_preserves_semantic_fields(temp_storage):
         """Holochain recall should preserve stored semantic metadata without fallback degradation."""
         memory = ConversationMemory(
             agent_id="test-agent",

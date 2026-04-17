@@ -25,6 +25,7 @@ OBSERVE -> EVALUATE -> PROPOSE -> VALIDATE -> COMMIT
 Collect recent state changes across all active substrates.
 
 **Inputs:**
+
 - Git log since last HARVEST (commits, PRs, branch activity)
 - AI conversation exports since last HARVEST (all active systems)
 - ADR modifications
@@ -37,12 +38,14 @@ Collect recent state changes across all active substrates.
 Compare observations against the kernel (Master Metaprompt v1.3.1).
 
 **Evaluation criteria:**
+
 - Do recent changes align with the 4 invariants? (Prerogative, Provenance, Contribution, Knowledge)
 - Have any Aspirational claims been promoted without evidence?
 - Are there contradictions between substrates? (version drift, competing designs)
 - Has any wheel-reinvention crept back in? (per ADR-5's Defend stage)
 
 **Output:** Evaluation report with findings classified as:
+
 - `ALIGNED` — consistent with kernel
 - `DRIFTED` — inconsistent, needs correction
 - `EVOLVED` — genuinely new insight that may warrant kernel update
@@ -53,6 +56,7 @@ Compare observations against the kernel (Master Metaprompt v1.3.1).
 Generate proposed actions for each non-ALIGNED finding.
 
 **Action types:**
+
 - `FIX` — correct drift back to kernel alignment
 - `ADR` — new architectural decision needed
 - `ARCHIVE` — superseded content needs archival
@@ -85,6 +89,7 @@ Execute validated proposals.
 ## Metrics
 
 Track per cycle:
+
 - `observations_count` — number of state changes observed
 - `drift_count` — findings classified as DRIFTED
 - `evolution_count` — findings classified as EVOLVED
@@ -112,6 +117,7 @@ Each completed cycle appends a dated entry to `docs/governance/HARVEST_LOG.md`:
 ## Future: Automated HARVEST
 
 When OpenClaw is validated as suitable:
+
 1. OBSERVE stage can be automated (git log parsing, file change detection)
 2. EVALUATE stage can be semi-automated (kernel diff checking)
 3. PROPOSE/VALIDATE/COMMIT remain human-in-the-loop until trust is established

@@ -30,7 +30,13 @@
         },
         "proposal_type": {
           "type": "string",
-          "enum": ["CodeChange", "ConfigChange", "SpecChange", "AdrChange", "Other"]
+          "enum": [
+            "CodeChange",
+            "ConfigChange",
+            "SpecChange",
+            "AdrChange",
+            "Other"
+          ]
         },
         "summary": {
           "type": "string",
@@ -76,16 +82,17 @@
     },
     "Vote": {
       "type": "object",
-      "required": ["voter", "vote", "rationale", "voted_at"],
+      "required": ["voter", "weight", "rationale", "voted_at"],
       "properties": {
         "voter": {
           "type": "string",
           "minLength": 1
         },
-        "vote": {
-          "type": "integer",
-          "enum": [-1, 0, 1],
-          "description": "Ternary: -1 reject, 0 abstain/defer, +1 approve"
+        "weight": {
+          "type": "number",
+          "minimum": -0.999,
+          "maximum": 0.999,
+          "description": "Analog support signal in [-0.999, 0.999]; positive supports, negative opposes, near-zero abstains"
         },
         "rationale": {
           "type": "string",
@@ -111,11 +118,11 @@
         },
         "outcome": {
           "type": "string",
-          "enum": ["APPROVED", "DEFERRED", "REJECTED", "OVERRIDDEN"]
+          "enum": ["APPROVED", "CONFLICT", "DEFERRED", "REJECTED", "OVERRIDDEN"]
         },
         "votes": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "items": { "$ref": "#/definitions/Vote" }
         },
         "decided_at": {
@@ -129,6 +136,15 @@
         "override_by": {
           "type": "string",
           "description": "Human identity if outcome is OVERRIDDEN"
+        },
+        "tally_mean": {
+          "type": "number",
+          "description": "Arithmetic mean of the vote weights considered for this decision"
+        },
+        "tally_variance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Population variance of the vote weights considered for this decision"
         }
       },
       "additionalProperties": false,
