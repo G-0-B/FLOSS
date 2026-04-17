@@ -381,8 +381,7 @@ class HolochainConnector:
                 f"[HolochainConnector] Found {len(stream_list)} streams for {bridge_id}"
             )
             return stream_list
-        else:
-            return []
+        return []
 
     async def ping(self) -> bool:
         """
@@ -477,6 +476,7 @@ class MockHolochainConnector(HolochainConnector):
 if __name__ == "__main__":
     # Test Holochain connector
     async def test_connector():
+        """Exercise the mock connector from the command line."""
         print("=== Holochain Connector Test ===\n")
 
         # Use mock connector for testing

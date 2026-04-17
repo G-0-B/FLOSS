@@ -11,10 +11,10 @@ Usage:
 """
 
 import asyncio
+from importlib import import_module
 import logging
-import sys
-import os
 from pathlib import Path
+import sys
 
 # Add project to path - ensure desktop_pony_swarm can be found
 project_root = Path(__file__).parent.absolute()
@@ -24,10 +24,11 @@ sys.path.insert(0, str(project_root))
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Import after path setup
-from desktop_pony_swarm.core.swarm import PonySwarm
-from desktop_pony_swarm.bridge.desktop_ponies import DesktopPoniesBridge
-from desktop_pony_swarm.config.settings import DEFAULT_CONFIG
+PonySwarm = import_module("desktop_pony_swarm.core.swarm").PonySwarm
+DesktopPoniesBridge = import_module(
+    "desktop_pony_swarm.bridge.desktop_ponies"
+).DesktopPoniesBridge
+DEFAULT_CONFIG = import_module("desktop_pony_swarm.config.settings").DEFAULT_CONFIG
 
 # Setup logging
 logging.basicConfig(
@@ -53,7 +54,10 @@ async def interactive_mode():
     print("=" * 80)
     print(f"Ponies: {', '.join(DEFAULT_CONFIG.pony_names)}")
     print(
-        f"RSA Parameters: N={DEFAULT_CONFIG.num_ponies}, K={DEFAULT_CONFIG.rsa_aggregation_size}, T={DEFAULT_CONFIG.rsa_iterations}"
+        "RSA Parameters: "
+        f"N={DEFAULT_CONFIG.num_ponies}, "
+        f"K={DEFAULT_CONFIG.rsa_aggregation_size}, "
+        f"T={DEFAULT_CONFIG.rsa_iterations}"
     )
     print("\nType your questions. Type 'quit' to exit.\n")
 
@@ -98,7 +102,10 @@ async def interactive_mode():
                 # Show metrics
                 metrics = result["metrics"]
                 print(
-                    f"\n📊 Metrics: {metrics['total_generations']} generations, {metrics['total_time']:.1f}s, diversity={metrics['avg_diversity']:.3f}"
+                    "\n📊 Metrics: "
+                    f"{metrics['total_generations']} generations, "
+                    f"{metrics['total_time']:.1f}s, "
+                    f"diversity={metrics['avg_diversity']:.3f}"
                 )
 
                 # Send to Desktop Ponies
@@ -133,7 +140,10 @@ async def demo_mode():
     test_queries = [
         "What is 47 * 89? Show your work.",
         "Explain the concept of recursion using a simple analogy.",
-        "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
+        (
+            "A bat and a ball cost $1.10 in total. The bat costs $1.00 more "
+            "than the ball. How much does the ball cost?"
+        ),
     ]
 
     async with PonySwarm(num_ponies=4) as swarm:
@@ -146,7 +156,9 @@ async def demo_mode():
 
             print(f"\n🐴 Final Response:\n{result['response']}")
             print(
-                f"\n📊 Time: {result['metrics']['total_time']:.1f}s, Diversity: {result['metrics']['avg_diversity']:.3f}"
+                "\n📊 Time: "
+                f"{result['metrics']['total_time']:.1f}s, "
+                f"Diversity: {result['metrics']['avg_diversity']:.3f}"
             )
 
             if i < len(test_queries):
