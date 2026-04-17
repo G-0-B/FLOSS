@@ -1,5 +1,3 @@
-"""
-ARF - Agentic Recursive Fractal
-"""
+"""ARF - Agentic Recursive Fractal."""
 
 __version__ = "0.4.1"
