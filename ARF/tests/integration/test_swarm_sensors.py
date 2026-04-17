@@ -81,7 +81,7 @@ class MockSensorStream:
                 "amplitude": 0.75,
                 "timestamp": "2025-11-14T00:00:00Z",
             }
-        elif self.stream_type == "vibration":
+        if self.stream_type == "vibration":
             return {
                 "type": "vibration",
                 "bridge_id": self.bridge_id,
@@ -90,12 +90,12 @@ class MockSensorStream:
                 "magnitude": 0.26,
                 "timestamp": "2025-11-14T00:00:00Z",
             }
-        else:
-            return {
-                "type": self.stream_type,
-                "bridge_id": self.bridge_id,
-                "sample_number": self._sample_count,
-            }
+
+        return {
+            "type": self.stream_type,
+            "bridge_id": self.bridge_id,
+            "sample_number": self._sample_count,
+        }
 
 
 async def setup_test_bridge() -> MockSensorBridge:
@@ -203,7 +203,8 @@ async def test_swarm_with_sensor_context_mock():
     query = f"""Is the motor operating normally?
 
 Context from sensors:
-- Acoustic: {acoustic_sample['frequencies']} Hz (amplitude: {acoustic_sample['amplitude']})
+- Acoustic: {acoustic_sample['frequencies']} Hz
+  (amplitude: {acoustic_sample['amplitude']})
 - Vibration: {vibration_sample['magnitude']} m/s²
 
 Please analyze this data and provide assessment."""

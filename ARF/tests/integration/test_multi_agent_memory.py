@@ -15,6 +15,7 @@ import tempfile
 import shutil
 from pathlib import Path
 import sys
+from typing import cast
 
 # Add ARF to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -142,9 +143,7 @@ def test_multi_agent_deduplication(alice_memory, bob_memory):
 
     # Import both
     carol.import_and_compose(alice_export)
-    stats = carol.import_and_compose(
-        bob_export
-    )  # pylint: disable=assignment-from-no-return
+    stats = cast(dict, carol.import_and_compose(bob_export))
 
     # Should detect duplicates
     assert stats.get("duplicates_skipped", 0) >= 0
@@ -251,9 +250,7 @@ def test_parallel_composition(temp_dir):
     # Compose all agents' memories
     for agent in agents:
         export = agent.export_for_composition()
-        stats = coordinator.import_and_compose(
-            export
-        )  # pylint: disable=assignment-from-no-return
+        stats = cast(dict, coordinator.import_and_compose(export))
         assert stats["new_understandings"] >= 1
 
     # Coordinator should have all 5 understandings
@@ -342,9 +339,7 @@ def test_composition_with_validation(temp_dir):
 
     # Export and compose
     alice_export = alice.export_for_composition()
-    stats = bob.import_and_compose(
-        alice_export
-    )  # pylint: disable=assignment-from-no-return
+    stats = cast(dict, bob.import_and_compose(alice_export))
 
     # Should succeed with validation
     assert stats["new_understandings"] >= 1
