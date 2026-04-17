@@ -269,6 +269,15 @@ def serialize_marker(skill: dict[str, Any], manifest_version: str) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
+def remove_path(path: Path) -> None:
+    if not path.exists() and not path.is_symlink():
+        return
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+        return
+    path.unlink()
+
+
 def install_skill_projection(
     target_name: str,
     skill: dict[str, Any],
@@ -304,9 +313,8 @@ def install_skill_projection(
     if not changed:
         return ([f"OK    {target_dir}"], False)
 
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
-    shutil.copytree(source_dir, target_dir)
+    remove_path(target_dir)
+    shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
     (target_dir / MANAGED_MARKER).write_text(
         expected_snapshot[MANAGED_MARKER],
         encoding="utf-8",

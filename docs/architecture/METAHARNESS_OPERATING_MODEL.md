@@ -74,6 +74,8 @@ Purpose: load only the right context for the current task.
 Current pieces:
 - `scripts/context_router.py`
 - `.agent-surface/context/context-registry.json`
+- `.agent-surface/context/CONTEXT_L0.md`
+- `.agent-surface/context/CONTEXT_L1.md`
 - Serena project memories
 - portable skills pointing back into canon
 
@@ -138,7 +140,7 @@ Rule:
 
 ## Default Metaharness Loop
 1. Route the task with the context harness.
-2. Load the smallest relevant skill or canon surface.
+2. Load the smallest relevant generated `L0/L1` view, skill, or canon surface.
 3. Choose one primary executor.
 4. Use Serena and cheap helpers for understanding, not authority.
 5. Land edits through an agent-native client whose config was materialized from canon.
@@ -204,5 +206,6 @@ Do not force fake portability for surfaces that are not actually shared yet.
 ## Relationship to Other Canonical Docs
 - `AGENTIC_OPERATING_MODEL.md` defines the broader stack and harness roles
 - `HOLISTIC_ARCHITECTURE.md` explains the project at macro scale
+- `CONTEXT_DAEMON_ARCHITECTURE.md` defines the living context stack and compression doctrine
 - `2026-04-16-forward-momentum-radicle-meta-harnesses.md` sequences near-term work
 - `shared-hook-surface.json` is the current canonical hook-policy source

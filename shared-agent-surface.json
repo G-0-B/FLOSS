@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.1.1",
+  "manifest_version": "0.1.2",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
   "mcp_source": ".mcp.json",
@@ -11,6 +11,9 @@
     "INDEX.md",
     "FLOSS/CLAUDE.md",
     "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+    "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
+    ".agent-surface/context/CONTEXT_L0.md",
+    ".agent-surface/context/CONTEXT_L1.md",
     "FLOSS/shared-context-surface.json",
     "FLOSS/shared-hook-surface.json",
     "FLOSS/shared-skill-surface.json",

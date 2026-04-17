@@ -10,17 +10,19 @@ Use this skill to regain orientation without spraying tokens across the whole re
 ## Core workflow
 
 1. Start with the canon:
+   - `.agent-surface/context/CONTEXT_L0.md` when present for cheap re-orientation
    - `INDEX.md`
    - `FLOSS/CLAUDE.md`
    - `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` when the task touches governing principles
 2. Route the task through the shared context surface before loading deeper files:
    - `python FLOSS/scripts/context_router.py "<query>" --format markdown --limit 4`
-3. Open only the top-routed corpus roots.
-4. Prefer current code, source-chain artifacts, and ADR-backed docs over stale summaries or `_reference/`.
+3. Load `.agent-surface/context/CONTEXT_L1.md` when present if `L0` is not enough.
+4. Open only the top-routed corpus roots.
+5. Prefer current code, source-chain artifacts, and ADR-backed docs over stale summaries or `_reference/`.
 
 ## Rules
 
-- Treat `_reference/` as last-resort prior art.
+- Treat `_reference/` as a last-resort published research library, not as the live canon.
 - If the task changes architecture or governance, read the relevant ADRs before editing.
 - If the task changes code, use the routed skill or code corpus before opening broad directories.
 
@@ -29,4 +31,3 @@ Use this skill to regain orientation without spraying tokens across the whole re
 Open only what you need:
 
 - `references/entry-points.md`
-

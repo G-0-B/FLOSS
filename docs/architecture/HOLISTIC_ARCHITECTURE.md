@@ -123,6 +123,14 @@ The current recommended operating structure.
 
 See `docs/architecture/AGENTIC_OPERATING_MODEL.md`.
 
+### 5h. Context Daemon
+The canonical shape for shared context as infrastructure rather than startup ritual.
+- generated `L0/L1` context briefings from canonical docs
+- routed `L2` retrieval into code, source-chain state, traces, and research
+- eventual observer, semantic index, graph, CRDT working state, and curator layers
+
+See `docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md`.
+
 ### 5g. NERV (Neurosynchronous Evolutionary Replicative Versioning)
 Distributed neural system for knowledge replication.
 - CRDT-based centroid clustering
@@ -206,6 +214,7 @@ This document **references** the canonical sources — it does not duplicate the
 | Decision records | `FLOSS/docs/adr/INDEX.md` |
 | Radicle dev substrate decision | `FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md` |
 | Agentic operating structure | `FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md` |
+| Context daemon architecture | `FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md` |
 | Forward-momentum execution plan | `FLOSS/docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md` |
 | Entry type schemas | `FLOSS/docs/specs/` |
 | Governance loading order | `FLOSS/docs/governance/LOADING_ORDER.md` |

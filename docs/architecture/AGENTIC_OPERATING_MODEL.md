@@ -72,6 +72,7 @@ Required shape:
 - lightweight index always loadable
 - topic files on-demand
 - raw traces only grepped or selectively loaded
+- generated `L0/L1` context projections derived from canon, not hand-maintained summaries
 
 Near-term additions:
 - Boulder-style task notepads
@@ -91,6 +92,9 @@ Canonical corpus order:
 7. later: Radicle COBs / patches
 
 Rule: prefer corpus routing first, vector retrieval second. Centralized single-store RAG is not the target architecture.
+
+The current canonical reference for this layer is
+`docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md`.
 
 ### 4. Optimization Harness
 Purpose: optimize the surrounding harnesses rather than model weights.
@@ -151,5 +155,6 @@ Rule: full traces on disk, selective retrieval into context. No optimization loo
 ## Relationship to Other Canonical Docs
 - `HOLISTIC_ARCHITECTURE.md` explains the project at macro scale
 - `METAHARNESS_OPERATING_MODEL.md` defines how the shared code harnesses compose in practice
+- `CONTEXT_DAEMON_ARCHITECTURE.md` defines the living context infrastructure and generated context views
 - `ADR-8-radicle-dev-substrate.md` records the dev-plane substrate decision
 - `2026-04-16-forward-momentum-radicle-meta-harnesses.md` sequences the work

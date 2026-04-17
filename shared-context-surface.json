@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.1.0",
+  "manifest_version": "0.2.0",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
   "default_route_order": [
@@ -16,9 +16,68 @@
   "rules": [
     "Route corpus first, then retrieve inside the chosen corpus.",
     "Load L0 context before L1 or L2 whenever possible.",
-    "Do not bulk-load `_reference/`; treat it as last-resort prior art.",
-    "Prefer current code and source-chain artifacts over stale summaries."
+    "Do not bulk-load `_reference/`; treat it as a last-resort published research library and background corpus.",
+    "Prefer current code and source-chain artifacts over stale summaries.",
+    "Generated L0/L1 context views are additive projections; canonical docs remain the source of truth."
   ],
+  "context_views": {
+    "note": "Generated cheap-load context layers derived from canonical docs. Keep canon rich; compress the projections, not the source.",
+    "outputs": {
+      "registry": ".agent-surface/context/context-view-registry.json",
+      "l0": ".agent-surface/context/CONTEXT_L0.md",
+      "l1": ".agent-surface/context/CONTEXT_L1.md"
+    },
+    "sources": [
+      {
+        "id": "workspace-index",
+        "label": "Workspace Index",
+        "path": "INDEX.md",
+        "summary_chars": 220,
+        "max_headings": 3,
+        "max_bullets": 3
+      },
+      {
+        "id": "project-orientation",
+        "label": "Project Orientation",
+        "path": "FLOSS/CLAUDE.md",
+        "summary_chars": 220,
+        "max_headings": 3,
+        "max_bullets": 3
+      },
+      {
+        "id": "agentic-operating-model",
+        "label": "Agentic Operating Model",
+        "path": "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "metaharness-operating-model",
+        "label": "Metaharness Operating Model",
+        "path": "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "holistic-architecture",
+        "label": "Holistic Architecture",
+        "path": "FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "context-daemon",
+        "label": "Context Daemon Architecture",
+        "path": "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      }
+    ]
+  },
   "corpora": [
     {
       "id": "canon",
@@ -54,6 +113,9 @@
         "architecture",
         "operating",
         "model",
+        "context",
+        "daemon",
+        "compression",
         "meta",
         "harness",
         "hook",
@@ -67,6 +129,7 @@
         "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
         "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
         "FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md",
+        "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
         "FLOSS/docs/superpowers/specs/2026-04-12-local-agent-node-design.md"
       ]
     },
@@ -205,11 +268,12 @@
       "uri": "floss://reference",
       "tier": "L2",
       "priority": 20,
-      "summary": "Read-only prior-art library used only after canon, code, and active research have been routed.",
+      "summary": "Read-only published research and books library used only after canon, code, and active research have been routed.",
       "keywords": [
         "reference",
-        "prior art",
-        "archive",
+        "research library",
+        "papers",
+        "books",
         "software engineering",
         "ai ml",
         "background"

@@ -28,6 +28,11 @@ OpenCode, and future peers.
 - A minimal shared context surface now exists in canonical form via
   `FLOSS/shared-context-surface.json`, with a generated bootstrap view and a
   small corpus router script.
+- The shared context surface now also generates additive compressed context
+  views at `.agent-surface/context/CONTEXT_L0.md` and `CONTEXT_L1.md`, so
+  agents can load cheap briefings before opening richer canonical docs.
+- The context-daemon architecture is now promoted into canon at
+  `FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md`.
 - A minimal shared skill surface now exists in canonical form via
   `FLOSS/shared-skill-surface.json`, backed by portable skills in
   `FLOSS/skill-corpus/` and a generated shared index.
@@ -52,6 +57,12 @@ OpenCode, and future peers.
   - Role: provider catalog, not framework.
   - Take: mine it for supported low-cost/free inference surfaces and wire only
     those that have real credentials or clear strategic value.
+
+- `caveman`
+  - Role: token-compression utility for agent output and session-start context.
+  - Take: mine the compression heuristics and `caveman-compress` workflow for
+    generated low-token views, but keep canonical docs human-readable and
+    editable.
 
 ## Fresh Fork Triage
 
@@ -120,6 +131,12 @@ Newest forks checked on April 16, 2026 against the current FLOSSI0ULLK state:
   - Relevance: portable skill substrate with low-token patterns across
     Claude Code, Gemini CLI, and others.
   - Take: harvest skill packaging and minimal-token context patterns.
+
+- `kalisam/caveman` (fork of `JuliusBrussee/caveman`, updated 2026-04-15)
+  - Relevance: prompt/skill-level token compression plus file-level context
+    compression for always-loaded docs.
+  - Take: use it as a projection/compression reference for L0/L1 context views,
+    not as a reason to rewrite canonical source docs into compressed speech.
 
 - `kalisam/holochain-agent-skill` (updated 2026-04-15)
   - Relevance: portable Holochain-specific skill corpus.
@@ -195,6 +212,10 @@ Use this shape instead:
 - Shared context registry and router
   - Canonical manifest: `FLOSS/shared-context-surface.json`
   - Generated bootstrap: `.agent-surface/context/CONTEXT_BOOTSTRAP.md`
+  - Generated compressed views:
+    - `.agent-surface/context/CONTEXT_L0.md`
+    - `.agent-surface/context/CONTEXT_L1.md`
+    - `.agent-surface/context/context-view-registry.json`
   - Routing script: `FLOSS/scripts/context_router.py`
 - Shared skill corpus and registry
   - Canonical manifest: `FLOSS/shared-skill-surface.json`
@@ -275,9 +296,11 @@ Do not bulk-load `_reference/`.
 Treat `_reference/` as a federated corpus:
 
 - `docs/` = active canon
-- `_reference/software-engineering` = patterns and implementation prior art
-- `_reference/ai-ml` = model, orchestration, memory, and agent research prior art
-- external forks = active implementation prior art
+- `_reference/software-engineering` = published software-engineering books,
+  papers, and implementation references
+- `_reference/ai-ml` = published model, orchestration, memory, and agent
+  research
+- external forks = active implementation references and experiments
 
 Retrieval should choose corpus first, then documents, then passages.
 
