@@ -65,7 +65,8 @@ class BridgeStream:
 
                 self.connected = True
                 print(
-                    f"[BridgeStream] Connected to {self.bridge.bridge_id}/{self.stream_type}"
+                    "[BridgeStream] Connected to "
+                    f"{self.bridge.bridge_id}/{self.stream_type}"
                 )
                 return True
 

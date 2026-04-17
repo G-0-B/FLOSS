@@ -15,13 +15,28 @@ from datetime import datetime
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-from mcp_server import InfinityBridgeMCPServer, BridgeStream, MockBridgeStream
-from discovery import BridgeDiscovery, MockBridgeDiscovery, BridgeInfo
-from holochain_connector import (
-    HolochainConnector,
-    MockHolochainConnector,
-    BridgeRegistration,
-)
+
+def _get_cli_dependencies():
+    """Import orchestrator types lazily after local path bootstrap."""
+    from discovery import BridgeInfo, BridgeDiscovery, MockBridgeDiscovery
+    from holochain_connector import (
+        BridgeRegistration,
+        HolochainConnector,
+        MockHolochainConnector,
+    )
+    from mcp_server import BridgeStream, InfinityBridgeMCPServer, MockBridgeStream
+
+    return {
+        "BridgeInfo": BridgeInfo,
+        "BridgeDiscovery": BridgeDiscovery,
+        "MockBridgeDiscovery": MockBridgeDiscovery,
+        "BridgeRegistration": BridgeRegistration,
+        "HolochainConnector": HolochainConnector,
+        "MockHolochainConnector": MockHolochainConnector,
+        "BridgeStream": BridgeStream,
+        "InfinityBridgeMCPServer": InfinityBridgeMCPServer,
+        "MockBridgeStream": MockBridgeStream,
+    }
 
 
 class InfinityBridgeCLI:
@@ -37,24 +52,25 @@ class InfinityBridgeCLI:
         """
         self.conductor_url = conductor_url
         self.mock = mock
-        self.server: Optional[InfinityBridgeMCPServer] = None
-        self.connector: Optional[HolochainConnector] = None
+        dependencies = _get_cli_dependencies()
+        self._dependencies = dependencies
+        self.server: Optional[object] = None
+        self.connector: Optional[object] = None
 
     async def initialize(self):
         """Initialize server and connector"""
         if not self.server:
-            self.server = InfinityBridgeMCPServer(
-                conductor_url=self.conductor_url, mock=self.mock
-            )
+            server_cls = self._dependencies["InfinityBridgeMCPServer"]
+            self.server = server_cls(conductor_url=self.conductor_url, mock=self.mock)
             await self.server.start()
 
         if not self.connector:
             if self.mock:
-                self.connector = MockHolochainConnector(
-                    conductor_url=self.conductor_url
-                )
+                connector_cls = self._dependencies["MockHolochainConnector"]
+                self.connector = connector_cls(conductor_url=self.conductor_url)
             else:
-                self.connector = HolochainConnector(conductor_url=self.conductor_url)
+                connector_cls = self._dependencies["HolochainConnector"]
+                self.connector = connector_cls(conductor_url=self.conductor_url)
             await self.connector.connect()
 
     async def cleanup(self):
@@ -161,11 +177,12 @@ class InfinityBridgeCLI:
 
         # Mock stream for testing
         if self.mock:
+            mock_stream_cls = self._dependencies["MockBridgeStream"]
 
             async def mock_subscribe(bid: str, stype: str):
                 bridge = self.server.discovery.get_bridge(bid)
                 if bridge:
-                    stream = MockBridgeStream(bridge, stype)
+                    stream = mock_stream_cls(bridge, stype)
                     await stream.connect()
                     return stream
                 return None
@@ -229,7 +246,8 @@ class InfinityBridgeCLI:
 
         print(f"\n📝 Registering bridge: {args.bridge_id}...\n")
 
-        registration = BridgeRegistration(
+        bridge_registration = self._dependencies["BridgeRegistration"]
+        registration = bridge_registration(
             bridge_id=args.bridge_id,
             capabilities=args.capabilities.split(","),
             transport=args.transport.split(","),
@@ -338,7 +356,8 @@ Examples:
   %(prog)s search acoustic_20hz_20khz          # Search by capability
   %(prog)s subscribe acoustic-esp32-001 acoustic/spectrum --samples 10
   %(prog)s resources                           # List MCP resources
-  %(prog)s register my-bridge "acoustic_20hz_20khz,fft_1024" tcp tcp://192.168.1.100:9999
+  %(prog)s register my-bridge "acoustic_20hz_20khz,fft_1024" tcp
+      tcp://192.168.1.100:9999
   %(prog)s info acoustic-esp32-001             # Show bridge info
   %(prog)s ping                                # Ping conductor
 
