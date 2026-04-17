@@ -55,35 +55,46 @@ version_history = {}
 
 
 class Content(BaseModel):
+    """Knowledge payload content and origin metadata."""
+
     text: str
     format: str
     generated_by: str
 
 
 class ConfidenceScores(BaseModel):
+    """Overall and per-statement confidence values for a package."""
+
     overall: float
     statements: Optional[Dict[str, float]] = None
 
     @validator("overall")
     def validate_overall(cls, v):
+        """Keep overall confidence within the normalized 0..1 range."""
         if not 0 <= v <= 1:
             raise ValueError("Overall confidence must be between 0 and 1")
         return v
 
 
 class ReasoningTrace(BaseModel):
+    """Structured reasoning trail supporting a knowledge package."""
+
     method: str
     steps: List[str]
     alternatives: Optional[List[Dict[str, Any]]] = None
 
 
 class SourceCitation(BaseModel):
+    """Reference material backing a knowledge claim."""
+
     source: str
     link: Optional[str] = None
     citation_text: Optional[str] = None
 
 
 class Metadata(BaseModel):
+    """Domain, typing, and timestamp metadata for a package."""
+
     domain: str
     type: str
     subdomains: Optional[List[str]] = None
@@ -95,16 +106,21 @@ class Metadata(BaseModel):
 
     @validator("created_at", "updated_at", pre=True, always=True)
     def set_timestamps(cls, v):
+        """Populate timestamps automatically when callers omit them."""
         return v or datetime.utcnow().isoformat()
 
 
 class Trust(BaseModel):
+    """Trust and voting metadata associated with a package."""
+
     signature: Optional[str] = None
     score: Optional[float] = None
     votes: Optional[Dict[str, int]] = None
 
 
 class KnowledgePackage(BaseModel):
+    """Top-level knowledge exchange payload."""
+
     knowledge_id: Optional[str] = None
     version_id: Optional[str] = None
     content: Content
@@ -115,6 +131,7 @@ class KnowledgePackage(BaseModel):
 
     @root_validator
     def set_ids(cls, values):
+        """Derive stable knowledge and version identifiers when absent."""
         # Generate knowledge_id if not provided
         if values.get("knowledge_id") is None:
             # Create a hash based on content and metadata
@@ -133,6 +150,8 @@ class KnowledgePackage(BaseModel):
 
 
 class KnowledgeQuery(BaseModel):
+    """Query filters for searching published knowledge packages."""
+
     domain: Optional[str] = None
     type: Optional[str] = None
     tags: Optional[List[str]] = None
@@ -142,6 +161,8 @@ class KnowledgeQuery(BaseModel):
 
 
 class KnowledgeEvaluation(BaseModel):
+    """A node's vote and rationale for a knowledge package."""
+
     evaluating_node: str
     vote: str  # "upvote" or "downvote"
     reason: Optional[str] = None
@@ -149,6 +170,8 @@ class KnowledgeEvaluation(BaseModel):
 
 
 class ConflictResolution(BaseModel):
+    """Resolution command for conflicting knowledge packages."""
+
     resolving_node: str
     resolution_type: str  # "accept", "reject", "merge"
     reasoning: str
