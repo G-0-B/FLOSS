@@ -747,7 +747,8 @@ class ConversationMemory:
                 results.append(result)
         return results
 
-    def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
+    @staticmethod
+    def _deduplicate_and_rank(results: List[Dict], top_k: int) -> List[Dict]:
         """Deduplicate results by embedding reference and keep the top-ranked ones."""
         seen_hashes = set()
         deduped = []

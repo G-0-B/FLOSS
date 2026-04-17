@@ -45,31 +45,40 @@ def _sha256_text(text: str) -> str:
 
 
 def _utcnow_iso() -> str:
+    """Return the current UTC time in a stable Z-suffixed timestamp format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _resolve_file_path(file_path: str) -> str:
+    """Return a normalized absolute path string for checkpoint signatures."""
     return str(Path(file_path).resolve(strict=False))
 
 
 def _canonical_tool_name(tool_name: str) -> str:
+    """Normalize a tool name into the lowercase routing key used by hashline."""
     return (tool_name or "").strip().lower()
 
 
 def _string_value(value: Any) -> str:
+    """Coerce arbitrary tool payload values into stable string content."""
     if value is None:
         return ""
     return value if isinstance(value, str) else str(value)
 
 
 def _canonical_edit(edit: dict[str, Any]) -> dict[str, str]:
+    """Normalize a replace-style edit payload into plain string fields."""
     return {
         "old_string": _string_value(edit.get("old_string", "")),
         "new_string": _string_value(edit.get("new_string", "")),
     }
 
 
-def _canonical_tool_intent(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+def _canonical_tool_intent(
+    tool_name: str,
+    tool_input: dict[str, Any],
+) -> dict[str, Any]:
+    """Reduce tool input to the deterministic fields relevant for verification."""
     tool = _canonical_tool_name(tool_name)
     if tool in {"edit", "replace"}:
         return _canonical_edit(tool_input)
@@ -82,7 +91,9 @@ def _canonical_tool_intent(tool_name: str, tool_input: dict[str, Any]) -> dict[s
         if not isinstance(edits, list):
             edits = []
         return {
-            "edits": [_canonical_edit(edit) for edit in edits if isinstance(edit, dict)],
+            "edits": [
+                _canonical_edit(edit) for edit in edits if isinstance(edit, dict)
+            ],
         }
     try:
         return json.loads(json.dumps(tool_input, sort_keys=True, default=str))
@@ -90,17 +101,28 @@ def _canonical_tool_intent(tool_name: str, tool_input: dict[str, Any]) -> dict[s
         return {"raw_tool_input": str(tool_input)}
 
 
-def build_tool_signature(file_path: str, tool_name: str, tool_input: dict[str, Any]) -> str:
+def build_tool_signature(
+    file_path: str,
+    tool_name: str,
+    tool_input: dict[str, Any],
+) -> str:
+    """Hash the file path plus canonicalized tool intent into a stable signature."""
     payload = {
         "tool_name": _canonical_tool_name(tool_name),
         "file_path": _resolve_file_path(file_path),
         "intent": _canonical_tool_intent(tool_name, tool_input),
     }
-    serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    serialized = json.dumps(
+        payload,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def _checkpoint_filename(signature: str) -> str:
+    """Build a sortable checkpoint filename from a signature prefix and UTC stamp."""
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     return f"{stamp}-{signature[:CHECKPOINT_FILENAME_HASH_CHARS]}.json"
 
@@ -110,55 +132,84 @@ def _render_exact_expected_post(
     intent: dict[str, Any],
     pre_text: str | None,
 ) -> tuple[str | None, str]:
+    """Derive the exact expected post-image when the tool payload makes it possible."""
     tool = _canonical_tool_name(tool_name)
 
     if tool in {"write", "write_file"}:
-        return (_string_value(intent.get("content", "")), "Exact post-image derived from full file content payload.")
+        return (
+            _string_value(intent.get("content", "")),
+            "Exact post-image derived from full file content payload.",
+        )
 
     if pre_text is None:
-        return (None, "Pre-write file text unavailable; exact post-image could not be derived.")
+        return (
+            None,
+            "Pre-write file text unavailable; exact post-image could not be derived.",
+        )
 
     if tool in {"edit", "replace"}:
         old_string = _string_value(intent.get("old_string", ""))
         new_string = _string_value(intent.get("new_string", ""))
         if not old_string:
-            return (None, "Exact post-image unavailable because the old snippet was empty.")
+            return (
+                None,
+                "Exact post-image unavailable because the old snippet was empty.",
+            )
         old_count = pre_text.count(old_string)
         if old_count != 1:
             return (
                 None,
-                f"Exact post-image unavailable because the old snippet matched {old_count} times in the pre-write file.",
+                "Exact post-image unavailable because the old snippet matched "
+                f"{old_count} times in the pre-write file.",
             )
         return (
             pre_text.replace(old_string, new_string, 1),
-            "Exact post-image derived from the pre-write checkpoint and replace payload.",
+            "Exact post-image derived from the pre-write checkpoint and replace "
+            "payload.",
         )
 
     if tool == "multiedit":
         edits = intent.get("edits") or []
         if not isinstance(edits, list) or not edits:
-            return (None, "Exact post-image unavailable because the multi-edit payload was empty.")
+            return (
+                None,
+                "Exact post-image unavailable because the multi-edit payload "
+                "was empty.",
+            )
         current = pre_text
         for idx, edit in enumerate(edits, start=1):
             if not isinstance(edit, dict):
-                return (None, f"Exact post-image unavailable because sub-edit {idx} was not an object.")
+                return (
+                    None,
+                    "Exact post-image unavailable because sub-edit "
+                    f"{idx} was not an object.",
+                )
             old_string = _string_value(edit.get("old_string", ""))
             new_string = _string_value(edit.get("new_string", ""))
             if not old_string:
-                return (None, f"Exact post-image unavailable because sub-edit {idx} had an empty old snippet.")
+                return (
+                    None,
+                    "Exact post-image unavailable because sub-edit "
+                    f"{idx} had an empty old snippet.",
+                )
             old_count = current.count(old_string)
             if old_count != 1:
                 return (
                     None,
-                    f"Exact post-image unavailable because sub-edit {idx} matched {old_count} times in the pre-write file.",
+                    "Exact post-image unavailable because sub-edit "
+                    f"{idx} matched {old_count} times in the pre-write file.",
                 )
             current = current.replace(old_string, new_string, 1)
         return (
             current,
-            "Exact post-image derived by replaying the multi-edit payload on the pre-write checkpoint.",
+            "Exact post-image derived by replaying the multi-edit payload on the "
+            "pre-write checkpoint.",
         )
 
-    return (None, f"Exact post-image unavailable for unsupported tool {tool_name!r}.")
+    return (
+        None,
+        f"Exact post-image unavailable for unsupported tool {tool_name!r}.",
+    )
 
 
 def build_pre_write_checkpoint(
@@ -171,8 +222,13 @@ def build_pre_write_checkpoint(
     hook_event_name: str = "",
     session_id: str = "",
 ) -> dict[str, Any]:
+    """Build the persisted checkpoint payload captured before a file write lands."""
     intent = _canonical_tool_intent(tool_name, tool_input)
-    expected_post_text, expected_reason = _render_exact_expected_post(tool_name, intent, pre_text)
+    expected_post_text, expected_reason = _render_exact_expected_post(
+        tool_name,
+        intent,
+        pre_text,
+    )
     signature = build_tool_signature(file_path, tool_name, tool_input)
     normalized_file_path = _resolve_file_path(file_path)
     checkpoint = {
@@ -185,10 +241,20 @@ def build_pre_write_checkpoint(
         "session_id": session_id or "",
         "source_exists": bool(source_exists),
         "pre_write_sha256": _sha256_text(pre_text) if pre_text is not None else None,
-        "pre_write_hashlines": render_hashlines(pre_text) if pre_text is not None else [],
+        "pre_write_hashlines": (
+            render_hashlines(pre_text) if pre_text is not None else []
+        ),
         "intent": intent,
-        "exact_expected_post_sha256": _sha256_text(expected_post_text) if expected_post_text is not None else None,
-        "exact_expected_post_hashlines": render_hashlines(expected_post_text) if expected_post_text is not None else [],
+        "exact_expected_post_sha256": (
+            _sha256_text(expected_post_text)
+            if expected_post_text is not None
+            else None
+        ),
+        "exact_expected_post_hashlines": (
+            render_hashlines(expected_post_text)
+            if expected_post_text is not None
+            else []
+        ),
         "exact_expected_post_available": expected_post_text is not None,
         "exact_expected_post_reason": expected_reason,
         "consumed_at": None,
@@ -196,11 +262,18 @@ def build_pre_write_checkpoint(
     return checkpoint
 
 
-def write_pre_write_checkpoint(checkpoint_dir: str | Path, checkpoint: dict[str, Any]) -> Path:
+def write_pre_write_checkpoint(
+    checkpoint_dir: str | Path,
+    checkpoint: dict[str, Any],
+) -> Path:
+    """Persist a pre-write checkpoint payload to disk and return its path."""
     directory = Path(checkpoint_dir)
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / _checkpoint_filename(checkpoint["signature"])
-    target.write_text(json.dumps(checkpoint, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps(checkpoint, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     return target
 
 
@@ -210,12 +283,16 @@ def claim_pre_write_checkpoint(
     tool_name: str,
     tool_input: dict[str, Any],
 ) -> dict[str, Any] | None:
+    """Mark the latest matching checkpoint consumed and return its payload."""
     directory = Path(checkpoint_dir)
     if not directory.exists():
         return None
 
     signature = build_tool_signature(file_path, tool_name, tool_input)
-    candidates = sorted(directory.glob(f"*-{signature[:CHECKPOINT_FILENAME_HASH_CHARS]}.json"), reverse=True)
+    candidates = sorted(
+        directory.glob(f"*-{signature[:CHECKPOINT_FILENAME_HASH_CHARS]}.json"),
+        reverse=True,
+    )
     for candidate in candidates:
         try:
             payload = json.loads(candidate.read_text(encoding="utf-8"))
@@ -229,7 +306,10 @@ def claim_pre_write_checkpoint(
             continue
         payload["consumed_at"] = _utcnow_iso()
         try:
-            candidate.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            candidate.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
         except Exception:  # noqa: BLE001
             continue
         payload["_checkpoint_path"] = str(candidate)
@@ -237,7 +317,13 @@ def claim_pre_write_checkpoint(
     return None
 
 
-def render_hashlines(text: str, *, start_line: int = 1, max_lines: int = MAX_HASHLINE_RENDER_LINES) -> list[str]:
+def render_hashlines(
+    text: str,
+    *,
+    start_line: int = 1,
+    max_lines: int = MAX_HASHLINE_RENDER_LINES,
+) -> list[str]:
+    """Render stable per-line fingerprints for a bounded slice of text."""
     lines = text.splitlines()
     rendered: list[str] = []
     for idx, line in enumerate(lines[:max_lines], start=start_line):
@@ -249,6 +335,7 @@ def render_hashlines(text: str, *, start_line: int = 1, max_lines: int = MAX_HAS
 
 
 def _line_starts(text: str) -> list[int]:
+    """Return the starting offset for each line in a text buffer."""
     starts = [0]
     for idx, ch in enumerate(text):
         if ch == "\n":
@@ -257,16 +344,24 @@ def _line_starts(text: str) -> list[int]:
 
 
 def _line_for_offset(starts: list[int], offset: int) -> int:
+    """Resolve a character offset to its 1-based line number."""
     return bisect_right(starts, offset)
 
 
 def _span_label(start_line: int, end_line: int) -> str:
+    """Format a single-line or range label for matched snippets."""
     if start_line == end_line:
         return str(start_line)
     return f"{start_line}-{end_line}"
 
 
-def find_snippet_matches(file_text: str, snippet: str, *, max_matches: int = MAX_MATCHES) -> list[dict[str, Any]]:
+def find_snippet_matches(
+    file_text: str,
+    snippet: str,
+    *,
+    max_matches: int = MAX_MATCHES,
+) -> list[dict[str, Any]]:
+    """Locate up to `max_matches` snippet occurrences with line-based evidence."""
     if not snippet:
         return []
 
@@ -296,7 +391,13 @@ def find_snippet_matches(file_text: str, snippet: str, *, max_matches: int = MAX
     return matches
 
 
-def _verify_replace_like(file_text: str, *, old_string: str, new_string: str) -> dict[str, Any]:
+def _verify_replace_like(
+    file_text: str,
+    *,
+    old_string: str,
+    new_string: str,
+) -> dict[str, Any]:
+    """Verify replace-style edits by comparing old and new snippet presence."""
     old_matches = find_snippet_matches(file_text, old_string)
     new_matches = find_snippet_matches(file_text, new_string)
     old_present = bool(old_matches) if old_string else False
@@ -313,7 +414,9 @@ def _verify_replace_like(file_text: str, *, old_string: str, new_string: str) ->
         reason = "Old snippet is still present and the new snippet is absent."
     else:
         status = "MISMATCH"
-        reason = "Neither the old nor the new snippet could be located after the write."
+        reason = (
+            "Neither the old nor the new snippet could be located after the write."
+        )
 
     return {
         "kind": "replace-like",
@@ -329,6 +432,7 @@ def _verify_replace_like(file_text: str, *, old_string: str, new_string: str) ->
 
 
 def _verify_write_like(file_text: str, *, expected_content: str) -> dict[str, Any]:
+    """Verify full-file write operations against the expected content payload."""
     exact_match = file_text == expected_content
     status = "VERIFIED" if exact_match else "MISMATCH"
     reason = (
@@ -348,6 +452,7 @@ def _verify_write_like(file_text: str, *, expected_content: str) -> dict[str, An
 
 
 def _verify_multiedit(file_text: str, *, edits: list[dict[str, Any]]) -> dict[str, Any]:
+    """Verify each sub-edit in a multiedit payload and summarize the outcome."""
     checks = [
         _verify_replace_like(
             file_text,
@@ -380,27 +485,44 @@ def _verify_multiedit(file_text: str, *, edits: list[dict[str, Any]]) -> dict[st
     }
 
 
-def _assess_pre_write_checkpoint(file_text: str, checkpoint: dict[str, Any] | None) -> dict[str, Any] | None:
+def _assess_pre_write_checkpoint(
+    file_text: str,
+    checkpoint: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Compare the current file with the claimed pre-write checkpoint evidence."""
     if not checkpoint:
         return None
 
     actual_sha256 = _sha256_text(file_text)
     exact_expected_post_sha256 = checkpoint.get("exact_expected_post_sha256")
     pre_write_sha256 = checkpoint.get("pre_write_sha256")
-    exact_available = bool(checkpoint.get("exact_expected_post_available")) and bool(exact_expected_post_sha256)
+    exact_available = bool(checkpoint.get("exact_expected_post_available")) and bool(
+        exact_expected_post_sha256
+    )
 
     if exact_available and actual_sha256 == exact_expected_post_sha256:
         status = "MATCHED_EXACT_POST"
-        reason = "Current file matches the exact post-image derived from the pre-write checkpoint."
+        reason = (
+            "Current file matches the exact post-image derived from the pre-write "
+            "checkpoint."
+        )
     elif exact_available and pre_write_sha256 and actual_sha256 == pre_write_sha256:
         status = "MATCHED_PRE_IMAGE"
-        reason = "Current file still matches the pre-write checkpoint; the intended write did not land."
+        reason = (
+            "Current file still matches the pre-write checkpoint; the intended "
+            "write did not land."
+        )
     elif exact_available:
         status = "DIVERGED_FROM_EXACT_POST"
-        reason = "Current file diverged from the exact post-image derived from the pre-write checkpoint; stale or intervening write likely."
+        reason = (
+            "Current file diverged from the exact post-image derived from the "
+            "pre-write checkpoint; stale or intervening write likely."
+        )
     else:
         status = "NO_EXACT_POST_IMAGE"
-        reason = checkpoint.get("exact_expected_post_reason") or "No exact post-image was available from the pre-write checkpoint."
+        reason = checkpoint.get("exact_expected_post_reason") or (
+            "No exact post-image was available from the pre-write checkpoint."
+        )
 
     return {
         "signature": checkpoint.get("signature"),
@@ -416,7 +538,9 @@ def _assess_pre_write_checkpoint(file_text: str, checkpoint: dict[str, Any] | No
         "pre_write_hashlines": checkpoint.get("pre_write_hashlines") or [],
         "exact_expected_post_available": exact_available,
         "exact_expected_post_sha256": exact_expected_post_sha256,
-        "exact_expected_post_hashlines": checkpoint.get("exact_expected_post_hashlines") or [],
+        "exact_expected_post_hashlines": (
+            checkpoint.get("exact_expected_post_hashlines") or []
+        ),
         "exact_expected_post_reason": checkpoint.get("exact_expected_post_reason"),
         "checkpoint_path": checkpoint.get("_checkpoint_path"),
     }
@@ -429,6 +553,7 @@ def verify_tool_edit(
     *,
     pre_checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Verify that the current file state matches the intent of a write tool call."""
     path = Path(file_path)
     try:
         file_text = path.read_text(encoding="utf-8", errors="replace")
@@ -466,7 +591,10 @@ def verify_tool_edit(
         if not isinstance(edits, list):
             return {
                 "status": "ERROR",
-                "reason": "MultiEdit payload did not contain a list-valued `edits` field.",
+                "reason": (
+                    "MultiEdit payload did not contain a list-valued `edits` "
+                    "field."
+                ),
                 "tool_name": tool_name,
                 "file_path": str(path),
                 "checks": [],
@@ -491,7 +619,10 @@ def verify_tool_edit(
     if checkpoint_result and checkpoint_result["status"] == "MATCHED_EXACT_POST":
         status = "VERIFIED"
         reason = checkpoint_result["reason"]
-    elif checkpoint_result and checkpoint_result["status"] in {"MATCHED_PRE_IMAGE", "DIVERGED_FROM_EXACT_POST"}:
+    elif checkpoint_result and checkpoint_result["status"] in {
+        "MATCHED_PRE_IMAGE",
+        "DIVERGED_FROM_EXACT_POST",
+    }:
         status = "MISMATCH"
         reason = checkpoint_result["reason"]
 
@@ -507,6 +638,7 @@ def verify_tool_edit(
 
 
 def render_verification_section(result: dict[str, Any]) -> str:
+    """Render a compact human-readable verification report section."""
     lines = [
         "VERIFICATION (Hashline spike):",
         f"Status: {result.get('status', 'UNKNOWN')}",
@@ -529,7 +661,9 @@ def render_verification_section(result: dict[str, Any]) -> str:
         if checkpoint.get("session_id"):
             lines.append(f"Session: {checkpoint['session_id']}")
         lines.append(f"Assessment: {checkpoint.get('status', 'UNKNOWN')}")
-        lines.append(f"Reason: {checkpoint.get('reason', 'No checkpoint reason recorded.')}")
+        lines.append(
+            f"Reason: {checkpoint.get('reason', 'No checkpoint reason recorded.')}"
+        )
         pre_write_sha256 = checkpoint.get("pre_write_sha256")
         if pre_write_sha256:
             lines.append(f"Pre-write SHA256: {pre_write_sha256}")
@@ -537,19 +671,27 @@ def render_verification_section(result: dict[str, Any]) -> str:
         if exact_expected_post_sha256:
             lines.append(f"Exact expected post SHA256: {exact_expected_post_sha256}")
         if checkpoint.get("exact_expected_post_reason"):
-            lines.append(f"Exact post-image basis: {checkpoint['exact_expected_post_reason']}")
+            lines.append(
+                "Exact post-image basis: "
+                f"{checkpoint['exact_expected_post_reason']}"
+            )
         pre_write_hashlines = checkpoint.get("pre_write_hashlines") or []
         if pre_write_hashlines:
             lines.append("Pre-write fingerprint:")
             lines.extend(pre_write_hashlines)
-        exact_expected_post_hashlines = checkpoint.get("exact_expected_post_hashlines") or []
+        exact_expected_post_hashlines = (
+            checkpoint.get("exact_expected_post_hashlines") or []
+        )
         if exact_expected_post_hashlines:
             lines.append("Exact expected post fingerprint:")
             lines.extend(exact_expected_post_hashlines)
 
     for idx, check in enumerate(result.get("checks", []), start=1):
         lines.append("")
-        lines.append(f"Check {idx}: {check.get('kind', 'unknown')} -> {check.get('status', 'UNKNOWN')}")
+        lines.append(
+            f"Check {idx}: {check.get('kind', 'unknown')} -> "
+            f"{check.get('status', 'UNKNOWN')}"
+        )
         lines.append(f"Reason: {check.get('reason', 'No reason recorded.')}")
 
         expected_old = check.get("expected_old_hashlines") or []
@@ -579,7 +721,8 @@ def render_verification_section(result: dict[str, Any]) -> str:
         subchecks = check.get("subchecks") or []
         for sub_idx, subcheck in enumerate(subchecks[:3], start=1):
             lines.append(
-                f"Subcheck {sub_idx}: {subcheck.get('status', 'UNKNOWN')} - {subcheck.get('reason', 'No reason recorded.')}"
+                f"Subcheck {sub_idx}: {subcheck.get('status', 'UNKNOWN')} - "
+                f"{subcheck.get('reason', 'No reason recorded.')}"
             )
 
         expected_hashlines = check.get("expected_hashlines") or []
