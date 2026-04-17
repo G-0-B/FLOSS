@@ -65,12 +65,14 @@ For the workspace root (`C:\~shit\`) and the intake-mouth convention, see `C:\~s
 
 | Layer | Technology | Location |
 |-------|-----------|----------|
+| **A0 — Dev substrate** | Radicle patches / COBs / delegate policy | `docs/adr/ADR-8-radicle-dev-substrate.md` |
 | **0 — Storage substrate** | Holochain agent-centric DHT | `ARF/dnas/rose_forest/` |
 | **1 — Persistent memory** | ADR system + ConversationMemory | `ARF/conversation_memory.py`, `docs/adr/` |
 | **2 — Semantic layer** | Semantic CRDTs + embeddings | `ARF/embedding_frames_of_scale.py` |
 | **3 — Symbolic validation** | Formal logic in Rust integrity zome | `ARF/dnas/*/zomes/integrity/` |
 | **4 — Agent coordination** | RSA swarm + LLM committee | `ARF/pwnies/`, `ARF/validation/` |
 | **4.5 — Local agent node** | MCP passive-router consensus gateway | `packages/` (096b058) |
+| **4.6 — Harness optimization** | Multi-harness routing, memory, retrieval, optimization | `docs/architecture/AGENTIC_OPERATING_MODEL.md` |
 
 ## Current Phase: Phase 0 — Substrate Viability
 
@@ -88,6 +90,21 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 - Plan: `docs/superpowers/plans/2026-04-12-local-agent-node.md`
 - ADR: `docs/adr/ADR-MCP-ORCHESTRATOR.md`
 - Code: `packages/{metacoordinator_mcp,orchestrator,source_chain}/`
+
+### Current Operating Stack
+
+- **Canonical dev-plane code substrate:** `Radicle` (see `docs/adr/ADR-8-radicle-dev-substrate.md`). GitHub remains a pragmatic mirror, not the architectural center.
+- **Immediate coordination bridge:** the local source chain and MCP gateway under `packages/`.
+- **Runtime truth target:** `Holochain`.
+- **Operating structure:** four harnesses — execution, memory, retrieval, optimization (see `docs/architecture/AGENTIC_OPERATING_MODEL.md`).
+
+### Inference Posture
+
+- **Groq + Cerebras:** cheap background voters, reviewers, explorers, and trace triage. Use these first for repetitive loops.
+- **Claude Code:** proposer, integrator, high-risk executor, and final technical synthesis.
+- **Gemini:** multimodal analysis, research digestion, design review, writing, and independent dissent.
+
+The current default LiteLLM voter roster already exercises the Groq/Cerebras path; the premium surfaces should not be burned on routine reviewer traffic.
 
 ## Development Commands
 
@@ -131,7 +148,10 @@ ruff check .
 - **Master index**: `../INDEX.md` (workspace root)
 - **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`
 - **Architecture**: `docs/architecture/HOLISTIC_ARCHITECTURE.md` (verify existence before relying on)
-- **Decision history**: `docs/adr/INDEX.md` (note: may be stale — current set is 9 numbered ADRs + `ADR-MCP-ORCHESTRATOR`)
+- **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`
+- **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
+- **Decision history**: `docs/adr/INDEX.md` (current set is 10 numbered ADRs + `ADR-MCP-ORCHESTRATOR`)
+- **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
 - **Local agent node**: `docs/adr/ADR-MCP-ORCHESTRATOR.md`
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`
 - **Symbolic first core**: `ARF/SYMBOLIC_FIRST_CORE.md`

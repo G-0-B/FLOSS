@@ -1,0 +1,92 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "portable_skill_root": "FLOSS/skill-corpus",
+  "rules": [
+    "Keep the source of truth for shared skills inside the repository.",
+    "Materialize agent-native views from the canonical skill corpus; do not hand-edit generated projections.",
+    "Prefer small, task-shaped skills that point back into canon, code, and the shared context surface.",
+    "Import external skill ideas selectively; preserve FLOSSI0ULLK-specific provenance and architecture rules."
+  ],
+  "upstream_candidates": [
+    {
+      "id": "OpenViking",
+      "repo": "kalisam/OpenViking",
+      "role": "Filesystem-native context, memory, and selective retrieval patterns."
+    },
+    {
+      "id": "context-engineering-kit",
+      "repo": "kalisam/context-engineering-kit",
+      "role": "Portable low-token skill and context packaging patterns."
+    },
+    {
+      "id": "holochain-agent-skill",
+      "repo": "kalisam/holochain-agent-skill",
+      "role": "Holochain-specific workflow and implementation references."
+    },
+    {
+      "id": "ExtendingSkillX",
+      "repo": "kalisam/ExtendingSkillX",
+      "role": "Later-stage skill distillation and hierarchical skill knowledge base design."
+    }
+  ],
+  "targets": {
+    "codex": {
+      "enabled": true,
+      "mode": "materialized-copy",
+      "install_path": "~/.codex/skills"
+    },
+    "claude": {
+      "enabled": true,
+      "mode": "materialized-copy",
+      "install_path": ".claude/skills"
+    },
+    "gemini": {
+      "enabled": true,
+      "mode": "materialized-copy",
+      "install_path": ".gemini/skills"
+    },
+    "opencode": {
+      "enabled": true,
+      "mode": "materialized-copy",
+      "install_path": "opworkers/.opencode/skills"
+    }
+  },
+  "skills": [
+    {
+      "path": "FLOSS/skill-corpus/flossi0ullk-orient",
+      "category": "orientation",
+      "summary": "Startup and re-orientation flow for canonical FLOSSI0ULLK work.",
+      "upstreams": [
+        "OpenViking",
+        "context-engineering-kit"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/flossi0ullk-shared-surface",
+      "category": "coordination",
+      "summary": "Canonical workflow for shared MCP, context, skills, and materialized agent surfaces.",
+      "upstreams": [
+        "context-engineering-kit",
+        "OpenViking"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/flossi0ullk-consensus-gateway",
+      "category": "execution",
+      "summary": "Workflow for the local consensus gateway, voter rosters, hooks, and source-chain evidence.",
+      "upstreams": [
+        "OpenViking"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/flossi0ullk-radicle-stack",
+      "category": "architecture",
+      "summary": "Architecture workflow for Radicle, the local source-chain bridge, and Holochain provenance.",
+      "upstreams": [
+        "holochain-agent-skill"
+      ]
+    }
+  ]
+}

@@ -11,6 +11,10 @@ Usage:
 Environment variables:
     FLOSS_AGENT_DIR   Base directory for cell storage (default: ~/.floss_agent)
     FLOSS_DNA_HASH    64-char hex dna_hash for the active cell (default: zeros)
+    FLOSS_VOTER_PROFILE  Built-in roster profile (`balanced` default; `fast`,
+                         `flowith`, `subscriptions`, and `amplified` optional)
+    FLOSS_VOTER_ROSTER   Full `name=model` roster override
+    FLOSS_EXTRA_VOTERS   Extra `name=model` voters appended to the built-in profile
 """
 
 from __future__ import annotations
@@ -85,12 +89,12 @@ def list_pending() -> str:
 
 @mcp.tool()
 def run_consensus_round(claim_id: str) -> str:
-    """Run the default voter roster against a pending Claim and append the Decision.
+    """Run the active voter roster against a pending Claim and append the Decision.
 
-    Builds the default voters (Cerebras Llama 3.1 8B + Groq GPT-OSS 20B + Groq
-    Qwen3 32B as of 2026-04-12), calls every voter on the claim, appends each
-    Vote to the chain, then appends the resulting Decision. Idempotent: a
-    claim that already has a Decision returns {"error": "E_ALREADY_DECIDED"}.
+    Resolves voters from the env-aware profile system in `voters.py`, calls every
+    voter on the claim, appends each Vote to the chain, then appends the
+    resulting Decision. Idempotent: a claim that already has a Decision returns
+    {"error": "E_ALREADY_DECIDED"}.
 
     Returns JSON with the full Decision (outcome, votes, tally_mean,
     tally_variance), or {"error": "..."} on lookup / voter / tally failure.

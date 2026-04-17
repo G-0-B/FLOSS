@@ -1,0 +1,33 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "mcp_source": ".mcp.json",
+  "mcp_mirrors": [
+    "FLOSS/.mcp.json"
+  ],
+  "context_pack_path": ".agent-surface/CONTEXT_POINTERS.md",
+  "context_pointers": [
+    "INDEX.md",
+    "FLOSS/CLAUDE.md",
+    "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+    "FLOSS/shared-context-surface.json",
+    "FLOSS/shared-hook-surface.json",
+    "FLOSS/shared-skill-surface.json",
+    "FLOSS/skill-corpus",
+    "FLOSS/scripts/context_router.py",
+    "FLOSS/.serena/project.yml",
+    "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+    "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+    "FLOSS/docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md",
+    "FLOSS/docs/superpowers/plans/2026-04-16-external-adoption-and-shared-surface.md"
+  ],
+  "targets": {
+    "gemini": {
+      "settings_path": ".gemini/settings.json"
+    },
+    "opencode": {
+      "settings_path": "opworkers/opencode.jsonc"
+    }
+  }
+}

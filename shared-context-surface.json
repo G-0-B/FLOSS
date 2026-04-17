@@ -1,0 +1,222 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "default_route_order": [
+    "canon",
+    "architecture",
+    "skills",
+    "code",
+    "serena-memory",
+    "source-chain",
+    "traces",
+    "research",
+    "reference"
+  ],
+  "rules": [
+    "Route corpus first, then retrieve inside the chosen corpus.",
+    "Load L0 context before L1 or L2 whenever possible.",
+    "Do not bulk-load `_reference/`; treat it as last-resort prior art.",
+    "Prefer current code and source-chain artifacts over stale summaries."
+  ],
+  "corpora": [
+    {
+      "id": "canon",
+      "uri": "floss://canon",
+      "tier": "L0",
+      "priority": 100,
+      "summary": "Canonical orientation and authority documents for current FLOSSI0ULLK work.",
+      "keywords": [
+        "canon",
+        "authority",
+        "index",
+        "kernel",
+        "claude",
+        "adr",
+        "spec",
+        "decision",
+        "governance"
+      ],
+      "roots": [
+        "INDEX.md",
+        "FLOSS/CLAUDE.md",
+        "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+        "FLOSS/docs/adr/INDEX.md"
+      ]
+    },
+    {
+      "id": "architecture",
+      "uri": "floss://architecture",
+      "tier": "L0",
+      "priority": 95,
+      "summary": "Active architecture, operating model, and local-agent-node design references.",
+      "keywords": [
+        "architecture",
+        "operating",
+        "model",
+        "meta",
+        "harness",
+        "hook",
+        "radicle",
+        "holochain",
+        "agentic",
+        "stack",
+        "design"
+      ],
+      "roots": [
+        "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+        "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+        "FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md",
+        "FLOSS/docs/superpowers/specs/2026-04-12-local-agent-node-design.md"
+      ]
+    },
+    {
+      "id": "skills",
+      "uri": "floss://skills",
+      "tier": "L1",
+      "priority": 92,
+      "summary": "Portable FLOSSI0ULLK skill corpus and shared skill manifest for reusable agent workflows.",
+      "keywords": [
+        "skill",
+        "workflow",
+        "portable",
+        "codex",
+        "gemini",
+        "claude",
+        "shared surface",
+        "holochain",
+        "radicle"
+      ],
+      "roots": [
+        "FLOSS/shared-skill-surface.json",
+        "FLOSS/skill-corpus"
+      ]
+    },
+    {
+      "id": "code",
+      "uri": "floss://code",
+      "tier": "L1",
+      "priority": 90,
+      "summary": "Live implementation surfaces for orchestration, source-chain logic, scripts, and ARF.",
+      "keywords": [
+        "code",
+        "implementation",
+        "module",
+        "package",
+        "script",
+        "function",
+        "class",
+        "test",
+        "bug",
+        "refactor"
+      ],
+      "roots": [
+        "FLOSS/packages",
+        "FLOSS/scripts",
+        "FLOSS/ARF"
+      ]
+    },
+    {
+      "id": "serena-memory",
+      "uri": "floss://serena-memory",
+      "tier": "L1",
+      "priority": 80,
+      "summary": "Repo-local Serena project configuration and durable codebase memories.",
+      "keywords": [
+        "serena",
+        "memory",
+        "conventions",
+        "overview",
+        "onboarding",
+        "style",
+        "checklist",
+        "lsp"
+      ],
+      "roots": [
+        "FLOSS/.serena/project.yml",
+        "FLOSS/.serena/memories"
+      ]
+    },
+    {
+      "id": "source-chain",
+      "uri": "floss://source-chain",
+      "tier": "L1",
+      "priority": 88,
+      "summary": "Local source-chain state for claims, votes, decisions, and cell-level provenance.",
+      "keywords": [
+        "claim",
+        "vote",
+        "decision",
+        "consensus",
+        "provenance",
+        "cell",
+        "source chain",
+        "ledger"
+      ],
+      "roots": [
+        "C:/Users/kalis/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/source_chain",
+        "C:/Users/kalis/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/head.json"
+      ]
+    },
+    {
+      "id": "traces",
+      "uri": "floss://traces",
+      "tier": "L2",
+      "priority": 70,
+      "summary": "Hook logs and consensus traces used for optimization, debugging, and retrospective analysis.",
+      "keywords": [
+        "trace",
+        "log",
+        "hook",
+        "round",
+        "optimization",
+        "debug",
+        "latency",
+        "failure"
+      ],
+      "roots": [
+        "C:/Users/kalis/.floss_agent/traces/consensus",
+        "C:/Users/kalis/.floss_agent/hook.log"
+      ]
+    },
+    {
+      "id": "research",
+      "uri": "floss://research",
+      "tier": "L2",
+      "priority": 60,
+      "summary": "Active FLOSSI0ULLK research notes, synthesis reports, and external-fork analysis.",
+      "keywords": [
+        "research",
+        "fork",
+        "survey",
+        "paper",
+        "analysis",
+        "meta",
+        "report"
+      ],
+      "roots": [
+        "FLOSS/docs/research",
+        "deep-flossi0ullkreport.md",
+        "oh-my-meta.md"
+      ]
+    },
+    {
+      "id": "reference",
+      "uri": "floss://reference",
+      "tier": "L2",
+      "priority": 20,
+      "summary": "Read-only prior-art library used only after canon, code, and active research have been routed.",
+      "keywords": [
+        "reference",
+        "prior art",
+        "archive",
+        "software engineering",
+        "ai ml",
+        "background"
+      ],
+      "roots": [
+        "_reference"
+      ]
+    }
+  ]
+}

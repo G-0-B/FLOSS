@@ -4,17 +4,19 @@
 
 ```yaml
 id: "flossi0ullk-holistic-architecture"
-version: "0.1.0"
+version: "0.2.0"
 kind: "architecture_reference"
-status: "Proposed"
-updated: "2026-03-15"
+status: "Active"
+updated: "2026-04-16"
 truth_status: "Specified"
 evidence_sources:
   - "Master Metaprompt v1.3.1 (canonical kernel)"
-  - "SYMBOLIC_FIRST_CORE.md (production Rust code)"
-  - "INTEGRATION_MAP.md (layer-by-layer plan)"
-  - "ADR-0 through ADR-4 (decision history)"
-  - "13+ months of multi-AI coordination"
+  - "docs/governance/spine-v0.5.md"
+  - "docs/adr/ADR-8-radicle-dev-substrate.md"
+  - "docs/architecture/AGENTIC_OPERATING_MODEL.md"
+  - "docs/superpowers/specs/2026-04-12-local-agent-node-design.md"
+  - "packages/source_chain/cell.py"
+  - "packages/metacoordinator_mcp/voters.py"
 ```
 
 ---
@@ -33,11 +35,14 @@ A decentralized coordination architecture for universal flourishing — enabling
 
 | Layer | Component | Purpose | Status |
 |-------|-----------|---------|--------|
-| **0** | Holochain agent-centric DHT | Data sovereignty, cryptographic validation | Specified (DNA scaffolded) |
-| **1** | ADR system | Persistent memory across AI conversations | Verified (8 ADRs, tested) |
-| **2** | Semantic CRDT | Conflict-free knowledge composition | Specified |
+| **A0** | Radicle dev-plane substrate | Canonical code collaboration, patches, review/social artifacts | Accepted policy, bridge not yet proven |
+| **0** | Holochain agent-centric DHT | Runtime data sovereignty, cryptographic validation | Specified (DNA scaffolded) |
+| **0.5** | Local source chain + MCP bridge | Immediate claim/vote/decision traceability and coordination | Implemented in `packages/` |
+| **1** | ADR system | Persistent decision memory across sessions | Active |
+| **2** | Semantic CRDT + federated retrieval | Conflict-aware knowledge composition and corpus routing | Partially specified |
 | **3** | Symbolic-first validation | Formal logic gates neural processing | Specified (Rust code ready) |
-| **4** | Recursive Self-Aggregation | Multi-agent synthesis | Aspirational |
+| **4** | Multi-agent orchestration | Specialized agents, policy-gated execution, consensus routing | Partially implemented |
+| **4.5** | Harness optimization | Optimize routing, prompts, traces, and policies | Specified |
 
 **Key principle**: Each layer validates the one above. Neural processing never bypasses symbolic validation. Code implements specifications, never the reverse.
 
@@ -65,12 +70,14 @@ AFTER (symbolic-first): Query → Parse formal → KG reasoning → LLM formats 
 
 ## 4. Two-Plane Architecture
 
-| Plane | Purpose | Authority |
-|-------|---------|-----------|
-| **A: Dev Meta-Coordinator** | Plans, ADRs, PRs, CI — centralized tooling for speed | Outputs are artifacts, not runtime truth |
-| **B: Runtime Meta-Coordinator** | Agent-centric runtime truth, integrity validation | Per-agent source chains, eventual consistency |
+| Plane | Purpose | Canonical stack | Authority |
+|-------|---------|-----------------|-----------|
+| **A: Dev Meta-Coordinator** | Code collaboration, patches, review, CI, traces, task routing | `Radicle` + local source chain/MCP + GitHub mirror | Outputs are artifacts, not runtime truth |
+| **B: Runtime Meta-Coordinator** | Agent-centric runtime truth, integrity validation | `Holochain` cells / DHT / warrants | Per-agent source chains, eventual consistency |
 
 **Bridge rule**: Plane A may publish into Plane B but CANNOT bypass Plane B validation.
+
+**Operational note**: the current active bridge is the file-based source chain and consensus gateway under `packages/`, not a fully landed Holochain runtime.
 
 ---
 
@@ -100,7 +107,23 @@ The proven working component — transmits understanding across AI conversations
 - Uses MultiScaleEmbedding (fractal frames)
 - Composition across multiple agents demonstrated
 
-### 5e. NERV (Neurosynchronous Evolutionary Replicative Versioning)
+### 5e. Local Agent Node
+The current working coordination seam on the dev plane.
+- `packages/source_chain/` stores file-based per-cell source chains
+- `packages/metacoordinator_mcp/` routes claims, votes, and decisions
+- `.claude/settings.json` + hooks submit substantive edits into the local consensus path
+- `Groq` + `Cerebras` already act as cheap background voters via LiteLLM
+
+### 5f. Multi-Harness Operating Model
+The current recommended operating structure.
+- **Execution harness**: task routing, edits, consensus hooks, policy gates
+- **Memory harness**: Boulder/KAIROS-style structured persistence
+- **Retrieval harness**: corpus routing before deeper retrieval
+- **Optimization harness**: MetaLoop over traces, prompts, routing, and hooks
+
+See `docs/architecture/AGENTIC_OPERATING_MODEL.md`.
+
+### 5g. NERV (Neurosynchronous Evolutionary Replicative Versioning)
 Distributed neural system for knowledge replication.
 - CRDT-based centroid clustering
 - Consistent hash rings for sharding
@@ -136,16 +159,22 @@ Distributed neural system for knowledge replication.
 | Symbolic Validation (Rust) | Yes | Code in docs | No | No |
 | ConversationMemory | Yes (ADR-0) | Yes | 3/4 pass | Active |
 | Multi-Agent Compose | Yes (ADR-0) | Yes | Pass | Active |
+| Local source chain | Yes | Yes | Yes | Active |
+| MCP consensus gateway | Yes | Yes | Partial | Active |
+| Groq/Cerebras cheap-loop voters | Yes | Yes | Operationally exercised | Active |
+| Radicle dev substrate | Yes (ADR-8) | No | No | No |
+| Multi-harness operating model | Yes | Docs only | No | Partial |
 | Fractal Embeddings | Yes | Yes | Yes | Pending real model |
 | VVS Architecture | Yes (v1.0-1.2) | Partial | No | No |
 | Commons Protocol (KERI) | Yes | Partial | No | No |
 | NERV | Specified | No | No | No |
 
 **Blocking items**:
-- Rose Forest DNA has never compiled (missing Holochain build infrastructure)
-- ConversationMemory API mismatch with MultiScaleEmbedding
+- Rose Forest DNA has never compiled end-to-end in the active workflow
+- `ConversationMemory` still needs its full memory-harness upgrade path
 - ADR-0 Test #4 (Human Coherence) not yet run
-- Mock embeddings need replacement with sentence-transformers
+- Radicle bridge spike not yet proven
+- Retrieval is still too repo-local and not yet corpus-routed
 
 ---
 
@@ -175,6 +204,9 @@ This document **references** the canonical sources — it does not duplicate the
 | Ontologies + migration | `FLOSS/ARF/ONTOLOGIES_AND_INTEGRATION.md` |
 | Layer integration plan | `FLOSS/ARF/INTEGRATION_MAP.md` |
 | Decision records | `FLOSS/docs/adr/INDEX.md` |
+| Radicle dev substrate decision | `FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md` |
+| Agentic operating structure | `FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md` |
+| Forward-momentum execution plan | `FLOSS/docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md` |
 | Entry type schemas | `FLOSS/docs/specs/` |
 | Governance loading order | `FLOSS/docs/governance/LOADING_ORDER.md` |
 | Full project index | `INDEX.md` (root) |
@@ -183,12 +215,13 @@ This document **references** the canonical sources — it does not duplicate the
 
 ## 10. Next Actions (Critical Path)
 
-Based on the validation matrix, the highest-leverage next steps are:
+Based on the current operating model, the highest-leverage next steps are:
 
-1. **Get Holochain DNA compiling** — the symbolic-first architecture exists as Rust code in docs but has never been built. This is the single biggest gap.
-2. **Replace mock embeddings** — ConversationMemory works but uses hash-based projection instead of real sentence-transformers.
-3. **Run ADR-0 Test #4** (Human Coherence) — the only unvalidated test.
-4. **Resolve ConversationMemory ↔ MultiScaleEmbedding API mismatch** — integration blocker.
+1. **Prove the Radicle bridge spike** — verify `code substrate -> provenance substrate` linkage before scaling autonomy.
+2. **Upgrade the memory harness** — Boulder/KAIROS-style structured persistence on top of the local source chain.
+3. **Add consensus hooks + deterministic edit verification** — make structural edits policy-aware and corruption-resistant.
+4. **Add corpus routing before heavier retrieval** — retrieval harness before larger indexes.
+5. **Get Holochain DNA compiling** — runtime substrate still needs real proof, not just design coherence.
 
 ---
 

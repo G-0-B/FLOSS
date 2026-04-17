@@ -1,0 +1,97 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "rules": [
+    "Keep hook policy canonical in-repo and project it outward.",
+    "Preserve unrelated agent-native settings; only managed hook events are rewritten.",
+    "Use one shared checkpoint + post-write consensus path before inventing per-client variants.",
+    "Prefer non-blocking observability and cheap background consensus over prompt-time token burn."
+  ],
+  "hook_scripts": [
+    "FLOSS/scripts/hook_pre_write.py",
+    "FLOSS/scripts/hook_post_write.py",
+    "FLOSS/scripts/hook_bg_round.py"
+  ],
+  "targets": {
+    "claude": {
+      "enabled": true,
+      "settings_path": ".claude/settings.json",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "gemini": {
+      "enabled": true,
+      "settings_path": ".gemini/settings.json",
+      "hooksConfig": {
+        "enabled": true,
+        "notifications": true,
+        "disabled": []
+      },
+      "hooks": {
+        "BeforeTool": [
+          {
+            "matcher": "write_file|replace",
+            "sequential": true,
+            "hooks": [
+              {
+                "name": "flossi0ullk-pre-write",
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py --stdout-json",
+                "timeout": 60000,
+                "description": "Checkpoint substantive code edits before the tool mutates the file."
+              }
+            ]
+          }
+        ],
+        "AfterTool": [
+          {
+            "matcher": "write_file|replace",
+            "sequential": true,
+            "hooks": [
+              {
+                "name": "flossi0ullk-post-write",
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py --stdout-json",
+                "timeout": 60000,
+                "description": "Submit substantive code edits into the FLOSSI0ULLK local consensus gateway."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "codex": {
+      "enabled": false,
+      "status": "pending",
+      "reason": "No repo-local native hook settings surface is currently materialized in this workspace."
+    },
+    "opencode": {
+      "enabled": false,
+      "status": "pending",
+      "reason": "No stable first-class hook configuration surface has been identified for OpenCode here yet."
+    }
+  }
+}

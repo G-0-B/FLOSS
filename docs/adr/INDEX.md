@@ -1,7 +1,7 @@
 # ADR Index — FLOSSI0ULLK / ARF Ecosystem
 
-**Version:** 1.0.0
-**Updated:** 2026-04-04
+**Version:** 1.1.0
+**Updated:** 2026-04-16
 **Truth Status:** Specified
 
 ---
@@ -25,6 +25,7 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 | **ADR-5** | Cognitive Virology as Architectural Pattern | Specified | Specified | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
 | **ADR-6** | Four-System Meta-Orchestration Integration | Proposed | Specified | 2026-04-04 | `ADR-6-four-system-integration.md` |
 | **ADR-7** | Embracing AGPL-3.0 Copyleft Cascade | Accepted | — | 2026-04-15 | `ADR-7-agpl-cascade.md` |
+| **ADR-8** | Radicle as Dev-Plane Code Substrate | Accepted | — | 2026-04-16 | `ADR-8-radicle-dev-substrate.md` |
 | **ADR-MCP-ORCHESTRATOR** | Local Agent Node | Accepted | — | 2026-04-10 | `ADR-MCP-ORCHESTRATOR.md` |
 
 ---

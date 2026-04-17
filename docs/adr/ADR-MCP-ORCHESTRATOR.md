@@ -1,10 +1,21 @@
 ﻿# ADR: MCP Server as Consensus Orchestration Hub
 
 ## Status
-Proposed
+Accepted (2026-04-16)
 
 ## Date
 2026-04-14
+
+## Note
+This ADR remains the accepted decision to expose the consensus/orchestration layer through MCP. The detailed mechanics have evolved since this draft was written:
+
+- the active implementation now uses a file-based local source chain (`packages/source_chain/`)
+- the active claim/vote model is analog rather than ternary
+- current hook-triggered background rounds run through the local MCP gateway
+
+For the current Phase 0 implementation details, read:
+- `docs/superpowers/specs/2026-04-12-local-agent-node-design.md`
+- `docs/architecture/AGENTIC_OPERATING_MODEL.md`
 
 ## Context
 

@@ -1,0 +1,47 @@
+{
+  "aliases": {
+    "default": "balanced",
+    "free": "balanced",
+    "subscriptions": "flowith",
+    "roi": "diverse",
+    "provider-diverse": "diverse",
+    "roi-plus": "diverse-plus"
+  },
+  "profiles": {
+    "balanced": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b"
+    },
+    "fast": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b"
+    },
+    "flowith": {
+      "flowith-gpt-4.1-mini": "flowith/gpt-4.1-mini",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat"
+    },
+    "amplified": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash"
+    },
+    "diverse": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat"
+    },
+    "diverse-plus": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat",
+      "openai-gpt-4.1-mini": "openai/gpt-4.1-mini"
+    }
+  }
+}

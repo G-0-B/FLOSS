@@ -233,7 +233,7 @@ class GatewayTools:
     # Tool 6 — run_consensus_round
     #
     # The loop-closer: looks up a pending Claim by id, runs the configured
-    # voters against it (default = Cerebras + Groq GPT-OSS + Groq Qwen3),
+    # voters against it (default = env-resolved balanced roster),
     # appends every Vote to the chain, then appends the Decision.
     #
     # submit_claim stays passive (spec §5 — router not controller). This
@@ -283,7 +283,7 @@ class GatewayTools:
             return _err(f"E_CLAIM_MALFORMED: {exc}")
 
         # Resolve voter factory lazily so tests that don't hit this code
-        # path never import voters.py (and therefore never import litellm).
+        # path never import voters.py or any provider SDKs.
         factory = self._voter_factory
         if factory is None:
             from packages.metacoordinator_mcp.voters import build_default_voters

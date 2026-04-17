@@ -1,9 +1,11 @@
 """
-Claude Code PostToolUse hook — submit substantive file edits as Claims to the
-local consensus gateway and kick off a detached background consensus round.
+Post-write hook for agent-native file edit tools — submit substantive edits as
+Claims to the local consensus gateway and kick off a detached background
+consensus round.
 
-Invoked by Claude Code on Write|Edit|MultiEdit with hook JSON on stdin:
-    {"tool_name": "Edit", "tool_input": {"file_path": "...", ...}, ...}
+Invoked with hook JSON on stdin from surfaces such as:
+    - Claude Code `PostToolUse` on `Write|Edit|MultiEdit`
+    - Gemini CLI `AfterTool` on `write_file|replace`
 
 Fast path (< 100 ms wall-clock):
     1. Parse stdin JSON (swallow errors)
@@ -33,6 +35,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AGENT_DIR = Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() / ".floss_agent"))
 LOG_FILE = AGENT_DIR / "hook.log"
+PRE_WRITE_CHECKPOINT_DIR = AGENT_DIR / "checkpoints" / "pre_write"
+EMIT_STDOUT_JSON = "--stdout-json" in sys.argv[1:]
 
 # Substantive = worth burning a consensus round on. Intentionally narrow.
 SUBSTANTIVE_PATH_SEGMENTS = ("/packages/",)
@@ -40,6 +44,13 @@ SUBSTANTIVE_EXTENSIONS = (".py", ".rs", ".toml")
 
 # Even within substantive paths, skip these — they're routine noise.
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
+MUTATING_TOOL_NAMES = {
+    "write",
+    "edit",
+    "multiedit",
+    "write_file",
+    "replace",
+}
 
 
 def log(msg: str) -> None:
@@ -52,6 +63,17 @@ def log(msg: str) -> None:
         pass  # logging must never break the hook
 
 
+def finish() -> int:
+    """Exit helper for agent CLIs that require a JSON response on stdout."""
+    if EMIT_STDOUT_JSON:
+        try:
+            sys.stdout.write("{}\n")
+            sys.stdout.flush()
+        except Exception:
+            pass
+    return 0
+
+
 def is_substantive(path_str: str) -> bool:
     """True if this edit is worth submitting as a Claim."""
     if not path_str:
@@ -62,6 +84,22 @@ def is_substantive(path_str: str) -> bool:
     if not norm.endswith(SUBSTANTIVE_EXTENSIONS):
         return False
     return any(part in norm for part in SUBSTANTIVE_PATH_SEGMENTS)
+
+
+def is_mutating_tool(tool_name: str) -> bool:
+    """True if the hook fired for a file-modifying tool we want to inspect."""
+    return (tool_name or "").strip().lower() in MUTATING_TOOL_NAMES
+
+
+def infer_surface(tool_name: str, hook_event_name: str) -> str:
+    """Best-effort origin label for the claim proposer."""
+    tn = (tool_name or "").strip().lower()
+    event_name = (hook_event_name or "").strip()
+    if tn in {"write", "edit", "multiedit"}:
+        return "claude-code"
+    if tn in {"write_file", "replace"} or event_name == "AfterTool":
+        return "gemini-cli"
+    return "agent-tool"
 
 
 # Character budget per side of an edit or per Write body. Chosen so that
@@ -92,11 +130,11 @@ def _render_change_section(tool_name: str, tool_input: dict) -> str:
     """
     tn = (tool_name or "").lower()
 
-    if tn == "edit":
+    if tn in {"edit", "replace"}:
         old = _trim(tool_input.get("old_string", "") or "")
         new = _trim(tool_input.get("new_string", "") or "")
         return (
-            "CHANGE (Edit):\n"
+            f"CHANGE ({tool_name}):\n"
             "--- old ---\n"
             f"{old}\n"
             "--- new ---\n"
@@ -119,9 +157,9 @@ def _render_change_section(tool_name: str, tool_input: dict) -> str:
             parts.append(f"... [{len(edits) - 5} more sub-edits omitted]")
         return "\n".join(parts)
 
-    if tn == "write":
+    if tn in {"write", "write_file"}:
         content = _trim(tool_input.get("content", "") or "")
-        return "CHANGE (Write — full new file content):\n" + content
+        return f"CHANGE ({tool_name} — full new file content):\n" + content
 
     # Unknown tool — fall back to a serialized tool_input so voters at
     # least see *something* rather than a bare filename.
@@ -171,16 +209,25 @@ def main() -> int:
         payload = json.loads(payload_raw) if payload_raw.strip() else {}
     except Exception as exc:  # noqa: BLE001
         log(f"[hook] stdin parse error: {exc}")
-        return 0
+        return finish()
 
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {}) or {}
-    file_path = tool_input.get("file_path") or tool_input.get("filePath") or ""
+    file_path = (
+        tool_input.get("file_path")
+        or tool_input.get("filePath")
+        or tool_input.get("path")
+        or tool_input.get("target_file")
+        or ""
+    )
+
+    if not is_mutating_tool(tool_name):
+        return finish()
 
     if not is_substantive(file_path):
         # Uncomment for verbose debugging:
         # log(f"[hook] skip {tool_name} {file_path}")
-        return 0
+        return finish()
 
     # Lazy import — only reached for substantive paths, so cold-start cost
     # is paid on exactly the edits that warrant it.
@@ -188,17 +235,22 @@ def main() -> int:
         sys.path.insert(0, str(REPO_ROOT))
 
     try:
+        from packages.metacoordinator_mcp.hashline import (
+            claim_pre_write_checkpoint,
+            render_verification_section,
+            verify_tool_edit,
+        )
         from packages.metacoordinator_mcp.tools import GatewayTools
     except Exception:  # noqa: BLE001
         log(f"[hook] GatewayTools import failed:\n{traceback.format_exc()}")
-        return 0
+        return finish()
 
     try:
         dna_hash = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
         gw = GatewayTools(base_dir=AGENT_DIR, dna_hash=dna_hash)
     except Exception:  # noqa: BLE001
         log(f"[hook] GatewayTools init failed:\n{traceback.format_exc()}")
-        return 0
+        return finish()
 
     rel_path = file_path
     try:
@@ -211,24 +263,48 @@ def main() -> int:
     # correctly abstain (0.0) because there is no content to judge — the
     # whole round becomes meaningless audit noise.
     change_section = _render_change_section(tool_name, tool_input)
+    pre_checkpoint = claim_pre_write_checkpoint(PRE_WRITE_CHECKPOINT_DIR, file_path, tool_name, tool_input)
+    verification = verify_tool_edit(
+        file_path,
+        tool_name,
+        tool_input,
+        pre_checkpoint=pre_checkpoint,
+    )
+    verification_section = render_verification_section(verification)
+    surface = infer_surface(tool_name, payload.get("hook_event_name", ""))
+    log(
+        f"[hook] verification {verification.get('status', 'UNKNOWN')} "
+        f"{rel_path}: {verification.get('reason', 'no reason')}"
+    )
+    if pre_checkpoint:
+        log(f"[hook] checkpoint {pre_checkpoint.get('signature', 'unknown')} consumed for {rel_path}")
+    else:
+        log(f"[hook] no pre-write checkpoint for {rel_path}")
 
-    summary = f"{tool_name} → {Path(file_path).name}"[:200]
+    summary = (
+        f"{surface}:{tool_name}:{verification.get('status', 'UNKNOWN').lower()} "
+        f"→ {Path(file_path).name}"
+    )[:200]
     body = (
-        f"Auto-Claim from Claude Code PostToolUse hook.\n"
-        f"Tool:  {tool_name}\n"
-        f"Path:  {rel_path}\n"
+        f"Auto-Claim from {surface} post-write hook.\n"
+        f"Hook Event: {payload.get('hook_event_name', 'PostToolUse')}\n"
+        f"Tool:       {tool_name}\n"
+        f"Path:       {rel_path}\n"
         f"\n"
         f"{change_section}\n"
         f"\n"
+        f"{verification_section}\n"
+        f"\n"
         f"Evaluate whether the change preserves module invariants, matches "
         f"existing conventions in the surrounding code, and carries no "
-        f"obvious security or correctness risks. Blast radius is Local — "
-        f"the hook never auto-escalates."
+        f"obvious security or correctness risks. Treat a verification status "
+        f"other than VERIFIED as a trust reduction signal for later automation. "
+        f"Blast radius is Local — the hook never auto-escalates."
     )
 
     try:
         result_str = gw.submit_claim(
-            proposer="claude-code-hook",
+            proposer=f"{surface}-hook",
             proposal_type="CodeChange",
             summary=summary,
             body=body,
@@ -237,17 +313,17 @@ def main() -> int:
         result = json.loads(result_str)
     except Exception:  # noqa: BLE001
         log(f"[hook] submit_claim crashed:\n{traceback.format_exc()}")
-        return 0
+        return finish()
 
     if "error" in result:
         log(f"[hook] submit_claim error for {rel_path}: {result['error']}")
-        return 0
+        return finish()
 
     claim_id = result.get("claim_id", "")
     log(f"[hook] claimed {rel_path} → {claim_id}")
 
     spawn_background_round(claim_id)
-    return 0
+    return finish()
 
 
 if __name__ == "__main__":
@@ -255,4 +331,4 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception:  # noqa: BLE001 — absolute last-resort guard
         log(f"[hook] top-level crash:\n{traceback.format_exc()}")
-        sys.exit(0)
+        sys.exit(finish())
