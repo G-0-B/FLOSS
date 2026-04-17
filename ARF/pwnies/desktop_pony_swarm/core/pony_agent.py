@@ -62,7 +62,10 @@ class DesktopPonyAgent:
         self.horde_client: Optional[Any] = None
 
         logger.info(
-            f"Initialized pony: {pony_id} ({pony_name}) [{'MOCK' if use_mock else 'REAL'} mode]"
+            "Initialized pony: %s (%s) [%s mode]",
+            pony_id,
+            pony_name,
+            "MOCK" if use_mock else "REAL",
         )
 
     async def __aenter__(self):
@@ -152,7 +155,7 @@ class DesktopPonyAgent:
         """
         if confidence < 0.5:
             return f"⚠️ Low confidence ({confidence:.0%}). Verify this carefully: "
-        elif confidence < 0.7:
+        if confidence < 0.7:
             return f"Moderate confidence ({confidence:.0%}). Consider alternatives: "
         return ""  # High confidence, no caveat
 

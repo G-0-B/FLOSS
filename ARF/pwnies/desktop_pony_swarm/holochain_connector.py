@@ -212,11 +212,12 @@ class HolochainConnector:
         if result:
             print(f"[HolochainConnector] Bridge registered: {registration.bridge_id}")
             return True
-        else:
-            print(
-                f"[HolochainConnector] Failed to register bridge: {registration.bridge_id}"
-            )
-            return False
+
+        print(
+            "[HolochainConnector] Failed to register bridge: "
+            f"{registration.bridge_id}"
+        )
+        return False
 
     async def discover_bridges(
         self, timeout: Optional[float] = None
@@ -250,7 +251,8 @@ class HolochainConnector:
                 bridge_list = bridge_list["bridges"]
             else:
                 print(
-                    f"[HolochainConnector] Unexpected response format: {type(bridge_list)}"
+                    "[HolochainConnector] Unexpected response format: "
+                    f"{type(bridge_list)}"
                 )
                 return []
 
@@ -301,7 +303,8 @@ class HolochainConnector:
                 bridge_list = bridge_list["bridges"]
             else:
                 print(
-                    f"[HolochainConnector] Unexpected response format: {type(bridge_list)}"
+                    "[HolochainConnector] Unexpected response format: "
+                    f"{type(bridge_list)}"
                 )
                 return []
 
@@ -315,7 +318,8 @@ class HolochainConnector:
                 continue
 
         print(
-            f"[HolochainConnector] Found {len(bridges)} bridges with capability '{capability}'"
+            "[HolochainConnector] Found "
+            f"{len(bridges)} bridges with capability '{capability}'"
         )
         return bridges
 
@@ -346,11 +350,12 @@ class HolochainConnector:
         if result:
             print(f"[HolochainConnector] Stream registered: {bridge_id}/{stream_type}")
             return True
-        else:
-            print(
-                f"[HolochainConnector] Failed to register stream: {bridge_id}/{stream_type}"
-            )
-            return False
+
+        print(
+            "[HolochainConnector] Failed to register stream: "
+            f"{bridge_id}/{stream_type}"
+        )
+        return False
 
     async def get_bridge_streams(self, bridge_id: str) -> List[Dict[str, Any]]:
         """

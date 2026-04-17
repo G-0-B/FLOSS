@@ -58,16 +58,16 @@ class MockHordeClient:
         # Detect query type
         if "15 * 23" in prompt or "15*23" in prompt:
             return self._mock_math_response(pony)
-        elif "17 sheep" in prompt:
+        if "17 sheep" in prompt:
             return self._mock_reasoning_response(pony)
-        elif "FLOSSI0ULLK" in prompt or "Love" in prompt or "Knowledge" in prompt:
+        if "FLOSSI0ULLK" in prompt or "Love" in prompt or "Knowledge" in prompt:
             return self._mock_flossi_response(pony)
-        elif "aggregat" in prompt.lower() or "candidate" in prompt.lower():
+        if "aggregat" in prompt.lower() or "candidate" in prompt.lower():
             # This is an aggregation prompt
             return self._mock_aggregation(prompt, pony)
-        else:
-            # Generic response
-            return self._mock_generic_response(prompt, pony)
+
+        # Generic response
+        return self._mock_generic_response(prompt, pony)
 
     async def generate_embedding(self, text: str) -> list[float]:
         """
@@ -211,7 +211,7 @@ Unconditional Love, Light, and Knowledge
 
 Core Principles:
 1. Love: Dignity, consent, individual sovereignty
-2. Light: Transparency, verifiability, open systems  
+2. Light: Transparency, verifiability, open systems
 3. Knowledge: Collective intelligence, distributed learning
 
 Technical Implementation:
@@ -247,9 +247,9 @@ This combines the clarity of Solution 1 with the verification from Solution 2.
 Answer: 345 ✓
 
 - {pony}"""
-        else:
-            # Self-refinement
-            return f"""Reviewing the candidate solution, I can refine it:
+
+        # Self-refinement
+        return f"""Reviewing the candidate solution, I can refine it:
 
 The approach is correct. Let me make it clearer:
 15 × 23 = 345

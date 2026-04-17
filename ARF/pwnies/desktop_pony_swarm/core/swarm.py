@@ -295,7 +295,10 @@ class PonySwarm:
             self.metrics["iteration_times"].append(iter_time)
 
             logger.info(
-                f"  Iteration {t} complete: diversity={diversity:.4f}, time={iter_time:.2f}s"
+                "  Iteration %s complete: diversity=%.4f, time=%.2fs",
+                t,
+                diversity,
+                iter_time,
             )
 
         # ============================================================
@@ -325,7 +328,9 @@ class PonySwarm:
         }
 
         logger.info(
-            f"RSA complete: time={total_time:.2f}s, final_diversity={iteration_history[-1]['diversity']:.4f}"
+            "RSA complete: time=%.2fs, final_diversity=%.4f",
+            total_time,
+            iteration_history[-1]["diversity"],
         )
 
         return result
@@ -366,16 +371,12 @@ Candidate solution:
 
 Now refine the candidate into an improved solution with clear reasoning:"""
 
-        else:
-            # Multi-candidate aggregation prompt
-            candidates_text = "\n\n".join(
-                [
-                    f"---- Solution {i+1} ----\n{cand}"
-                    for i, cand in enumerate(candidates)
-                ]
-            )
+        # Multi-candidate aggregation prompt
+        candidates_text = "\n\n".join(
+            [f"---- Solution {i+1} ----\n{cand}" for i, cand in enumerate(candidates)]
+        )
 
-            return f"""You are given a problem and several candidate solutions.
+        return f"""You are given a problem and several candidate solutions.
 Some candidates may be incorrect or contain errors.
 Aggregate the useful ideas and produce a single, high-quality solution.
 Reason carefully; if candidates disagree, choose the correct path.
