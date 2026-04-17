@@ -101,6 +101,7 @@ def _normalize_metadata(raw_metadata: Any) -> Dict[str, Any]:
 @dataclass
 class Understanding:
     """A moment of coherent understanding, representing an atomic unit of memory."""
+
     content: str
     agent_id: str
     timestamp: str
@@ -171,6 +172,7 @@ class ConversationMemory:
             'validation_failed': 0,
             'validation_skipped': 0,
         }
+        self._embedding_model = None
 
         # Initialize committee validation
         self.committee = None
@@ -322,8 +324,8 @@ class ConversationMemory:
         elif validation_mode == 'skipped':
             self.validation_stats['validation_skipped'] += 1
 
+    @staticmethod
     def _build_holochain_payload(
-        self,
         understanding_dict: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Return the full understanding payload supported by the Holochain zome API."""
@@ -698,7 +700,7 @@ class ConversationMemory:
 
     def _encode_text(self, text: str) -> np.ndarray:
         """Encode text with the sentence-transformer model, loading it lazily."""
-        if not hasattr(self, '_embedding_model'):
+        if self._embedding_model is None:
             from sentence_transformers import SentenceTransformer
 
             logger.info("Loading sentence-transformers model (one-time setup)...")

@@ -33,12 +33,14 @@ CHECKPOINT_FILENAME_HASH_CHARS = 12
 
 
 def _short_hash(text: str) -> str:
+    """Return a short stable token for display-oriented hashline identifiers."""
     digest = hashlib.sha256(text.encode("utf-8")).digest()
     token = base64.b32encode(digest).decode("ascii").rstrip("=")
     return token[:HASHLINE_ID_CHARS]
 
 
 def _sha256_text(text: str) -> str:
+    """Return the full SHA-256 hex digest for a UTF-8 text payload."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 

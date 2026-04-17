@@ -392,31 +392,35 @@ class TestOntologyValidation:
 
     def test_validate_triple_valid_is_a(self, temp_memory):
         """Test validation of valid 'is_a' triple."""
-        is_valid, error = temp_memory._validate_triple(('GPT-4', 'is_a', 'LLM'))
+        is_valid, error, _ = temp_memory._validate_triple(('GPT-4', 'is_a', 'LLM'))
         assert is_valid is True
         assert error is None
 
     def test_validate_triple_valid_improves_upon(self, temp_memory):
         """Test validation of valid 'improves_upon' triple."""
-        is_valid, error = temp_memory._validate_triple(('V2', 'improves_upon', 'V1'))
+        is_valid, error, _ = temp_memory._validate_triple(
+            ('V2', 'improves_upon', 'V1')
+        )
         assert is_valid is True
         assert error is None
 
     def test_validate_triple_invalid_predicate(self, temp_memory):
         """Test validation fails with unknown predicate."""
-        is_valid, error = temp_memory._validate_triple(('X', 'unknown_predicate', 'Y'))
+        is_valid, error, _ = temp_memory._validate_triple(
+            ('X', 'unknown_predicate', 'Y')
+        )
         assert is_valid is False
         assert 'Unknown predicate' in error
 
     def test_validate_triple_empty_subject(self, temp_memory):
         """Test validation fails with empty subject."""
-        is_valid, error = temp_memory._validate_triple(('', 'is_a', 'Y'))
+        is_valid, error, _ = temp_memory._validate_triple(('', 'is_a', 'Y'))
         assert is_valid is False
         assert 'non-empty' in error
 
     def test_validate_triple_empty_object(self, temp_memory):
         """Test validation fails with empty object."""
-        is_valid, error = temp_memory._validate_triple(('X', 'is_a', ''))
+        is_valid, error, _ = temp_memory._validate_triple(('X', 'is_a', ''))
         assert is_valid is False
         assert 'non-empty' in error
 
@@ -425,7 +429,7 @@ class TestOntologyValidation:
         memory = ConversationMemory(agent_id="test", storage_path=temp_storage,
                                     validate_ontology=False)
         # Even invalid triple should pass when validation disabled
-        is_valid, error = memory._validate_triple(('X', 'invalid_pred', 'Y'))
+        is_valid, error, _ = memory._validate_triple(('X', 'invalid_pred', 'Y'))
         assert is_valid is True
         assert error is None
 
@@ -783,7 +787,7 @@ class TestOntologyValidation:
                            'evaluated_on', 'stated']
 
         for predicate in known_predicates:
-            is_valid, error = temp_memory._validate_triple(('X', predicate, 'Y'))
+            is_valid, error, _ = temp_memory._validate_triple(('X', predicate, 'Y'))
             assert is_valid is True, f"Predicate {predicate} should be valid"
             assert error is None
 
@@ -803,12 +807,12 @@ class TestOntologyValidation:
     def test_validation_error_messages_clear(self, temp_memory):
         """Test that validation error messages are clear and helpful."""
         # Unknown predicate
-        is_valid, error = temp_memory._validate_triple(('X', 'bad_pred', 'Y'))
+        is_valid, error, _ = temp_memory._validate_triple(('X', 'bad_pred', 'Y'))
         assert 'Unknown predicate' in error
         assert 'bad_pred' in error
 
         # Empty subject
-        is_valid, error = temp_memory._validate_triple(('', 'is_a', 'Y'))
+        is_valid, error, _ = temp_memory._validate_triple(('', 'is_a', 'Y'))
         assert 'non-empty' in error
 
     def test_multiple_validation_attempts(self, temp_memory):

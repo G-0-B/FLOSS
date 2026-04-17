@@ -91,9 +91,11 @@ def _utc_now_iso() -> str:
     """Return the current UTC timestamp as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
+
 @dataclass
 class Understanding:
     """A moment of coherent understanding, representing an atomic unit of memory."""
+
     content: str
     agent_id: str
     timestamp: str
@@ -175,6 +177,7 @@ class ConversationMemory:
             'validation_failed': 0,
             'validation_skipped': 0,
         }
+        self._embedding_model = None
 
         # Initialize committee validation
         self.committee = None
@@ -248,7 +251,8 @@ class ConversationMemory:
             return self._transmit_holochain(understanding_dict, skip_validation)
         return self._transmit_file(understanding_dict, skip_validation)
 
-    def _understanding_log_ref(self, understanding_dict: Dict[str, Any]) -> str:
+    @staticmethod
+    def _understanding_log_ref(understanding_dict: Dict[str, Any]) -> str:
         """Return a deterministic log reference without exposing raw memory."""
         payload = json.dumps(
             understanding_dict,
@@ -325,8 +329,8 @@ class ConversationMemory:
         elif validation_mode == 'skipped':
             self.validation_stats['validation_skipped'] += 1
 
+    @staticmethod
     def _build_holochain_payload(
-        self,
         understanding_dict: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Return the full understanding payload supported by the Holochain zome API."""
@@ -491,21 +495,20 @@ class ConversationMemory:
             return None
 
         if self.patterns:
-            for name, pattern in self.patterns.items():
+            for pattern in self.patterns.values():
                 regex = pattern.get('regex')
                 predicate = pattern.get('predicate')
 
                 if regex and predicate:
                     match = re.search(regex, content, re.IGNORECASE)
-                    if match:
-                        if len(match.groups()) >= 2:
-                            subject = match.group(1).strip()
-                            obj = match.group(2).strip()
+                    if match and len(match.groups()) >= 2:
+                        subject = match.group(1).strip()
+                        obj = match.group(2).strip()
 
-                            if predicate == IS_A:
-                                obj = obj.replace(' ', '-')
+                        if predicate == IS_A:
+                            obj = obj.replace(' ', '-')
 
-                            return (subject, predicate, obj)
+                        return (subject, predicate, obj)
 
         # Fallback patterns use non-overlapping token classes to avoid
         # regex backtracking.
@@ -680,8 +683,6 @@ class ConversationMemory:
 
         if self.embeddings and other_memory_export['embedding_state']:
             try:
-                from embedding_frames_of_scale import MultiScaleEmbedding
-
                 other_embeddings = MultiScaleEmbedding.from_dict(
                     other_memory_export['embedding_state']
                 )
@@ -701,7 +702,7 @@ class ConversationMemory:
 
     def _encode_text(self, text: str) -> np.ndarray:
         """Encode text with the sentence-transformer model, loading it lazily."""
-        if not hasattr(self, '_embedding_model'):
+        if self._embedding_model is None:
             from sentence_transformers import SentenceTransformer
 
             logger.info("Loading sentence-transformers model (one-time setup)...")
@@ -918,6 +919,7 @@ class HolochainClient:
         except FileNotFoundError as err:
             logger.warning("'hc' command not found - Holochain backend unavailable")
             raise RuntimeError("Holochain CLI not found.") from err
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
