@@ -38,9 +38,7 @@ class BudgetExceededError(Exception):
 
 
 class BudgetManager:
-    """
-    Manages resource budget for an agent.
-    """
+    """Manage resource budget for an agent."""
 
     def __init__(
         self,

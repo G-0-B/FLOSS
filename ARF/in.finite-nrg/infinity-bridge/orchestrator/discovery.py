@@ -181,7 +181,8 @@ class BridgeDiscovery:
                     self.discovered_bridges[bridge.bridge_id] = bridge
 
             print(
-                f"[BridgeDiscovery] Found {len(bridges)} bridges with capability '{capability}'"
+                "[BridgeDiscovery] Found "
+                f"{len(bridges)} bridges with capability '{capability}'"
             )
             return bridges
 

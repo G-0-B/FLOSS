@@ -11,12 +11,18 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
-from orchestrator.discovery import MockBridgeDiscovery
+
+def _get_demo_dependencies():
+    """Import demo-only orchestrator types after local path bootstrap."""
+    from orchestrator.discovery import MockBridgeDiscovery
+    from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
+
+    return InfinityBridgeMCPServer, MockBridgeStream, MockBridgeDiscovery
 
 
 async def demo_basic_discovery():
     """Demo 1: Basic bridge discovery"""
+    InfinityBridgeMCPServer, _, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 1: Basic Bridge Discovery")
     print("=" * 60)
@@ -43,6 +49,7 @@ async def demo_basic_discovery():
 
 async def demo_capability_search():
     """Demo 2: Search bridges by capability"""
+    _, _, MockBridgeDiscovery = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 2: Capability-Based Discovery")
     print("=" * 60)
@@ -68,6 +75,7 @@ async def demo_capability_search():
 
 async def demo_streaming():
     """Demo 3: Subscribe and stream data"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("\n" + "=" * 60)
     print("DEMO 3: Stream Subscription and Data Reading")
     print("=" * 60)
@@ -121,6 +129,7 @@ async def demo_streaming():
 
 async def demo_mcp_resources():
     """Demo 4: MCP resource URIs"""
+    InfinityBridgeMCPServer, _, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 4: MCP Resource URIs")
     print("=" * 60)
@@ -144,6 +153,7 @@ async def demo_mcp_resources():
 
 async def demo_correlation():
     """Demo 5: Cross-correlation of acoustic and vibration"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 5: Acoustic-Vibration Correlation")
     print("=" * 60)
@@ -240,6 +250,7 @@ async def demo_correlation():
 
 async def demo_performance_metrics():
     """Demo 6: Performance metrics validation"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("\n" + "=" * 60)
     print("DEMO 6: Performance Metrics")
     print("=" * 60)
