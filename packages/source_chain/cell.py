@@ -30,8 +30,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from packages.orchestrator.serialization import canonical_serialize, entry_hash as _entry_hash
-
+from packages.orchestrator.serialization import (
+    canonical_serialize,
+    entry_hash as _entry_hash,
+)
 
 _LOCK_TIMEOUT = 5.0  # seconds before waiters give up and surface a lock timeout
 

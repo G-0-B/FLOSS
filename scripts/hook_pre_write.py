@@ -148,7 +148,9 @@ def main() -> int:
             hook_event_name=payload.get("hook_event_name", ""),
             session_id=extract_session_id(payload),
         )
-        checkpoint_path = write_pre_write_checkpoint(PRE_WRITE_CHECKPOINT_DIR, checkpoint)
+        checkpoint_path = write_pre_write_checkpoint(
+            PRE_WRITE_CHECKPOINT_DIR, checkpoint
+        )
     except Exception:  # noqa: BLE001
         log(f"[hook-pre] checkpoint build/write failed:\n{traceback.format_exc()}")
         return finish()

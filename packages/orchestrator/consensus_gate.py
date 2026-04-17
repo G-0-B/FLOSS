@@ -232,12 +232,14 @@ def default_adr_writer(adr_dir: Path) -> Callable[[Decision, Claim], str]:
             lines.append(f"  - {v.rationale}")
 
         if decision.override_by:
-            lines.extend([
-                "",
-                "## Override",
-                "",
-                f"Overridden by human voter: **{decision.override_by}**",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "## Override",
+                    "",
+                    f"Overridden by human voter: **{decision.override_by}**",
+                ]
+            )
 
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return str(path)

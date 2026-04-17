@@ -18,7 +18,6 @@ if str(_REPO_ROOT) not in sys.path:
 from packages.source_chain import cell as cell_module
 from packages.source_chain.cell import CellDirectory, CellDirectoryError
 
-
 DNA_HASH = "a" * 64  # 64-char hex string simulating a real dna_hash
 
 
@@ -249,6 +248,7 @@ def test_entry_filename_is_hash_of_raw_bytes_with_float():
 # ---------------------------------------------------------------------------
 # CLI runner
 # ---------------------------------------------------------------------------
+
 
 def _run_all():
     tests = [

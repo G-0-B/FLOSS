@@ -96,7 +96,9 @@ def test_build_default_voters_raises_when_no_enabled_roster_exists():
         except RuntimeError as exc:
             assert "No enabled voters" in str(exc)
         else:
-            raise AssertionError("Expected RuntimeError when no provider keys are loaded")
+            raise AssertionError(
+                "Expected RuntimeError when no provider keys are loaded"
+            )
 
 
 def test_flowith_profile_enables_when_api_key_is_present():

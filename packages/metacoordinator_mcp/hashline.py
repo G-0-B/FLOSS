@@ -246,9 +246,7 @@ def build_pre_write_checkpoint(
         ),
         "intent": intent,
         "exact_expected_post_sha256": (
-            _sha256_text(expected_post_text)
-            if expected_post_text is not None
-            else None
+            _sha256_text(expected_post_text) if expected_post_text is not None else None
         ),
         "exact_expected_post_hashlines": (
             render_hashlines(expected_post_text)
@@ -377,7 +375,7 @@ def find_snippet_matches(
         start_line = _line_for_offset(starts, offset)
         end_offset = offset + max(len(snippet) - 1, 0)
         end_line = _line_for_offset(starts, end_offset)
-        excerpt = "\n".join(file_lines[start_line - 1:end_line])
+        excerpt = "\n".join(file_lines[start_line - 1 : end_line])
         matches.append(
             {
                 "start_line": start_line,
@@ -414,9 +412,7 @@ def _verify_replace_like(
         reason = "Old snippet is still present and the new snippet is absent."
     else:
         status = "MISMATCH"
-        reason = (
-            "Neither the old nor the new snippet could be located after the write."
-        )
+        reason = "Neither the old nor the new snippet could be located after the write."
 
     return {
         "kind": "replace-like",
@@ -592,8 +588,7 @@ def verify_tool_edit(
             return {
                 "status": "ERROR",
                 "reason": (
-                    "MultiEdit payload did not contain a list-valued `edits` "
-                    "field."
+                    "MultiEdit payload did not contain a list-valued `edits` " "field."
                 ),
                 "tool_name": tool_name,
                 "file_path": str(path),
@@ -672,8 +667,7 @@ def render_verification_section(result: dict[str, Any]) -> str:
             lines.append(f"Exact expected post SHA256: {exact_expected_post_sha256}")
         if checkpoint.get("exact_expected_post_reason"):
             lines.append(
-                "Exact post-image basis: "
-                f"{checkpoint['exact_expected_post_reason']}"
+                "Exact post-image basis: " f"{checkpoint['exact_expected_post_reason']}"
             )
         pre_write_hashlines = checkpoint.get("pre_write_hashlines") or []
         if pre_write_hashlines:

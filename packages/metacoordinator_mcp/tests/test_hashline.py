@@ -69,7 +69,10 @@ def test_verify_write_reports_exact_file_match():
             {"content": content},
         )
         assert result["status"] == "VERIFIED"
-        assert result["checks"][0]["expected_sha256"] == result["checks"][0]["actual_sha256"]
+        assert (
+            result["checks"][0]["expected_sha256"]
+            == result["checks"][0]["actual_sha256"]
+        )
 
 
 def test_verify_multiedit_aggregates_subchecks():
@@ -120,7 +123,9 @@ def test_verify_replace_reports_mismatch_when_exact_post_image_diverges():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "sample.py"
         pre_text = "def answer():\n    return 42\n"
-        path.write_text("def answer():\n    return 43\n# intervening write\n", encoding="utf-8")
+        path.write_text(
+            "def answer():\n    return 43\n# intervening write\n", encoding="utf-8"
+        )
         checkpoint = build_pre_write_checkpoint(
             str(path),
             "replace",

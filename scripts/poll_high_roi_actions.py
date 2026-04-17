@@ -45,7 +45,10 @@ def utc_stamp() -> str:
 def candidate_claims() -> list[dict[str, Any]]:
     shared_evidence = [
         {"type": "spec", "ref": "docs/architecture/METAHARNESS_OPERATING_MODEL.md"},
-        {"type": "spec", "ref": "docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md"},
+        {
+            "type": "spec",
+            "ref": "docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md",
+        },
     ]
     return [
         {
@@ -70,7 +73,8 @@ def candidate_claims() -> list[dict[str, Any]]:
                 "and verify the linkage from another peer so the collaboration substrate is proven end "
                 "to end."
             ),
-            "evidence": shared_evidence + [
+            "evidence": shared_evidence
+            + [
                 {"type": "adr", "ref": "docs/adr/ADR-8-radicle-dev-substrate.md"},
             ],
         },
@@ -123,13 +127,15 @@ def build_markdown_summary(payload: dict[str, Any]) -> str:
     for item in payload["roster"]:
         if item.get("enabled"):
             lines.append(f"- `{item['name']}` -> `{item['model']}`")
-    lines.extend([
-        "",
-        "## Ranked Actions",
-        "",
-        "| Rank | Candidate | Outcome | Mean | Variance | Claim ID |",
-        "|---|---|---:|---:|---:|---|",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Ranked Actions",
+            "",
+            "| Rank | Candidate | Outcome | Mean | Variance | Claim ID |",
+            "|---|---|---:|---:|---:|---|",
+        ]
+    )
     for idx, result in enumerate(payload["results"], start=1):
         mean = result["decision"].get("tally_mean")
         variance = result["decision"].get("tally_variance")
@@ -140,13 +146,19 @@ def build_markdown_summary(payload: dict[str, Any]) -> str:
             f"{mean_str} | {var_str} | `{result['claim_id']}` |"
         )
 
-    lines.extend([
-        "",
-        "## Top Dissents",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Top Dissents",
+            "",
+        ]
+    )
     for result in payload["results"]:
-        negative_votes = [vote for vote in result["decision"].get("votes", []) if vote.get("weight", 0.0) < 0.0]
+        negative_votes = [
+            vote
+            for vote in result["decision"].get("votes", [])
+            if vote.get("weight", 0.0) < 0.0
+        ]
         if not negative_votes:
             continue
         strongest = min(negative_votes, key=lambda vote: vote.get("weight", 0.0))
@@ -191,11 +203,15 @@ def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
             )
         )
         if "error" in claim_result:
-            raise RuntimeError(f"submit_claim failed for {candidate['slug']}: {claim_result['error']}")
+            raise RuntimeError(
+                f"submit_claim failed for {candidate['slug']}: {claim_result['error']}"
+            )
         claim_id = claim_result["claim_id"]
         decision = json.loads(gateway.run_consensus_round(claim_id))
         if "error" in decision:
-            raise RuntimeError(f"run_consensus_round failed for {candidate['slug']}: {decision['error']}")
+            raise RuntimeError(
+                f"run_consensus_round failed for {candidate['slug']}: {decision['error']}"
+            )
         results.append(
             {
                 "slug": candidate["slug"],
@@ -224,7 +240,9 @@ def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{stamp}-high-roi-actions.json"
     md_path = output_dir / f"{stamp}-high-roi-actions.md"
-    json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     md_path.write_text(build_markdown_summary(payload), encoding="utf-8")
     payload["json_path"] = str(json_path)
     payload["markdown_path"] = str(md_path)
@@ -233,7 +251,9 @@ def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a durable high-ROI action poll")
-    parser.add_argument("--profile", default="diverse", help="Voter profile to use (default: diverse)")
+    parser.add_argument(
+        "--profile", default="diverse", help="Voter profile to use (default: diverse)"
+    )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser.parse_args()
 

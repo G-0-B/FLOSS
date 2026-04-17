@@ -15,7 +15,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE_ROOT = REPO_ROOT.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-context-surface.json"
@@ -61,12 +60,16 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
         if not isinstance(corpus, dict):
             raise ContextSurfaceError("Every corpus entry must be a JSON object")
         roots = corpus.get("roots", [])
-        if not isinstance(roots, list) or not all(isinstance(item, str) for item in roots):
+        if not isinstance(roots, list) or not all(
+            isinstance(item, str) for item in roots
+        ):
             raise ContextSurfaceError(
                 f"Corpus {corpus.get('id', '<unknown>')!r} must provide string roots"
             )
         resolved = dict(corpus)
-        resolved["resolved_roots"] = [resolve_root(workspace_root, item) for item in roots]
+        resolved["resolved_roots"] = [
+            resolve_root(workspace_root, item) for item in roots
+        ]
         registry["corpora"].append(resolved)
     return registry
 
@@ -84,26 +87,32 @@ def build_bootstrap(registry: dict[str, Any]) -> str:
     ]
     for rule in registry.get("rules", []):
         lines.append(f"- {rule}")
-    lines.extend([
-        "",
-        "## Default Route Order",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Default Route Order",
+            "",
+        ]
+    )
     for item in registry.get("default_route_order", []):
         lines.append(f"- `{item}`")
-    lines.extend([
-        "",
-        "## Corpora",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Corpora",
+            "",
+        ]
+    )
     for corpus in registry["corpora"]:
-        lines.extend([
-            f"### `{corpus['id']}` (`{corpus['uri']}`)",
-            f"- Tier: `{corpus['tier']}`",
-            f"- Priority: `{corpus['priority']}`",
-            f"- Summary: {corpus['summary']}",
-            "- Roots:",
-        ])
+        lines.extend(
+            [
+                f"### `{corpus['id']}` (`{corpus['uri']}`)",
+                f"- Tier: `{corpus['tier']}`",
+                f"- Priority: `{corpus['priority']}`",
+                f"- Summary: {corpus['summary']}",
+                "- Roots:",
+            ]
+        )
         for root in corpus["resolved_roots"]:
             lines.append(f"  - `{root}`")
         lines.append("- Keywords:")
@@ -115,7 +124,9 @@ def build_bootstrap(registry: dict[str, Any]) -> str:
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def write_text(path: Path, content: str) -> None:
@@ -123,7 +134,9 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def check_or_write(path: Path, content: str, *, check: bool, dry_run: bool) -> tuple[str, bool]:
+def check_or_write(
+    path: Path, content: str, *, check: bool, dry_run: bool
+) -> tuple[str, bool]:
     changed = True
     if path.exists():
         changed = path.read_text(encoding="utf-8") != content
@@ -137,7 +150,9 @@ def check_or_write(path: Path, content: str, *, check: bool, dry_run: bool) -> t
     return (f"OK    {path}", changed)
 
 
-def check_or_write_json(path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool) -> tuple[str, bool]:
+def check_or_write_json(
+    path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool
+) -> tuple[str, bool]:
     content = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     return check_or_write(path, content, check=check, dry_run=dry_run)
 
@@ -158,19 +173,25 @@ def materialize(
     drift_found = False
 
     registry_path = output_dir / "context-registry.json"
-    message, changed = check_or_write_json(registry_path, registry, check=check, dry_run=dry_run)
+    message, changed = check_or_write_json(
+        registry_path, registry, check=check, dry_run=dry_run
+    )
     results.append(message)
     drift_found = drift_found or changed
 
     bootstrap_path = output_dir / "CONTEXT_BOOTSTRAP.md"
-    message, changed = check_or_write(bootstrap_path, bootstrap, check=check, dry_run=dry_run)
+    message, changed = check_or_write(
+        bootstrap_path, bootstrap, check=check, dry_run=dry_run
+    )
     results.append(message)
     drift_found = drift_found or changed
     return results, drift_found
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Materialize the FLOSSI0ULLK shared context surface")
+    parser = argparse.ArgumentParser(
+        description="Materialize the FLOSSI0ULLK shared context surface"
+    )
     parser.add_argument("--workspace-root", type=Path, default=WORKSPACE_ROOT)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

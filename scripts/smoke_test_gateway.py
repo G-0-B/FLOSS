@@ -128,10 +128,16 @@ def main() -> int:
         print("STEP 4: get_decision (read it back from the chain)")
         reread = json.loads(gw.get_decision(claim_id))
         if reread is None:
-            print("FAIL: get_decision returned null for a just-decided claim", file=sys.stderr)
+            print(
+                "FAIL: get_decision returned null for a just-decided claim",
+                file=sys.stderr,
+            )
             return 1
         if reread["claim_id"] != claim_id or reread["outcome"] != decision["outcome"]:
-            print("FAIL: re-read decision does not match written decision", file=sys.stderr)
+            print(
+                "FAIL: re-read decision does not match written decision",
+                file=sys.stderr,
+            )
             return 1
         print("  → round-trips cleanly (claim_id + outcome match)")
 

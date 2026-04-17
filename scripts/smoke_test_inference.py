@@ -41,7 +41,7 @@ PROMPT = "Say the single word READY and nothing else."
 # Upgrade to 70B / Llama 4 once these prove the pipe works.
 TARGETS = [
     ("Cerebras", "cerebras/llama3.1-8b"),
-    ("Groq",     "groq/llama-3.1-8b-instant"),
+    ("Groq", "groq/llama-3.1-8b-instant"),
 ]
 
 

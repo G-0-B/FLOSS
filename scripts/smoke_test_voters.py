@@ -73,7 +73,10 @@ def main() -> int:
     try:
         voters = build_default_voters()
     except Exception as exc:  # noqa: BLE001
-        print(f"FAIL: build_default_voters() raised {type(exc).__name__}: {exc}", file=sys.stderr)
+        print(
+            f"FAIL: build_default_voters() raised {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
         return 1
     print(f"Voters built:  {len(voters)}")
     for v in voters:

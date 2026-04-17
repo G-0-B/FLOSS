@@ -25,9 +25,7 @@ from pathlib import Path
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError as exc:
-    raise ImportError(
-        "MCP SDK not installed. Run: pip install mcp"
-    ) from exc
+    raise ImportError("MCP SDK not installed. Run: pip install mcp") from exc
 
 from .tools import GatewayTools
 

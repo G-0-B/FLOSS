@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-context-surface.json"
 TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9\-_/.:+]*")
@@ -49,7 +48,9 @@ def score_corpus(corpus: dict[str, Any], query: str) -> tuple[int, list[str]]:
     return score, sorted(set(matched))
 
 
-def choose_corpora(manifest: dict[str, Any], query: str, limit: int) -> list[dict[str, Any]]:
+def choose_corpora(
+    manifest: dict[str, Any], query: str, limit: int
+) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
     for corpus in manifest["corpora"]:
         score, matched = score_corpus(corpus, query)
@@ -58,7 +59,13 @@ def choose_corpora(manifest: dict[str, Any], query: str, limit: int) -> list[dic
         enriched["matched_keywords"] = matched
         ranked.append(enriched)
 
-    ranked.sort(key=lambda item: (-int(item["score"]), -int(item.get("priority", 0)), item["id"]))
+    ranked.sort(
+        key=lambda item: (
+            -int(item["score"]),
+            -int(item.get("priority", 0)),
+            item["id"],
+        )
+    )
     return ranked[:limit]
 
 
@@ -68,12 +75,14 @@ def render_markdown(results: list[dict[str, Any]], query: str) -> str:
         "",
     ]
     for item in results:
-        lines.extend([
-            f"## `{item['id']}` (`{item['uri']}`)",
-            f"- Score: `{item['score']}`",
-            f"- Tier: `{item['tier']}`",
-            f"- Summary: {item['summary']}",
-        ])
+        lines.extend(
+            [
+                f"## `{item['id']}` (`{item['uri']}`)",
+                f"- Score: `{item['score']}`",
+                f"- Tier: `{item['tier']}`",
+                f"- Summary: {item['summary']}",
+            ]
+        )
         if item["matched_keywords"]:
             lines.append("- Matched keywords:")
             for keyword in item["matched_keywords"]:
@@ -86,12 +95,16 @@ def render_markdown(results: list[dict[str, Any]], query: str) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Route a query to FLOSSI0ULLK context corpora")
+    parser = argparse.ArgumentParser(
+        description="Route a query to FLOSSI0ULLK context corpora"
+    )
     parser.add_argument("query", nargs="*", help="Query or intent text to route")
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST_PATH)
     parser.add_argument("--limit", type=int, default=3)
     parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
-    parser.add_argument("--list", action="store_true", help="List corpora without scoring")
+    parser.add_argument(
+        "--list", action="store_true", help="List corpora without scoring"
+    )
     return parser.parse_args()
 
 

@@ -64,7 +64,9 @@ Cast your vote now."""
 
 
 _WEIGHT_RE = re.compile(r"WEIGHT\s*:\s*([+-]?\d+(?:\.\d+)?)", re.IGNORECASE)
-_RATIONALE_RE = re.compile(r"RATIONALE\s*:\s*(.+?)(?:\n\s*\n|\Z)", re.IGNORECASE | re.DOTALL)
+_RATIONALE_RE = re.compile(
+    r"RATIONALE\s*:\s*(.+?)(?:\n\s*\n|\Z)", re.IGNORECASE | re.DOTALL
+)
 _ROSTER_SPLIT_RE = re.compile(r"[;,\n]+")
 
 # Reasoning models (Qwen3, DeepSeek R1, GPT-OSS reasoning mode, ...) emit
@@ -148,6 +150,7 @@ def make_litellm_voter(
         )
         try:
             from litellm import completion
+
             resp = completion(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -228,7 +231,7 @@ def _parse_flowith_models(model: str) -> list[str]:
     prefix = "flowith/"
     if not model.strip().lower().startswith(prefix):
         raise ValueError(f"unsupported Flowith model spec {model!r}")
-    raw = model.strip()[len(prefix):]
+    raw = model.strip()[len(prefix) :]
     models = [item.strip() for item in raw.split("|") if item.strip()]
     if not models:
         raise ValueError("Flowith voter spec must include at least one model")
@@ -328,9 +331,13 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
     try:
         raw = json.loads(VOTER_REGISTRY_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise RuntimeError(f"Missing voter registry file: {VOTER_REGISTRY_PATH}") from exc
+        raise RuntimeError(
+            f"Missing voter registry file: {VOTER_REGISTRY_PATH}"
+        ) from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Invalid JSON in voter registry {VOTER_REGISTRY_PATH}: {exc}") from exc
+        raise RuntimeError(
+            f"Invalid JSON in voter registry {VOTER_REGISTRY_PATH}: {exc}"
+        ) from exc
 
     aliases_raw = raw.get("aliases", {})
     profiles_raw = raw.get("profiles", {})
@@ -342,7 +349,9 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
     aliases: dict[str, str] = {}
     for name, target in aliases_raw.items():
         if not isinstance(name, str) or not isinstance(target, str):
-            raise RuntimeError(f"Voter registry aliases must be string -> string: {name!r}")
+            raise RuntimeError(
+                f"Voter registry aliases must be string -> string: {name!r}"
+            )
         aliases[name.strip().lower()] = target.strip().lower()
 
     profiles: dict[str, dict[str, str]] = {}
@@ -368,7 +377,9 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
             )
 
     if "balanced" not in profiles:
-        raise RuntimeError(f"Voter registry {VOTER_REGISTRY_PATH} must define a 'balanced' profile")
+        raise RuntimeError(
+            f"Voter registry {VOTER_REGISTRY_PATH} must define a 'balanced' profile"
+        )
 
     return aliases, profiles
 
@@ -463,14 +474,18 @@ def describe_default_roster(profile: str | None = None) -> list[dict[str, str | 
     """Return the resolved roster plus enable/disable reasons for logging/UI."""
     enabled = resolve_default_voter_specs(profile=profile, include_unavailable=False)
     described: list[dict[str, str | bool]] = []
-    for name, model in resolve_default_voter_specs(profile=profile, include_unavailable=True).items():
+    for name, model in resolve_default_voter_specs(
+        profile=profile, include_unavailable=True
+    ).items():
         is_enabled, reason = _credential_state_for_model(model)
-        described.append({
-            "name": name,
-            "model": model,
-            "enabled": name in enabled,
-            "reason": reason if not is_enabled else "enabled",
-        })
+        described.append(
+            {
+                "name": name,
+                "model": model,
+                "enabled": name in enabled,
+                "reason": reason if not is_enabled else "enabled",
+            }
+        )
     return described
 
 

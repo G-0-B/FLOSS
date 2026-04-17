@@ -89,10 +89,10 @@ def canonical_serialize(data: dict) -> bytes:
     return json.dumps(
         _normalize_val(data),
         sort_keys=True,
-        separators=(',', ':'),
+        separators=(",", ":"),
         ensure_ascii=False,  # raw UTF-8 — do NOT escape non-ASCII as \uXXXX
-        allow_nan=False,     # belt-and-suspenders: normalize_float catches this first
-    ).encode('utf-8')
+        allow_nan=False,  # belt-and-suspenders: normalize_float catches this first
+    ).encode("utf-8")
 
 
 def entry_hash(data: dict) -> str:

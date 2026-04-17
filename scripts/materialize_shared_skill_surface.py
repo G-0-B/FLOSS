@@ -22,7 +22,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE_ROOT = REPO_ROOT.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-skill-surface.json"
@@ -72,14 +71,18 @@ def parse_frontmatter(skill_md: Path) -> dict[str, str]:
         key, value = stripped.split(":", 1)
         payload[key.strip()] = value.strip().strip('"').strip("'")
     if not payload.get("name") or not payload.get("description"):
-        raise SkillSurfaceError(f"{skill_md} frontmatter must include `name` and `description`")
+        raise SkillSurfaceError(
+            f"{skill_md} frontmatter must include `name` and `description`"
+        )
     return payload
 
 
 def resolve_skill_entry(workspace_root: Path, entry: dict[str, Any]) -> dict[str, Any]:
     raw_path = entry.get("path")
     if not isinstance(raw_path, str) or not raw_path.strip():
-        raise SkillSurfaceError("Every skill entry must contain a non-empty string `path`")
+        raise SkillSurfaceError(
+            "Every skill entry must contain a non-empty string `path`"
+        )
     skill_dir = (workspace_root / raw_path).resolve()
     skill_md = skill_dir / "SKILL.md"
     if not skill_dir.is_dir():
@@ -110,7 +113,9 @@ def resolve_install_path(workspace_root: Path, raw_path: str) -> Path:
     return (workspace_root / raw_path).resolve()
 
 
-def build_target_roots(manifest: dict[str, Any], workspace_root: Path) -> dict[str, str]:
+def build_target_roots(
+    manifest: dict[str, Any], workspace_root: Path
+) -> dict[str, str]:
     targets = manifest.get("targets", {})
     if not isinstance(targets, dict):
         raise SkillSurfaceError("Manifest `targets` must be a JSON object")
@@ -123,12 +128,16 @@ def build_target_roots(manifest: dict[str, Any], workspace_root: Path) -> dict[s
             continue
         install_path = target_cfg.get("install_path")
         if not isinstance(install_path, str) or not install_path.strip():
-            raise SkillSurfaceError(f"Enabled target {target_name!r} must define `install_path`")
+            raise SkillSurfaceError(
+                f"Enabled target {target_name!r} must define `install_path`"
+            )
         roots[target_name] = str(resolve_install_path(workspace_root, install_path))
     return roots
 
 
-def build_registry(manifest: dict[str, Any], workspace_root: Path, target_roots: dict[str, str]) -> dict[str, Any]:
+def build_registry(
+    manifest: dict[str, Any], workspace_root: Path, target_roots: dict[str, str]
+) -> dict[str, Any]:
     skills: list[dict[str, Any]] = []
     for entry in manifest["skills"]:
         if not isinstance(entry, dict):
@@ -144,7 +153,9 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path, target_roots:
         "manifest_version": manifest.get("manifest_version", "?"),
         "workspace_id": manifest.get("workspace_id", "workspace"),
         "workspace_name": manifest.get("workspace_name", "workspace"),
-        "portable_skill_root": manifest.get("portable_skill_root", "FLOSS/skill-corpus"),
+        "portable_skill_root": manifest.get(
+            "portable_skill_root", "FLOSS/skill-corpus"
+        ),
         "rules": manifest.get("rules", []),
         "upstream_candidates": manifest.get("upstream_candidates", []),
         "targets": manifest.get("targets", {}),
@@ -166,19 +177,23 @@ def build_index(registry: dict[str, Any]) -> str:
     ]
     for rule in registry.get("rules", []):
         lines.append(f"- {rule}")
-    lines.extend([
-        "",
-        "## Skills",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Skills",
+            "",
+        ]
+    )
     for skill in registry["skills"]:
-        lines.extend([
-            f"### `{skill['skill_name']}`",
-            f"- Category: `{skill.get('category', 'uncategorized')}`",
-            f"- Summary: {skill.get('summary', '')}",
-            f"- Description: {skill['description']}",
-            f"- Source: `{skill['resolved_path']}`",
-        ])
+        lines.extend(
+            [
+                f"### `{skill['skill_name']}`",
+                f"- Category: `{skill.get('category', 'uncategorized')}`",
+                f"- Summary: {skill.get('summary', '')}",
+                f"- Description: {skill['description']}",
+                f"- Source: `{skill['resolved_path']}`",
+            ]
+        )
         install_targets = skill.get("install_targets", {})
         if install_targets:
             lines.append("- Install targets:")
@@ -193,25 +208,31 @@ def build_index(registry: dict[str, Any]) -> str:
 
     upstreams = registry.get("upstream_candidates", [])
     if upstreams:
-        lines.extend([
-            "## Upstream Candidates",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Upstream Candidates",
+                "",
+            ]
+        )
         for upstream in upstreams:
             lines.append(
                 f"- `{upstream.get('id', '?')}`: {upstream.get('repo', '?')} - {upstream.get('role', '')}"
             )
         lines.append("")
 
-    lines.extend([
-        "## Generated By",
-        "",
-        "- `FLOSS/scripts/materialize_shared_skill_surface.py`",
-    ])
+    lines.extend(
+        [
+            "## Generated By",
+            "",
+            "- `FLOSS/scripts/materialize_shared_skill_surface.py`",
+        ]
+    )
     return "\n".join(lines)
 
 
-def check_or_write(path: Path, content: str, *, check: bool, dry_run: bool) -> tuple[str, bool]:
+def check_or_write(
+    path: Path, content: str, *, check: bool, dry_run: bool
+) -> tuple[str, bool]:
     changed = True
     if path.exists():
         changed = path.read_text(encoding="utf-8") != content
@@ -226,7 +247,9 @@ def check_or_write(path: Path, content: str, *, check: bool, dry_run: bool) -> t
     return (f"OK    {path}", changed)
 
 
-def check_or_write_json(path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool) -> tuple[str, bool]:
+def check_or_write_json(
+    path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool
+) -> tuple[str, bool]:
     content = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     return check_or_write(path, content, check=check, dry_run=dry_run)
 
@@ -269,7 +292,10 @@ def install_skill_projection(
     if check:
         return ([f"CHECK {'DRIFT' if changed else 'OK'} {target_dir}"], changed)
     if dry_run:
-        return ([f"PLAN  {'WRITE' if changed else 'KEEP'} {target_name}:{target_dir}"], changed)
+        return (
+            [f"PLAN  {'WRITE' if changed else 'KEEP'} {target_name}:{target_dir}"],
+            changed,
+        )
     if not changed:
         return ([f"OK    {target_dir}"], False)
 
@@ -302,7 +328,9 @@ def materialize(
     drift_found = False
 
     registry_path = output_dir / "skill-registry.json"
-    message, changed = check_or_write_json(registry_path, registry, check=check, dry_run=dry_run)
+    message, changed = check_or_write_json(
+        registry_path, registry, check=check, dry_run=dry_run
+    )
     results.append(message)
     drift_found = drift_found or changed
 
@@ -329,7 +357,9 @@ def materialize(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Materialize the FLOSSI0ULLK shared skill surface")
+    parser = argparse.ArgumentParser(
+        description="Materialize the FLOSSI0ULLK shared skill surface"
+    )
     parser.add_argument("--workspace-root", type=Path, default=WORKSPACE_ROOT)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

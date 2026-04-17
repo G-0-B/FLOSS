@@ -49,8 +49,10 @@ CL = CERTAINTY_LIMIT  # shorthand: 0.999
 
 def mock_voter(name: str, weight: float, rationale: str = "test") -> Voter:
     """Build a Voter that always casts the same analog weight."""
+
     def _v(_claim: Claim) -> Vote:
         return Vote(voter=name, weight=weight, rationale=rationale)
+
     return _v
 
 
@@ -91,7 +93,9 @@ def test_vector_1b_moderate_approval_module():
 
 def test_vector_2_strong_rejection():
     """[-0.999, -0.999, -0.999] on System => REJECTED (mean=-0.999 < θ_reject=-0.50)."""
-    claim = sample_claim(blast=BlastRadius.SYSTEM, proposal_type=ProposalType.SPEC_CHANGE)
+    claim = sample_claim(
+        blast=BlastRadius.SYSTEM, proposal_type=ProposalType.SPEC_CHANGE
+    )
     voters = [mock_voter("a", -CL), mock_voter("b", -CL), mock_voter("c", -CL)]
     decision = decide(claim, voters)
     assert decision.outcome == Outcome.REJECTED
@@ -99,7 +103,9 @@ def test_vector_2_strong_rejection():
 
 def test_vector_3a_high_support_with_abstain_approves():
     """[0.999, 0.999, 0.0] on System => APPROVED (mean≈0.666 > θ_approve=0.60)."""
-    claim = sample_claim(blast=BlastRadius.SYSTEM, proposal_type=ProposalType.ADR_CHANGE)
+    claim = sample_claim(
+        blast=BlastRadius.SYSTEM, proposal_type=ProposalType.ADR_CHANGE
+    )
     voters = [mock_voter("a", CL), mock_voter("b", CL), mock_voter("c", 0.0)]
     decision = decide(claim, voters)
     assert decision.outcome == Outcome.APPROVED
@@ -107,7 +113,9 @@ def test_vector_3a_high_support_with_abstain_approves():
 
 def test_vector_3b_low_support_with_abstains_defers():
     """[0.5, 0.0, 0.0] on System => DEFERRED (mean≈0.167 < θ_approve=0.60)."""
-    claim = sample_claim(blast=BlastRadius.SYSTEM, proposal_type=ProposalType.ADR_CHANGE)
+    claim = sample_claim(
+        blast=BlastRadius.SYSTEM, proposal_type=ProposalType.ADR_CHANGE
+    )
     voters = [mock_voter("a", 0.5), mock_voter("b", 0.0), mock_voter("c", 0.0)]
     decision = decide(claim, voters)
     assert decision.outcome == Outcome.DEFERRED
@@ -285,6 +293,7 @@ def test_all_voters_consulted_despite_strong_opposition():
         def _v(_c):
             called.append(name)
             return Vote(voter=name, weight=weight_val, rationale="spy")
+
         return _v
 
     claim = sample_claim(blast=BlastRadius.SYSTEM)
@@ -326,7 +335,9 @@ def test_override_rejects_conflict():
     except ConsensusGateError as e:
         assert "E_OVERRIDE_INVALID_STATE" in str(e)
     else:
-        raise AssertionError("expected ConsensusGateError — CONFLICT requires human resolution, not override")
+        raise AssertionError(
+            "expected ConsensusGateError — CONFLICT requires human resolution, not override"
+        )
 
 
 def test_override_rejects_substrate():
@@ -403,6 +414,7 @@ def test_invalid_weight_below_limit_raises():
 def test_nan_weight_raises():
     """NaN weight raises E_VOTE_INVALID_RANGE."""
     import math
+
     try:
         Vote(voter="bad", weight=math.nan, rationale="nan").validate()
     except ValueError as e:
@@ -414,6 +426,7 @@ def test_nan_weight_raises():
 def test_inf_weight_raises():
     """Infinite weight raises E_VOTE_INVALID_RANGE."""
     import math
+
     try:
         Vote(voter="bad", weight=math.inf, rationale="inf").validate()
     except ValueError as e:
@@ -465,6 +478,7 @@ def test_claim_validate_rejects_non_uuidv7():
 
 def test_claim_validate_rejects_uuid4():
     import uuid as _uuid
+
     claim = sample_claim()
     claim.id = str(_uuid.uuid4())
     try:
@@ -635,6 +649,7 @@ def test_decide_rejects_duplicate_voters():
 
 def test_adr_writer_produces_file():
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         adr_dir = Path(tmp)
         writer = default_adr_writer(adr_dir)
@@ -658,7 +673,10 @@ def test_adr_writer_produces_file():
 
 def test_tally_direct_approved():
     claim = sample_claim(blast=BlastRadius.MODULE)
-    vs = [Vote(voter="a", weight=CL, rationale="ok"), Vote(voter="b", weight=CL, rationale="ok")]
+    vs = [
+        Vote(voter="a", weight=CL, rationale="ok"),
+        Vote(voter="b", weight=CL, rationale="ok"),
+    ]
     outcome, mean, variance = tally(claim, vs)
     assert outcome == Outcome.APPROVED
     assert mean > 0

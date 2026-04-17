@@ -263,7 +263,9 @@ def main() -> int:
     # correctly abstain (0.0) because there is no content to judge — the
     # whole round becomes meaningless audit noise.
     change_section = _render_change_section(tool_name, tool_input)
-    pre_checkpoint = claim_pre_write_checkpoint(PRE_WRITE_CHECKPOINT_DIR, file_path, tool_name, tool_input)
+    pre_checkpoint = claim_pre_write_checkpoint(
+        PRE_WRITE_CHECKPOINT_DIR, file_path, tool_name, tool_input
+    )
     verification = verify_tool_edit(
         file_path,
         tool_name,
@@ -277,7 +279,9 @@ def main() -> int:
         f"{rel_path}: {verification.get('reason', 'no reason')}"
     )
     if pre_checkpoint:
-        log(f"[hook] checkpoint {pre_checkpoint.get('signature', 'unknown')} consumed for {rel_path}")
+        log(
+            f"[hook] checkpoint {pre_checkpoint.get('signature', 'unknown')} consumed for {rel_path}"
+        )
     else:
         log(f"[hook] no pre-write checkpoint for {rel_path}")
 

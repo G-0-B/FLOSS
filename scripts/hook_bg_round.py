@@ -70,6 +70,7 @@ def main() -> int:
     # env, so we have to rehydrate from the repo's .env file ourselves.
     try:
         from dotenv import load_dotenv
+
         env_path = REPO_ROOT / ".env"
         if env_path.exists():
             load_dotenv(env_path)
@@ -82,21 +83,29 @@ def main() -> int:
     try:
         from packages.metacoordinator_mcp.tools import GatewayTools
     except Exception:  # noqa: BLE001
-        log(f"[bg] GatewayTools import failed for {claim_id}:\n{traceback.format_exc()}")
-        write_trace(claim_id, {
-            "claim_id": claim_id,
-            "started_at": started_at,
-            "finished_at": utcnow_iso(),
-            "profile": profile,
-            "roster": roster,
-            "error": "GatewayTools import failed",
-        })
+        log(
+            f"[bg] GatewayTools import failed for {claim_id}:\n{traceback.format_exc()}"
+        )
+        write_trace(
+            claim_id,
+            {
+                "claim_id": claim_id,
+                "started_at": started_at,
+                "finished_at": utcnow_iso(),
+                "profile": profile,
+                "roster": roster,
+                "error": "GatewayTools import failed",
+            },
+        )
         return 1
 
     try:
         from packages.metacoordinator_mcp.voters import describe_default_roster
+
         roster = describe_default_roster(profile=profile)
-        enabled = [f"{item['name']}={item['model']}" for item in roster if item["enabled"]]
+        enabled = [
+            f"{item['name']}={item['model']}" for item in roster if item["enabled"]
+        ]
         disabled = [
             f"{item['name']} ({item['reason']})"
             for item in roster
@@ -107,21 +116,26 @@ def main() -> int:
         if disabled:
             log(f"[bg] {claim_id} roster[{profile}] disabled: " + " | ".join(disabled))
     except Exception:  # noqa: BLE001
-        log(f"[bg] roster introspection failed for {claim_id}:\n{traceback.format_exc()}")
+        log(
+            f"[bg] roster introspection failed for {claim_id}:\n{traceback.format_exc()}"
+        )
 
     try:
         dna_hash = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
         gw = GatewayTools(base_dir=AGENT_DIR, dna_hash=dna_hash)
     except Exception:  # noqa: BLE001
         log(f"[bg] GatewayTools init failed for {claim_id}:\n{traceback.format_exc()}")
-        write_trace(claim_id, {
-            "claim_id": claim_id,
-            "started_at": started_at,
-            "finished_at": utcnow_iso(),
-            "profile": profile,
-            "roster": roster,
-            "error": "GatewayTools init failed",
-        })
+        write_trace(
+            claim_id,
+            {
+                "claim_id": claim_id,
+                "started_at": started_at,
+                "finished_at": utcnow_iso(),
+                "profile": profile,
+                "roster": roster,
+                "error": "GatewayTools init failed",
+            },
+        )
         return 1
 
     t0 = time.perf_counter()
@@ -129,15 +143,20 @@ def main() -> int:
         result_str = gw.run_consensus_round(claim_id)
         result = json.loads(result_str)
     except Exception:  # noqa: BLE001
-        log(f"[bg] run_consensus_round crashed for {claim_id}:\n{traceback.format_exc()}")
-        write_trace(claim_id, {
-            "claim_id": claim_id,
-            "started_at": started_at,
-            "finished_at": utcnow_iso(),
-            "profile": profile,
-            "roster": roster,
-            "error": "run_consensus_round crashed",
-        })
+        log(
+            f"[bg] run_consensus_round crashed for {claim_id}:\n{traceback.format_exc()}"
+        )
+        write_trace(
+            claim_id,
+            {
+                "claim_id": claim_id,
+                "started_at": started_at,
+                "finished_at": utcnow_iso(),
+                "profile": profile,
+                "roster": roster,
+                "error": "run_consensus_round crashed",
+            },
+        )
         return 1
     dt = time.perf_counter() - t0
     trace_payload = {

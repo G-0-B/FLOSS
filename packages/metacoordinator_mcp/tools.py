@@ -111,7 +111,7 @@ class GatewayTools:
             return _err(f"E_SUBMIT_CLAIM_INVALID: {exc}")
 
         ev_refs: list[EvidenceRef] = []
-        for item in (evidence or []):
+        for item in evidence or []:
             try:
                 ref = EvidenceRef(type=item["type"], ref=item["ref"])
                 ref.validate()
@@ -256,10 +256,7 @@ class GatewayTools:
 
         claim_entry: Optional[dict[str, Any]] = None
         for e in entries:
-            if (
-                e.get("type") == "claim"
-                and e.get("content", {}).get("id") == claim_id
-            ):
+            if e.get("type") == "claim" and e.get("content", {}).get("id") == claim_id:
                 claim_entry = e
                 break
         if claim_entry is None:
@@ -287,6 +284,7 @@ class GatewayTools:
         factory = self._voter_factory
         if factory is None:
             from packages.metacoordinator_mcp.voters import build_default_voters
+
             factory = build_default_voters
 
         try:
