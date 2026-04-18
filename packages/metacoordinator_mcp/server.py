@@ -29,6 +29,30 @@ except ImportError as exc:
 
 from .tools import GatewayTools
 
+_THIS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _THIS_DIR.parent.parent
+
+
+def _load_repo_env() -> None:
+    """Load repo-local .env so MCP-launched servers see provider credentials.
+
+    The workspace MCP config intentionally keeps the env block minimal, so the
+    server must load `FLOSS/.env` itself when it starts. `override=False`
+    preserves explicit parent-process overrides and keeps tests hermetic.
+    """
+
+    env_path = Path(os.environ.get("FLOSS_ENV_PATH", _REPO_ROOT / ".env")).expanduser()
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(env_path, override=False)
+
+
+_load_repo_env()
+
 BASE_DIR = Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() / ".floss_agent"))
 DNA_HASH = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
 
