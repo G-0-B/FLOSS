@@ -545,13 +545,41 @@ def build_vibe_launcher(workspace_root: Path, vibe_cfg: dict[str, Any]) -> str:
     script = f"""
     $ErrorActionPreference = "Stop"
 
-    $workspaceRoot = "{workspace_root}"
+    $workspaceRoot = (Split-Path -Parent $PSCommandPath)
     $envFile = Join-Path $workspaceRoot "{env_rel.replace('/', '\\')}"
-    $vibeExe = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
-    $pythonExe = "{python_exe}"
+    $vibeFallback = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
+    $vibeCommand = Get-Command vibe.exe -ErrorAction SilentlyContinue
+    if (-not $vibeCommand) {{
+        $vibeCommand = Get-Command vibe -ErrorAction SilentlyContinue
+    }}
+    if ($vibeCommand) {{
+        $vibeExe = $vibeCommand.Source
+    }} elseif (Test-Path $vibeFallback) {{
+        $vibeExe = $vibeFallback
+    }} else {{
+        throw "vibe executable not found. Install Vibe or add it to PATH."
+    }}
 
-    if (-not (Test-Path $vibeExe)) {{
-        throw "vibe.exe not found at $vibeExe"
+    $pythonCandidates = @(
+        "py.exe",
+        "python.exe",
+        "python3.exe",
+        "{python_exe}"
+    ) | Select-Object -Unique
+    $pythonExe = $null
+    foreach ($candidate in $pythonCandidates) {{
+        if ($candidate -match "[\\\\/:]") {{
+            if (Test-Path $candidate) {{
+                $pythonExe = $candidate
+                break
+            }}
+            continue
+        }}
+        $pythonCommand = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($pythonCommand) {{
+            $pythonExe = $pythonCommand.Source
+            break
+        }}
     }}
 
     if (Test-Path $envFile) {{
@@ -569,13 +597,13 @@ def build_vibe_launcher(workspace_root: Path, vibe_cfg: dict[str, Any]) -> str:
         }}
     }}
 
-    if (Test-Path $pythonExe) {{
+    if ($pythonExe) {{
         $trustScript = @'
 from pathlib import Path
 import json
 import tomllib
 
-workspace = Path(r"{workspace_root}").resolve()
+workspace = Path.cwd().resolve()
 path = Path.home() / ".vibe" / "trusted_folders.toml"
 trusted = []
 untrusted = []
@@ -597,7 +625,12 @@ path.write_text(
     encoding="utf-8",
 )
 '@
-        $trustScript | & $pythonExe -
+        Push-Location $workspaceRoot
+        try {{
+            $trustScript | & $pythonExe -
+        }} finally {{
+            Pop-Location
+        }}
     }}
 
     $argList = [System.Collections.Generic.List[string]]::new()
