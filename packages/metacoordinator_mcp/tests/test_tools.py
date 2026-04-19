@@ -195,6 +195,24 @@ def test_submit_claim_rejects_invalid_blast_radius():
         assert "error" in result
 
 
+def test_submit_claim_rejects_non_mapping_evidence_items():
+    """submit_claim() returns a JSON error when evidence items are not objects."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp)
+        result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="test",
+                body="body",
+                blast_radius="Local",
+                evidence=[None],
+            )
+        )
+        assert "error" in result
+        assert "E_SUBMIT_CLAIM_INVALID_EVIDENCE" in result["error"]
+
+
 def test_cast_vote_rejects_weight_above_limit():
     """cast_vote() returns JSON with 'error' key when weight > CERTAINTY_LIMIT."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -224,6 +242,36 @@ def test_cast_vote_rejects_invalid_proposal_type():
             )
         )
         assert "error" in result
+
+
+def test_cast_vote_rejects_claims_with_terminal_decisions():
+    """cast_vote() rejects late votes once a claim has a terminal decision."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="already closed",
+                body="body",
+                blast_radius="Local",
+            )
+        )
+        gw._cell.append_entry(
+            entry_type="decision",
+            author_did="metacoordinator",
+            content={"claim_id": claim_result["claim_id"], "outcome": "APPROVED"},
+        )
+        result = json.loads(
+            gw.cast_vote(
+                claim_id=claim_result["claim_id"],
+                voter="late-reviewer",
+                weight=0.3,
+                rationale="too late",
+            )
+        )
+        assert "error" in result
+        assert "E_ALREADY_DECIDED" in result["error"]
 
 
 def test_run_consensus_round_finds_old_claim_beyond_500_entries():
@@ -443,8 +491,10 @@ def _run_all():
         test_list_pending_includes_deferred_claims,
         test_get_decision_returns_null_when_no_decision,
         test_submit_claim_rejects_invalid_blast_radius,
+        test_submit_claim_rejects_non_mapping_evidence_items,
         test_cast_vote_rejects_weight_above_limit,
         test_cast_vote_rejects_invalid_proposal_type,
+        test_cast_vote_rejects_claims_with_terminal_decisions,
         test_run_consensus_round_finds_old_claim_beyond_500_entries,
         test_run_consensus_round_detects_buried_existing_decision,
         test_run_consensus_round_counts_existing_manual_votes,

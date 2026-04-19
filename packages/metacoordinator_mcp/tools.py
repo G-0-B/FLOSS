@@ -141,11 +141,16 @@ class GatewayTools:
 
         ev_refs: list[EvidenceRef] = []
         for item in evidence or []:
+            if not isinstance(item, dict):
+                return _err(
+                    "E_SUBMIT_CLAIM_INVALID_EVIDENCE: "
+                    "evidence items must be objects with 'type' and 'ref'"
+                )
             try:
                 ref = EvidenceRef(type=item["type"], ref=item["ref"])
                 ref.validate()
                 ev_refs.append(ref)
-            except (KeyError, ValueError) as exc:
+            except (KeyError, TypeError, ValueError) as exc:
                 return _err(f"E_SUBMIT_CLAIM_INVALID_EVIDENCE: {exc}")
 
         try:
@@ -198,6 +203,24 @@ class GatewayTools:
             for entry in entries
         ):
             return _err(f"E_CLAIM_NOT_FOUND: no claim with id {claim_id}")
+        latest_decision: Optional[dict[str, Any]] = None
+        for entry in entries:
+            if (
+                entry.get("type") == "decision"
+                and entry.get("content", {}).get("claim_id") == claim_id
+            ):
+                latest_decision = entry["content"]
+                break
+        if latest_decision is not None:
+            try:
+                latest_outcome = _decision_outcome(latest_decision)
+            except (KeyError, ValueError) as exc:
+                return _err(f"E_DECISION_MALFORMED: {exc}")
+            if latest_outcome != Outcome.DEFERRED:
+                return _err(
+                    "E_ALREADY_DECIDED: claim "
+                    f"{claim_id} already has a terminal decision ({latest_outcome.value})"
+                )
 
         content = {"claim_id": claim_id, **vote.to_dict()}
         h = self._cell.append_entry(
