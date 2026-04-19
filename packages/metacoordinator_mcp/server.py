@@ -53,6 +53,7 @@ DNA_HASH = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
 
 _gateway = GatewayTools(base_dir=BASE_DIR, dna_hash=DNA_HASH)
 
+
 def submit_claim(
     proposer: str,
     proposal_type: str,
