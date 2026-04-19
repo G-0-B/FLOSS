@@ -47,7 +47,7 @@ class MockSensorBridge:
         self.active_streams = []
 
     async def subscribe(self, stream_type: str) -> "MockSensorStream":
-        """Subscribe to a sensor stream"""
+        """Subscribe to a sensor stream."""
         if stream_type not in self.capabilities:
             raise ValueError(f"Bridge {self.bridge_id} does not support {stream_type}")
 
@@ -56,12 +56,12 @@ class MockSensorBridge:
         return stream
 
     def get_capabilities(self) -> List[str]:
-        """Get list of sensor capabilities"""
+        """Get the list of sensor capabilities."""
         return self.capabilities.copy()
 
 
 class MockSensorStream:
-    """Mock sensor data stream"""
+    """Mock sensor data stream."""
 
     def __init__(self, bridge_id: str, stream_type: str):
         self.bridge_id = bridge_id
@@ -69,7 +69,7 @@ class MockSensorStream:
         self._sample_count = 0
 
     async def read(self) -> Dict[str, Any]:
-        """Read next sensor sample"""
+        """Read the next sensor sample."""
         self._sample_count += 1
 
         if self.stream_type == "acoustic":
@@ -99,9 +99,7 @@ class MockSensorStream:
 
 
 async def setup_test_bridge() -> MockSensorBridge:
-    """
-    Setup mock bridge for testing (as specified in roadmap).
-    """
+    """Set up the mock bridge for testing."""
     bridge = MockSensorBridge(
         bridge_id="test_bridge_001", capabilities=["acoustic", "vibration"]
     )
@@ -115,7 +113,7 @@ async def setup_test_bridge() -> MockSensorBridge:
 
 @pytest.fixture
 def event_loop():
-    """Create event loop for async tests"""
+    """Create an event loop for async tests."""
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
@@ -123,7 +121,7 @@ def event_loop():
 
 @pytest.fixture
 async def test_bridge():
-    """Provide mock sensor bridge for tests"""
+    """Provide a mock sensor bridge for tests."""
     bridge = await setup_test_bridge()
     yield bridge
     # Cleanup streams
@@ -137,9 +135,7 @@ async def test_bridge():
 
 @pytest.mark.asyncio
 async def test_swarm_basic_query():
-    """
-    Test basic swarm query without sensor context (baseline).
-    """
+    """Test basic swarm query without sensor context."""
     async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
         result = await swarm.single_step_aggregation(query="What is 2 + 2?", K=2)
 
@@ -150,9 +146,7 @@ async def test_swarm_basic_query():
 
 @pytest.mark.asyncio
 async def test_bridge_discovery():
-    """
-    Test bridge discovery and capability query.
-    """
+    """Test bridge discovery and capability query."""
     bridge = await setup_test_bridge()
 
     # Verify bridge capabilities
@@ -163,9 +157,7 @@ async def test_bridge_discovery():
 
 @pytest.mark.asyncio
 async def test_bridge_stream_subscription():
-    """
-    Test subscribing to sensor streams.
-    """
+    """Test subscribing to sensor streams."""
     bridge = await setup_test_bridge()
 
     # Subscribe to acoustic stream
@@ -221,9 +213,7 @@ Please analyze this data and provide assessment."""
 
 @pytest.mark.asyncio
 async def test_multi_bridge_coordination():
-    """
-    Test coordination with multiple sensor bridges.
-    """
+    """Test coordination with multiple sensor bridges."""
     # Setup multiple bridges
     bridge1 = MockSensorBridge("bridge_001", ["acoustic"])
     bridge2 = MockSensorBridge("bridge_002", ["vibration"])
@@ -243,9 +233,7 @@ async def test_multi_bridge_coordination():
 
 @pytest.mark.asyncio
 async def test_sensor_data_persistence():
-    """
-    Test that sensor context can be stored and retrieved for later analysis.
-    """
+    """Test that sensor context can be stored and retrieved later."""
     bridge = await setup_test_bridge()
     stream = await bridge.subscribe("acoustic")
 
@@ -263,9 +251,7 @@ async def test_sensor_data_persistence():
 
 @pytest.mark.asyncio
 async def test_bridge_error_handling():
-    """
-    Test error handling for invalid stream subscriptions.
-    """
+    """Test error handling for invalid stream subscriptions."""
     bridge = await setup_test_bridge()
 
     # Try to subscribe to unsupported stream
@@ -275,9 +261,7 @@ async def test_bridge_error_handling():
 
 @pytest.mark.asyncio
 async def test_swarm_rsa_with_context():
-    """
-    Test full RSA (Recursive Self-Aggregation) with sensor context.
-    """
+    """Test full RSA with sensor context."""
     bridge = await setup_test_bridge()
 
     # Get sensor reading
@@ -303,9 +287,7 @@ Is this pattern consistent with normal motor operation?"""
 
 @pytest.mark.asyncio
 async def test_sensor_stream_timeout():
-    """
-    Test that sensor stream reads have reasonable timeout.
-    """
+    """Test that sensor stream reads complete within a timeout."""
     bridge = await setup_test_bridge()
     stream = await bridge.subscribe("acoustic")
 
@@ -316,9 +298,7 @@ async def test_sensor_stream_timeout():
 
 @pytest.mark.asyncio
 async def test_bridge_metadata():
-    """
-    Test that bridge provides proper metadata for discovery.
-    """
+    """Test that the bridge provides proper discovery metadata."""
     bridge = await setup_test_bridge()
 
     assert bridge.bridge_id == "test_bridge_001"
@@ -337,9 +317,7 @@ async def test_bridge_metadata():
 
 @pytest.mark.asyncio
 async def test_stream_latency():
-    """
-    Test that stream latency meets <50ms requirement (from roadmap).
-    """
+    """Test that stream latency stays under the mock target."""
     import time
 
     bridge = await setup_test_bridge()
@@ -356,9 +334,7 @@ async def test_stream_latency():
 
 @pytest.mark.asyncio
 async def test_concurrent_streams():
-    """
-    Test reading from multiple streams concurrently.
-    """
+    """Test reading from multiple streams concurrently."""
     bridge = await setup_test_bridge()
 
     # Subscribe to multiple streams
@@ -375,9 +351,7 @@ async def test_concurrent_streams():
 
 @pytest.mark.asyncio
 async def test_bridge_cleanup():
-    """
-    Test that bridge resources are properly cleaned up.
-    """
+    """Test that bridge resources are properly cleaned up."""
     bridge = await setup_test_bridge()
 
     # Subscribe to streams
@@ -405,7 +379,7 @@ async def test_real_bridge_discovery():
 
     This will be implemented when Task 4.3 is complete.
     """
-    pass
+    raise AssertionError("unreachable: test is skipped until Task 4.3 lands")
 
 
 @pytest.mark.skip(reason="Requires full Infinity Bridge implementation (Task 4.3)")
@@ -416,7 +390,7 @@ async def test_fft_correlation_engine():
 
     Target: <10ms correlation latency (from roadmap).
     """
-    pass
+    raise AssertionError("unreachable: test is skipped until Task 4.3 lands")
 
 
 @pytest.mark.skip(reason="Requires full Infinity Bridge implementation (Task 4.3)")
@@ -427,7 +401,7 @@ async def test_mcp_protocol_integration():
 
     Format: bridge://bridge123/acoustic/spectrum
     """
-    pass
+    raise AssertionError("unreachable: test is skipped until Task 4.3 lands")
 
 
 if __name__ == "__main__":
