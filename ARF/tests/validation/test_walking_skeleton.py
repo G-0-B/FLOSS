@@ -43,6 +43,7 @@ def test_composition(validation_spec):
     print(f"\n--- Running Test: {criteria} ---")
 
     async def run_test():
+        """Exercise recursive self-aggregation for the composition check."""
         from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
 
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
@@ -64,6 +65,7 @@ def test_persistence(validation_spec):
     print(f"\n--- Running Test: {criteria} ---")
 
     async def run_test():
+        """Exercise embedding persistence and retrieval for the persistence check."""
         from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
 
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:

@@ -63,12 +63,7 @@ _register_subcommands()
 
 @app.command()
 def version():
-    """Displays the version information for the ARF CLI and its dependencies.
-
-    This command provides a quick way to check the installed version of the CLI,
-    ensuring that the correct version is in use and aiding in debugging and
-    reproducibility.
-    """
+    """Display the ARF CLI version and Python runtime."""
     from cli import __version__
 
     table = Table(title="ARF CLI Version")
@@ -84,14 +79,7 @@ def version():
 
 @app.command()
 def info():
-    """Displays system information and the status of key dependencies.
-
-    This command provides an overview of the ARF environment, including the
-    installation path, available commands, and the status of critical libraries
-    like `numpy` and `sentence-transformers`. It serves as a diagnostic tool
-    to quickly assess the health and configuration of the system.
-    """
-
+    """Display system information and the status of key dependencies."""
     # Gather system info
     info_data = {
         "arf_version": "0.1.0",
@@ -137,18 +125,7 @@ def main(
         False, "--quiet", "-q", help="Suppress output except errors"
     ),
 ):
-    """The main callback for the ARF CLI application.
-
-    This function is executed before any subcommand is run. It sets up the global
-    context, including flags for verbosity and quiet mode, which can be used by
-    the subcommands to control their output. This centralized setup ensures a
-    consistent user experience across all CLI operations.
-
-    Args:
-        ctx: The Typer context, used to pass state to subcommands.
-        verbose: If True, enables detailed, verbose output.
-        quiet: If True, suppresses all output except for errors.
-    """
+    """Initialize CLI-wide context flags before any subcommand runs."""
     # Store in context for subcommands
     ctx.obj = {
         "verbose": verbose,
@@ -157,13 +134,7 @@ def main(
 
 
 def cli_main():
-    """The main entry point for the ARF CLI application.
-
-    This function wraps the Typer application, providing centralized error
-    handling for common issues like keyboard interrupts and other exceptions.
-    It ensures that the CLI exits with the appropriate Unix exit codes,
-    facilitating its use in scripting and automated workflows.
-    """
+    """Run the Typer app with centralized CLI error handling."""
     try:
         app()
     except KeyboardInterrupt:

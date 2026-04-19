@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple standalone test to verify validation functionality.
-This doesn't require sentence-transformers.
-"""
+"""Simple standalone test to verify validation functionality."""
 
 import sys
 import tempfile
@@ -13,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Temporarily disable embeddings to avoid needing sentence-transformers
-import conversation_memory
+import conversation_memory  # noqa: E402
 
 conversation_memory.EMBEDDINGS_AVAILABLE = False
 

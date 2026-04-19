@@ -1,7 +1,4 @@
-"""
-Agent Pool for Validation Committee.
-Manages a pool of LLM agents that can act as validators.
-"""
+"""Agent pool for the validation committee."""
 
 from typing import List
 from dataclasses import dataclass
@@ -51,7 +48,8 @@ class MockValidator(Validator):
                 reasoning="Detected nonsense content.",
             )
 
-        # Simulate rejection of unknown predicates (redundant with basic check but good for testing)
+        # Simulate rejection of unknown predicates.
+        # This is redundant with the basic check but useful for tests.
         if predicate == "unknown_predicate":
             return ValidatorResponse(
                 agent_id=self.agent_id,

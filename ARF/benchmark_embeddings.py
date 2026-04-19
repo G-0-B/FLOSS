@@ -22,6 +22,10 @@ def run_benchmark():
     """
     from conversation_memory import ConversationMemory
 
+    def benchmark_encode(memory: ConversationMemory, text: str):
+        """Benchmark the current embedding path without widening the public API."""
+        return memory._encode_text(text)  # skipcq: PYL-W0212
+
     print("=== Embedding Performance Benchmark ===\n")
 
     # Initialize memory
@@ -44,7 +48,7 @@ def run_benchmark():
     # First encoding (includes model loading time)
     print("First encoding (includes model loading time):")
     start = time.perf_counter()
-    first_emb = memory._encode_text(texts[0])
+    first_emb = benchmark_encode(memory, texts[0])
     first_time = time.perf_counter() - start
     print(f"  Time: {first_time:.3f}s")
     print(f"  Shape: {first_emb.shape}")
@@ -55,7 +59,7 @@ def run_benchmark():
     times = []
     for i, text in enumerate(texts[1:], 1):
         start = time.perf_counter()
-        memory._encode_text(text)
+        benchmark_encode(memory, text)
         elapsed = time.perf_counter() - start
         times.append(elapsed)
         print(f"  Text {i} ({len(text.split())} words): {elapsed*1000:.2f}ms")
@@ -71,9 +75,9 @@ def run_benchmark():
 
     # Test semantic similarity
     print("\n=== Semantic Similarity Test ===")
-    dog_emb = memory._encode_text("dog")
-    puppy_emb = memory._encode_text("puppy")
-    car_emb = memory._encode_text("car")
+    dog_emb = benchmark_encode(memory, "dog")
+    puppy_emb = benchmark_encode(memory, "puppy")
+    car_emb = benchmark_encode(memory, "car")
 
     dog_puppy_sim = np.dot(dog_emb, puppy_emb)
     dog_car_sim = np.dot(dog_emb, car_emb)

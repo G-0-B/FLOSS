@@ -29,13 +29,7 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 
 
 def _load_repo_env() -> None:
-    """Load repo-local .env so MCP-launched servers see provider credentials.
-
-    The workspace MCP config intentionally keeps the env block minimal, so the
-    server must load `FLOSS/.env` itself when it starts. `override=False`
-    preserves explicit parent-process overrides and keeps tests hermetic.
-    """
-
+    """Load repo-local `.env` so MCP-launched servers see provider credentials."""
     env_path = Path(os.environ.get("FLOSS_ENV_PATH", _REPO_ROOT / ".env")).expanduser()
     if not env_path.exists():
         return

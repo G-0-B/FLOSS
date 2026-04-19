@@ -1,7 +1,4 @@
-"""
-Committee Validation Logic.
-Orchestrates the voting process for knowledge triples.
-"""
+"""Committee validation logic for knowledge triples."""
 
 import asyncio
 from typing import List, Tuple, Dict
@@ -25,6 +22,7 @@ class CommitteeResult:
     reasoning: List[str]
 
     def to_dict(self) -> Dict:
+        """Convert the committee result into a JSON-serializable dictionary."""
         return asdict(self)
 
 

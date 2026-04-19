@@ -7,7 +7,7 @@ import logging
 # Add parent dir to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from conversation_memory import ConversationMemory
+from conversation_memory import ConversationMemory  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 
