@@ -318,9 +318,7 @@ def make_flowith_voter(
                 status = response.getcode()
                 raw_response = response.read().decode("utf-8", "replace")
             if status >= 400:
-                raise ValueError(
-                    f"Flowith HTTP {status}: {raw_response[:200]!r}"
-                )
+                raise ValueError(f"Flowith HTTP {status}: {raw_response[:200]!r}")
             payload = json.loads(raw_response)
             text = payload["choices"][0]["message"]["content"].strip()
             if not text:
