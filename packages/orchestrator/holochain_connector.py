@@ -264,8 +264,7 @@ class HolochainConnector:
                     return msgpack.unpackb(inner, raw=False)
                 return inner
             return data
-        else:
-            raise HolochainError("Unexpected response type: %s" % response.get("type"))
+        raise HolochainError("Unexpected response type: %s" % response.get("type"))
 
 
 # ── Convenience Functions ────────────────────────────
@@ -314,8 +313,8 @@ def understanding_to_rose_node(
 
 
 async def round_trip_demo(app_ws_url: str = "ws://localhost:8888"):
-    """
-    Demonstrate a full round-trip:
+    """Demonstrate a full round-trip.
+
     1. Create a mock Understanding (as from ConversationMemory)
     2. Convert to RoseNode and write to Holochain
     3. Retrieve via vector_search

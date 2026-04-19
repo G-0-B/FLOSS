@@ -77,7 +77,8 @@ EVIDENCE_TYPES: frozenset[str] = frozenset({"spec", "test", "adr", "url", "commi
 CERTAINTY_LIMIT: float = 0.999
 """Asymptotic upper bound for vote weights.
 
-The valid domain for Vote.weight is the CLOSED interval [-CERTAINTY_LIMIT, CERTAINTY_LIMIT].
+The valid domain for Vote.weight is the CLOSED interval
+[-CERTAINTY_LIMIT, CERTAINTY_LIMIT].
 Weights of exactly ±0.999 are permitted — they represent maximum support/opposition.
 Absolute ±1.0 is forbidden (1.0 > CERTAINTY_LIMIT fails the range check).
 """
@@ -254,7 +255,8 @@ class Vote:
         """
         if not isinstance(self.weight, float) or not math.isfinite(self.weight):
             raise ValueError(
-                f"E_VOTE_INVALID_RANGE: weight must be a finite float, got {self.weight!r}"
+                "E_VOTE_INVALID_RANGE: weight must be a finite float, "
+                f"got {self.weight!r}"
             )
         if not (-CERTAINTY_LIMIT <= self.weight <= CERTAINTY_LIMIT):
             raise ValueError(
@@ -295,7 +297,8 @@ class Decision:
             ) from exc
         if claim_uuid.version != 7:
             raise ValueError(
-                f"E_DECISION_INVALID_SCHEMA: claim_id must be UUID v7, got v{claim_uuid.version}"
+                "E_DECISION_INVALID_SCHEMA: claim_id must be UUID v7, "
+                f"got v{claim_uuid.version}"
             )
         if not isinstance(self.blast_radius, BlastRadius):
             raise ValueError(
@@ -331,7 +334,10 @@ class Decision:
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize Decision to a plain dict (outcome as .value; optional fields omitted when None)."""
+        """Serialize Decision to a plain dict.
+
+        Outcome is emitted as `.value`; optional fields are omitted when `None`.
+        """
         self.validate()
         d = {
             "claim_id": self.claim_id,

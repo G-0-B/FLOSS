@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import ssl
 import sys
-import http.client
 import urllib.parse
+import urllib.request
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
@@ -142,8 +143,10 @@ def make_litellm_voter(
 ) -> Voter:
     """Build a sync Voter that queries `model` via LiteLLM and returns a Vote.
 
-    name:        voter identifier written into Vote.voter (e.g. "cerebras-llama3.1-8b")
-    model:       LiteLLM model string (e.g. "cerebras/llama3.1-8b", "groq/qwen/qwen3-32b")
+    name:        voter identifier written into Vote.voter
+                 (e.g. "cerebras-llama3.1-8b")
+    model:       LiteLLM model string
+                 (e.g. "cerebras/llama3.1-8b", "groq/qwen/qwen3-32b")
     max_tokens:  cap on response length. Default is 2000 to give reasoning
                  models (Qwen3, DeepSeek R1, GPT-OSS reasoning) room to
                  think AND emit the WEIGHT/RATIONALE output after thinking.
@@ -193,7 +196,7 @@ def make_litellm_voter(
 
 
 def _flowith_credentials_path() -> Path:
-    """Return the configured Flowith credentials path or its default home-directory fallback."""
+    """Return the configured Flowith credentials path or the default fallback."""
     configured = os.environ.get(FLOWITH_CREDENTIALS_PATH_ENV, "").strip()
     if configured:
         return Path(configured).expanduser()
@@ -295,26 +298,28 @@ def make_flowith_voter(
                     "online": False,
                 }
             ).encode("utf-8")
-            connection = http.client.HTTPSConnection(host, timeout=timeout_s)
-            try:
-                connection.request(
-                    "POST",
-                    path,
-                    body=request_body,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "User-Agent": "FLOSSI0ULLK-Consensus/0.1",
-                        "Accept": "application/json",
-                    },
-                )
-                response = connection.getresponse()
+            request = urllib.request.Request(
+                url=f"https://{host}{path}",
+                data=request_body,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "FLOSSI0ULLK-Consensus/0.1",
+                    "Accept": "application/json",
+                },
+                method="POST",
+            )
+            context = ssl.create_default_context()
+            with urllib.request.urlopen(
+                request,
+                timeout=timeout_s,
+                context=context,
+            ) as response:
+                status = response.getcode()
                 raw_response = response.read().decode("utf-8", "replace")
-            finally:
-                connection.close()
-            if response.status >= 400:
+            if status >= 400:
                 raise ValueError(
-                    f"Flowith HTTP {response.status}: {raw_response[:200]!r}"
+                    f"Flowith HTTP {status}: {raw_response[:200]!r}"
                 )
             payload = json.loads(raw_response)
             text = payload["choices"][0]["message"]["content"].strip()
@@ -399,14 +404,16 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
     for profile_name, roster in profiles_raw.items():
         if not isinstance(profile_name, str) or not isinstance(roster, dict):
             raise RuntimeError(
-                f"Voter registry profiles must map names to object rosters: {profile_name!r}"
+                "Voter registry profiles must map names to object rosters: "
+                f"{profile_name!r}"
             )
         normalized_profile = profile_name.strip().lower()
         normalized_roster: dict[str, str] = {}
         for voter_name, model in roster.items():
             if not isinstance(voter_name, str) or not isinstance(model, str):
                 raise RuntimeError(
-                    f"Voter registry roster entries must be string -> string: {profile_name!r}"
+                    "Voter registry roster entries must be string -> string: "
+                    f"{profile_name!r}"
                 )
             normalized_roster[voter_name.strip()] = model.strip()
         profiles[normalized_profile] = normalized_roster
@@ -414,7 +421,8 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
     for alias_name, target_name in aliases.items():
         if target_name not in profiles:
             raise RuntimeError(
-                f"Voter registry alias {alias_name!r} points to unknown profile {target_name!r}"
+                f"Voter registry alias {alias_name!r} points to unknown profile "
+                f"{target_name!r}"
             )
 
     if "balanced" not in profiles:
@@ -426,6 +434,7 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
 
 
 def _normalize_profile(profile: str | None) -> str:
+    """Resolve the active profile name, falling back to the built-in default."""
     normalized = (profile or os.environ.get(PROFILE_ENV, "balanced")).strip().lower()
     if not normalized:
         return "balanced"
@@ -456,6 +465,7 @@ def _parse_voter_map(raw: str, *, source: str) -> dict[str, str]:
 
 
 def _credential_state_for_model(model: str) -> tuple[bool, str]:
+    """Report whether built-in credentials exist for the provider behind `model`."""
     lower = model.strip().lower()
     if lower.startswith("flowith/"):
         return _flowith_credential_state()
