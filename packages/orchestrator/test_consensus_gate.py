@@ -61,7 +61,6 @@ def sample_claim(
     proposal_type: ProposalType = ProposalType.CODE_CHANGE,
 ) -> Claim:
     """Build a baseline Claim for consensus-gate tests."""
-
     return Claim(
         proposer="agent-test",
         proposal_type=proposal_type,
@@ -482,7 +481,6 @@ def test_integer_weight_raises():
 
 def test_claim_summary_length():
     """Claim summaries longer than 200 chars fail schema validation."""
-
     try:
         Claim(
             proposer="a",
@@ -499,7 +497,6 @@ def test_claim_summary_length():
 
 def test_claim_validate_rejects_non_uuidv7():
     """Non-UUID claim IDs fail claim schema validation."""
-
     claim = sample_claim()
     claim.id = "not-a-uuid"
     try:
@@ -512,7 +509,6 @@ def test_claim_validate_rejects_non_uuidv7():
 
 def test_claim_validate_rejects_uuid4():
     """UUIDv4 claim IDs fail the UUIDv7 schema requirement."""
-
     import uuid as _uuid
 
     claim = sample_claim()
@@ -527,7 +523,6 @@ def test_claim_validate_rejects_uuid4():
 
 def test_claim_validate_rejects_bad_submitted_at():
     """Non-ISO timestamps fail claim schema validation."""
-
     claim = sample_claim()
     claim.submitted_at = "yesterday"
     try:
@@ -540,7 +535,6 @@ def test_claim_validate_rejects_bad_submitted_at():
 
 def test_claim_validate_rejects_bad_proposal_type():
     """Non-enum proposal types fail claim schema validation."""
-
     claim = sample_claim()
     object.__setattr__(claim, "proposal_type", "CodeChange")
     try:
@@ -553,7 +547,6 @@ def test_claim_validate_rejects_bad_proposal_type():
 
 def test_claim_validate_rejects_bad_blast_radius():
     """Non-enum blast radii fail claim schema validation."""
-
     claim = sample_claim()
     object.__setattr__(claim, "blast_radius", "Module")
     try:
@@ -566,7 +559,6 @@ def test_claim_validate_rejects_bad_blast_radius():
 
 def test_claim_validate_rejects_non_evidence_ref_entries():
     """Raw dict evidence entries fail claim schema validation."""
-
     claim = sample_claim()
     claim.evidence = [{"type": "spec", "ref": "docs/specs/consensus-gate.spec.md"}]
     try:
@@ -580,7 +572,6 @@ def test_claim_validate_rejects_non_evidence_ref_entries():
 
 def test_claim_validate_rejects_blank_evidence_ref():
     """Blank EvidenceRef refs fail claim schema validation."""
-
     claim = sample_claim()
     claim.evidence = [EvidenceRef(type="spec", ref="  ")]
     try:
@@ -593,7 +584,6 @@ def test_claim_validate_rejects_blank_evidence_ref():
 
 def test_claim_to_dict_serializes_validated_evidence():
     """to_dict() preserves validated EvidenceRef entries."""
-
     claim = sample_claim()
     claim.evidence = [
         EvidenceRef(type="spec", ref="docs/specs/consensus-gate.spec.md"),
@@ -613,7 +603,6 @@ def test_claim_to_dict_serializes_validated_evidence():
 
 def test_decision_validate_rejects_string_outcome():
     """String outcomes fail decision schema validation."""
-
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
@@ -631,7 +620,6 @@ def test_decision_validate_rejects_string_outcome():
 
 def test_decision_validate_rejects_non_vote_entries():
     """Non-Vote entries fail decision schema validation."""
-
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
@@ -652,7 +640,6 @@ def test_decision_validate_rejects_non_vote_entries():
 
 def test_decision_validate_rejects_override_by_without_overridden():
     """override_by without OVERRIDDEN outcome fails decision validation."""
-
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
@@ -671,7 +658,6 @@ def test_decision_validate_rejects_override_by_without_overridden():
 
 def test_decision_to_dict_validates_before_serializing():
     """to_dict() validates Decision fields before serializing."""
-
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
@@ -695,7 +681,6 @@ def test_decision_to_dict_validates_before_serializing():
 
 def test_decide_rejects_duplicate_voters():
     """decide() rejects duplicate voter identities."""
-
     claim = sample_claim(blast=BlastRadius.SYSTEM)
     voters = [mock_voter("dup", CL), mock_voter("dup", CL), mock_voter("c", CL)]
     try:
@@ -713,7 +698,6 @@ def test_decide_rejects_duplicate_voters():
 
 def test_adr_writer_produces_file():
     """default_adr_writer() writes an ADR record for a decision."""
-
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -763,7 +747,6 @@ def test_adr_writer_uses_unique_file_per_decision_event():
 
 def test_tally_direct_approved():
     """tally() returns APPROVED for strong positive module votes."""
-
     claim = sample_claim(blast=BlastRadius.MODULE)
     vs = [
         Vote(voter="a", weight=CL, rationale="ok"),
@@ -777,31 +760,28 @@ def test_tally_direct_approved():
 
 def test_tally_direct_rejected():
     """tally() returns REJECTED for strong negative module votes."""
-
     claim = sample_claim(blast=BlastRadius.MODULE)
     vs = [
         Vote(voter="a", weight=-CL, rationale="no"),
         Vote(voter="b", weight=-CL, rationale="no"),
     ]
-    outcome, mean, variance = tally(claim, vs)
+    outcome, _, _ = tally(claim, vs)
     assert outcome == Outcome.REJECTED
 
 
 def test_tally_direct_conflict():
     """tally() returns CONFLICT for strongly polarized module votes."""
-
     claim = sample_claim(blast=BlastRadius.MODULE)
     vs = [
         Vote(voter="a", weight=CL, rationale="yes"),
         Vote(voter="b", weight=-CL, rationale="no"),
     ]
-    outcome, mean, variance = tally(claim, vs)
+    outcome, _, _ = tally(claim, vs)
     assert outcome == Outcome.CONFLICT
 
 
 def test_tally_empty_defers():
     """tally() returns a neutral deferred result for an empty ballot."""
-
     claim = sample_claim(blast=BlastRadius.MODULE)
     outcome, mean, variance = tally(claim, [])
     assert outcome == Outcome.DEFERRED

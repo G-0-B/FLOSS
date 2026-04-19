@@ -45,7 +45,8 @@ TARGETS = [
 ]
 
 
-def call_one(label: str, model: str) -> tuple[bool, str, float]:
+def call_one(model: str) -> tuple[bool, str, float]:
+    """Run one inference call against `model` and return success, text, and latency."""
     t0 = time.perf_counter()
     try:
         resp = completion(
@@ -63,6 +64,7 @@ def call_one(label: str, model: str) -> tuple[bool, str, float]:
 
 
 def main() -> int:
+    """Run the smoke test against the configured free-tier inference providers."""
     failures = 0
     print("=" * 60)
     print("FLOSSIØULLK inference smoke test")
@@ -70,7 +72,7 @@ def main() -> int:
     print("=" * 60)
 
     for label, model in TARGETS:
-        ok, msg, dt = call_one(label, model)
+        ok, msg, dt = call_one(model)
         status = "PASS" if ok else "FAIL"
         print(f"[{status}] {label:10s} {model}  ({dt*1000:.0f} ms)")
         print(f"         → {msg[:200]}")

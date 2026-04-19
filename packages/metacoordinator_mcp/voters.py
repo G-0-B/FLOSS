@@ -15,10 +15,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import ssl
 import sys
 import urllib.parse
-import urllib.request
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
@@ -287,6 +285,8 @@ def make_flowith_voter(
             body=claim.body,
         )
         try:
+            import requests
+
             api_key = _load_flowith_api_key()
             host, path = _flowith_endpoint()
             request_body = json.dumps(
@@ -297,28 +297,23 @@ def make_flowith_voter(
                     "thinking": False,
                     "online": False,
                 }
-            ).encode("utf-8")
-            request = urllib.request.Request(
-                url=f"https://{host}{path}",
-                data=request_body,
+            )
+            response = requests.post(
+                f"https://{host}{path}",
+                json=request_body,
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                     "User-Agent": "FLOSSI0ULLK-Consensus/0.1",
                     "Accept": "application/json",
                 },
-                method="POST",
-            )
-            context = ssl.create_default_context()
-            with urllib.request.urlopen(
-                request,
                 timeout=timeout_s,
-                context=context,
-            ) as response:
-                status = response.getcode()
-                raw_response = response.read().decode("utf-8", "replace")
-            if status >= 400:
-                raise ValueError(f"Flowith HTTP {status}: {raw_response[:200]!r}")
+            )
+            raw_response = response.text
+            if response.status_code >= 400:
+                raise ValueError(
+                    f"Flowith HTTP {response.status_code}: {raw_response[:200]!r}"
+                )
             payload = json.loads(raw_response)
             text = payload["choices"][0]["message"]["content"].strip()
             if not text:

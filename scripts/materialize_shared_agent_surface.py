@@ -539,7 +539,8 @@ def build_vibe_agent(agent_spec: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_vibe_launcher(workspace_root: Path, vibe_cfg: dict[str, Any]) -> str:
+def build_vibe_launcher(vibe_cfg: dict[str, Any]) -> str:
+    """Build the PowerShell launcher for the local Vibe workspace projection."""
     env_rel = str(vibe_cfg.get("env_path", "FLOSS/.env"))
     python_exe = str(vibe_cfg.get("python_exe", "C:/Python313/python.exe"))
     script = f"""
@@ -775,7 +776,7 @@ def materialize(
                     "Vibe target field `launcher_path` must be a non-empty string"
                 )
             launcher_path = workspace_root / launcher_raw
-            launcher_content = build_vibe_launcher(workspace_root, vibe_cfg)
+            launcher_content = build_vibe_launcher(vibe_cfg)
             message, changed = check_or_write_text(
                 launcher_path, launcher_content, check=check, dry_run=dry_run
             )
