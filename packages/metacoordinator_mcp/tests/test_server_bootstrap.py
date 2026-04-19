@@ -120,6 +120,7 @@ def test_server_imports_without_fastmcp_for_bootstrap_paths():
 
 
 def _run_all() -> int:
+    """Run the standalone bootstrap test module without requiring pytest."""
     tests = [
         test_server_bootstrap_loads_repo_env_when_process_env_missing,
         test_server_bootstrap_preserves_explicit_process_env,

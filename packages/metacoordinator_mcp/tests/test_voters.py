@@ -38,6 +38,7 @@ ENV_KEYS = (
 
 @contextmanager
 def patched_env(**updates: str | None):
+    """Temporarily replace the environment variables used by voter resolution."""
     snapshot = {key: os.environ.get(key) for key in ENV_KEYS}
     try:
         for key in ENV_KEYS:
@@ -55,12 +56,14 @@ def patched_env(**updates: str | None):
 
 
 def test_resolve_default_voter_specs_filters_missing_provider_keys():
+    """Return an empty roster when no provider credentials are available."""
     with patched_env():
         resolved = resolve_default_voter_specs(profile="balanced")
     assert resolved == {}
 
 
 def test_resolve_default_voter_specs_honors_profile_and_credentials():
+    """Enable only the models backed by credentials for the selected profile."""
     with patched_env(GROQ_API_KEY="test-groq-key"):
         resolved = resolve_default_voter_specs(profile="fast")
     assert resolved == {
@@ -69,6 +72,7 @@ def test_resolve_default_voter_specs_honors_profile_and_credentials():
 
 
 def test_roster_override_takes_precedence_over_profile_and_extra():
+    """Prefer an explicit roster override over profile and extra voter settings."""
     with patched_env(
         GROQ_API_KEY="test-groq-key",
         FLOSS_VOTER_PROFILE="fast",
@@ -80,17 +84,22 @@ def test_roster_override_takes_precedence_over_profile_and_extra():
 
 
 def test_describe_default_roster_marks_missing_credentials_disabled():
+    """Mark roster entries disabled when their provider credentials are absent."""
     with patched_env(
         GROQ_API_KEY="test-groq-key",
         FLOSS_EXTRA_VOTERS="gemini-flash=gemini/custom-model",
     ):
         described = describe_default_roster(profile="fast")
-    gemini = next(item for item in described if item["name"] == "gemini-flash")
+    try:
+        gemini = next(item for item in described if item["name"] == "gemini-flash")
+    except StopIteration as exc:
+        raise AssertionError("Expected gemini-flash in described roster") from exc
     assert gemini["enabled"] is False
     assert gemini["reason"] == "missing GOOGLE_API_KEY or GEMINI_API_KEY"
 
 
 def test_build_default_voters_raises_when_no_enabled_roster_exists():
+    """Raise a clear error when no enabled voters can be built."""
     with patched_env():
         try:
             build_default_voters(profile="balanced")
@@ -103,6 +112,7 @@ def test_build_default_voters_raises_when_no_enabled_roster_exists():
 
 
 def test_flowith_profile_enables_when_api_key_is_present():
+    """Enable the Flowith roster when the API key is present."""
     with patched_env(
         FLOWITH_API_KEY="flo-test-key",
         FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
@@ -116,6 +126,7 @@ def test_flowith_profile_enables_when_api_key_is_present():
 
 
 def test_flowith_profile_reports_missing_credentials_cleanly():
+    """Report missing Flowith credentials without crashing roster description."""
     with patched_env(FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json"):
         described = describe_default_roster(profile="flowith")
     first = described[0]
@@ -124,6 +135,7 @@ def test_flowith_profile_reports_missing_credentials_cleanly():
 
 
 def test_profile_alias_resolves_to_underlying_registry_profile():
+    """Resolve profile aliases to the registry profile they point at."""
     with patched_env(
         FLOWITH_API_KEY="flo-test-key",
         FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
@@ -137,6 +149,7 @@ def test_profile_alias_resolves_to_underlying_registry_profile():
 
 
 def test_mistral_profile_enables_when_api_key_is_present():
+    """Enable the Mistral free roster when its API key is available."""
     with patched_env(MISTRAL_API_KEY="test-mistral-key"):
         resolved = resolve_default_voter_specs(profile="mistral-free")
     assert resolved == {
@@ -147,6 +160,7 @@ def test_mistral_profile_enables_when_api_key_is_present():
 
 
 def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist():
+    """Prefer the live multi-provider ROI roster when credentials exist."""
     with patched_env(
         CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
@@ -166,6 +180,7 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
 
 
 def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
+    """Add the optional OpenAI lane when the wider ROI roster can use it."""
     with patched_env(
         CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
@@ -187,6 +202,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
 
 
 def _run_all() -> int:
+    """Run the standalone test module without requiring pytest."""
     tests = [
         test_resolve_default_voter_specs_filters_missing_provider_keys,
         test_resolve_default_voter_specs_honors_profile_and_credentials,
