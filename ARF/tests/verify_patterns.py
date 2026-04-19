@@ -1,3 +1,5 @@
+"""Manual verification script for triple-extraction ontology patterns."""
+
 import sys
 from pathlib import Path
 import logging
@@ -11,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 def test_patterns():
+    """Verify the expected triples are extracted from representative sentences."""
     print("Initializing ConversationMemory...")
     memory = ConversationMemory(agent_id="test-verifier")
 

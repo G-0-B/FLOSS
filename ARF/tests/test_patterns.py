@@ -1,6 +1,4 @@
-"""
-Test script for Pattern Library and Meaningful Mixing.
-"""
+"""Test script for Pattern Library and Meaningful Mixing."""
 
 import sys
 from pathlib import Path
@@ -18,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def test_pattern_matching():
+    """Verify keyword matching returns the expected ontology pattern."""
     print("\n=== Testing PatternMatcher ===")
     matcher = PatternMatcher()
 
@@ -43,6 +42,7 @@ def test_pattern_matching():
 
 
 def test_pattern_mixing():
+    """Verify pattern mixing produces a combined structure and label."""
     print("\n=== Testing PatternMixer ===")
     mixer = PatternMixer()
 
@@ -59,6 +59,7 @@ def test_pattern_mixing():
 
 
 def test_memory_integration():
+    """Verify ConversationMemory records detected rhetorical patterns."""
     print("\n=== Testing ConversationMemory Integration ===")
     memory = ConversationMemory(agent_id="test-pattern-agent")
 

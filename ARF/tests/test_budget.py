@@ -1,6 +1,4 @@
-"""
-Test script for Autonomous Budgeting.
-"""
+"""Test script for Autonomous Budgeting."""
 
 import sys
 import shutil
@@ -20,17 +18,20 @@ TEST_DIR = Path("./test_memory_budget")
 
 
 def setup_module():
+    """Create a clean budget test directory before module tests run."""
     if TEST_DIR.exists():
         shutil.rmtree(TEST_DIR)
     TEST_DIR.mkdir()
 
 
 def teardown_module():
+    """Remove the temporary budget test directory after module tests finish."""
     if TEST_DIR.exists():
         shutil.rmtree(TEST_DIR)
 
 
 def test_budget_manager():
+    """Verify budget tracking and overflow handling for a session."""
     print("\n=== Testing BudgetManager ===")
     config = BudgetConfig(max_tokens_per_session=100)
     manager = BudgetManager("test-agent", storage_path=str(TEST_DIR), config=config)
@@ -59,6 +60,7 @@ def test_budget_manager():
 
 
 def test_memory_integration():
+    """Verify ConversationMemory enforces the configured token budget."""
     print("\n=== Testing ConversationMemory Integration ===")
     # Use a fresh directory for this agent
     agent_dir = TEST_DIR / "memory_agent"

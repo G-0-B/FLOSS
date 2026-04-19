@@ -3,10 +3,12 @@ Validation tests for the Walking Skeleton, generated from the
 walking_skeleton_validation.yaml specification.
 """
 
+import asyncio
 import pytest
 import yaml
 from pathlib import Path
 import sys
+import numpy as np
 
 # Add parent directories to path
 test_dir = Path(__file__).parent.absolute()
@@ -23,6 +25,7 @@ SPEC_FILE = Path(__file__).parent.parent.parent / "walking_skeleton_validation.y
 
 @pytest.fixture
 def validation_spec():
+    """Load the walking skeleton validation spec from disk."""
     with open(SPEC_FILE, "r") as f:
         return yaml.safe_load(f)
 
@@ -33,21 +36,14 @@ def test_spec_exists(validation_spec):
     assert "test_2_composition" in validation_spec
     assert "test_3_persistence" in validation_spec
 
-
-import asyncio
-import numpy as np
-from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
-
-
 def test_composition(validation_spec):
-    """
-    Validates ADR-0 Test 2: Composition.
-    Generated from: walking_skeleton_validation.yaml
-    """
+    """Validate ADR-0 Test 2 composition behavior against the spec."""
     criteria = validation_spec["test_2_composition"]["criteria"]
     print(f"\n--- Running Test: {criteria} ---")
 
     async def run_test():
+        from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
             result = await swarm.recursive_self_aggregation(
                 query="What is the core principle of FLOSSI0ULLK?", K=2, T=3
@@ -60,19 +56,14 @@ def test_composition(validation_spec):
 
     asyncio.run(run_test())
 
-
-from pwnies.desktop_pony_swarm.core.embedding import MultiScaleEmbedding
-
-
 def test_persistence(validation_spec):
-    """
-    Validates ADR-0 Test 3: Persistence.
-    Generated from: walking_skeleton_validation.yaml
-    """
+    """Validate ADR-0 Test 3 persistence behavior against the spec."""
     criteria = validation_spec["test_3_persistence"]["criteria"]
     print(f"\n--- Running Test: {criteria} ---")
 
     async def run_test():
+        from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
             # Conversation 1: Create knowledge
             query1 = "What is the capital of France?"
