@@ -370,10 +370,10 @@ class GatewayTools:
         except Exception as exc:  # noqa: BLE001
             return _err(f"E_CONSENSUS_FAILED: {type(exc).__name__}: {exc}")
 
-        if not new_votes and latest_decision is not None:
-            return _ok(latest_decision)
-
         all_votes = [*existing_votes_by_voter.values(), *new_votes]
+        if not new_votes and latest_decision is not None:
+            if latest_decision.get("votes") == [vote.to_dict() for vote in all_votes]:
+                return _ok(latest_decision)
         outcome, mean, variance = tally(claim, all_votes)
         decision = Decision(
             claim_id=claim.id,

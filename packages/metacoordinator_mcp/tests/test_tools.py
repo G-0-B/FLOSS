@@ -337,6 +337,39 @@ def test_run_consensus_round_allows_rerun_after_deferred():
         assert decision["outcome"] == "APPROVED"
 
 
+def test_run_consensus_round_retallies_manual_votes_after_deferred():
+    """run_consensus_round() must reconsider newly appended manual votes after DEFERRED."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="manual vote after deferred",
+                body="body",
+                blast_radius="Module",
+            )
+        )
+        first_decision = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert first_decision["outcome"] == "DEFERRED"
+
+        json.loads(
+            gw.cast_vote(
+                claim_id=claim_result["claim_id"],
+                voter="human-reviewer",
+                weight=0.8,
+                rationale="Enough signal now",
+            )
+        )
+        second_decision = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert second_decision["claim_id"] == claim_result["claim_id"]
+        assert second_decision["outcome"] == "APPROVED"
+        assert {vote["voter"] for vote in second_decision["votes"]} == {
+            "human-reviewer",
+            "groq-reviewer",
+        }
+
+
 def test_get_decision_finds_buried_decision():
     """get_decision() traverses past the last 500 entries when needed."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -416,6 +449,7 @@ def _run_all():
         test_run_consensus_round_detects_buried_existing_decision,
         test_run_consensus_round_counts_existing_manual_votes,
         test_run_consensus_round_allows_rerun_after_deferred,
+        test_run_consensus_round_retallies_manual_votes_after_deferred,
         test_get_decision_finds_buried_decision,
         test_run_consensus_round_returns_json_error_on_write_failure,
     ]

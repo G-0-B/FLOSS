@@ -25,7 +25,7 @@ from pathlib import Path
 from .tools import GatewayTools
 
 _THIS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _THIS_DIR.parent.parent.parent
+_REPO_ROOT = _THIS_DIR.parent.parent
 
 
 def _load_repo_env() -> None:

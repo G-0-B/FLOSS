@@ -111,6 +111,13 @@ def test_server_bootstrap_loads_repo_env_when_process_env_missing():
             assert server.BASE_DIR == Path(tmp)
 
 
+def test_server_bootstrap_resolves_repo_root_to_checkout_root():
+    """Resolve the repo root to the checkout root so default env lookup hits FLOSS/.env."""
+    with patched_env():
+        server = import_server_module()
+        assert server._REPO_ROOT == _REPO_ROOT
+
+
 def test_server_bootstrap_preserves_explicit_process_env():
     """Keep explicit process env values ahead of repo env defaults."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -164,6 +171,7 @@ def _run_all() -> int:
     """Run the standalone bootstrap test module without requiring pytest."""
     tests = [
         test_server_bootstrap_loads_repo_env_when_process_env_missing,
+        test_server_bootstrap_resolves_repo_root_to_checkout_root,
         test_server_bootstrap_preserves_explicit_process_env,
         test_server_imports_without_fastmcp_for_bootstrap_paths,
         test_server_bootstrap_surfaces_missing_dotenv_for_repo_env_file,
