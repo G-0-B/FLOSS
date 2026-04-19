@@ -54,7 +54,9 @@ def missing_fastmcp():
     blocked = "mcp.server.fastmcp"
     cached = sys.modules.pop(blocked, None)
 
-    def fake_import(name, module_globals=None, module_locals=None, fromlist=(), level=0):
+    def fake_import(
+        name, module_globals=None, module_locals=None, fromlist=(), level=0
+    ):
         """Raise on FastMCP imports while delegating everything else."""
         if name == blocked:
             raise ImportError("blocked for test")

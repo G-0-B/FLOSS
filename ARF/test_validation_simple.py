@@ -80,9 +80,7 @@ def test_validation():
         memory2 = ConversationMemory(
             agent_id="test", storage_path=temp_dir, validate_ontology=False
         )
-        is_valid, error, _committee = memory2._validate_triple(
-            ("X", "invalid", "Y")
-        )
+        is_valid, error, _committee = memory2._validate_triple(("X", "invalid", "Y"))
         assert is_valid is True
         print("  ✓ validation can be disabled")
 
@@ -148,9 +146,7 @@ def test_all_known_predicates():
         ]
 
         for predicate in known_predicates:
-            is_valid, error, _committee = memory._validate_triple(
-                ("X", predicate, "Y")
-            )
+            is_valid, error, _committee = memory._validate_triple(("X", predicate, "Y"))
             assert is_valid is True, f"Predicate {predicate} should be valid"
 
         print(f"  ✓ all {len(known_predicates)} known predicates are valid")
