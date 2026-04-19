@@ -35,8 +35,11 @@ def _load_repo_env() -> None:
         return
     try:
         from dotenv import load_dotenv
-    except ImportError:
-        return
+    except ImportError as exc:
+        raise RuntimeError(
+            "python-dotenv is required to load repo credentials from "
+            f"{env_path}. Install python-dotenv or remove the env file override."
+        ) from exc
     load_dotenv(env_path, override=False)
 
 

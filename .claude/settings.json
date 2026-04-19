@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+            "command": "python scripts/hook_post_write.py"
           }
         ]
       }

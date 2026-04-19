@@ -26,12 +26,14 @@ if str(_REPO_ROOT) not in sys.path:
 from packages.orchestrator.claim_schema import (  # noqa: E402
     BlastRadius,
     Claim,
+    Decision,
     EvidenceRef,
+    Outcome,
     ProposalType,
     TruthStatus,
     Vote,
 )
-from packages.orchestrator.consensus_gate import decide  # noqa: E402
+from packages.orchestrator.consensus_gate import tally  # noqa: E402
 from packages.source_chain.cell import CellDirectory  # noqa: E402
 
 # Deferred type — avoids importing voters.py (and LiteLLM) at module load.
@@ -63,11 +65,39 @@ def _claim_from_chain_entry(entry_content: dict[str, Any]) -> Claim:
 
 
 def _ok(data: Any) -> str:
+    """Serialize a successful tool result into the compact JSON wire format."""
     return json.dumps(data, separators=(",", ":"), ensure_ascii=False)
 
 
 def _err(msg: str) -> str:
+    """Serialize a tool error so MCP callers always receive parseable JSON."""
     return json.dumps({"error": msg}, separators=(",", ":"))
+
+
+def _vote_from_chain_entry(entry_content: dict[str, Any]) -> Vote:
+    """Reconstruct and validate a Vote dataclass from persisted source-chain content."""
+    vote = Vote(
+        voter=entry_content["voter"],
+        weight=float(entry_content["weight"]),
+        rationale=entry_content["rationale"],
+        voted_at=entry_content["voted_at"],
+    )
+    vote.validate()
+    return vote
+
+
+def _decision_outcome(entry_content: dict[str, Any]) -> Outcome:
+    """Parse the Outcome enum from a persisted Decision payload."""
+    return Outcome(entry_content["outcome"])
+
+
+def _known_voter_name(voter: Callable[[Claim], Vote]) -> Optional[str]:
+    """Return the configured voter name when it can be inferred without a network call."""
+    name = getattr(voter, "__name__", "")
+    for prefix in ("litellm_voter_", "flowith_voter_"):
+        if name.startswith(prefix):
+            return name[len(prefix) :]
+    return None
 
 
 class GatewayTools:
@@ -161,6 +191,14 @@ class GatewayTools:
         except (ValueError, TypeError) as exc:
             return _err(f"E_CAST_VOTE_INVALID: {exc}")
 
+        entries = self._cell.read_chain(limit=None)
+        if not any(
+            entry.get("type") == "claim"
+            and entry.get("content", {}).get("id") == claim_id
+            for entry in entries
+        ):
+            return _err(f"E_CLAIM_NOT_FOUND: no claim with id {claim_id}")
+
         content = {"claim_id": claim_id, **vote.to_dict()}
         h = self._cell.append_entry(
             entry_type="vote",
@@ -206,16 +244,18 @@ class GatewayTools:
     # ------------------------------------------------------------------
 
     def list_pending(self) -> str:
-        """Return all Claims that have no corresponding Decision entry yet.
+        """Return Claims whose latest Decision is absent or still DEFERRED.
 
         Returns JSON list of {"claim_id": "<uuid>", "summary": "<text>"}.
         """
         entries = self._cell.read_chain(limit=None)
-        decided_claim_ids = {
-            e["content"]["claim_id"]
-            for e in entries
-            if e.get("type") == "decision" and "claim_id" in e.get("content", {})
-        }
+        latest_outcome_by_claim: dict[str, str] = {}
+        for entry in entries:
+            if entry.get("type") != "decision":
+                continue
+            claim_id = entry.get("content", {}).get("claim_id")
+            if claim_id and claim_id not in latest_outcome_by_claim:
+                latest_outcome_by_claim[claim_id] = entry["content"].get("outcome", "")
         pending = [
             {
                 "claim_id": e["content"]["id"],
@@ -224,7 +264,8 @@ class GatewayTools:
             }
             for e in entries
             if e.get("type") == "claim"
-            and e.get("content", {}).get("id") not in decided_claim_ids
+            and latest_outcome_by_claim.get(e.get("content", {}).get("id"))
+            in (None, Outcome.DEFERRED.value)
         ]
         return _ok(pending)
 
@@ -240,13 +281,15 @@ class GatewayTools:
     # ------------------------------------------------------------------
 
     def run_consensus_round(self, claim_id: str) -> str:
-        """Run the default voter roster against a pending Claim and record the Decision.
+        """Run the active voter roster, folding prior on-chain votes into the tally.
 
         Looks up the Claim on the source chain by id, refuses to re-run if a
-        Decision already exists for it, calls `decide()` with the voters from
-        `self._voter_factory` (or the LiteLLM default), writes each Vote to
-        the chain under the voter's DID, then writes the Decision under the
-        "metacoordinator" system DID.
+        non-deferred Decision already exists for it, calls the voters from
+        `self._voter_factory` (or the LiteLLM default), merges those new votes
+        with any existing source-chain votes for the same claim, writes only the
+        newly collected Vote entries, then writes the Decision under the
+        "metacoordinator" system DID. Claims whose latest Decision is DEFERRED
+        may be re-run so additional votes can progress them.
 
         Returns JSON: the full Decision.to_dict() (outcome, votes, tally_mean,
         tally_variance, etc.). On lookup or validation failure: {"error": ...}.
@@ -261,22 +304,42 @@ class GatewayTools:
         if claim_entry is None:
             return _err(f"E_CLAIM_NOT_FOUND: no claim with id {claim_id}")
 
-        # Idempotency: don't double-vote on an already-decided claim. The
-        # chain is append-only so a stale re-run would produce confusing
-        # duplicate votes with conflicting weights.
-        for e in entries:
+        latest_decision: Optional[dict[str, Any]] = None
+        for entry in entries:
             if (
-                e.get("type") == "decision"
-                and e.get("content", {}).get("claim_id") == claim_id
+                entry.get("type") == "decision"
+                and entry.get("content", {}).get("claim_id") == claim_id
             ):
+                latest_decision = entry["content"]
+                break
+        if latest_decision is not None:
+            try:
+                latest_outcome = _decision_outcome(latest_decision)
+            except (KeyError, ValueError) as exc:
+                return _err(f"E_DECISION_MALFORMED: {exc}")
+            if latest_outcome != Outcome.DEFERRED:
                 return _err(
-                    f"E_ALREADY_DECIDED: claim {claim_id} already has a decision"
+                    "E_ALREADY_DECIDED: claim "
+                    f"{claim_id} already has a terminal decision ({latest_outcome.value})"
                 )
 
         try:
             claim = _claim_from_chain_entry(claim_entry["content"])
         except (KeyError, ValueError) as exc:
             return _err(f"E_CLAIM_MALFORMED: {exc}")
+
+        existing_votes_by_voter: dict[str, Vote] = {}
+        for entry in entries:
+            if (
+                entry.get("type") != "vote"
+                or entry.get("content", {}).get("claim_id") != claim_id
+            ):
+                continue
+            try:
+                vote = _vote_from_chain_entry(entry["content"])
+            except (KeyError, TypeError, ValueError) as exc:
+                return _err(f"E_VOTE_MALFORMED: {exc}")
+            existing_votes_by_voter.setdefault(vote.voter, vote)
 
         # Resolve voter factory lazily so tests that don't hit this code
         # path never import voters.py or any provider SDKs.
@@ -292,16 +355,41 @@ class GatewayTools:
             return _err(f"E_VOTER_BUILD_FAILED: {type(exc).__name__}: {exc}")
 
         try:
-            decision = decide(claim, voters)
+            new_votes: list[Vote] = []
+            seen_voters = set(existing_votes_by_voter)
+            for voter in voters:
+                known_name = _known_voter_name(voter)
+                if known_name and known_name in seen_voters:
+                    continue
+                vote = voter(claim)
+                vote.validate()
+                if vote.voter in seen_voters:
+                    continue
+                seen_voters.add(vote.voter)
+                new_votes.append(vote)
         except Exception as exc:  # noqa: BLE001
             return _err(f"E_CONSENSUS_FAILED: {type(exc).__name__}: {exc}")
+
+        if not new_votes and latest_decision is not None:
+            return _ok(latest_decision)
+
+        all_votes = [*existing_votes_by_voter.values(), *new_votes]
+        outcome, mean, variance = tally(claim, all_votes)
+        decision = Decision(
+            claim_id=claim.id,
+            blast_radius=claim.blast_radius,
+            outcome=outcome,
+            votes=all_votes,
+            tally_mean=mean,
+            tally_variance=variance,
+        )
 
         # Append each vote under the voter's identity, then the decision
         # under the system author. If a chain write fails mid-way we accept
         # a partial record — the next list_pending call will see it as
         # still-pending because the decision entry is the last to land.
         try:
-            for vote in decision.votes:
+            for vote in new_votes:
                 self._cell.append_entry(
                     entry_type="vote",
                     author_did=vote.voter,

@@ -16,7 +16,8 @@ import json
 import os
 import re
 import sys
-import urllib.request
+import http.client
+import urllib.parse
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
@@ -34,7 +35,8 @@ from packages.orchestrator.claim_schema import (  # noqa: E402
 
 Voter = Callable[[Claim], Vote]
 
-VOTER_PROMPT = """You are a peer voter in a multi-agent consensus gate for the FLOSSIØULLK project.
+VOTER_PROMPT = """You are a peer voter in a multi-agent consensus gate for the
+FLOSSIØULLK project.
 
 You have been given a Claim proposed by another agent. Evaluate it on its merits
 and cast a single vote.
@@ -67,7 +69,10 @@ CLAIM TO EVALUATE:
 Cast your vote now."""
 
 
-_WEIGHT_RE = re.compile(r"WEIGHT\s*:\s*([+-]?\d+(?:\.\d+)?)", re.IGNORECASE)
+_WEIGHT_RE = re.compile(
+    r"WEIGHT\s*:\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))",
+    re.IGNORECASE,
+)
 _RATIONALE_RE = re.compile(
     r"RATIONALE\s*:\s*(.+?)(?:\n\s*\n|\Z)", re.IGNORECASE | re.DOTALL
 )
@@ -102,6 +107,7 @@ def _strip_thinking(text: str) -> str:
 
 
 def _parse_weight(text: str) -> float:
+    """Extract a WEIGHT float from model output, defaulting to 0.0 on parse failure."""
     m = _WEIGHT_RE.search(text)
     if not m:
         return 0.0
@@ -120,6 +126,7 @@ def _parse_weight(text: str) -> float:
 
 
 def _parse_rationale(text: str) -> str:
+    """Extract the RATIONALE field, falling back to a trimmed raw response slice."""
     m = _RATIONALE_RE.search(text)
     if not m:
         return text.strip()[:500]
@@ -145,6 +152,7 @@ def make_litellm_voter(
     """
 
     def voter(claim: Claim) -> Vote:
+        """Call LiteLLM for one claim and normalize the provider output into a Vote."""
         prompt = VOTER_PROMPT.format(
             proposer=claim.proposer,
             proposal_type=claim.proposal_type.value,
@@ -185,6 +193,7 @@ def make_litellm_voter(
 
 
 def _flowith_credentials_path() -> Path:
+    """Return the configured Flowith credentials path or its default home-directory fallback."""
     configured = os.environ.get(FLOWITH_CREDENTIALS_PATH_ENV, "").strip()
     if configured:
         return Path(configured).expanduser()
@@ -192,6 +201,7 @@ def _flowith_credentials_path() -> Path:
 
 
 def _load_flowith_api_key() -> str:
+    """Resolve the Flowith API key from env first, then from the credentials file."""
     env_key = os.environ.get(FLOWITH_API_KEY_ENV, "").strip()
     if env_key:
         return env_key
@@ -213,6 +223,7 @@ def _load_flowith_api_key() -> str:
 
 
 def _flowith_credential_state() -> tuple[bool, str]:
+    """Return whether Flowith credentials are available plus a human-readable reason."""
     env_key = os.environ.get(FLOWITH_API_KEY_ENV, "").strip()
     if env_key:
         return True, f"credential found in {FLOWITH_API_KEY_ENV}"
@@ -232,6 +243,7 @@ def _flowith_credential_state() -> tuple[bool, str]:
 
 
 def _parse_flowith_models(model: str) -> list[str]:
+    """Parse a `flowith/...` model spec into the concrete model list Flowith expects."""
     prefix = "flowith/"
     if not model.strip().lower().startswith(prefix):
         raise ValueError(f"unsupported Flowith model spec {model!r}")
@@ -240,6 +252,17 @@ def _parse_flowith_models(model: str) -> list[str]:
     if not models:
         raise ValueError("Flowith voter spec must include at least one model")
     return models
+
+
+def _flowith_endpoint() -> tuple[str, str]:
+    """Return the validated Flowith HTTPS host/path pair used for API requests."""
+    parsed = urllib.parse.urlparse(FLOWITH_API_URL)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("FLOWITH_API_URL must be an https URL")
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    return parsed.netloc, path
 
 
 def make_flowith_voter(
@@ -252,6 +275,7 @@ def make_flowith_voter(
     models = _parse_flowith_models(model)
 
     def voter(claim: Claim) -> Vote:
+        """Call Flowith for one claim and normalize the provider output into a Vote."""
         prompt = VOTER_PROMPT.format(
             proposer=claim.proposer,
             proposal_type=claim.proposal_type.value,
@@ -261,6 +285,7 @@ def make_flowith_voter(
         )
         try:
             api_key = _load_flowith_api_key()
+            host, path = _flowith_endpoint()
             request_body = json.dumps(
                 {
                     "models": models,
@@ -270,19 +295,28 @@ def make_flowith_voter(
                     "online": False,
                 }
             ).encode("utf-8")
-            request = urllib.request.Request(
-                FLOWITH_API_URL,
-                data=request_body,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "FLOSSI0ULLK-Consensus/0.1",
-                    "Accept": "application/json",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=timeout_s) as response:
-                payload = json.loads(response.read().decode("utf-8", "replace"))
+            connection = http.client.HTTPSConnection(host, timeout=timeout_s)
+            try:
+                connection.request(
+                    "POST",
+                    path,
+                    body=request_body,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "FLOSSI0ULLK-Consensus/0.1",
+                        "Accept": "application/json",
+                    },
+                )
+                response = connection.getresponse()
+                raw_response = response.read().decode("utf-8", "replace")
+            finally:
+                connection.close()
+            if response.status >= 400:
+                raise ValueError(
+                    f"Flowith HTTP {response.status}: {raw_response[:200]!r}"
+                )
+            payload = json.loads(raw_response)
             text = payload["choices"][0]["message"]["content"].strip()
             if not text:
                 raise ValueError("missing response content from Flowith")
@@ -333,6 +367,7 @@ _CREDENTIAL_ENV_BY_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 @lru_cache(maxsize=1)
 def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """Load and normalize the built-in voter registry aliases and profiles."""
     try:
         raw = json.loads(VOTER_REGISTRY_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -348,7 +383,8 @@ def _load_builtin_registry() -> tuple[dict[str, str], dict[str, dict[str, str]]]
     profiles_raw = raw.get("profiles", {})
     if not isinstance(aliases_raw, dict) or not isinstance(profiles_raw, dict):
         raise RuntimeError(
-            f"Voter registry {VOTER_REGISTRY_PATH} must contain object-valued aliases and profiles"
+            "Voter registry "
+            f"{VOTER_REGISTRY_PATH} must contain object-valued aliases and profiles"
         )
 
     aliases: dict[str, str] = {}

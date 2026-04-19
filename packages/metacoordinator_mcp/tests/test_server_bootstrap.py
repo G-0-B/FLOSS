@@ -72,6 +72,30 @@ def missing_fastmcp():
             sys.modules[blocked] = cached
 
 
+@contextmanager
+def missing_dotenv():
+    """Temporarily block python-dotenv imports to exercise bootstrap failures."""
+    blocked = "dotenv"
+    cached = sys.modules.pop(blocked, None)
+
+    def fake_import(
+        name, module_globals=None, module_locals=None, fromlist=(), level=0
+    ):
+        """Raise on dotenv imports while delegating every other import unchanged."""
+        if name == blocked:
+            raise ImportError("blocked for test")
+        return original_import(name, module_globals, module_locals, fromlist, level)
+
+    original_import = builtins.__import__
+    builtins.__import__ = fake_import
+    try:
+        yield
+    finally:
+        builtins.__import__ = original_import
+        if cached is not None:
+            sys.modules[blocked] = cached
+
+
 def test_server_bootstrap_loads_repo_env_when_process_env_missing():
     """Load provider keys from the repo env file when process env is empty."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -119,12 +143,30 @@ def test_server_imports_without_fastmcp_for_bootstrap_paths():
             assert os.environ["GROQ_API_KEY"] == "from-file"
 
 
+def test_server_bootstrap_surfaces_missing_dotenv_for_repo_env_file():
+    """Raise a clear bootstrap error when a repo env file exists but dotenv is missing."""
+    with tempfile.TemporaryDirectory() as tmp:
+        env_path = Path(tmp) / ".env"
+        env_path.write_text("GROQ_API_KEY=from-file\n", encoding="utf-8")
+        with (
+            patched_env(FLOSS_AGENT_DIR=tmp, FLOSS_ENV_PATH=str(env_path)),
+            missing_dotenv(),
+        ):
+            try:
+                import_server_module()
+            except RuntimeError as exc:
+                assert "python-dotenv is required" in str(exc)
+            else:
+                raise AssertionError("Expected RuntimeError when dotenv is unavailable")
+
+
 def _run_all() -> int:
     """Run the standalone bootstrap test module without requiring pytest."""
     tests = [
         test_server_bootstrap_loads_repo_env_when_process_env_missing,
         test_server_bootstrap_preserves_explicit_process_env,
         test_server_imports_without_fastmcp_for_bootstrap_paths,
+        test_server_bootstrap_surfaces_missing_dotenv_for_repo_env_file,
     ]
     passed = failed = 0
     for test in tests:

@@ -13,6 +13,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from packages.metacoordinator_mcp.voters import (  # noqa: E402
+    _parse_weight,
     build_default_voters,
     describe_default_roster,
     resolve_default_voter_specs,
@@ -60,6 +61,12 @@ def test_resolve_default_voter_specs_filters_missing_provider_keys():
     with patched_env():
         resolved = resolve_default_voter_specs(profile="balanced")
     assert resolved == {}
+
+
+def test_parse_weight_accepts_leading_dot_float():
+    """Parse weights like `.8` and `-.4` instead of silently zeroing them out."""
+    assert _parse_weight("WEIGHT: .8\nRATIONALE: yes") == 0.8
+    assert _parse_weight("WEIGHT: -.4\nRATIONALE: no") == -0.4
 
 
 def test_resolve_default_voter_specs_honors_profile_and_credentials():
@@ -204,6 +211,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
 def _run_all() -> int:
     """Run the standalone test module without requiring pytest."""
     tests = [
+        test_parse_weight_accepts_leading_dot_float,
         test_resolve_default_voter_specs_filters_missing_provider_keys,
         test_resolve_default_voter_specs_honors_profile_and_credentials,
         test_roster_override_takes_precedence_over_profile_and_extra,

@@ -81,6 +81,22 @@ def test_cast_vote_returns_entry_hash():
         assert len(vote_result["entry_hash"]) == 64
 
 
+def test_cast_vote_rejects_unknown_claim_id():
+    """cast_vote() rejects orphan votes whose claim_id is not present on-chain."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp)
+        result = json.loads(
+            gw.cast_vote(
+                claim_id="00000000-0000-7000-8000-000000000000",
+                voter="gemini",
+                weight=0.2,
+                rationale="unknown claim",
+            )
+        )
+        assert "error" in result
+        assert "E_CLAIM_NOT_FOUND" in result["error"]
+
+
 def test_get_chain_context_returns_list():
     """get_chain_context() returns a JSON list with at least the submitted claim."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -117,6 +133,29 @@ def test_list_pending_returns_unresolved_claims():
                 body="body",
                 blast_radius="Local",
             )
+        )
+        pending = json.loads(gw.list_pending())
+        claim_ids = [c["claim_id"] for c in pending]
+        assert claim_result["claim_id"] in claim_ids
+
+
+def test_list_pending_includes_deferred_claims():
+    """list_pending() keeps claims visible when their latest decision is DEFERRED."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="needs more signal",
+                body="body",
+                blast_radius="Local",
+            )
+        )
+        gw._cell.append_entry(
+            entry_type="decision",
+            author_did="metacoordinator",
+            content={"claim_id": claim_result["claim_id"], "outcome": "DEFERRED"},
         )
         pending = json.loads(gw.list_pending())
         claim_ids = [c["claim_id"] for c in pending]
@@ -244,6 +283,60 @@ def test_run_consensus_round_detects_buried_existing_decision():
         assert "E_ALREADY_DECIDED" in result["error"]
 
 
+def test_run_consensus_round_counts_existing_manual_votes():
+    """run_consensus_round() tallies prior chain votes alongside new automated votes."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="manual vote should count",
+                body="body",
+                blast_radius="Local",
+            )
+        )
+        json.loads(
+            gw.cast_vote(
+                claim_id=claim_result["claim_id"],
+                voter="human-reviewer",
+                weight=-0.8,
+                rationale="Needs work first",
+            )
+        )
+        decision = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert decision["claim_id"] == claim_result["claim_id"]
+        assert decision["outcome"] == "CONFLICT"
+        assert decision["tally_mean"] == 0.0
+        assert {vote["voter"] for vote in decision["votes"]} == {
+            "human-reviewer",
+            "groq-reviewer",
+        }
+
+
+def test_run_consensus_round_allows_rerun_after_deferred():
+    """run_consensus_round() may progress claims whose latest decision is DEFERRED."""
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="deferred can progress",
+                body="body",
+                blast_radius="Local",
+            )
+        )
+        gw._cell.append_entry(
+            entry_type="decision",
+            author_did="metacoordinator",
+            content={"claim_id": claim_result["claim_id"], "outcome": "DEFERRED"},
+        )
+        decision = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+        assert decision["claim_id"] == claim_result["claim_id"]
+        assert decision["outcome"] == "APPROVED"
+
+
 def test_get_decision_finds_buried_decision():
     """get_decision() traverses past the last 500 entries when needed."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -310,15 +403,19 @@ def _run_all():
     tests = [
         test_submit_claim_returns_entry_hash,
         test_cast_vote_returns_entry_hash,
+        test_cast_vote_rejects_unknown_claim_id,
         test_get_chain_context_returns_list,
         test_list_pending_returns_empty_when_no_claims,
         test_list_pending_returns_unresolved_claims,
+        test_list_pending_includes_deferred_claims,
         test_get_decision_returns_null_when_no_decision,
         test_submit_claim_rejects_invalid_blast_radius,
         test_cast_vote_rejects_weight_above_limit,
         test_cast_vote_rejects_invalid_proposal_type,
         test_run_consensus_round_finds_old_claim_beyond_500_entries,
         test_run_consensus_round_detects_buried_existing_decision,
+        test_run_consensus_round_counts_existing_manual_votes,
+        test_run_consensus_round_allows_rerun_after_deferred,
         test_get_decision_finds_buried_decision,
         test_run_consensus_round_returns_json_error_on_write_failure,
     ]
