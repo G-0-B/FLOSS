@@ -15,8 +15,8 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.source_chain import cell as cell_module
-from packages.source_chain.cell import CellDirectory, CellDirectoryError
+from packages.source_chain import cell as cell_module  # noqa: E402
+from packages.source_chain.cell import CellDirectory, CellDirectoryError  # noqa: E402
 
 DNA_HASH = "a" * 64  # 64-char hex string simulating a real dna_hash
 

@@ -3,10 +3,9 @@ Agent Pool for Validation Committee.
 Manages a pool of LLM agents that can act as validators.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List
 from dataclasses import dataclass
 import random
-import asyncio
 
 
 @dataclass

@@ -23,8 +23,7 @@ _REPO_ROOT = _THIS_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.orchestrator.claim_schema import (
-    CERTAINTY_LIMIT,
+from packages.orchestrator.claim_schema import (  # noqa: E402
     BlastRadius,
     Claim,
     EvidenceRef,
@@ -32,8 +31,8 @@ from packages.orchestrator.claim_schema import (
     TruthStatus,
     Vote,
 )
-from packages.orchestrator.consensus_gate import decide
-from packages.source_chain.cell import CellDirectory
+from packages.orchestrator.consensus_gate import decide  # noqa: E402
+from packages.source_chain.cell import CellDirectory  # noqa: E402
 
 # Deferred type — avoids importing voters.py (and LiteLLM) at module load.
 # Tests that never call run_consensus_round should never touch the network.

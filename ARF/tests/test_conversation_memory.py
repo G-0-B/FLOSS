@@ -25,7 +25,6 @@ from conversation_memory import (
     Understanding,
     DEFAULT_EMBEDDING_LEVEL,
 )
-from embedding_frames_of_scale import MultiScaleEmbedding
 from ontology.predicates import STATED
 
 # ============================================================================
@@ -97,7 +96,7 @@ def test_semantic_similarity(temp_memory):
 
     # Dog and car should be less similar
     dog_car_sim = np.dot(dog_emb, car_emb)
-    assert dog_car_sim < dog_puppy_sim, f"Dog should be more similar to puppy than car"
+    assert dog_car_sim < dog_puppy_sim, "Dog should be more similar to puppy than car"
 
 
 def test_transmit_and_recall(temp_memory):

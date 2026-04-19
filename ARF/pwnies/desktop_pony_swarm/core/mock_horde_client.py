@@ -13,9 +13,7 @@ Usage:
 
 import asyncio
 import logging
-import random
 import hashlib
-from typing import Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)

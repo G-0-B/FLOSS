@@ -9,7 +9,6 @@ Usage:
     python rollback_migration.py
 """
 
-import json
 import shutil
 import logging
 from pathlib import Path

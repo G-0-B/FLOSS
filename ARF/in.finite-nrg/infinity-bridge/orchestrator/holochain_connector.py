@@ -399,9 +399,9 @@ class HolochainConnector:
             test_msg = {"type": "ping", "id": str(uuid.uuid4())}
             await self.websocket.send(json.dumps(test_msg))
 
-            response_str = await asyncio.wait_for(self.websocket.recv(), timeout=2.0)
+            await asyncio.wait_for(self.websocket.recv(), timeout=2.0)
             return True
-        except:
+        except:  # noqa: E722
             return False
 
     def __repr__(self) -> str:

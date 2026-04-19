@@ -12,7 +12,7 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.metacoordinator_mcp.voters import (
+from packages.metacoordinator_mcp.voters import (  # noqa: E402
     build_default_voters,
     describe_default_roster,
     resolve_default_voter_specs,

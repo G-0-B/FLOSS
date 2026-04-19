@@ -19,8 +19,7 @@ for path in [project_root, package_dir]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from desktop_pony_swarm.runtime.orchestrator import SwarmRuntime
-from desktop_pony_swarm.config.settings import DEFAULT_CONFIG
+from desktop_pony_swarm.runtime.orchestrator import SwarmRuntime  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -41,7 +40,7 @@ async def test_basic_rsa():
 
     query = "What is 15 * 23? Show your work step by step."
 
-    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
+    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:  # noqa: F821
         result = await swarm.recursive_self_aggregation(query=query, K=2, T=3)
 
         print("\n--- FINAL RESPONSE ---")
@@ -71,7 +70,7 @@ async def test_reasoning_task():
     query = """A farmer has 17 sheep. All but 9 die. How many are left?
 Think carefully about what 'all but 9' means."""
 
-    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
+    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:  # noqa: F821
         result = await swarm.recursive_self_aggregation(query=query, K=2, T=3)
 
         print("\n--- FINAL RESPONSE ---")
@@ -98,7 +97,7 @@ async def test_single_step_aggregation():
 
     query = "What are three benefits of using distributed systems?"
 
-    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
+    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:  # noqa: F821
         result = await swarm.single_step_aggregation(query=query, K=4)
 
         print("\n--- CANDIDATES ---")
@@ -126,7 +125,7 @@ async def test_adr_validation():
 
     query = "What is the core principle of FLOSSI0ULLK?"
 
-    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
+    async with PonySwarm(num_ponies=4, use_mock=True) as swarm:  # noqa: F821
         result = await swarm.recursive_self_aggregation(query=query, K=2, T=3)
 
         print(

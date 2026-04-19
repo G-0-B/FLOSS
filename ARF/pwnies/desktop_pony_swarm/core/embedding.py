@@ -6,7 +6,6 @@ Integrates with ../embedding_frames_of_scale.py
 
 from importlib import import_module
 import logging
-import statistics
 from pathlib import Path
 import sys
 from typing import Any, Dict, List

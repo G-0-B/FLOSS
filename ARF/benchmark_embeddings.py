@@ -55,7 +55,7 @@ def run_benchmark():
     times = []
     for i, text in enumerate(texts[1:], 1):
         start = time.perf_counter()
-        emb = memory._encode_text(text)
+        memory._encode_text(text)
         elapsed = time.perf_counter() - start
         times.append(elapsed)
         print(f"  Text {i} ({len(text.split())} words): {elapsed*1000:.2f}ms")

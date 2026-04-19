@@ -17,7 +17,7 @@ import time
 from typing import List, Dict, Any, Optional
 from .pony_agent import DesktopPonyAgent
 from .embedding import SwarmEmbeddingManager
-from .adaptive_params import AdaptiveParameterSelector, RSAParams
+from .adaptive_params import AdaptiveParameterSelector
 
 logger = logging.getLogger(__name__)
 

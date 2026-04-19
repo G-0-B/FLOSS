@@ -10,7 +10,6 @@ Tests cover:
 """
 
 import pytest
-import asyncio
 import time
 from pathlib import Path
 import sys

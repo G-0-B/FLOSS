@@ -113,7 +113,7 @@ def query(
                 )
             )
         else:
-            console.print(f"\n[bold green]Response:[/bold green]")
+            console.print("\n[bold green]Response:[/bold green]")
             console.print(result["response"])
             console.print()
 

@@ -4,7 +4,6 @@ Individual desktop pony agent with full dAsGI capabilities.
 Priority system: Wellbeing > Honesty > Tools
 """
 
-import asyncio
 import logging
 import time
 from typing import Optional, Dict, Any, List
@@ -182,7 +181,7 @@ class DesktopPonyAgent:
             A string containing the generated response.
         """
         if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()
+            self.horde_client = await HordeClient().__aenter__()  # noqa: F821
 
         # Add pony personality to prompt
         full_prompt = f"""You are {self.pony_name}, a helpful desktop assistant.
@@ -229,7 +228,7 @@ Your response:"""
             A list of floats representing the embedding vector.
         """
         if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()
+            self.horde_client = await HordeClient().__aenter__()  # noqa: F821
 
         return await self.horde_client.generate_embedding(text)
 

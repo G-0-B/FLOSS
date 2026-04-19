@@ -17,7 +17,7 @@ import conversation_memory
 
 conversation_memory.EMBEDDINGS_AVAILABLE = False
 
-from conversation_memory import ConversationMemory
+from conversation_memory import ConversationMemory  # noqa: E402
 
 
 def test_triple_extraction():

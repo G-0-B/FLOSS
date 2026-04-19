@@ -9,7 +9,7 @@ import sys
 import os
 import argparse
 import json
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 # Add parent directory to path for imports
@@ -260,12 +260,12 @@ class InfinityBridgeCLI:
         success = await self.connector.register_bridge(registration)
 
         if success:
-            print(f"✓ Bridge registered successfully")
+            print("✓ Bridge registered successfully")
             print(f"  ID: {registration.bridge_id}")
             print(f"  Capabilities: {', '.join(registration.capabilities)}")
             print(f"  Endpoint: {registration.endpoint}")
         else:
-            print(f"✗ Failed to register bridge")
+            print("✗ Failed to register bridge")
 
     async def cmd_streams(self, args):
         """Get streams for a bridge"""

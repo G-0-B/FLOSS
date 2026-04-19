@@ -26,7 +26,11 @@ _REPO_ROOT = _THIS_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.orchestrator.claim_schema import CERTAINTY_LIMIT, Claim, Vote
+from packages.orchestrator.claim_schema import (  # noqa: E402
+    CERTAINTY_LIMIT,
+    Claim,
+    Vote,
+)  # noqa: E402
 
 Voter = Callable[[Claim], Vote]
 

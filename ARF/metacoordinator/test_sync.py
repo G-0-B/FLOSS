@@ -1,4 +1,3 @@
-import time
 import sys
 import os
 
@@ -15,7 +14,7 @@ def test_basic_sync():
 
     # 1. Register Agents
     print("Registering agents...")
-    agent_a = engine.register_agent("Agent_A")
+    engine.register_agent("Agent_A")
     agent_b = engine.register_agent("Agent_B")
 
     # 2. Agent A updates context
@@ -38,7 +37,7 @@ def test_late_joiner():
     engine = ContextSyncEngine()
 
     # Agent A starts and sets context
-    agent_a = engine.register_agent("Agent_A")
+    engine.register_agent("Agent_A")
     engine.broadcast_update("global_config", {"mode": "strict"}, "Agent_A")
 
     # Agent C joins later

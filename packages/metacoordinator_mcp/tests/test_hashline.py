@@ -11,7 +11,7 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.metacoordinator_mcp.hashline import (
+from packages.metacoordinator_mcp.hashline import (  # noqa: E402
     build_pre_write_checkpoint,
     render_verification_section,
     verify_tool_edit,

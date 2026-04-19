@@ -109,11 +109,11 @@ def transmit(
                 )
             )
         else:
-            console.print(f"[green]✓ Transmitted understanding[/green]")
+            console.print("[green]✓ Transmitted understanding[/green]")
             console.print(f"  Agent: {agent}")
             console.print(f"  Ref: {ref[:16]}...")
             if is_decision:
-                console.print(f"  [bold]Marked as ADR[/bold]")
+                console.print("  [bold]Marked as ADR[/bold]")
 
         sys.exit(0)
 

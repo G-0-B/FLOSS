@@ -56,11 +56,11 @@ class ConsensusPreview:
             if k.startswith(f"rfc/{rfc_id}/votes/")
         }
 
-        print(f"\n✅ Consensus Preview:")
+        print("\n✅ Consensus Preview:")
         print(f"  RFC: {rfc_id}")
         print(f"  Votes collected: {len(votes)}")
-        print(f"  All votes: +1 (unanimous approval)")
-        print(f"\n→ Week 3-4 will implement full consensus logic")
+        print("  All votes: +1 (unanimous approval)")
+        print("\n→ Week 3-4 will implement full consensus logic")
 
 
 if __name__ == "__main__":

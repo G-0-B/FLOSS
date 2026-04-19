@@ -4,7 +4,7 @@ Orchestrates the voting process for knowledge triples.
 """
 
 import asyncio
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict
 from dataclasses import dataclass, asdict
 import logging
 

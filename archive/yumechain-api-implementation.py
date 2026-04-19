@@ -11,17 +11,16 @@ This implementation provides the core functionality for:
 - Handling conflicts between AI nodes
 """
 
-import os
 import json
 import hashlib
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, validator, root_validator
 import jsonschema
 
 # Load the JSON schema for validation

@@ -19,9 +19,8 @@ import asyncio
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 import sys
-import json
 
 # Add ARF to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

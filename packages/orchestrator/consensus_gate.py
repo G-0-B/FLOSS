@@ -23,7 +23,6 @@ from .claim_schema import (
     POLARIZATION_THRESHOLD,
     QUORUM_MIN,
     REJECT_THRESHOLD,
-    BlastRadius,
     Claim,
     Decision,
     Outcome,

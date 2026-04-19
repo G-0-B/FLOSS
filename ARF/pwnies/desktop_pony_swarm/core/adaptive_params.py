@@ -357,7 +357,6 @@ def select_parameters_for_query(query: str) -> RSAParams:
 
 # Example usage and testing
 if __name__ == "__main__":
-    import sys
 
     # Setup logging
     logging.basicConfig(

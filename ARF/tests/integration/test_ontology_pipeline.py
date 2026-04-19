@@ -114,9 +114,7 @@ def test_invalid_triple_rejection(validated_memory):
     """
     # Note: The current implementation may not raise ValidationError,
     # but should mark the triple as invalid in metadata
-    ref = validated_memory.transmit(
-        {"content": "GPT-4 ate a sandwich", "coherence": 0.5}
-    )
+    validated_memory.transmit({"content": "GPT-4 ate a sandwich", "coherence": 0.5})
 
     # Check validation stats
     stats = validated_memory.get_validation_stats()
@@ -379,7 +377,7 @@ def test_validation_pipeline_end_to_end(validated_memory):
 def test_validation_with_empty_content(validated_memory):
     """Test that validation handles empty content gracefully."""
     # Empty content should be skipped or handled gracefully
-    ref = validated_memory.transmit({"content": "", "coherence": 0.5})
+    validated_memory.transmit({"content": "", "coherence": 0.5})
 
     # Should not crash - either skipped or stored with low confidence
     stats = validated_memory.get_validation_stats()
@@ -396,7 +394,7 @@ def test_validation_with_malformed_content(validated_memory):
     ]
 
     for content in malformed_cases:
-        ref = validated_memory.transmit({"content": content, "coherence": 0.5})
+        validated_memory.transmit({"content": content, "coherence": 0.5})
         # Should handle gracefully (may skip or store with low confidence)
 
     # Check stats

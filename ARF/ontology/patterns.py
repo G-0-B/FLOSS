@@ -4,7 +4,7 @@ Defines standard interaction patterns and logic to match them.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)

@@ -20,7 +20,7 @@ _REPO_ROOT = _THIS_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.orchestrator.claim_schema import (
+from packages.orchestrator.claim_schema import (  # noqa: E402
     CERTAINTY_LIMIT,
     BlastRadius,
     Claim,
@@ -30,7 +30,7 @@ from packages.orchestrator.claim_schema import (
     ProposalType,
     Vote,
 )
-from packages.orchestrator.consensus_gate import (
+from packages.orchestrator.consensus_gate import (  # noqa: E402
     ConsensusGateError,
     Voter,
     decide,

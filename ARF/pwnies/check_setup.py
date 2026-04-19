@@ -5,7 +5,6 @@ Run this to diagnose import issues.
 """
 
 import sys
-import os
 from pathlib import Path
 
 
@@ -54,7 +53,7 @@ def check_setup():
 
     if not all_exist:
         print("\n   ⚠️  Some files are missing. Are you in the correct directory?")
-        print(f"   Expected directory: C:\\crap\\ARF\\ or /mnt/project/")
+        print("   Expected directory: C:\\crap\\ARF\\ or /mnt/project/")
         print(f"   Current directory:  {cwd}")
         return False
 
@@ -77,8 +76,8 @@ def check_setup():
             break
 
     if not found:
-        print(f"   ❌ desktop_pony_swarm not in Python path")
-        print(f"\n   💡 FIX: Add project root to PYTHONPATH")
+        print("   ❌ desktop_pony_swarm not in Python path")
+        print("\n   💡 FIX: Add project root to PYTHONPATH")
         print(f"      Windows: set PYTHONPATH={cwd}")
         print(f"      Linux:   export PYTHONPATH={cwd}")
         return False
@@ -92,7 +91,7 @@ def check_setup():
         print(f"   Added {cwd} to path")
 
     try:
-        from desktop_pony_swarm import PonySwarm
+        from desktop_pony_swarm import PonySwarm  # noqa: F401
 
         print("   ✅ desktop_pony_swarm.PonySwarm imported successfully")
     except ImportError as e:
@@ -100,7 +99,7 @@ def check_setup():
         return False
 
     try:
-        from desktop_pony_swarm.core.swarm import PonySwarm as PS
+        from desktop_pony_swarm.core.swarm import PonySwarm as PS  # noqa: F401
 
         print("   ✅ desktop_pony_swarm.core.swarm imported successfully")
     except ImportError as e:
@@ -108,7 +107,7 @@ def check_setup():
         return False
 
     try:
-        from embedding_frames_of_scale import MultiScaleEmbedding
+        from embedding_frames_of_scale import MultiScaleEmbedding  # noqa: F401
 
         print("   ✅ embedding_frames_of_scale imported successfully")
     except ImportError as e:

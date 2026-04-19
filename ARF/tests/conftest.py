@@ -116,7 +116,7 @@ def sample_understandings():
 
 # Swarm fixtures (optional - only if swarm is available)
 try:
-    from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+    from pwnies.desktop_pony_swarm.core.swarm import PonySwarm  # noqa: F401
     from pwnies.desktop_pony_swarm.core.adaptive_params import RSAParams
 
     @pytest.fixture

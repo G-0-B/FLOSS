@@ -59,7 +59,7 @@ def test_voting_strategy_reasoning_task():
 
     print(f"✅ Decision: {adr.decision}")
     print(f"   Method: {adr.consensus_method}")
-    print(f"   Votes: 3 approve, 0 reject, 1 abstain")
+    print("   Votes: 3 approve, 0 reject, 1 abstain")
     print(f"   Provenance: {len(adr.provenance)} agents")
 
 
@@ -98,7 +98,7 @@ def test_consensus_strategy_knowledge_task():
 
     print(f"✅ Decision: {adr.decision}")
     print(f"   Method: {adr.consensus_method}")
-    print(f"   Votes: 3 approve (75% > 66% threshold)")
+    print("   Votes: 3 approve (75% > 66% threshold)")
 
 
 def test_rejection_requires_rework():
@@ -143,7 +143,7 @@ def test_rejection_requires_rework():
     assert adr.decision == "REQUIRES_REWORK"
 
     print(f"✅ Decision: {adr.decision}")
-    print(f"   3 rejections means proposal needs major revision")
+    print("   3 rejections means proposal needs major revision")
 
 
 def test_learning_from_outcomes():
@@ -165,7 +165,7 @@ def test_learning_from_outcomes():
     engine.cast_vote("RFC-GOOD", "agent_bob", Vote.APPROVE, "Agree")
     engine.cast_vote("RFC-GOOD", "agent_charlie", Vote.APPROVE, "Yes")
 
-    adr_good = engine.evaluate_consensus("RFC-GOOD")
+    engine.evaluate_consensus("RFC-GOOD")
     engine.record_outcome("RFC-GOOD", "success", "Tests caught 3 bugs")
 
     # Bad decision that fails
@@ -181,7 +181,7 @@ def test_learning_from_outcomes():
     engine.cast_vote("RFC-BAD", "agent_bob", Vote.APPROVE, "OK")
     engine.cast_vote("RFC-BAD", "agent_charlie", Vote.ABSTAIN, "Risky")
 
-    adr_bad = engine.evaluate_consensus("RFC-BAD")
+    engine.evaluate_consensus("RFC-BAD")
     engine.record_outcome("RFC-BAD", "failure", "Invalid data corrupted system")
 
     # Check learning
@@ -190,9 +190,9 @@ def test_learning_from_outcomes():
     assert engine.adrs["RFC-BAD"].outcome == "failure"
 
     print(f"✅ Recorded outcomes for {len(engine.decision_history)} decisions")
-    print(f"   Success: RFC-GOOD (tests prevented bugs)")
-    print(f"   Failure: RFC-BAD (skipping validation caused corruption)")
-    print(f"   → System can learn from both to improve future decisions")
+    print("   Success: RFC-GOOD (tests prevented bugs)")
+    print("   Failure: RFC-BAD (skipping validation caused corruption)")
+    print("   → System can learn from both to improve future decisions")
 
 
 def test_integration_with_context_sync():
@@ -229,11 +229,11 @@ def test_integration_with_context_sync():
     assert f"rfc/{rfc.id}/votes/agent_charlie" in context.shared_context
 
     # Should finalize and broadcast ADR
-    adr = engine.evaluate_consensus("RFC-INTEGRATED")
+    engine.evaluate_consensus("RFC-INTEGRATED")
     assert f"adr/{rfc.id}/final" in context.shared_context
 
-    print(f"✅ RFC, votes, and ADR all synchronized via context")
-    print(f"   All agents have access to full decision history")
+    print("✅ RFC, votes, and ADR all synchronized via context")
+    print("   All agents have access to full decision history")
 
 
 if __name__ == "__main__":

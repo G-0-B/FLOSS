@@ -296,7 +296,7 @@ class ConsensusEngine:
         """
         approve = sum(1 for v in votes.values() if v.vote == Vote.APPROVE)
         reject = sum(1 for v in votes.values() if v.vote == Vote.REJECT)
-        abstain = sum(1 for v in votes.values() if v.vote == Vote.ABSTAIN)
+        sum(1 for v in votes.values() if v.vote == Vote.ABSTAIN)
 
         total = len(votes)
 

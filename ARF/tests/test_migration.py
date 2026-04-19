@@ -191,7 +191,7 @@ def test_migrate_memory_store(test_memory_without_triples):
     """Test migration of an entire memory store."""
     stats = MigrationStats()
 
-    failed = migrate_memory_store(test_memory_without_triples, stats)
+    migrate_memory_store(test_memory_without_triples, stats)
 
     assert stats.total_agents == 1
     assert stats.total_understandings == 2

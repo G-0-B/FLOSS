@@ -12,8 +12,8 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.metacoordinator_mcp.tools import GatewayTools
-from packages.orchestrator.claim_schema import Vote
+from packages.metacoordinator_mcp.tools import GatewayTools  # noqa: E402
+from packages.orchestrator.claim_schema import Vote  # noqa: E402
 
 DNA_HASH = "b" * 64
 

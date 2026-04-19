@@ -91,7 +91,6 @@ def info():
     like `numpy` and `sentence-transformers`. It serves as a diagnostic tool
     to quickly assess the health and configuration of the system.
     """
-    import json
 
     # Gather system info
     info_data = {
@@ -103,14 +102,14 @@ def info():
 
     # Check for key dependencies
     try:
-        import numpy
+        import numpy  # noqa: F401
 
         info_data["numpy_available"] = True
     except ImportError:
         info_data["numpy_available"] = False
 
     try:
-        import sentence_transformers
+        import sentence_transformers  # noqa: F401
 
         info_data["embeddings_available"] = True
     except ImportError:

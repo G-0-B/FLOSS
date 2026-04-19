@@ -48,7 +48,7 @@ def test_pattern_mixing():
 
     mixed = mixer.mix(SOCRATIC_METHOD, DEBATE, strategy="interleave")
     print(f"Mixed Name: {mixed.name}")
-    print(f"Mixed Structure (first 4 steps):")
+    print("Mixed Structure (first 4 steps):")
     for step in mixed.structure[:4]:
         print(f"  {step}")
 
@@ -65,7 +65,7 @@ def test_memory_integration():
 
     # Transmit text that should trigger Socratic pattern
     # Keywords: why, define, suppose
-    ref = memory.transmit(
+    memory.transmit(
         {
             "content": "Why do you think that? Can you define your terms? Suppose we assume the opposite.",
             "context": "Socratic dialogue about optics.",

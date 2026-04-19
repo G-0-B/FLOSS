@@ -26,8 +26,6 @@ Date: 2025-11-01
 """
 
 import sys
-import json
-from pathlib import Path
 import logging
 
 # Setup logging
@@ -38,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Import our new memory system
 try:
-    from conversation_memory import ConversationMemory, Understanding
+    from conversation_memory import ConversationMemory, Understanding  # noqa: F401
 
     MEMORY_AVAILABLE = True
 except ImportError as e:
@@ -47,7 +45,7 @@ except ImportError as e:
 
 # Try to import existing project infrastructure
 try:
-    from embedding_frames_of_scale import MultiScaleEmbedding
+    from embedding_frames_of_scale import MultiScaleEmbedding  # noqa: F401
 
     EMBEDDINGS_AVAILABLE = True
     logger.info("✓ embedding_frames_of_scale.py available")
@@ -259,7 +257,7 @@ class ValidationTest:
             # === Composition ===
             # Export AI's memory
             ai_export = ai_memory.export_for_composition()
-            print(f"  ✓ AI memory exported")
+            print("  ✓ AI memory exported")
 
             # Import into Human's memory (composing the frames)
             initial_count = len(human_memory.understandings)
@@ -286,7 +284,7 @@ class ValidationTest:
                 )
                 return False
 
-            print(f"  ✓ Both perspectives preserved in composed memory")
+            print("  ✓ Both perspectives preserved in composed memory")
 
             # Test recall across composed memory
             results = human_memory.recall("what is the breakthrough?", top_k=3)

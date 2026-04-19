@@ -4,7 +4,7 @@ import hashlib
 import yaml
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Dict
 
 
 class IPFSStorageAdapter:

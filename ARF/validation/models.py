@@ -3,7 +3,7 @@ Data models for LLM committee validation system.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from datetime import datetime
 from enum import Enum
 

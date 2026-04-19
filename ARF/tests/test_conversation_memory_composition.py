@@ -11,7 +11,6 @@ Date: 2025-11-11
 """
 
 import pytest
-import numpy as np
 import sys
 import tempfile
 import shutil

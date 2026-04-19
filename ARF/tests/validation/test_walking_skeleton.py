@@ -37,7 +37,6 @@ def test_spec_exists(validation_spec):
     assert "test_3_persistence" in validation_spec
 
 
-
 def test_composition(validation_spec):
     """Validate ADR-0 Test 2 composition behavior against the spec."""
     criteria = validation_spec["test_2_composition"]["criteria"]
@@ -59,7 +58,6 @@ def test_composition(validation_spec):
     asyncio.run(run_test())
 
 
-
 def test_persistence(validation_spec):
     """Validate ADR-0 Test 3 persistence behavior against the spec."""
     criteria = validation_spec["test_3_persistence"]["criteria"]
@@ -71,7 +69,7 @@ def test_persistence(validation_spec):
         async with PonySwarm(num_ponies=4, use_mock=True) as swarm:
             # Conversation 1: Create knowledge
             query1 = "What is the capital of France?"
-            result1 = await swarm.recursive_self_aggregation(query=query1, K=2, T=3)
+            await swarm.recursive_self_aggregation(query=query1, K=2, T=3)
             # This is a placeholder for storing the embedding.
             # In a real implementation, the swarm would do this automatically.
             embedding = np.random.rand(384)
@@ -80,7 +78,6 @@ def test_persistence(validation_spec):
             )
 
             # Conversation 2: Retrieve knowledge
-            query2 = "What is the main city in France?"
             # Use a mock embedding for the query
             query_embedding = np.random.rand(384)
             similar = swarm.embedding_manager.query_similar(

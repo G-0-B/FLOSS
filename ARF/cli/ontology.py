@@ -116,12 +116,12 @@ def validate(
             )
         else:
             if is_valid:
-                console.print(f"[green]✓ Valid triple[/green]")
+                console.print("[green]✓ Valid triple[/green]")
                 console.print(f"  Subject: {subject}")
                 console.print(f"  Predicate: {predicate}")
                 console.print(f"  Object: {obj}")
             else:
-                console.print(f"[red]✗ Invalid triple[/red]")
+                console.print("[red]✗ Invalid triple[/red]")
                 console.print(f"  Error: {error_msg}")
                 console.print(f"  Triple: ({subject}, {predicate}, {obj})")
 
@@ -170,7 +170,7 @@ def infer(
                     )
                 )
             else:
-                console.print(f"[red]✗ Cannot infer from invalid triple[/red]")
+                console.print("[red]✗ Cannot infer from invalid triple[/red]")
                 console.print(f"  Error: {error_msg}")
             sys.exit(1)
 
@@ -194,9 +194,9 @@ def infer(
                 )
             )
         else:
-            console.print(f"[green]✓ Triple validated and stored[/green]")
+            console.print("[green]✓ Triple validated and stored[/green]")
             console.print(f"  ({subject}, {predicate}, {obj})")
-            console.print(f"  [dim]Note: Full inference engine coming in Phase 7[/dim]")
+            console.print("  [dim]Note: Full inference engine coming in Phase 7[/dim]")
 
         sys.exit(0)
 

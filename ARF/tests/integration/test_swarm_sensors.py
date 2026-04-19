@@ -12,8 +12,6 @@ Phase 4.4, Task 4.4: Integration Test Suite
 
 import pytest
 import asyncio
-import tempfile
-import shutil
 from pathlib import Path
 import sys
 from typing import Dict, List, Any
@@ -27,7 +25,7 @@ for path in [arf_root, pwnies_root]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from desktop_pony_swarm.core.swarm import PonySwarm
+from desktop_pony_swarm.core.swarm import PonySwarm  # noqa: E402
 
 # ============================================================================
 # Mock Infinity Bridge Components
@@ -355,8 +353,8 @@ async def test_bridge_cleanup():
     bridge = await setup_test_bridge()
 
     # Subscribe to streams
-    stream1 = await bridge.subscribe("acoustic")
-    stream2 = await bridge.subscribe("vibration")
+    await bridge.subscribe("acoustic")
+    await bridge.subscribe("vibration")
 
     # Verify streams are tracked
     assert len(bridge.active_streams) == 2

@@ -8,7 +8,7 @@ Integrates with AI-Horde for free distributed inference.
 import aiohttp
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 

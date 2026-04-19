@@ -8,7 +8,6 @@ Ensures performance optimizations maintain target metrics:
 Phase 4.1: Performance Optimization
 """
 
-import asyncio
 import pytest
 import time
 import sys
