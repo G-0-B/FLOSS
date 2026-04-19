@@ -371,6 +371,24 @@ def test_override_rejects_claim_id_mismatch():
         raise AssertionError("expected ConsensusGateError for claim_id mismatch")
 
 
+def test_override_rejects_blast_radius_mismatch():
+    """override() rejects a caller-supplied claim that downgrades blast radius."""
+    original = sample_claim(blast=BlastRadius.SUBSTRATE)
+    voters = [mock_voter("a", CL), mock_voter("b", CL), mock_voter("c", 0.1)]
+    deferred = decide(original, voters)
+    assert deferred.outcome == Outcome.DEFERRED
+
+    forged = sample_claim(blast=BlastRadius.LOCAL)
+    forged.id = original.id
+
+    try:
+        override(deferred, forged, "human-x", "attempt downgrade")
+    except ConsensusGateError as e:
+        assert "E_OVERRIDE_RADIUS_MISMATCH" in str(e)
+    else:
+        raise AssertionError("expected ConsensusGateError for blast_radius mismatch")
+
+
 def test_override_rejects_duplicate_human_voter():
     """override() rejects a human_voter who already voted."""
     claim = sample_claim(blast=BlastRadius.MODULE)
@@ -567,6 +585,7 @@ def test_decision_validate_rejects_string_outcome():
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=claim.blast_radius,
         outcome="APPROVED",  # type: ignore[arg-type]
         votes=[Vote(voter="a", weight=CL, rationale="ok")],
     )
@@ -582,6 +601,7 @@ def test_decision_validate_rejects_non_vote_entries():
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=claim.blast_radius,
         outcome=Outcome.APPROVED,
         votes=[{"voter": "a", "weight": CL, "rationale": "ok"}],  # type: ignore[list-item]
     )
@@ -598,6 +618,7 @@ def test_decision_validate_rejects_override_by_without_overridden():
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=claim.blast_radius,
         outcome=Outcome.APPROVED,
         votes=[Vote(voter="a", weight=CL, rationale="ok")],
         override_by="human-x",
@@ -614,6 +635,7 @@ def test_decision_to_dict_validates_before_serializing():
     claim = sample_claim()
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=claim.blast_radius,
         outcome=Outcome.APPROVED,
         votes=[Vote(voter="a", weight=CL, rationale="ok")],
         decided_at="not-a-timestamp",
@@ -664,6 +686,30 @@ def test_adr_writer_produces_file():
         assert "APPROVED" in content
         assert claim.id in content
         assert "a" in content and "b" in content
+
+
+def test_adr_writer_uses_unique_file_per_decision_event():
+    """A later override must not overwrite the earlier deferred decision record."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        adr_dir = Path(tmp)
+        writer = default_adr_writer(adr_dir)
+        claim = sample_claim(blast=BlastRadius.MODULE)
+        voters = [mock_voter("a", CL), mock_voter("b", 0.0)]
+        deferred = decide(claim, voters, adr_writer=writer)
+        overridden = override(
+            deferred,
+            claim,
+            human_voter="human-x",
+            rationale="time-sensitive fix",
+            adr_writer=writer,
+        )
+        assert deferred.adr_ref is not None
+        assert overridden.adr_ref is not None
+        assert deferred.adr_ref != overridden.adr_ref
+        assert Path(deferred.adr_ref).exists()
+        assert Path(overridden.adr_ref).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -753,6 +799,7 @@ def _run_all():
         test_override_rejects_conflict,
         test_override_rejects_substrate,
         test_override_rejects_claim_id_mismatch,
+        test_override_rejects_blast_radius_mismatch,
         test_override_rejects_duplicate_human_voter,
         test_invalid_weight_above_limit_raises,
         test_invalid_weight_below_limit_raises,
@@ -774,6 +821,7 @@ def _run_all():
         test_decision_to_dict_validates_before_serializing,
         test_decide_rejects_duplicate_voters,
         test_adr_writer_produces_file,
+        test_adr_writer_uses_unique_file_per_decision_event,
         test_tally_direct_approved,
         test_tally_direct_rejected,
         test_tally_direct_conflict,

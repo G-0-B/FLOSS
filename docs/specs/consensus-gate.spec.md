@@ -58,6 +58,7 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 | Field            | Type      | Required | Description                                                          |
 | ---------------- | --------- | -------- | -------------------------------------------------------------------- |
 | `claim_id`       | UUID v7   | Yes      | Claim being decided                                                  |
+| `blast_radius`   | Enum      | Yes      | Immutable blast radius copied from the Claim that produced this Decision |
 | `outcome`        | Enum      | Yes      | One of: `APPROVED`, `CONFLICT`, `DEFERRED`, `REJECTED`, `OVERRIDDEN` |
 | `votes`          | Vec<Vote> | Yes      | All votes received                                                   |
 | `decided_at`     | Timestamp | Yes      | ISO 8601                                                             |
@@ -86,6 +87,7 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 9. **INV-009:** `Decision.outcome == OVERRIDDEN` requires `override_by` to be a registered human identity
 10. **INV-010:** `Decision.outcome == DEFERRED` means the claim was neither approved, rejected, nor flagged as conflict by the current vote set
 11. **INV-011:** No Claim may be decided twice; a DEFERRED decision MAY be superseded by an override, which replaces (not appends to) the lifecycle state
+12. **INV-011a:** `Decision.blast_radius` MUST match the originating Claim blast radius and MUST be used for any later override authorization
 
 ### 3.3 Provenance
 
@@ -124,11 +126,15 @@ Override is a **superseding transition** on a `DEFERRED` decision, not a second 
 ```text
 OVERRIDE prior_decision, claim, human_voter, rationale:
   REQUIRE prior_decision.claim_id == claim.id        # E_OVERRIDE_CLAIM_MISMATCH
+  REQUIRE prior_decision.blast_radius == claim.blast_radius
+                                                 # E_OVERRIDE_RADIUS_MISMATCH
   REQUIRE prior_decision.outcome == DEFERRED         # E_OVERRIDE_INVALID_STATE
-  REQUIRE OVERRIDE_ALLOWED[claim.blast_radius]       # E_OVERRIDE_NOT_ALLOWED (non-substrate only)
+  REQUIRE OVERRIDE_ALLOWED[prior_decision.blast_radius]
+                                                 # E_OVERRIDE_NOT_ALLOWED (non-substrate only)
   REQUIRE human_voter, rationale non-empty           # E_OVERRIDE_NOT_HUMAN
   REQUIRE human_voter not in prior_decision.votes    # E_OVERRIDE_DUPLICATE
   EMIT superseding Decision with outcome=OVERRIDDEN, override_by=human_voter,
+       blast_radius=prior_decision.blast_radius,
        votes=prior_decision.votes + [override_vote]
 ```
 
@@ -165,6 +171,7 @@ OVERRIDE prior_decision, claim, human_voter, rationale:
 - **E_OVERRIDE_INVALID_STATE:** Override attempted on non-DEFERRED decision
 - **E_OVERRIDE_NOT_ALLOWED:** Override attempted on a blast radius that disallows it (e.g. `Substrate`)
 - **E_OVERRIDE_CLAIM_MISMATCH:** `prior_decision.claim_id` does not match `claim.id`
+- **E_OVERRIDE_RADIUS_MISMATCH:** caller-supplied Claim blast radius does not match the original Decision blast radius
 - **E_OVERRIDE_DUPLICATE:** Override voter has already cast a vote on this claim
 - **E_VOTE_DUPLICATE:** Two voters with the same identity in one `decide()` call
 - **E_QUORUM_INSUFFICIENT:** Blast radius requires more voters than available
@@ -281,4 +288,4 @@ When a tool execution is intercepted:
 - **Voter registration:** How are voters (AI or human) registered? Deferred to Seam 5 (OpenClaw gateway handles identity).
 - **Timeout behavior:** If quorum not reached within T seconds, default to DEFERRED. T configurable per blast radius.
 - **Vote collection mechanism:** Synchronous (all voters respond before decision) vs streaming. Start synchronous; do not early-exit, because conflict detection depends on seeing the full vote set.
-- **ADR path for decision records:** `docs/adr/decisions/YYYY-MM-DD-<claim-id>.md` proposed. Confirm in prototype.
+- **ADR path for decision records:** `docs/adr/decisions/YYYY-MM-DD-<claim-id>-<outcome>-<decision-event>.md` proposed to avoid overwriting superseding decisions on the same claim/day.

@@ -276,6 +276,7 @@ class Decision:
     """Aggregated outcome of all Votes for a Claim."""
 
     claim_id: str
+    blast_radius: BlastRadius
     outcome: Outcome
     votes: list[Vote]
     decided_at: str = field(default_factory=_utcnow_iso)
@@ -295,6 +296,10 @@ class Decision:
         if claim_uuid.version != 7:
             raise ValueError(
                 f"E_DECISION_INVALID_SCHEMA: claim_id must be UUID v7, got v{claim_uuid.version}"
+            )
+        if not isinstance(self.blast_radius, BlastRadius):
+            raise ValueError(
+                "E_DECISION_INVALID_SCHEMA: blast_radius must be a BlastRadius member"
             )
         if not isinstance(self.outcome, Outcome):
             raise ValueError(
@@ -330,6 +335,7 @@ class Decision:
         self.validate()
         d = {
             "claim_id": self.claim_id,
+            "blast_radius": self.blast_radius.value,
             "outcome": self.outcome.value,
             "votes": [v.to_dict() for v in self.votes],
             "decided_at": self.decided_at,

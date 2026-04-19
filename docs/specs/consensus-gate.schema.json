@@ -108,13 +108,18 @@
     },
     "Decision": {
       "type": "object",
-      "required": ["claim_id", "outcome", "votes", "decided_at"],
+      "required": ["claim_id", "blast_radius", "outcome", "votes", "decided_at"],
       "properties": {
         "claim_id": {
           "type": "string",
           "format": "uuid",
           "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
           "description": "UUID v7 of the Claim this decision concerns"
+        },
+        "blast_radius": {
+          "type": "string",
+          "enum": ["Local", "Module", "System", "Substrate"],
+          "description": "Immutable blast radius copied from the originating Claim"
         },
         "outcome": {
           "type": "string",

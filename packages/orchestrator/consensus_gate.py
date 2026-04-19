@@ -12,6 +12,7 @@ See:
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -124,6 +125,7 @@ def decide(
     outcome, mean, variance = tally(claim, votes)
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=claim.blast_radius,
         outcome=outcome,
         votes=votes,
         tally_mean=mean,
@@ -159,14 +161,20 @@ def override(
             f"E_OVERRIDE_CLAIM_MISMATCH: prior decision {prior_decision.claim_id} "
             f"does not belong to claim {claim.id}"
         )
+    if prior_decision.blast_radius != claim.blast_radius:
+        raise ConsensusGateError(
+            "E_OVERRIDE_RADIUS_MISMATCH: caller blast_radius "
+            f"{claim.blast_radius.value} does not match original decision "
+            f"{prior_decision.blast_radius.value}"
+        )
     if prior_decision.outcome != Outcome.DEFERRED:
         raise ConsensusGateError(
             f"E_OVERRIDE_INVALID_STATE: override only valid on DEFERRED decisions, "
             f"got {prior_decision.outcome}"
         )
-    if not OVERRIDE_ALLOWED[claim.blast_radius]:
+    if not OVERRIDE_ALLOWED[prior_decision.blast_radius]:
         raise ConsensusGateError(
-            f"E_OVERRIDE_NOT_ALLOWED: blast_radius {claim.blast_radius.value} "
+            f"E_OVERRIDE_NOT_ALLOWED: blast_radius {prior_decision.blast_radius.value} "
             f"does not permit override"
         )
     if not human_voter or not rationale:
@@ -183,6 +191,7 @@ def override(
 
     decision = Decision(
         claim_id=claim.id,
+        blast_radius=prior_decision.blast_radius,
         outcome=Outcome.OVERRIDDEN,
         votes=[*prior_decision.votes, override_vote],
         override_by=human_voter,
@@ -209,7 +218,10 @@ def default_adr_writer(adr_dir: Path) -> Callable[[Decision, Claim], str]:
         decisions_dir = adr_dir / "decisions"
         decisions_dir.mkdir(parents=True, exist_ok=True)
         date_part = decision.decided_at[:10]  # YYYY-MM-DD
-        path = decisions_dir / f"{date_part}-{claim.id}.md"
+        timestamp_slug = re.sub(r"[^0-9A-Za-z]+", "", decision.decided_at)
+        path = decisions_dir / (
+            f"{date_part}-{claim.id}-{decision.outcome.value.lower()}-{timestamp_slug}.md"
+        )
 
         lines = [
             f"# Decision Record — Claim {claim.id}",
