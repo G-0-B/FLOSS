@@ -101,6 +101,20 @@ def test_verify_multiedit_aggregates_subchecks():
         assert "2/2 verified" in result["reason"]
 
 
+def test_verify_multiedit_empty_payload_is_unverified():
+    """Empty multiedit payloads should not produce a false green verification."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        path.write_text("def alpha():\n    return 10\n", encoding="utf-8")
+        result = verify_tool_edit(
+            str(path),
+            "multiedit",
+            {"edits": []},
+        )
+        assert result["status"] == "UNVERIFIED"
+        assert "0/0 verified" in result["reason"]
+
+
 def test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches():
     """Exact checkpoint post-images should override weaker replace heuristics."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -175,6 +189,7 @@ def _run_all() -> int:
         test_verify_replace_reports_mismatch_when_new_is_absent,
         test_verify_write_reports_exact_file_match,
         test_verify_multiedit_aggregates_subchecks,
+        test_verify_multiedit_empty_payload_is_unverified,
         test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches,
         test_verify_replace_reports_mismatch_when_exact_post_image_diverges,
         test_render_verification_section_includes_hashlined_evidence,

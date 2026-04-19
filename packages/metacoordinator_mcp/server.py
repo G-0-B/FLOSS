@@ -22,15 +22,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError as exc:
-    raise ImportError("MCP SDK not installed. Run: pip install mcp") from exc
-
 from .tools import GatewayTools
 
 _THIS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _THIS_DIR.parent.parent
+_REPO_ROOT = _THIS_DIR.parent.parent.parent
 
 
 def _load_repo_env() -> None:
@@ -58,10 +53,6 @@ DNA_HASH = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
 
 _gateway = GatewayTools(base_dir=BASE_DIR, dna_hash=DNA_HASH)
 
-mcp = FastMCP("FLOSSIØULLK Consensus Gateway")
-
-
-@mcp.tool()
 def submit_claim(
     proposer: str,
     proposal_type: str,
@@ -78,7 +69,6 @@ def submit_claim(
     return _gateway.submit_claim(proposer, proposal_type, summary, body, blast_radius)
 
 
-@mcp.tool()
 def cast_vote(claim_id: str, voter: str, weight: float, rationale: str) -> str:
     """Cast an analog vote on a pending Claim.
 
@@ -88,7 +78,6 @@ def cast_vote(claim_id: str, voter: str, weight: float, rationale: str) -> str:
     return _gateway.cast_vote(claim_id, voter, weight, rationale)
 
 
-@mcp.tool()
 def get_chain_context(limit: int = 20) -> str:
     """Return the most recent source chain entries for voter context.
 
@@ -97,19 +86,16 @@ def get_chain_context(limit: int = 20) -> str:
     return _gateway.get_chain_context(limit)
 
 
-@mcp.tool()
 def get_decision(claim_id: str) -> str:
     """Return the Decision for a given claim_id, or null if not yet decided."""
     return _gateway.get_decision(claim_id)
 
 
-@mcp.tool()
 def list_pending() -> str:
     """List all Claims that have not yet received a Decision."""
     return _gateway.list_pending()
 
 
-@mcp.tool()
 def run_consensus_round(claim_id: str) -> str:
     """Run the active voter roster against a pending Claim and append the Decision.
 
@@ -124,5 +110,30 @@ def run_consensus_round(claim_id: str) -> str:
     return _gateway.run_consensus_round(claim_id)
 
 
+def _create_mcp():
+    """Build the FastMCP app when the optional MCP SDK is available."""
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError:
+        return None
+
+    app = FastMCP("FLOSSIØULLK Consensus Gateway")
+    for tool in (
+        submit_claim,
+        cast_vote,
+        get_chain_context,
+        get_decision,
+        list_pending,
+        run_consensus_round,
+    ):
+        app.tool()(tool)
+    return app
+
+
+mcp = _create_mcp()
+
+
 if __name__ == "__main__":
+    if mcp is None:
+        raise ImportError("MCP SDK not installed. Run: pip install mcp")
     mcp.run()

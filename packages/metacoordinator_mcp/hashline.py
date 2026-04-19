@@ -449,6 +449,14 @@ def _verify_write_like(file_text: str, *, expected_content: str) -> dict[str, An
 
 def _verify_multiedit(file_text: str, *, edits: list[dict[str, Any]]) -> dict[str, Any]:
     """Verify each sub-edit in a multiedit payload and summarize the outcome."""
+    if not edits:
+        return {
+            "kind": "multiedit",
+            "status": "UNVERIFIED",
+            "reason": "0/0 verified, 1 unverified, 0 mismatched sub-edits.",
+            "subchecks": [],
+        }
+
     checks = [
         _verify_replace_like(
             file_text,

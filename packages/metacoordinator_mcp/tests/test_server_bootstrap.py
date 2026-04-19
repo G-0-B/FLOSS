@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import builtins
 import os
 import sys
 import tempfile
@@ -45,6 +46,26 @@ def import_server_module():
     return importlib.import_module("packages.metacoordinator_mcp.server")
 
 
+@contextmanager
+def missing_fastmcp():
+    blocked = "mcp.server.fastmcp"
+    cached = sys.modules.pop(blocked, None)
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == blocked:
+            raise ImportError("blocked for test")
+        return original_import(name, globals, locals, fromlist, level)
+
+    original_import = builtins.__import__
+    builtins.__import__ = fake_import
+    try:
+        yield
+    finally:
+        builtins.__import__ = original_import
+        if cached is not None:
+            sys.modules[blocked] = cached
+
+
 def test_server_bootstrap_loads_repo_env_when_process_env_missing():
     with tempfile.TemporaryDirectory() as tmp:
         env_path = Path(tmp) / ".env"
@@ -76,10 +97,22 @@ def test_server_bootstrap_preserves_explicit_process_env():
             assert os.environ["MISTRAL_API_KEY"] == "from-file-mistral"
 
 
+def test_server_imports_without_fastmcp_for_bootstrap_paths():
+    with tempfile.TemporaryDirectory() as tmp:
+        env_path = Path(tmp) / ".env"
+        env_path.write_text("GROQ_API_KEY=from-file\n", encoding="utf-8")
+        with patched_env(FLOSS_AGENT_DIR=tmp, FLOSS_ENV_PATH=str(env_path)):
+            with missing_fastmcp():
+                server = import_server_module()
+                assert server.mcp is None
+                assert os.environ["GROQ_API_KEY"] == "from-file"
+
+
 def _run_all() -> int:
     tests = [
         test_server_bootstrap_loads_repo_env_when_process_env_missing,
         test_server_bootstrap_preserves_explicit_process_env,
+        test_server_imports_without_fastmcp_for_bootstrap_paths,
     ]
     passed = failed = 0
     for test in tests:
