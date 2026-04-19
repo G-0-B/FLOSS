@@ -37,6 +37,7 @@ def test_spec_exists(validation_spec):
     assert "test_3_persistence" in validation_spec
 
 
+
 def test_composition(validation_spec):
     """Validate ADR-0 Test 2 composition behavior against the spec."""
     criteria = validation_spec["test_2_composition"]["criteria"]
@@ -56,6 +57,7 @@ def test_composition(validation_spec):
             assert result["metrics"]["avg_diversity"] > 0
 
     asyncio.run(run_test())
+
 
 
 def test_persistence(validation_spec):
