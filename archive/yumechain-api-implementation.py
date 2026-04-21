@@ -121,11 +121,11 @@ class KnowledgePackage(BaseModel):
             domain = values.get('metadata').domain
             hash_input = f"{content_str}:{domain}"
             values['knowledge_id'] = hashlib.sha256(hash_input.encode()).hexdigest()[:16]
-        
+
         # Generate version_id
         if values.get('version_id') is None:
             values['version_id'] = str(uuid.uuid4())[:8]
-        
+
         return values
 
 
@@ -174,23 +174,23 @@ def verify_signature(signature: str) -> Optional[str]:
 def detect_conflicts(knowledge: KnowledgePackage) -> List[str]:
     """Detect potential conflicts with existing knowledge."""
     conflicts = []
-    
+
     # Simple conflict detection based on domain and high confidence contradictions
     # In a real implementation, this would be much more sophisticated
     domain = knowledge.metadata.domain
     content_text = knowledge.content.text.lower()
-    
+
     for k_id, k in knowledge_store.items():
         if k['metadata']['domain'] == domain:
             existing_text = k['content']['text'].lower()
-            
+
             # Very basic conflict detection - would be much more advanced in practice
             # This is just checking for potential negations
             if ("not " in content_text and "not " not in existing_text) or \
                ("not " not in content_text and "not " in existing_text):
                 if knowledge.confidence.overall > 0.7 and k['confidence']['overall'] > 0.7:
                     conflicts.append(k_id)
-    
+
     return conflicts
 
 
@@ -198,21 +198,21 @@ def update_trust_score(knowledge_id: str, evaluation: KnowledgeEvaluation) -> fl
     """Update the trust score based on evaluations."""
     if knowledge_id not in trust_scores:
         trust_scores[knowledge_id] = {"score": 0.5, "votes": {"upvotes": 0, "downvotes": 0}}
-    
+
     # Update votes
     if evaluation.vote == "upvote":
         trust_scores[knowledge_id]["votes"]["upvotes"] += 1
     else:
         trust_scores[knowledge_id]["votes"]["downvotes"] += 1
-    
+
     # Recalculate score
     upvotes = trust_scores[knowledge_id]["votes"]["upvotes"]
     downvotes = trust_scores[knowledge_id]["votes"]["downvotes"]
     total_votes = upvotes + downvotes
-    
+
     if total_votes > 0:
         trust_scores[knowledge_id]["score"] = upvotes / total_votes
-    
+
     return trust_scores[knowledge_id]["score"]
 
 
@@ -223,14 +223,14 @@ async def resolve_conflict_background(knowledge_id: str, conflicts: List[str]):
     # 2. Request additional information or reasoning
     # 3. Apply consensus algorithms
     # 4. Update the knowledge store with resolution
-    
+
     # For the prototype, we'll just mark the conflicts
     for conflict_id in conflicts:
         if conflict_id in knowledge_store:
             if "conflicts" not in knowledge_store[conflict_id]:
                 knowledge_store[conflict_id]["conflicts"] = []
             knowledge_store[conflict_id]["conflicts"].append(knowledge_id)
-    
+
     if knowledge_id in knowledge_store:
         if "conflicts" not in knowledge_store[knowledge_id]:
             knowledge_store[knowledge_id]["conflicts"] = []
@@ -244,13 +244,13 @@ async def register_ai_node(node_id: str, public_key: str):
     """Register a new AI node in the network."""
     if node_id in ai_nodes:
         raise HTTPException(status_code=400, detail="Node ID already registered")
-    
+
     ai_nodes[node_id] = {
         "public_key": public_key,
         "registered_at": datetime.utcnow().isoformat(),
         "trust_score": 0.5  # Initial neutral trust score
     }
-    
+
     return {"status": "success", "message": f"AI node {node_id} registered successfully"}
 
 
@@ -266,35 +266,35 @@ async def publish_knowledge(
         node_id = verify_signature(authorization)
         if not node_id:
             raise HTTPException(status_code=401, detail="Invalid signature")
-        
+
         # Set the generating node
         knowledge.content.generated_by = node_id
-    
+
     # Validate against JSON schema
     try:
         jsonschema.validate(instance=json.loads(knowledge.json()), schema=KNOWLEDGE_SCHEMA)
     except jsonschema.exceptions.ValidationError as e:
         raise HTTPException(status_code=400, detail=f"Schema validation error: {str(e)}")
-    
+
     # Generate IDs if not provided
     if not knowledge.knowledge_id:
         knowledge.knowledge_id = generate_knowledge_hash(knowledge)
-    
+
     if not knowledge.version_id:
         knowledge.version_id = str(uuid.uuid4())[:8]
-    
+
     # Set timestamps
     current_time = datetime.utcnow().isoformat()
     knowledge.metadata.created_at = current_time
     knowledge.metadata.updated_at = current_time
-    
+
     # Initialize trust
     if not knowledge.trust:
         knowledge.trust = Trust(
             score=0.5,
             votes={"upvotes": 0, "downvotes": 0}
         )
-    
+
     # Check for conflicts
     conflicts = detect_conflicts(knowledge)
     if conflicts:
@@ -302,14 +302,14 @@ async def publish_knowledge(
         knowledge_dict = json.loads(knowledge.json())
         knowledge_dict["conflicts"] = conflicts
         knowledge_store[knowledge.knowledge_id] = knowledge_dict
-        
+
         # Trigger conflict resolution in the background
         background_tasks.add_task(
             resolve_conflict_background,
             knowledge.knowledge_id,
             conflicts
         )
-        
+
         return {
             "status": "success",
             "message": "Knowledge published with potential conflicts",
@@ -317,20 +317,20 @@ async def publish_knowledge(
             "version_id": knowledge.version_id,
             "conflicts": conflicts
         }
-    
+
     # Store the knowledge
     knowledge_store[knowledge.knowledge_id] = json.loads(knowledge.json())
-    
+
     # Store in version history
     if knowledge.knowledge_id not in version_history:
         version_history[knowledge.knowledge_id] = []
-    
+
     version_history[knowledge.knowledge_id].append({
         "version_id": knowledge.version_id,
         "timestamp": current_time,
         "generated_by": knowledge.content.generated_by
     })
-    
+
     return {
         "status": "success",
         "message": "Knowledge published successfully",
@@ -344,7 +344,7 @@ async def get_knowledge(knowledge_id: str = Path(..., description="The ID of the
     """Retrieve a specific knowledge package by ID."""
     if knowledge_id not in knowledge_store:
         raise HTTPException(status_code=404, detail="Knowledge not found")
-    
+
     return knowledge_store[knowledge_id]
 
 
@@ -359,36 +359,36 @@ async def query_knowledge(
 ):
     """Query knowledge packages based on criteria."""
     results = []
-    
+
     # Parse tags if provided
     tag_list = tags.split(',') if tags else None
-    
+
     # Filter knowledge based on criteria
     for k_id, knowledge in knowledge_store.items():
         matches = True
-        
+
         if domain and knowledge['metadata']['domain'] != domain:
             matches = False
-        
+
         if type and knowledge['metadata']['type'] != type:
             matches = False
-        
+
         if tag_list and 'tags' in knowledge['metadata']:
             if not any(tag in knowledge['metadata']['tags'] for tag in tag_list):
                 matches = False
-        
+
         if ai_node and knowledge['content']['generated_by'] != ai_node:
             matches = False
-        
+
         if knowledge['confidence']['overall'] < min_confidence:
             matches = False
-        
+
         if matches:
             results.append(knowledge)
-            
+
             if len(results) >= limit:
                 break
-    
+
     return {"count": len(results), "results": results}
 
 
@@ -402,53 +402,53 @@ async def update_knowledge(
     """Update existing knowledge with new information."""
     if knowledge_id not in knowledge_store:
         raise HTTPException(status_code=404, detail="Knowledge not found")
-    
+
     # Verify AI node if authorization is provided
     if authorization:
         node_id = verify_signature(authorization)
         if not node_id:
             raise HTTPException(status_code=401, detail="Invalid signature")
-        
+
         # Set the updating node
         updated_knowledge.content.generated_by = node_id
-    
+
     # Ensure knowledge_id matches
     updated_knowledge.knowledge_id = knowledge_id
-    
+
     # Generate new version_id
     updated_knowledge.version_id = str(uuid.uuid4())[:8]
-    
+
     # Update timestamp
     current_time = datetime.utcnow().isoformat()
     updated_knowledge.metadata.updated_at = current_time
-    
+
     # Preserve creation timestamp
     updated_knowledge.metadata.created_at = knowledge_store[knowledge_id]['metadata']['created_at']
-    
+
     # Check for conflicts
     conflicts = detect_conflicts(updated_knowledge)
-    
+
     # Store the updated knowledge
     knowledge_store[knowledge_id] = json.loads(updated_knowledge.json())
-    
+
     # Add to version history
     version_history[knowledge_id].append({
         "version_id": updated_knowledge.version_id,
         "timestamp": current_time,
         "generated_by": updated_knowledge.content.generated_by
     })
-    
+
     # Handle conflicts if any
     if conflicts:
         knowledge_store[knowledge_id]["conflicts"] = conflicts
-        
+
         # Trigger conflict resolution in the background
         background_tasks.add_task(
             resolve_conflict_background,
             knowledge_id,
             conflicts
         )
-        
+
         return {
             "status": "success",
             "message": "Knowledge updated with potential conflicts",
@@ -456,7 +456,7 @@ async def update_knowledge(
             "version_id": updated_knowledge.version_id,
             "conflicts": conflicts
         }
-    
+
     return {
         "status": "success",
         "message": "Knowledge updated successfully",
@@ -470,7 +470,7 @@ async def get_knowledge_history(knowledge_id: str):
     """Retrieve the version history of a knowledge package."""
     if knowledge_id not in version_history:
         raise HTTPException(status_code=404, detail="Knowledge history not found")
-    
+
     return {"knowledge_id": knowledge_id, "versions": version_history[knowledge_id]}
 
 
@@ -483,30 +483,30 @@ async def evaluate_knowledge(
     """Evaluate (upvote/downvote) a knowledge package."""
     if knowledge_id not in knowledge_store:
         raise HTTPException(status_code=404, detail="Knowledge not found")
-    
+
     # Verify AI node if authorization is provided
     if authorization:
         node_id = verify_signature(authorization)
         if not node_id:
             raise HTTPException(status_code=401, detail="Invalid signature")
-        
+
         # Set the evaluating node
         evaluation.evaluating_node = node_id
-    
+
     # Validate vote
     if evaluation.vote not in ["upvote", "downvote"]:
         raise HTTPException(status_code=400, detail="Vote must be 'upvote' or 'downvote'")
-    
+
     # Update trust score
     new_score = update_trust_score(knowledge_id, evaluation)
-    
+
     # Update the knowledge store
     if "trust" not in knowledge_store[knowledge_id]:
         knowledge_store[knowledge_id]["trust"] = {}
-    
+
     knowledge_store[knowledge_id]["trust"]["score"] = new_score
     knowledge_store[knowledge_id]["trust"]["votes"] = trust_scores[knowledge_id]["votes"]
-    
+
     return {
         "status": "success",
         "message": "Knowledge evaluated successfully",
@@ -525,19 +525,19 @@ async def resolve_conflict(
     """Resolve a conflict between knowledge packages."""
     if knowledge_id not in knowledge_store:
         raise HTTPException(status_code=404, detail="Knowledge not found")
-    
+
     if "conflicts" not in knowledge_store[knowledge_id] or not knowledge_store[knowledge_id]["conflicts"]:
         raise HTTPException(status_code=400, detail="No conflicts to resolve")
-    
+
     # Verify AI node if authorization is provided
     if authorization:
         node_id = verify_signature(authorization)
         if not node_id:
             raise HTTPException(status_code=401, detail="Invalid signature")
-        
+
         # Set the resolving node
         resolution.resolving_node = node_id
-    
+
     # Process resolution based on type
     if resolution.resolution_type == "accept":
         # Accept the current knowledge as correct
@@ -545,31 +545,31 @@ async def resolve_conflict(
             if conflict_id in knowledge_store and "conflicts" in knowledge_store[conflict_id]:
                 if knowledge_id in knowledge_store[conflict_id]["conflicts"]:
                     knowledge_store[conflict_id]["conflicts"].remove(knowledge_id)
-        
+
         # Clear conflicts
         knowledge_store[knowledge_id]["conflicts"] = []
-        
+
     elif resolution.resolution_type == "reject":
         # Reject the current knowledge as incorrect
         # In a production system, this might archive or flag the knowledge
         knowledge_store[knowledge_id]["rejected"] = True
         knowledge_store[knowledge_id]["rejection_reason"] = resolution.reasoning
-        
+
     elif resolution.resolution_type == "merge":
         # Merge conflicting knowledge
         if not resolution.merged_content:
             raise HTTPException(status_code=400, detail="Merged content required for merge resolution")
-        
+
         # Create a new version with the merged content
         current_time = datetime.utcnow().isoformat()
         merged_version_id = str(uuid.uuid4())[:8]
-        
+
         # Update the knowledge with merged content
         knowledge_store[knowledge_id].update(resolution.merged_content)
         knowledge_store[knowledge_id]["version_id"] = merged_version_id
         knowledge_store[knowledge_id]["metadata"]["updated_at"] = current_time
         knowledge_store[knowledge_id]["conflicts"] = []
-        
+
         # Add to version history
         version_history[knowledge_id].append({
             "version_id": merged_version_id,
@@ -577,10 +577,10 @@ async def resolve_conflict(
             "generated_by": resolution.resolving_node,
             "merged": True
         })
-        
+
     else:
         raise HTTPException(status_code=400, detail="Invalid resolution type")
-    
+
     return {
         "status": "success",
         "message": f"Conflict resolved with method: {resolution.resolution_type}",
@@ -604,7 +604,6 @@ async def health_check():
         "nodes": len(ai_nodes),
         "knowledge_packages": len(knowledge_store)
     }
-
 
 # --- Main Function ---
 

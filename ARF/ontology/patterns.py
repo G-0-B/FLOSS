@@ -87,7 +87,7 @@ class PatternMatcher:
         """
         matches = []
         text_lower = conversation_text.lower()
-        
+
         for key, pattern in self.patterns.items():
             score = 0.0
             # Simple keyword matching for now
@@ -95,10 +95,10 @@ class PatternMatcher:
             for kw in pattern.keywords:
                 if kw in text_lower:
                     hits += 1
-            
+
             if pattern.keywords:
                 score = hits / len(pattern.keywords)
-            
+
             # Boost score if pattern name is mentioned
             if pattern.name.lower() in text_lower:
                 score = max(score, 0.8)
@@ -109,6 +109,6 @@ class PatternMatcher:
                     'confidence': score,
                     'details': pattern.description
                 })
-        
+
         matches.sort(key=lambda x: x['confidence'], reverse=True)
         return matches

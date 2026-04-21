@@ -22,7 +22,7 @@ class BudgetState:
     """Current state of budget usage."""
     tokens_used: int = 0
     estimated_cost: float = 0.0
-    
+
     def to_dict(self):
         return asdict(self)
 
@@ -37,13 +37,13 @@ class BudgetManager:
     def __init__(self, agent_id: str, storage_path: Optional[str] = None, config: BudgetConfig = None):
         self.agent_id = agent_id
         self.config = config or BudgetConfig()
-        
+
         if storage_path is None:
             storage_path = f"./memory/{agent_id}"
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.state_file = self.storage_path / "budget.json"
-        
+
         self.state = self._load_state()
         logger.info(f"Initialized BudgetManager for {agent_id}. Used: {self.state.tokens_used} tokens.")
 
@@ -54,7 +54,7 @@ class BudgetManager:
         """
         if self.state.tokens_used >= self.config.max_tokens_per_session:
             raise BudgetExceededError(f"Token limit exceeded: {self.state.tokens_used}/{self.config.max_tokens_per_session}")
-        
+
         if self.state.estimated_cost >= self.config.max_cost_per_session:
             raise BudgetExceededError(f"Cost limit exceeded: ${self.state.estimated_cost}/${self.config.max_cost_per_session}")
 

@@ -180,7 +180,7 @@ def migrate_memory_store(
                 try:
                     # Transmit to Holochain
                     action_hash = memory.transmit(understanding_dict)
-                    
+
                     if action_hash:
                         understanding_dict['synced_to_holochain'] = True
                         understanding_dict['holochain_action_hash'] = action_hash

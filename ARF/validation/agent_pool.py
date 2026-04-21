@@ -31,7 +31,7 @@ class MockValidator(Validator):
         """Simulates validation with random or deterministic logic."""
         # Deterministic mock logic for testing
         subject, predicate, obj = triple
-        
+
         # Simulate rejection of "nonsense"
         if "nonsense" in subject.lower() or "nonsense" in obj.lower() or "nonsense" in context.lower():
             return ValidatorResponse(
@@ -40,7 +40,7 @@ class MockValidator(Validator):
                 confidence=0.9,
                 reasoning="Detected nonsense content."
             )
-            
+
         # Simulate rejection of unknown predicates (redundant with basic check but good for testing)
         if predicate == "unknown_predicate":
              return ValidatorResponse(
@@ -64,7 +64,7 @@ class ValidatorPool:
         self.validators: List[Validator] = []
         if use_mock:
             self._init_mock_pool()
-    
+
     def _init_mock_pool(self):
         """Initializes a diverse pool of mock validators."""
         self.validators = [
@@ -74,7 +74,7 @@ class ValidatorPool:
             MockValidator("validator-4", "mock-mistral"),
             MockValidator("validator-5", "mock-gemini"),
         ]
-    
+
     def get_committee(self, size: int = 3) -> List[Validator]:
         """Selects a random committee of validators."""
         if size > len(self.validators):

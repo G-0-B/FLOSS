@@ -38,14 +38,13 @@ class SwarmEmbeddingManager:
         iteration_history: A dictionary that tracks the responses generated at
             each iteration of the RSA algorithm.
     """
-    
+
     def __init__(self):
         """Initializes the SwarmEmbeddingManager."""
         self.embeddings = MultiScaleEmbedding()
         self.iteration_history: Dict[int, List[Dict[str, Any]]] = {}
-        
         logger.debug("Initialized SwarmEmbeddingManager with MultiScaleEmbedding")
-    
+
     def add_pony_response(
         self,
         pony_id: str,
@@ -95,7 +94,7 @@ class SwarmEmbeddingManager:
             'embedding_id': embedding_id,
             'response': response
         })
-    
+
     def aggregate_to_community(self, iteration: int, pony_ids: List[str]):
         """Aggregates individual pony embeddings into a community-level embedding.
 
@@ -157,7 +156,7 @@ class SwarmEmbeddingManager:
                         'iteration': iteration
                     }
                 )
-    
+
     def get_diversity_metric(self, iteration: int) -> float:
         """Calculates the semantic diversity of the pony responses at a given iteration.
 

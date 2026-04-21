@@ -14,7 +14,7 @@ Built on top of embedding_frames_of_scale.py (which already exists in this proje
 Usage:
     # Initialize memory for an agent
     memory = ConversationMemory(agent_id="claude-sonnet-4.5")
-    
+
     # Transmit understanding
     ref = memory.transmit({
         'content': "The walking skeleton is the conversation itself",
@@ -22,7 +22,7 @@ Usage:
         'is_decision': True,
         'coherence': 0.95
     })
-    
+
     # Later (or in another conversation):
     results = memory.recall("what is the walking skeleton?")
     # Returns: Understanding from previous transmission
@@ -95,10 +95,10 @@ class Understanding:
     coherence_score: float = 0.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     embedding_ref: Optional[str] = None
-    
+
     def to_dict(self) -> Dict:
         return asdict(self)
-    
+
     def hash(self) -> str:
         content_str = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(content_str.encode()).hexdigest()
@@ -188,7 +188,7 @@ class ConversationMemory:
             logger.error(f"Failed to load pattern config: {e}")
 
         logger.info(f"Initialized ConversationMemory for agent: {agent_id} (backend: {backend})")
-    
+
     def transmit(self, understanding_dict: Dict, skip_validation: bool = False) -> Optional[str]:
         if self.backend == 'holochain':
             return self._transmit_holochain(understanding_dict, skip_validation)
@@ -254,7 +254,7 @@ class ConversationMemory:
             raw_content = understanding_dict.get('content', '')
             provided_context = understanding_dict.get('context', '')
             full_context = f"Content: {raw_content}\nContext: {provided_context}"
-            
+
             is_valid, error_msg, committee_result = self._validate_triple(triple, full_context)
             if not is_valid:
                 logger.error(f"Ontology validation failed: {error_msg}")
@@ -319,12 +319,12 @@ class ConversationMemory:
 
         self._save()
         logger.info(f"Transmitted understanding with triple: {triple}")
-        
+
         # Record usage (approximate)
         if self.budget_manager:
             tokens = len(understanding.content) // 4
             self.budget_manager.record_usage(tokens)
-            
+
         return understanding.hash()
 
     def _extract_triple(self, understanding_dict: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
@@ -336,17 +336,17 @@ class ConversationMemory:
             for name, pattern in self.patterns.items():
                 regex = pattern.get('regex')
                 predicate = pattern.get('predicate')
-                
+
                 if regex and predicate:
                     match = re.search(regex, content, re.IGNORECASE)
                     if match:
                         if len(match.groups()) >= 2:
                             subject = match.group(1).strip()
                             obj = match.group(2).strip()
-                            
+
                             if predicate == IS_A:
                                 obj = obj.replace(' ', '-')
-                                
+
                             return (subject, predicate, obj)
 
         # Fallback patterns
@@ -432,9 +432,9 @@ class ConversationMemory:
 
         if self.embeddings is None:
             return self._text_search(query, top_k)
-        
+
         query_vector = self._encode_text(query)
-        
+
         if across_scales:
             results = []
             for level_name in self.embeddings.get_level_names():
@@ -446,9 +446,9 @@ class ConversationMemory:
         else:
             # Just finest granularity
             results = self._search_at_level(query_vector, level="level_0", top_k=top_k)
-        
+
         return results
-    
+
     def export_for_composition(self) -> Dict:
         return {
             'agent_id': self.agent_id,
@@ -457,21 +457,21 @@ class ConversationMemory:
             'embedding_state': self.embeddings.to_dict() if self.embeddings else None,
             'exported_at': datetime.now().isoformat()
         }
-    
+
     def import_and_compose(self, other_memory_export: Dict) -> None:
         other_agent = other_memory_export['agent_id']
         logger.info(f"Composing memory from {other_agent} with {self.agent_id}")
-        
+
         for u_dict in other_memory_export['understandings']:
             understanding = Understanding(**u_dict)
             self.understandings.append(understanding)
-            
+
             if understanding.is_decision:
                 for adr in other_memory_export['adrs']:
                     if adr['embedding_ref'] == understanding.embedding_ref:
                         self.adrs.append(adr)
                         break
-        
+
         if self.embeddings and other_memory_export['embedding_state']:
             try:
                 from embedding_frames_of_scale import MultiScaleEmbedding
@@ -479,13 +479,13 @@ class ConversationMemory:
                 self.embeddings.compose(other_embeddings, strategy='merge')
             except Exception as e:
                 logger.error(f"Failed to compose embeddings: {e}", exc_info=True)
-        
+
         self._save()
         logger.info(f"Composition complete. Total understandings: {len(self.understandings)}")
-    
+
     def get_adr_history(self) -> List[Dict]:
         return sorted(self.adrs, key=lambda x: x['id'])
-    
+
     def _encode_text(self, text: str) -> np.ndarray:
         if not hasattr(self, '_embedding_model'):
             from sentence_transformers import SentenceTransformer
@@ -495,7 +495,7 @@ class ConversationMemory:
 
         embedding = self._embedding_model.encode(text, normalize_embeddings=True)
         return embedding
-    
+
     def _search_at_level(self, query_vector: np.ndarray, level: str, top_k: int) -> List[Dict]:
         """Search at a specific granularity level"""
         # Get embeddings at this level
@@ -525,7 +525,7 @@ class ConversationMemory:
                 result['found_at_level'] = level
                 results.append(result)
         return results
-    
+
     def _deduplicate_and_rank(self, results: List[Dict], top_k: int) -> List[Dict]:
         seen_hashes = set()
         deduped = []
@@ -536,7 +536,7 @@ class ConversationMemory:
                 seen_hashes.add(h)
                 deduped.append(result)
         return deduped[:top_k]
-    
+
     def _text_search(self, query: str, top_k: int) -> List[Dict]:
         query_terms = set(query.lower().split())
         scored = []
@@ -547,22 +547,22 @@ class ConversationMemory:
                 scored.append((u, overlap))
         scored.sort(key=lambda x: x[1], reverse=True)
         return [u.to_dict() for u, _ in scored[:top_k]]
-    
+
     def _save(self):
         understandings_file = self.storage_path / "understandings.json"
         with open(understandings_file, 'w') as f:
             json.dump([u.to_dict() for u in self.understandings], f, indent=2)
-        
+
         adrs_file = self.storage_path / "adrs.json"
         with open(adrs_file, 'w') as f:
             json.dump(self.adrs, f, indent=2)
-        
+
         if self.embeddings:
             embeddings_file = self.storage_path / "embeddings.json"
             with open(embeddings_file, 'w') as f:
                 json.dump(self.embeddings.to_dict(), f, indent=2)
         logger.debug(f"Memory saved to {self.storage_path}")
-    
+
     def _load(self):
         understandings_file = self.storage_path / "understandings.json"
         if understandings_file.exists():
@@ -570,13 +570,13 @@ class ConversationMemory:
                 data = json.load(f)
                 self.understandings = [Understanding(**u) for u in data]
             logger.info(f"Loaded {len(self.understandings)} understandings from disk")
-        
+
         adrs_file = self.storage_path / "adrs.json"
         if adrs_file.exists():
             with open(adrs_file, 'r') as f:
                 self.adrs = json.load(f)
             logger.info(f"Loaded {len(self.adrs)} ADRs from disk")
-        
+
         if self.embeddings:
             embeddings_file = self.storage_path / "embeddings.json"
             if embeddings_file.exists():

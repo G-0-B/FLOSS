@@ -53,7 +53,7 @@ async def interactive_mode():
     print(f"Ponies: {', '.join(DEFAULT_CONFIG.pony_names)}")
     print(f"RSA Parameters: N={DEFAULT_CONFIG.num_ponies}, K={DEFAULT_CONFIG.rsa_aggregation_size}, T={DEFAULT_CONFIG.rsa_iterations}")
     print("\nType your questions. Type 'quit' to exit.\n")
-    
+
     # Initialize bridge
     bridge = None
     if DEFAULT_CONFIG.desktop_ponies_enabled:
@@ -62,7 +62,7 @@ async def interactive_mode():
             port=DEFAULT_CONFIG.desktop_ponies_port
         )
         bridge.connect()
-    
+
     # Initialize swarm
     async with PonySwarm(
         num_ponies=DEFAULT_CONFIG.num_ponies,
@@ -100,13 +100,13 @@ async def interactive_mode():
                 # Send to Desktop Ponies
                 if bridge:
                     bridge.send_speech("Pinkie Pie", result['response'][:100])
-            
+
             except KeyboardInterrupt:
                 print("\n\nGoodbye! 🐴")
                 break
             except Exception as e:
                 logger.error(f"Error: {e}", exc_info=True)
-    
+
     # Cleanup
     if bridge:
         bridge.close()
@@ -124,13 +124,13 @@ async def demo_mode():
     print("\n" + "="*80)
     print("🐴 DESKTOP PONY SWARM - Demo Mode")
     print("="*80 + "\n")
-    
+
     test_queries = [
         "What is 47 * 89? Show your work.",
         "Explain the concept of recursion using a simple analogy.",
         "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?"
     ]
-    
+
     async with PonySwarm(num_ponies=4) as swarm:
         for i, query in enumerate(test_queries, 1):
             print(f"\n{'='*80}")

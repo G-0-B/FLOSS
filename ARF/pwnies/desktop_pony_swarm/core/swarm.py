@@ -42,7 +42,7 @@ class PonySwarm:
         param_selector: An optional component for adaptively selecting RSA parameters.
         metrics: A dictionary for tracking performance and diversity metrics.
     """
-    
+
     def __init__(
         self,
         num_ponies: int = 4,
@@ -96,22 +96,22 @@ class PonySwarm:
         mode = "MOCK" if use_mock else "REAL"
         adaptive = " + ADAPTIVE" if use_adaptive_params else ""
         logger.info(f"Initialized swarm with {num_ponies} ponies [{mode}{adaptive} inference]")
-    
+
     async def __aenter__(self):
         """Enters the asynchronous context, initializing pony agents."""
         for pony in self.ponies:
             await pony.__aenter__()
         return self
-    
+
     async def __aexit__(self, *args):
         """Exits the asynchronous context, cleaning up pony agents."""
         for pony in self.ponies:
             await pony.__aexit__(*args)
-    
+
     # ============================================================
     # RSA CORE ALGORITHM
     # ============================================================
-    
+
     async def recursive_self_aggregation(
         self,
         query: str,
@@ -315,7 +315,7 @@ class PonySwarm:
     # ============================================================
     # AGGREGATION PROMPTS
     # ============================================================
-    
+
     def _build_aggregation_prompt(
         self,
         query: str,
@@ -400,7 +400,7 @@ Now write a single improved solution with clear reasoning:"""
     # ============================================================
     # ALTERNATIVE: SINGLE-STEP AGGREGATION
     # ============================================================
-    
+
     async def single_step_aggregation(
         self,
         query: str,
