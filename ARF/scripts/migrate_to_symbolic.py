@@ -200,7 +200,7 @@ def migrate_memory_store(
                     message = "Already migrated and synced"
 
         if success:
-            if message == "Already migrated" or message == "Already migrated and synced":
+            if message in ("Already migrated", "Already migrated and synced"):
                 stats.already_migrated += 1
             else:
                 stats.successfully_migrated += 1

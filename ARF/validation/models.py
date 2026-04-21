@@ -54,7 +54,7 @@ class ValidationResult:
     @property
     def is_unanimous(self) -> bool:
         """Check if all validators agreed."""
-        return self.yes_votes == self.total_votes or self.no_votes == self.total_votes
+        return self.total_votes in (self.yes_votes, self.no_votes)
 
     @property
     def mean_confidence(self) -> float:
