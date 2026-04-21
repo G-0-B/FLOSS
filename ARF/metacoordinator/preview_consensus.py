@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from metacoordinator.context_sync import ContextSyncEngine
 from typing import Dict, Any
 
+
 class ConsensusPreview:
     """Demonstrates how consensus will integrate with context sync"""
 
@@ -25,9 +26,9 @@ class ConsensusPreview:
             value={
                 "title": "Add federated learning to swarm",
                 "description": "Integrate FL for privacy-preserving coordination",
-                "proposer": "agent_a"
+                "proposer": "agent_a",
             },
-            source_agent="agent_a"
+            source_agent="agent_a",
         )
 
         # Agent B reads RFC from shared context
@@ -37,26 +38,21 @@ class ConsensusPreview:
         # Agent B votes via context update
         self.context.broadcast_update(
             key=f"rfc/{rfc_id}/votes/agent_b",
-            value={
-                "vote": 1,  # Approve
-                "rationale": "FL aligns with privacy values"
-            },
-            source_agent="agent_b"
+            value={"vote": 1, "rationale": "FL aligns with privacy values"},  # Approve
+            source_agent="agent_b",
         )
 
         # Agent C also votes
         self.context.broadcast_update(
             key=f"rfc/{rfc_id}/votes/agent_c",
-            value={
-                "vote": 1,  # Approve
-                "rationale": "Good for distributed learning"
-            },
-            source_agent="agent_c"
+            value={"vote": 1, "rationale": "Good for distributed learning"},  # Approve
+            source_agent="agent_c",
         )
 
         # Consensus engine (Week 3-4) will read all votes from context
         votes = {
-            k: v for k, v in self.context.shared_context.items()
+            k: v
+            for k, v in self.context.shared_context.items()
             if k.startswith(f"rfc/{rfc_id}/votes/")
         }
 
@@ -65,6 +61,7 @@ class ConsensusPreview:
         print(f"  Votes collected: {len(votes)}")
         print(f"  All votes: +1 (unanimous approval)")
         print(f"\n→ Week 3-4 will implement full consensus logic")
+
 
 if __name__ == "__main__":
     engine = ContextSyncEngine()

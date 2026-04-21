@@ -8,12 +8,13 @@ import sys
 import os
 from pathlib import Path
 
+
 def check_setup():
     """Check if Desktop Pony Swarm is properly set up."""
 
-    print("="*80)
+    print("=" * 80)
     print("🔍 DESKTOP PONY SWARM - Setup Diagnostic")
-    print("="*80)
+    print("=" * 80)
 
     # Check 1: Python version
     print("\n1️⃣ Python Version")
@@ -93,6 +94,7 @@ def check_setup():
 
     try:
         from desktop_pony_swarm import PonySwarm
+
         print("   ✅ desktop_pony_swarm.PonySwarm imported successfully")
     except ImportError as e:
         print(f"   ❌ Import failed: {e}")
@@ -100,6 +102,7 @@ def check_setup():
 
     try:
         from desktop_pony_swarm.core.swarm import PonySwarm as PS
+
         print("   ✅ desktop_pony_swarm.core.swarm imported successfully")
     except ImportError as e:
         print(f"   ❌ Import failed: {e}")
@@ -107,6 +110,7 @@ def check_setup():
 
     try:
         from embedding_frames_of_scale import MultiScaleEmbedding
+
         print("   ✅ embedding_frames_of_scale imported successfully")
     except ImportError as e:
         print(f"   ❌ Import failed: {e}")
@@ -115,7 +119,7 @@ def check_setup():
 
     # Check 7: Dependencies
     print("\n7️⃣ Dependencies")
-    required = ['aiohttp', 'numpy']
+    required = ["aiohttp", "numpy"]
     all_installed = True
     for module in required:
         try:
@@ -131,9 +135,9 @@ def check_setup():
         return False
 
     # Success!
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ ALL CHECKS PASSED - Setup is correct!")
-    print("="*80)
+    print("=" * 80)
     print("\n🚀 Ready to run:")
     print("   python run_swarm.py              # Interactive mode")
     print("   python run_swarm.py demo          # Demo mode")
@@ -142,6 +146,7 @@ def check_setup():
     print("   pony-swarm                        # Can then use command")
     print()
     return True
+
 
 if __name__ == "__main__":
     success = check_setup()

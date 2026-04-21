@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
 
+
 class IPFSStorageAdapter:
     """
     IPFS storage layer for FLOSS large files.
@@ -25,7 +26,7 @@ class IPFSStorageAdapter:
 
     def _save_manifest(self):
         self.manifest_path.parent.mkdir(exist_ok=True)
-        with open(self.manifest_path, 'w') as f:
+        with open(self.manifest_path, "w") as f:
             yaml.dump(self.manifest, f, default_flow_style=False)
 
     def add_file(self, file_path: str, pin: bool = True) -> str:
@@ -40,17 +41,19 @@ class IPFSStorageAdapter:
 
         # Add to IPFS
         result = self.client.add(str(path), pin=pin)
-        cid = result['Hash']
+        cid = result["Hash"]
 
         # Update manifest
-        self.manifest['files'].append({
-            'name': path.name,
-            'path': str(path),
-            'ipfs_cid': cid,
-            'sha256': sha256,
-            'size_bytes': path.stat().st_size,
-            'uploaded_at': datetime.utcnow().isoformat(),
-        })
+        self.manifest["files"].append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "ipfs_cid": cid,
+                "sha256": sha256,
+                "size_bytes": path.stat().st_size,
+                "uploaded_at": datetime.utcnow().isoformat(),
+            }
+        )
 
         self._save_manifest()
 
@@ -67,27 +70,29 @@ class IPFSStorageAdapter:
         self.client.get(cid, target=str(path))
 
         # Verify against manifest
-        for file_info in self.manifest['files']:
-            if file_info['ipfs_cid'] == cid:
+        for file_info in self.manifest["files"]:
+            if file_info["ipfs_cid"] == cid:
                 actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
 
-                expected_hash = file_info['sha256']
+                expected_hash = file_info["sha256"]
 
                 if actual_hash != expected_hash:
                     path.unlink()
-                    raise ValueError(f"Hash mismatch! Expected {expected_hash}, got {actual_hash}")
+                    raise ValueError(
+                        f"Hash mismatch! Expected {expected_hash}, got {actual_hash}"
+                    )
 
                 print(f"✅ {path.name} verified")
                 return
 
     def download_all(self):
         """Download all files from manifest"""
-        for file_info in self.manifest['files']:
-            path = Path(file_info['path'])
+        for file_info in self.manifest["files"]:
+            path = Path(file_info["path"])
 
             if path.exists():
                 print(f"⏭️  {path.name} exists, skipping")
                 continue
 
             print(f"📥 Downloading {path.name}...")
-            self.get_file(file_info['ipfs_cid'], str(path))
+            self.get_file(file_info["ipfs_cid"], str(path))

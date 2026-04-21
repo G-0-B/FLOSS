@@ -2,14 +2,22 @@
 Meaningful Mixing Logic.
 Combines interaction patterns to create novel coordination strategies.
 """
+
 from typing import Optional
 from .patterns import InteractionPattern
+
 
 class PatternMixer:
     """
     Mixes two interaction patterns to create a new hybrid pattern.
     """
-    def mix(self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, strategy: str = "interleave") -> InteractionPattern:
+
+    def mix(
+        self,
+        pattern_a: InteractionPattern,
+        pattern_b: InteractionPattern,
+        strategy: str = "interleave",
+    ) -> InteractionPattern:
         """
         Combines two patterns.
 
@@ -48,10 +56,12 @@ class PatternMixer:
             name=new_name,
             description=new_desc,
             structure=new_structure,
-            keywords=new_keywords
+            keywords=new_keywords,
         )
 
-    async def mix_with_llm(self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, llm_client) -> InteractionPattern:
+    async def mix_with_llm(
+        self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, llm_client
+    ) -> InteractionPattern:
         """
         Uses an LLM to creatively mix patterns.
         (Placeholder for future implementation)

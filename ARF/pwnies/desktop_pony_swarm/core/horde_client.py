@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+
 class HordeClient:
     """Client for Horde.AI distributed inference."""
 
@@ -33,7 +34,7 @@ class HordeClient:
         prompt: str,
         max_length: int = 512,
         temperature: float = 0.8,
-        model: str = "koboldcpp/LLaMA2-13B-Tiefighter"
+        model: str = "koboldcpp/LLaMA2-13B-Tiefighter",
     ) -> str:
         """
         Generate text using Horde.AI distributed workers.
@@ -50,23 +51,18 @@ class HordeClient:
                 "max_length": max_length,
                 "temperature": temperature,
                 "top_p": 0.9,
-                "n": 1
+                "n": 1,
             },
             "models": [model],
-            "trusted_workers": False
+            "trusted_workers": False,
         }
 
-        headers = {
-            "apikey": self.api_key,
-            "Content-Type": "application/json"
-        }
+        headers = {"apikey": self.api_key, "Content-Type": "application/json"}
 
         try:
             # Submit request
             async with self.session.post(
-                f"{self.api_base}/generate/text/async",
-                json=payload,
-                headers=headers
+                f"{self.api_base}/generate/text/async", json=payload, headers=headers
             ) as resp:
                 if resp.status != 202:
                     error_text = await resp.text()
@@ -85,7 +81,7 @@ class HordeClient:
 
                 async with self.session.get(
                     f"{self.api_base}/generate/text/status/{request_id}",
-                    headers=headers
+                    headers=headers,
                 ) as resp:
                     status_data = await resp.json()
 

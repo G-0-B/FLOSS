@@ -2,6 +2,7 @@
 Committee Validation Logic.
 Orchestrates the voting process for knowledge triples.
 """
+
 import asyncio
 from typing import List, Tuple, Dict, Any
 from dataclasses import dataclass, asdict
@@ -11,9 +12,11 @@ from .agent_pool import ValidatorPool, ValidatorResponse
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class CommitteeResult:
     """Result of a committee vote."""
+
     accepted: bool
     yes_votes: int
     no_votes: int
@@ -24,17 +27,23 @@ class CommitteeResult:
     def to_dict(self) -> Dict:
         return asdict(self)
 
+
 class TripleValidationCommittee:
     """
     A committee of LLM agents that validates knowledge triples.
     Uses a consensus mechanism (e.g., majority vote) to accept or reject triples.
     """
-    def __init__(self, pool_size: int = 5, committee_size: int = 3, use_mock: bool = True):
+
+    def __init__(
+        self, pool_size: int = 5, committee_size: int = 3, use_mock: bool = True
+    ):
         self.pool = ValidatorPool(use_mock=use_mock)
         self.committee_size = committee_size
         logger.info(f"Initialized TripleValidationCommittee (size={committee_size})")
 
-    async def validate(self, triple: Tuple[str, str, str], context: str) -> CommitteeResult:
+    async def validate(
+        self, triple: Tuple[str, str, str], context: str
+    ) -> CommitteeResult:
         """
         Validates a triple by polling a committee of validators.
 
@@ -78,5 +87,5 @@ class TripleValidationCommittee:
             no_votes=no_votes,
             total_votes=len(responses),
             confidence=avg_confidence,
-            reasoning=reasons
+            reasoning=reasons,
         )

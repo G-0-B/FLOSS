@@ -12,20 +12,25 @@ import time
 import json
 from pathlib import Path
 
+
 class Vote(Enum):
     """Ternary voting system"""
-    APPROVE = 1      # +1: Good to go, proceed
-    ABSTAIN = 0      # 0: Need more information, hold
-    REJECT = -1      # -1: This needs rework, reject
+
+    APPROVE = 1  # +1: Good to go, proceed
+    ABSTAIN = 0  # 0: Need more information, hold
+    REJECT = -1  # -1: This needs rework, reject
 
     def __str__(self):
         return {1: "+1", 0: "0", -1: "-1"}[self.value]
 
+
 TaskType = Literal["reasoning", "knowledge", "implementation", "design"]
+
 
 @dataclass
 class RFC:
     """Request for Comments - Proposal for system change"""
+
     id: str
     title: str
     description: str
@@ -52,12 +57,14 @@ class RFC:
             "practical_engineering": self.practical_engineering,
             "critical_red_team": self.critical_red_team,
             "values_alignment": self.values_alignment,
-            "systems_governance": self.systems_governance
+            "systems_governance": self.systems_governance,
         }
+
 
 @dataclass
 class VoteCast:
     """Individual vote with reasoning"""
+
     agent_id: str
     vote: Vote
     rationale: str
@@ -71,12 +78,14 @@ class VoteCast:
             "vote_str": str(self.vote),
             "rationale": self.rationale,
             "timestamp": self.timestamp,
-            "confidence": self.confidence
+            "confidence": self.confidence,
         }
+
 
 @dataclass
 class ADR:
     """Architecture Decision Record - Final decision with provenance"""
+
     rfc_id: str
     decision: str  # "APPROVED", "REJECTED", "REQUIRES_REWORK", "CONSENSUS_APPROVED"
     rationale: str  # Synthesized from all vote rationales
@@ -99,7 +108,7 @@ class ADR:
             "provenance": self.provenance,
             "created_at": self.created_at,
             "outcome": self.outcome,
-            "outcome_notes": self.outcome_notes
+            "outcome_notes": self.outcome_notes,
         }
 
     def save(self, directory: Path = Path("ARF/adr/")):
@@ -110,9 +119,10 @@ class ADR:
         number = len(existing) + 1
         slug = self.rfc_id.lower().replace("_", "-")
         filename = directory / f"ADR-{number:04d}-{slug}.json"
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
         return filename
+
 
 class ConsensusEngine:
     """
@@ -121,6 +131,7 @@ class ConsensusEngine:
 
     Learns from all outcomes (success/failure/neutral) to improve over time.
     """
+
     def __init__(self, context_sync=None):
         self.context_sync = context_sync
         self.pending_rfcs: Dict[str, RFC] = {}
@@ -142,31 +153,32 @@ class ConsensusEngine:
             self.context_sync.broadcast_update(
                 key=f"rfc/{rfc.id}/proposal",
                 value=rfc.to_dict(),
-                source_agent=rfc.proposer
+                source_agent=rfc.proposer,
             )
         return rfc.id
 
-    def cast_vote(self, 
-                  rfc_id: str, 
-                  agent_id: str, 
-                  vote: Vote, 
-                  rationale: str,
-                  confidence: float = 1.0):
+    def cast_vote(
+        self,
+        rfc_id: str,
+        agent_id: str,
+        vote: Vote,
+        rationale: str,
+        confidence: float = 1.0,
+    ):
         """
         Agent casts ternary vote with reasoning.
 
         Votes are broadcast to all agents for transparency.
         """
         if rfc_id in self.adrs:
-            print(f"⚠️ Vote from {agent_id} received for finalized RFC {rfc_id}. Vote recorded but decision stands.")
+            print(
+                f"⚠️ Vote from {agent_id} received for finalized RFC {rfc_id}. Vote recorded but decision stands."
+            )
             return None
         if rfc_id not in self.pending_rfcs:
             raise ValueError(f"RFC {rfc_id} not found")
         vote_cast = VoteCast(
-            agent_id=agent_id,
-            vote=vote,
-            rationale=rationale,
-            confidence=confidence
+            agent_id=agent_id, vote=vote, rationale=rationale, confidence=confidence
         )
         self.votes[rfc_id][agent_id] = vote_cast
         # Broadcast vote via context sync
@@ -174,7 +186,7 @@ class ConsensusEngine:
             self.context_sync.broadcast_update(
                 key=f"rfc/{rfc_id}/votes/{agent_id}",
                 value=vote_cast.to_dict(),
-                source_agent=agent_id
+                source_agent=agent_id,
             )
         # Check if consensus reached
         adr = self.evaluate_consensus(rfc_id)
@@ -218,7 +230,9 @@ class ConsensusEngine:
         abstain = sum(1 for v in votes.values() if v.vote == Vote.ABSTAIN)
         total = len(votes)
         # Weighted votes by confidence
-        weighted_approve = sum(v.confidence for v in votes.values() if v.vote == Vote.APPROVE)
+        weighted_approve = sum(
+            v.confidence for v in votes.values() if v.vote == Vote.APPROVE
+        )
         weighted_total = sum(v.confidence for v in votes.values())
         # Majority approval (>50% of votes OR >60% of confidence-weighted votes)
         if (approve / total > 0.5) or (weighted_approve / weighted_total > 0.6):
@@ -228,7 +242,7 @@ class ConsensusEngine:
                 rationale=self._synthesize_rationale(votes, "approved"),
                 votes=votes,
                 consensus_method="voting",
-                provenance=[rfc.proposer] + list(votes.keys())
+                provenance=[rfc.proposer] + list(votes.keys()),
             )
         # Strong rejection (>50%)
         elif reject / total > 0.5:
@@ -238,7 +252,7 @@ class ConsensusEngine:
                 rationale=self._synthesize_rationale(votes, "rejected"),
                 votes=votes,
                 consensus_method="voting",
-                provenance=[rfc.proposer] + list(votes.keys())
+                provenance=[rfc.proposer] + list(votes.keys()),
             )
         # Too many abstentions - need more information
         elif abstain / total > 0.4:
@@ -248,7 +262,9 @@ class ConsensusEngine:
         else:
             return None
 
-    def _evaluate_consensus(self, rfc: RFC, votes: Dict[str, VoteCast]) -> Optional[ADR]:
+    def _evaluate_consensus(
+        self, rfc: RFC, votes: Dict[str, VoteCast]
+    ) -> Optional[ADR]:
         """
         Consensus protocol: Agents converge on shared understanding.
         Better for knowledge tasks requiring collective agreement.
@@ -267,7 +283,7 @@ class ConsensusEngine:
                 rationale=self._synthesize_rationale(votes, "consensus"),
                 votes=votes,
                 consensus_method="consensus",
-                provenance=[rfc.proposer] + list(votes.keys())
+                provenance=[rfc.proposer] + list(votes.keys()),
             )
 
         # Any significant rejection (>20%) requires rework
@@ -278,7 +294,7 @@ class ConsensusEngine:
                 rationale=self._synthesize_rationale(votes, "rework"),
                 votes=votes,
                 consensus_method="consensus",
-                provenance=[rfc.proposer] + list(votes.keys())
+                provenance=[rfc.proposer] + list(votes.keys()),
             )
 
         # Continue deliberation
@@ -288,12 +304,16 @@ class ConsensusEngine:
     def _synthesize_rationale(self, votes: Dict[str, VoteCast], outcome: str) -> str:
         """
         Synthesize comprehensive rationale from all vote rationales.
-        
+
         Includes perspectives from approvers, rejectors, and abstainers.
         """
-        approve_reasons = [v.rationale for v in votes.values() if v.vote == Vote.APPROVE]
+        approve_reasons = [
+            v.rationale for v in votes.values() if v.vote == Vote.APPROVE
+        ]
         reject_reasons = [v.rationale for v in votes.values() if v.vote == Vote.REJECT]
-        abstain_reasons = [v.rationale for v in votes.values() if v.vote == Vote.ABSTAIN]
+        abstain_reasons = [
+            v.rationale for v in votes.values() if v.vote == Vote.ABSTAIN
+        ]
 
         synthesis = f"Decision: {outcome.upper()}\n\n"
 
@@ -329,25 +349,32 @@ class ConsensusEngine:
             self.context_sync.broadcast_update(
                 key=f"adr/{rfc_id}/final",
                 value=adr.to_dict(),
-                source_agent="consensus_engine"
+                source_agent="consensus_engine",
             )
 
         # Remove from pending
         del self.pending_rfcs[rfc_id]
 
         # Record for learning
-        self.decision_history.append({
-            "rfc_id": rfc_id,
-            "decision": adr.decision,
-            "method": adr.consensus_method,
-            "timestamp": adr.created_at,
-            "num_votes": len(adr.votes)
-        })
+        self.decision_history.append(
+            {
+                "rfc_id": rfc_id,
+                "decision": adr.decision,
+                "method": adr.consensus_method,
+                "timestamp": adr.created_at,
+                "num_votes": len(adr.votes),
+            }
+        )
 
-    def record_outcome(self, rfc_id: str, outcome: Literal["success", "failure", "neutral"], notes: str = ""):
+    def record_outcome(
+        self,
+        rfc_id: str,
+        outcome: Literal["success", "failure", "neutral"],
+        notes: str = "",
+    ):
         """
         Record outcome of implemented decision for learning.
-        
+
         CRITICAL: We learn from ALL outcomes - success teaches what works,
         failure teaches what doesn't, neutral teaches edge cases.
         """

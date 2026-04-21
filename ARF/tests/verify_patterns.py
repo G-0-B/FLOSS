@@ -9,6 +9,7 @@ from conversation_memory import ConversationMemory
 
 logging.basicConfig(level=logging.INFO)
 
+
 def test_patterns():
     print("Initializing ConversationMemory...")
     memory = ConversationMemory(agent_id="test-verifier")
@@ -16,17 +17,23 @@ def test_patterns():
     # Test cases from YAML examples
     test_cases = [
         ("GPT-4 is a large language model", ("GPT-4", "is_a", "large-language-model")),
-        ("Python is an interpreted language", ("Python", "is_a", "interpreted-language")),
-        ("Sonnet 4.5 improves upon Sonnet 4", ("Sonnet 4.5", "improves_upon", "Sonnet 4")),
+        (
+            "Python is an interpreted language",
+            ("Python", "is_a", "interpreted-language"),
+        ),
+        (
+            "Sonnet 4.5 improves upon Sonnet 4",
+            ("Sonnet 4.5", "improves_upon", "Sonnet 4"),
+        ),
         ("Claude can write code", ("Claude", "capable_of", "write")),
-        ("GPT-4 is capable of reasoning", ("GPT-4", "capable_of", "reasoning"))
+        ("GPT-4 is capable of reasoning", ("GPT-4", "capable_of", "reasoning")),
     ]
 
     print(f"\nTesting {len(test_cases)} patterns...")
     passed = 0
     for content, expected in test_cases:
         print(f"\nInput: '{content}'")
-        triple = memory._extract_triple({'content': content})
+        triple = memory._extract_triple({"content": content})
         print(f"Extracted: {triple}")
 
         if triple == expected:
@@ -43,6 +50,7 @@ def test_patterns():
     else:
         print("Verification FAILED")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     test_patterns()

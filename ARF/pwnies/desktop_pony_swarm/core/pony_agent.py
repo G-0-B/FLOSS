@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
+
 class DesktopPonyAgent:
     """Represents a single, autonomous pony agent within the dAsGI ecosystem.
 
@@ -37,7 +38,7 @@ class DesktopPonyAgent:
         pony_id: str,
         pony_name: str = "Pinkie Pie",
         role: str = "generalist",
-        use_mock: bool = True
+        use_mock: bool = True,
     ):
         """Initializes a DesktopPonyAgent instance.
 
@@ -60,16 +61,20 @@ class DesktopPonyAgent:
         # Horde client (created on demand)
         self.horde_client: Optional[Any] = None
 
-        logger.info(f"Initialized pony: {pony_id} ({pony_name}) [{'MOCK' if use_mock else 'REAL'} mode]")
+        logger.info(
+            f"Initialized pony: {pony_id} ({pony_name}) [{'MOCK' if use_mock else 'REAL'} mode]"
+        )
 
     async def __aenter__(self):
         """Asynchronously initializes the Horde.AI client upon entering a context."""
         # Import the appropriate client
         if self.use_mock:
             from .mock_horde_client import MockHordeClient
+
             self.horde_client = await MockHordeClient().__aenter__()
         else:
             from .horde_client import HordeClient
+
             self.horde_client = await HordeClient().__aenter__()
         return self
 
@@ -82,7 +87,9 @@ class DesktopPonyAgent:
     # PRIORITY 1: USER WELLBEING
     # ============================================================
 
-    def check_crisis_indicators(self, text: str, user_state: Dict[str, Any]) -> Optional[str]:
+    def check_crisis_indicators(
+        self, text: str, user_state: Dict[str, Any]
+    ) -> Optional[str]:
         """Scans for indicators of user crisis, prioritizing well-being.
 
         This is the agent's highest-priority function. It checks for keywords
@@ -100,8 +107,12 @@ class DesktopPonyAgent:
             An alert message string if a crisis is detected, otherwise None.
         """
         crisis_keywords = [
-            'suicide', 'kill myself', 'end it all', 'not worth living',
-            'everyone better off without me', 'can\'t go on'
+            "suicide",
+            "kill myself",
+            "end it all",
+            "not worth living",
+            "everyone better off without me",
+            "can't go on",
         ]
 
         text_lower = text.lower()
@@ -113,7 +124,7 @@ class DesktopPonyAgent:
             )
 
         # Check stress levels if in recovery
-        if user_state.get('recovery_status') and user_state.get('stress_level', 0) > 8:
+        if user_state.get("recovery_status") and user_state.get("stress_level", 0) > 8:
             return (
                 f"[WELLBEING] {self.pony_id} noticed high stress. "
                 f"Reminder: {user_state.get('anchor_reason', 'You matter.')}"
@@ -150,10 +161,7 @@ class DesktopPonyAgent:
     # ============================================================
 
     async def generate_response(
-        self,
-        prompt: str,
-        max_length: int = 512,
-        temperature: float = 0.8
+        self, prompt: str, max_length: int = 512, temperature: float = 0.8
     ) -> str:
         """Generates a textual response using the Horde.AI distributed network.
 
@@ -185,18 +193,18 @@ Your response:"""
 
         try:
             response = await self.horde_client.generate_text(
-                prompt=full_prompt,
-                max_length=max_length,
-                temperature=temperature
+                prompt=full_prompt, max_length=max_length, temperature=temperature
             )
 
             # Add to context buffer
-            self.add_to_context({
-                'type': 'generation',
-                'prompt': prompt,
-                'response': response,
-                'timestamp': time.time()
-            })
+            self.add_to_context(
+                {
+                    "type": "generation",
+                    "prompt": prompt,
+                    "response": response,
+                    "timestamp": time.time(),
+                }
+            )
 
             return response.strip()
 
@@ -239,7 +247,7 @@ Your response:"""
 
         # Trim if exceeds max size
         if len(self.context_buffer) > self.max_context_size:
-            self.context_buffer = self.context_buffer[-self.max_context_size:]
+            self.context_buffer = self.context_buffer[-self.max_context_size :]
 
     def get_recent_context(self, n: int = 10) -> List[Dict[str, Any]]:
         """Retrieves the `n` most recent entries from the context buffer.

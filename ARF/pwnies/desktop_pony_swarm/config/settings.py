@@ -5,6 +5,7 @@ Configuration for desktop pony swarm.
 from dataclasses import dataclass
 from typing import List
 
+
 @dataclass
 class SwarmConfig:
     """Swarm configuration."""
@@ -15,7 +16,7 @@ class SwarmConfig:
 
     # RSA parameters (from paper recommendations)
     rsa_aggregation_size: int = 2  # K
-    rsa_iterations: int = 3        # T
+    rsa_iterations: int = 3  # T
 
     # Inference backend
     use_mock_client: bool = True  # True = instant mock responses, False = real Horde.AI
@@ -40,8 +41,9 @@ class SwarmConfig:
                 "Pinkie Pie",
                 "Rainbow Dash",
                 "Twilight Sparkle",
-                "Fluttershy"
+                "Fluttershy",
             ]
+
 
 # Default configuration
 DEFAULT_CONFIG = SwarmConfig()

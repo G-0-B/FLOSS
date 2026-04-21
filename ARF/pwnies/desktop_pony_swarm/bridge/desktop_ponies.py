@@ -10,10 +10,11 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
 class DesktopPoniesBridge:
     """
     Communication bridge to Desktop Ponies app.
-    
+
     Desktop Ponies can display:
     - Speech bubbles
     - Animations
