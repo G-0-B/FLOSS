@@ -1,6 +1,4 @@
-"""
-Data models for LLM committee validation system.
-"""
+"""Data models for LLM committee validation system."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple

@@ -1,6 +1,4 @@
-"""
-Test suite for consensus engine with ternary voting.
-"""
+"""Test suite for consensus engine with ternary voting."""
 
 import sys
 import os

@@ -31,9 +31,7 @@ class BudgetExceededError(Exception):
     pass
 
 class BudgetManager:
-    """
-    Manages resource budget for an agent.
-    """
+    """Manages resource budget for an agent."""
     def __init__(self, agent_id: str, storage_path: Optional[str] = None, config: BudgetConfig = None):
         self.agent_id = agent_id
         self.config = config or BudgetConfig()
@@ -64,9 +62,7 @@ class BudgetManager:
             logger.warning(f"Budget warning: {token_ratio*100:.1f}% of token limit used.")
 
     def record_usage(self, tokens: int, cost: float = 0.0):
-        """
-        Records resource usage.
-        """
+        """Records resource usage."""
         self.state.tokens_used += tokens
         self.state.estimated_cost += cost
         self._save_state()

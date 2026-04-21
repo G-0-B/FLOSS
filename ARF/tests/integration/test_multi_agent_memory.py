@@ -123,9 +123,7 @@ def test_three_agent_composition(alice_memory, bob_memory, carol_memory):
 
 
 def test_multi_agent_deduplication(alice_memory, bob_memory):
-    """
-    Test that duplicate transmissions across agents are properly handled.
-    """
+    """Test that duplicate transmissions across agents are properly handled."""
     # Both agents transmit the same understanding
     content = "GPT-4 is a large language model"
 
@@ -160,9 +158,7 @@ def test_multi_agent_deduplication(alice_memory, bob_memory):
 
 
 def test_composition_with_embeddings(alice_memory, bob_memory):
-    """
-    Test that embedding frames are properly composed across agents.
-    """
+    """Test that embedding frames are properly composed across agents."""
     # Transmit related understandings
     alice_memory.transmit({
         "content": "Neural networks learn from data",
@@ -196,9 +192,7 @@ def test_composition_with_embeddings(alice_memory, bob_memory):
 
 
 def test_multi_agent_adr_tracking(alice_memory, bob_memory, carol_memory):
-    """
-    Test that ADRs (Architecture Decision Records) are tracked across agents.
-    """
+    """Test that ADRs (Architecture Decision Records) are tracked across agents."""
     # Alice makes a decision
     alice_memory.transmit({
         "content": "We decided to use Holochain for distributed storage",
@@ -271,9 +265,7 @@ def test_parallel_composition(temp_dir):
 
 
 def test_triple_extraction_consistency(alice_memory, bob_memory):
-    """
-    Test that triple extraction works consistently across agents.
-    """
+    """Test that triple extraction works consistently across agents."""
     # Both agents transmit structured knowledge
     alice_memory.transmit({
         "content": "GPT-4 is a LLM",
@@ -340,9 +332,7 @@ def test_empty_composition(alice_memory, bob_memory):
 
 
 def test_composition_with_validation(temp_dir):
-    """
-    Test composition with ontology validation enabled.
-    """
+    """Test composition with ontology validation enabled."""
     # Create memories with validation
     alice_path = temp_dir / "alice_validated"
     alice = ConversationMemory(

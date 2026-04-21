@@ -259,9 +259,7 @@ def test_memory_holochain_backend_initialization(temp_dir):
 
 
 def test_memory_with_holochain_transmit_fallback(temp_dir):
-    """
-    Test that memory gracefully falls back when Holochain unavailable.
-    """
+    """Test that memory gracefully falls back when Holochain unavailable."""
     storage_path = temp_dir / "fallback_memory"
 
     memory = ConversationMemory(
@@ -289,9 +287,7 @@ def test_memory_with_holochain_transmit_fallback(temp_dir):
 
 @pytest.mark.asyncio
 async def test_dht_multi_agent_coordination(mock_holochain):
-    """
-    Test multiple agents coordinating via DHT.
-    """
+    """Test multiple agents coordinating via DHT."""
     # Agent A transmits
     await mock_holochain.call_zome(
         zome="memory_coordinator",
@@ -330,9 +326,7 @@ async def test_dht_multi_agent_coordination(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_dht_query_filtering(mock_holochain):
-    """
-    Test querying DHT with filters.
-    """
+    """Test querying DHT with filters."""
     # Add multiple entries
     await mock_holochain.call_zome(
         zome="memory_coordinator",
@@ -380,9 +374,7 @@ async def test_dht_query_filtering(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_dht_operation_count(mock_holochain):
-    """
-    Test tracking of DHT operations.
-    """
+    """Test tracking of DHT operations."""
     initial_count = mock_holochain.call_count
 
     # Perform several operations
@@ -412,9 +404,7 @@ async def test_dht_operation_count(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_dht_batch_operations(mock_holochain):
-    """
-    Test batch operations on DHT.
-    """
+    """Test batch operations on DHT."""
     # Batch transmit
     tasks = []
     for i in range(10):
@@ -450,9 +440,7 @@ async def test_dht_batch_operations(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_holochain_unknown_zome(mock_holochain):
-    """
-    Test handling of unknown zome calls.
-    """
+    """Test handling of unknown zome calls."""
     result = await mock_holochain.call_zome(
         zome="unknown_zome",
         function="unknown_function",
@@ -464,9 +452,7 @@ async def test_holochain_unknown_zome(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_holochain_missing_payload(mock_holochain):
-    """
-    Test handling of missing required payload fields.
-    """
+    """Test handling of missing required payload fields."""
     # Transmit without content
     result = await mock_holochain.call_zome(
         zome="memory_coordinator",
@@ -510,9 +496,7 @@ async def test_dht_gossip_protocol():
 @pytest.mark.skip(reason="Requires full Holochain conductor setup")
 @pytest.mark.asyncio
 async def test_holochain_signature_verification():
-    """
-    Test cryptographic signature verification on DHT entries.
-    """
+    """Test cryptographic signature verification on DHT entries."""
     pass
 
 

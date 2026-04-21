@@ -1,6 +1,4 @@
-"""
-Test script for Pattern Library and Meaningful Mixing.
-"""
+"""Test script for Pattern Library and Meaningful Mixing."""
 import sys
 from pathlib import Path
 import logging
@@ -16,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def test_pattern_matching():
-    print("\n=== Testing PatternMatcher ===")
+    print("=== Testing PatternMatcher ===")
     matcher = PatternMatcher()
     
     # Test Socratic

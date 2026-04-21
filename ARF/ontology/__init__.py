@@ -1,4 +1,2 @@
-"""
-Ontology package for ARF.
-"""
+"""Ontology package for ARF."""
 from .predicates import *

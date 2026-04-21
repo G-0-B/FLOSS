@@ -1,6 +1,4 @@
-"""
-Test script for LLM Committee Validation.
-"""
+"""Test script for LLM Committee Validation."""
 import asyncio
 import logging
 import sys

@@ -6,9 +6,7 @@ from typing import Optional
 from .patterns import InteractionPattern
 
 class PatternMixer:
-    """
-    Mixes two interaction patterns to create a new hybrid pattern.
-    """
+    """Mixes two interaction patterns to create a new hybrid pattern."""
     def mix(self, pattern_a: InteractionPattern, pattern_b: InteractionPattern, strategy: str = "interleave") -> InteractionPattern:
         """
         Combines two patterns.

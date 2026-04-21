@@ -1,6 +1,4 @@
-"""
-Test script for Autonomous Budgeting.
-"""
+"""Test script for Autonomous Budgeting."""
 import sys
 import shutil
 from pathlib import Path

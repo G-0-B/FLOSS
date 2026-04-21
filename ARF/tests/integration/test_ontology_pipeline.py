@@ -150,9 +150,7 @@ def test_invalid_triple_rejection(validated_memory):
 
 
 def test_validation_disabled_accepts_all(unvalidated_memory):
-    """
-    Test that with validation disabled, all content is accepted.
-    """
+    """Test that with validation disabled, all content is accepted."""
     # This should succeed even though it's not a valid ontological triple
     ref = unvalidated_memory.transmit({
         "content": "Random content that doesn't form a valid triple",
@@ -171,9 +169,7 @@ def test_validation_disabled_accepts_all(unvalidated_memory):
 # ============================================================================
 
 def test_validation_stats_tracking(validated_memory):
-    """
-    Test that validation statistics are properly tracked.
-    """
+    """Test that validation statistics are properly tracked."""
     # Transmit several items
     validated_memory.transmit({"content": "GPT-4 is a LLM", "coherence": 0.95})
     validated_memory.transmit({"content": "Claude is a chatbot", "coherence": 0.9})
@@ -198,9 +194,7 @@ def test_validation_stats_tracking(validated_memory):
 
 
 def test_validation_stats_accumulate(validated_memory):
-    """
-    Test that validation stats accumulate over multiple transmissions.
-    """
+    """Test that validation stats accumulate over multiple transmissions."""
     # First transmission
     validated_memory.transmit({"content": "Test 1 is a test", "coherence": 0.9})
     stats1 = validated_memory.get_validation_stats()
@@ -220,9 +214,7 @@ def test_validation_stats_accumulate(validated_memory):
 # ============================================================================
 
 def test_triple_metadata_storage(validated_memory):
-    """
-    Test that extracted triples are stored in metadata.
-    """
+    """Test that extracted triples are stored in metadata."""
     validated_memory.transmit({
         "content": "GPT-4 is a LLM",
         "coherence": 0.95
@@ -247,9 +239,7 @@ def test_triple_metadata_storage(validated_memory):
 
 
 def test_triple_extraction_normalization(validated_memory):
-    """
-    Test that triple extraction handles different text formats.
-    """
+    """Test that triple extraction handles different text formats."""
     variations = [
         "GPT-4 is a LLM",
         "GPT-4 is an LLM",
@@ -270,9 +260,7 @@ def test_triple_extraction_normalization(validated_memory):
 # ============================================================================
 
 def test_validated_composition(temp_dir):
-    """
-    Test composition between two validated memories.
-    """
+    """Test composition between two validated memories."""
     # Create two validated memories
     alice_path = temp_dir / "alice_val"
     alice = ConversationMemory(
@@ -311,9 +299,7 @@ def test_validated_composition(temp_dir):
 
 
 def test_mixed_validation_composition(temp_dir):
-    """
-    Test composition between validated and unvalidated memories.
-    """
+    """Test composition between validated and unvalidated memories."""
     validated_path = temp_dir / "validated_mix"
     validated = ConversationMemory(
         agent_id="validated",
@@ -381,9 +367,7 @@ def test_all_supported_predicates(validated_memory):
 
 
 def test_validation_pipeline_end_to_end(validated_memory):
-    """
-    Test complete validation pipeline from transmission to recall.
-    """
+    """Test complete validation pipeline from transmission to recall."""
     # Step 1: Transmit with validation
     ref = validated_memory.transmit({
         "content": "Sonnet-4 is a powerful AI model",
@@ -410,9 +394,7 @@ def test_validation_pipeline_end_to_end(validated_memory):
 # ============================================================================
 
 def test_validation_with_empty_content(validated_memory):
-    """
-    Test that validation handles empty content gracefully.
-    """
+    """Test that validation handles empty content gracefully."""
     # Empty content should be skipped or handled gracefully
     ref = validated_memory.transmit({
         "content": "",
@@ -425,9 +407,7 @@ def test_validation_with_empty_content(validated_memory):
 
 
 def test_validation_with_malformed_content(validated_memory):
-    """
-    Test that validation handles malformed content.
-    """
+    """Test that validation handles malformed content."""
     malformed_cases = [
         "...",
         "!@#$%",
@@ -453,9 +433,7 @@ def test_validation_with_malformed_content(validated_memory):
 # ============================================================================
 
 def test_validation_performance(validated_memory):
-    """
-    Test that validation doesn't significantly slow down transmissions.
-    """
+    """Test that validation doesn't significantly slow down transmissions."""
     import time
 
     # Transmit 20 items and measure time
