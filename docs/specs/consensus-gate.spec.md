@@ -1,8 +1,8 @@
 # Consensus Gate Specification (Seam 1)
 
-**Version:** 0.1.0
+**Version:** 0.1.1
 **Status:** Draft
-**Last Updated:** 2026-04-04
+**Last Updated:** 2026-05-24
 **ADR:** ADR-6 Seam 1
 **Authors:** FLOSSI0ULLK collective
 
@@ -37,7 +37,7 @@ A Claim is a proposed change submitted to the gate. It wraps the proposal with m
 | `body`          | String           | Yes      | Full proposal content (diff, config, prose)                              |
 | `truth_status`  | Enum             | Yes      | Initial label: `Unverified` (always, until consensus)                    |
 | `blast_radius`  | Enum             | Yes      | One of: `Local`, `Module`, `System`, `Substrate`                         |
-| `evidence`      | Vec<EvidenceRef> | No       | Links to supporting specs, tests, prior ADRs                             |
+| `evidence`      | Vec<EvidenceRef> | No       | Links to supporting specs, tests, prior ADRs, commits, URLs, or `provenance_packet` refs |
 | `submitted_at`  | Timestamp        | Yes      | ISO 8601                                                                 |
 
 ### 2.2 Vote
@@ -94,6 +94,8 @@ A Decision is the aggregated outcome of all Votes for a Claim.
 12. **INV-012:** Every Vote MUST carry voter identity
 13. **INV-013:** Every Decision MUST record all Votes that were considered
 14. **INV-014:** When `adr_ref` is set, the ADR file MUST exist at that path
+15. **INV-015:** `provenance_packet` evidence MUST validate per `FLOSS/docs/specs/provenance-packet.spec.md`
+16. **INV-016:** System/Substrate `AdrChange`, `SpecChange`, and `ConfigChange` Claims MUST carry at least one valid `provenance_packet` evidence ref with `consent_ref.decision_action_hash`
 
 ---
 
@@ -175,6 +177,8 @@ OVERRIDE prior_decision, claim, human_voter, rationale:
 - **E_OVERRIDE_DUPLICATE:** Override voter has already cast a vote on this claim
 - **E_VOTE_DUPLICATE:** Two voters with the same identity in one `decide()` call
 - **E_QUORUM_INSUFFICIENT:** Blast radius requires more voters than available
+- **E_SUBMIT_CLAIM_INVALID_PROVENANCE:** A submitted `provenance_packet` evidence ref failed packet validation
+- **E_GOVERNED_PROVENANCE_REQUIRED:** A governed System/Substrate Claim is missing a valid provenance packet with consent
 
 ---
 

@@ -72,7 +72,9 @@ OVERRIDE_ALLOWED: dict[BlastRadius, bool] = {
     BlastRadius.SUBSTRATE: False,
 }
 
-EVIDENCE_TYPES: frozenset[str] = frozenset({"spec", "test", "adr", "url", "commit"})
+EVIDENCE_TYPES: frozenset[str] = frozenset(
+    {"spec", "test", "adr", "url", "commit", "provenance_packet"}
+)
 
 CERTAINTY_LIMIT: float = 0.999
 """Asymptotic upper bound for vote weights.
@@ -133,8 +135,9 @@ def _new_id() -> str:
 class EvidenceRef:
     """Typed reference to supporting evidence for a Claim (spec §4.1)."""
 
-    type: str  # "spec" | "test" | "adr" | "url" | "commit"
+    type: str  # "spec" | "test" | "adr" | "url" | "commit" | "provenance_packet"
     ref: str
+    sha256: Optional[str] = None
 
     def validate(self) -> None:
         """Enforce a minimal provenance shape for supporting evidence."""
@@ -147,6 +150,21 @@ class EvidenceRef:
             )
         if not isinstance(self.ref, str) or not self.ref.strip():
             raise ValueError("E_EVIDENCE_INVALID_SCHEMA: evidence.ref required")
+        if self.sha256 is not None and (
+            not isinstance(self.sha256, str)
+            or len(self.sha256) != 64
+            or any(ch not in "0123456789abcdef" for ch in self.sha256)
+        ):
+            raise ValueError(
+                "E_EVIDENCE_INVALID_SCHEMA: evidence.sha256 must be 64 hex chars"
+            )
+
+    def to_dict(self) -> dict[str, str]:
+        """Serialize while omitting optional fields that are not present."""
+        d = {"type": self.type, "ref": self.ref}
+        if self.sha256 is not None:
+            d["sha256"] = self.sha256
+        return d
 
 
 @dataclass
@@ -228,6 +246,7 @@ class Claim:
         d["proposal_type"] = self.proposal_type.value
         d["blast_radius"] = self.blast_radius.value
         d["truth_status"] = self.truth_status.value
+        d["evidence"] = [e.to_dict() for e in self.evidence]
         return d
 
 

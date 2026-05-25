@@ -48,7 +48,7 @@ def _claim_from_chain_entry(entry_content: dict[str, Any]) -> Claim:
     downstream validation and tally logic work against the typed API.
     """
     evidence = [
-        EvidenceRef(type=e["type"], ref=e["ref"])
+        EvidenceRef(type=e["type"], ref=e["ref"], sha256=e.get("sha256"))
         for e in entry_content.get("evidence", [])
     ]
     return Claim(
@@ -98,6 +98,19 @@ def _known_voter_name(voter: Callable[[Claim], Vote]) -> Optional[str]:
         if name.startswith(prefix):
             return name[len(prefix) :]
     return None
+
+
+def _is_governed_claim(proposal_type: ProposalType, blast_radius: BlastRadius) -> bool:
+    """Return True for the v1 provenance hard-block boundary."""
+
+    return blast_radius in {
+        BlastRadius.SYSTEM,
+        BlastRadius.SUBSTRATE,
+    } and proposal_type in {
+        ProposalType.ADR_CHANGE,
+        ProposalType.CONFIG_CHANGE,
+        ProposalType.SPEC_CHANGE,
+    }
 
 
 def _find_claim_entry(
@@ -222,11 +235,53 @@ class GatewayTools:
         dna_hash: str,
         *,
         voter_factory: Optional[VoterFactory] = None,
+        workspace_root: Path | str | None = None,
     ) -> None:
         self._cell = CellDirectory(base_dir=base_dir, dna_hash=dna_hash)
         # voter_factory is lazy: default stays None so test harnesses that
         # don't exercise run_consensus_round never import voters.py / litellm.
         self._voter_factory: Optional[VoterFactory] = voter_factory
+        self._workspace_root = (
+            Path(workspace_root) if workspace_root is not None else _REPO_ROOT.parent
+        )
+
+    def _validate_provenance_evidence(
+        self, evidence: list[EvidenceRef]
+    ) -> tuple[bool, bool, list[str]]:
+        """Validate packet evidence and report whether any valid packet has consent."""
+
+        from packages.activity_log import provenance
+
+        has_valid_packet = False
+        has_consent = False
+        errors: list[str] = []
+        for ref in evidence:
+            if ref.type != "provenance_packet":
+                continue
+            packet_path = Path(ref.ref)
+            if not packet_path.is_absolute():
+                packet_path = self._workspace_root / ref.ref
+            if not packet_path.exists():
+                errors.append("E_PROVENANCE_PACKET_NOT_FOUND")
+                continue
+            if (
+                ref.sha256 is not None
+                and provenance.sha256_file(packet_path) != ref.sha256
+            ):
+                errors.append("E_PROVENANCE_SHA256_MISMATCH")
+                continue
+            result = provenance.validate_packet(
+                packet_path,
+                workspace_root=self._workspace_root,
+            )
+            if not result.ok:
+                errors.extend(result.errors)
+                continue
+            has_valid_packet = True
+            has_consent = has_consent or provenance.packet_has_consent(
+                result.packet or {}
+            )
+        return has_valid_packet, has_consent, errors
 
     # ------------------------------------------------------------------
     # Tool 1 — submit_claim
@@ -260,11 +315,30 @@ class GatewayTools:
                     "evidence items must be objects with 'type' and 'ref'"
                 )
             try:
-                ref = EvidenceRef(type=item["type"], ref=item["ref"])
+                ref = EvidenceRef(
+                    type=item["type"],
+                    ref=item["ref"],
+                    sha256=item.get("sha256"),
+                )
                 ref.validate()
                 ev_refs.append(ref)
             except (KeyError, TypeError, ValueError) as exc:
                 return _err(f"E_SUBMIT_CLAIM_INVALID_EVIDENCE: {exc}")
+
+        has_packet, has_consent, provenance_errors = self._validate_provenance_evidence(
+            ev_refs
+        )
+        if provenance_errors:
+            return _err(
+                "E_SUBMIT_CLAIM_INVALID_PROVENANCE: "
+                + ";".join(sorted(set(provenance_errors)))
+            )
+        if _is_governed_claim(pt, br) and (not has_packet or not has_consent):
+            return _err(
+                "E_GOVERNED_PROVENANCE_REQUIRED: System/Substrate "
+                "AdrChange/SpecChange/ConfigChange claims require valid "
+                "provenance_packet evidence with consent_ref"
+            )
 
         try:
             claim = Claim(
