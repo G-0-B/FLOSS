@@ -1,28 +1,41 @@
 {
+  "_comment": "Shared MCP servers wrapped through JanuScope (https://github.com/giancarloerra/JanuScope) for audit logging + instruction injection. Lens configs under .mcp/lenses/. Takes effect on next MCP-aware session start. Pre-JanuScope config preserved at .mcp.json.pre-januscope.bak.",
   "mcpServers": {
     "serena": {
-      "command": "C:/Python313/Scripts/uvx.exe",
+      "command": "npx",
       "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context=codex",
-        "--project-from-cwd",
-        "--enable-web-dashboard=false",
-        "--open-web-dashboard=false"
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/serena.yaml"
       ]
     },
     "flossiullk-consensus": {
-      "command": "C:/Python313/python.exe",
+      "command": "npx",
       "args": [
-        "-m",
-        "packages.metacoordinator_mcp.server"
-      ],
-      "env": {
-        "PYTHONPATH": "C:/~shit/FLOSS",
-        "FLOSS_DNA_HASH": "0000000000000000000000000000000000000000000000000000000000000000"
-      }
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/flossiullk-consensus.yaml"
+      ]
+    },
+    "flossiullk-reasoning-ensemble": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/flossiullk-reasoning-ensemble.yaml"
+      ]
+    },
+    "agentmemory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/agentmemory.yaml"
+      ]
     }
   }
 }

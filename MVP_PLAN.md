@@ -21,6 +21,8 @@ rollback_plan: "Each phase ships independently; any phase can stall without brea
 
 ---
 
+Current phase-status note (2026-05-18): MVP Phase 0 substrate viability is complete: DNA compiles to WASM, Holochain hApp/Tryorama integration tests pass, and ontology integrity unit tests pass. Do not confuse this with the separate orchestration substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md`, which remains Specified until publish/provenance/independent-verify/fork-visible criteria are executed and logged.
+
 ## The Honest State of Things
 
 ### What's REAL (verified, tested, working)

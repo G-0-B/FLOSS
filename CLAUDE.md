@@ -50,8 +50,6 @@ FLOSS/
 │   ├── specs/                                       # Entry type schemas (JSON Schema + .spec.md)
 │   └── guides/                                      # Onboarding, quick-start
 │
-├── FLOSSI_U_Founding_Kit_v1.6/                      # Parallel ADR track (ADR-001..019) + seed packet v1.6
-│                                                    #   (reconciliation with docs/adr/ pending)
 ├── archive/                                         # Superseded canonical versions — never delete
 │   ├── claude-md-versions/                          # 2025-11-16_v2.md lives here (the old giant guide)
 │   ├── metaprompt-versions/, arf-spec-versions/, ...
@@ -60,6 +58,8 @@ FLOSS/
 ```
 
 For the workspace root (`C:\~shit\`) and the intake-mouth convention, see `C:\~shit\INDEX.md`.
+
+**Sibling project:** `C:\~shit\FLOSSI_U/` is the Free YOU-niversity — a separate FLOSS educational/sovereignty project that shares the FLOSSI0ULLK family but has its own ADR-001..019 namespace and canon. Relocated 2026-05-11 from the prior co-located path `FLOSS/FLOSSI_U_Founding_Kit_v1.6/`. The two projects do not share ADR numbering.
 
 ## Layer Stack (from Master Metaprompt v1.3.1)
 
@@ -74,15 +74,19 @@ For the workspace root (`C:\~shit\`) and the intake-mouth convention, see `C:\~s
 | **4.5 — Local agent node** | MCP passive-router consensus gateway | `packages/` (096b058) |
 | **4.6 — Harness optimization** | Multi-harness routing, memory, retrieval, optimization | `docs/architecture/AGENTIC_OPERATING_MODEL.md` |
 
-## Current Phase: Phase 0 — Substrate Viability
+## Current Phase: Post-MVP Phase 0 / Bridge Validation
 
-Phase sequence: Foundation → **Phase 0 (substrate)** → Phase 1 (MVC) → Phase 2+
+Phase sequence: Foundation → **MVP Phase 0 (substrate viability)** → Phase 1 (MVC / KnowledgeTriple) + Orchestration Phase 0 bridge validation → Phase 2+
 
-Known Phase 0 items (verify current state before assuming any are still blockers — Kitsune2 landed in Holochain 2025, which may have changed the calculus):
+**Terminology correction (2026-05-18):** Do not collapse two different "Phase 0" gates.
 
-1. Rose Forest DNA has not yet been compiled (build infra was missing as of last audit)
-2. `ConversationMemory` ↔ `MultiScaleEmbedding` API reconciliation. A defensive metadata-normalization fix landed in commit `193729c` but the underlying API mismatch is a separate concern.
-3. ADR-0 Test #4 (Human Coherence) has not been run
+1. **MVP Phase 0 / Rose Forest substrate viability**: ✅ Complete per `MVP_PLAN.md` and cross-agent synthesis in `pprevious_working_task.md`: DNA compiles to WASM, hApp/Tryorama integration tests pass, and the ontology integrity layer has 38 passing unit tests. The round-trip test timed out once, then passed on rerun.
+2. **Orchestration Phase 0 / substrate bridge validation**: ⚠️ Specified in `docs/specs/phase0-substrate-bridge.spec.md`. This is the next coordination-proof gate: publish → provenance → independent verify → query discovery → fork visibility → no privileged verifier. It is not a repeat of the MVP Tryorama gate.
+3. **ADR-2 evidence drift**: ⚠️ `FLOSSI0ULLK-ADR-Suite-v2.0.md` still contains the older "full round-trip unvalidated" note. Treat that as pending ADR evidence reconciliation, not as the current operational state.
+4. `ConversationMemory` ↔ `MultiScaleEmbedding` API reconciliation. A defensive metadata-normalization fix landed in commit `193729c` but the underlying API mismatch is a separate concern still open.
+5. **ADR-0 Test #4 (Human Coherence)**: ✅ **PASSED 2026-03-20** (per ADR-0.1 v2.0, human-confirmed). All four ADR-0 validation criteria are now Verified — Recognition Protocol is **Validated**.
+
+**Active Holochain zome set**: the live `ARF/Cargo.toml` workspace contains only `dnas/rose_forest/zomes/integrity`, `coordinator`, `consent_integrity`, and `consent_coordinator`. These inherit `hdi = "=0.7.1"` / `hdk = "=0.6.1"` from the workspace. Older pinned folders (`hrea_*`, `identity_*`, `memory_coordinator`, `ontology_integrity`, and `infinity_bridge`) are excluded pre-migration dev artifacts, not current build blockers; migrate them before re-adding them to the workspace.
 
 An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`) implements a passive-router MCP consensus gateway with a file-based source chain that mirrors the eventual Holochain Cell structure 1:1. It accepts Claims and Votes from any agent (human, model, ensemble, or otherwise) and appends to disk. It is a router, not a controller — it does not decide outcomes or command voters.
 
@@ -147,12 +151,13 @@ ruff check .
 
 - **Master index**: `../INDEX.md` (workspace root)
 - **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`
-- **Architecture**: `docs/architecture/HOLISTIC_ARCHITECTURE.md` (verify existence before relying on)
+- **Architecture (teleological axis)**: `docs/architecture/HOLISTIC_ARCHITECTURE.md` — CCES 8-layer + Foundation Stack (what flourishing is being served)
+- **Architecture (operational axis)**: `docs/architecture/META_COORDINATION_KERNEL_v4.0.md` — 9-layer agent-centric stack + RICE overlay + Superalignment Triad + 10 named roles (what agents do, where authority sits). See §21 for the orthogonal-axis composition with CCES. Landed 2026-05-13 via consensus claim `019e2293` APPROVED mean +0.717.
 - **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`
 - **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
-- **Decision history**: `docs/adr/INDEX.md` (current set is 10 numbered ADRs + `ADR-MCP-ORCHESTRATOR`)
+- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (current set per v2.0 suite is ADR-0, 0.1, 1–11; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10; ADR-N (IPFS) was assigned ADR-11)
 - **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
-- **Local agent node**: `docs/adr/ADR-MCP-ORCHESTRATOR.md`
+- **Local agent node**: `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 in the v2.0 suite)
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`
 - **Symbolic first core**: `ARF/SYMBOLIC_FIRST_CORE.md`
 - **Integration map**: `ARF/INTEGRATION_MAP.md`
