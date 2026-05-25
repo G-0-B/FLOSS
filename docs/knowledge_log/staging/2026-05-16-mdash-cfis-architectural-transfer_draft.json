@@ -1,0 +1,6 @@
+{
+  "file_path": "C:\\~shit\\FLOSS\\docs\\research\\2026-05-16-mdash-cfis-architectural-transfer.md",
+  "model": "groq/llama-3.3-70b-versatile",
+  "staged_at": "20260517T033406Z",
+  "insights": "### Chunk 1/1\n### Key Paradigm Shifts / Vision\n* Empirical validation of CFIS architecture class through Microsoft's MDASH announcement\n* Shift from single-model approaches to multi-model, multi-agent security harness\n* Emphasis on \"the harness is the product, the model is one input\" design principle\n\n### Architectural Constraints or Invariants\n* Auditor/Debater/Prover triad per protocol step\n* Prove Gate between Q-score and Tier-1/2 certification\n* Model Invariant Layer (MIL) for model-agnostic components\n* Frame Context Plugin (FCP) for injectable domain knowledge\n* Divergence Stress-Test Agent (DST-A) for T4 epistemically stronger validation\n\n### Missing links or open contradictions\n* Dual-use risk: same architecture that finds defender bugs finds attacker zero-days\n* Lack of institutional backstop for FLOSSI0ULLK, unlike Microsoft's MSRC and Patch Tuesday\n* Need for separate ADR-THREAT-MODEL pass before deploying prove-stage at FLOSSI0ULLK consensus gateway\n* Unverified Claude Mythos Preview score and model-identity attribution"
+}
