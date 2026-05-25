@@ -42,6 +42,8 @@ from materialize_shared_context_surface import (
 )
 from materialize_shared_hook_surface import materialize as materialize_hook_surface
 from materialize_shared_skill_surface import materialize as materialize_skill_surface
+from materialize_shared_agent_memory import materialize as materialize_memory_surface
+from materialize_shared_ai_roster import materialize as materialize_ai_roster_surface
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKSPACE_ROOT = REPO_ROOT.parent
@@ -49,6 +51,8 @@ DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-agent-surface.json"
 DEFAULT_CONTEXT_MANIFEST_PATH = REPO_ROOT / "shared-context-surface.json"
 DEFAULT_HOOK_MANIFEST_PATH = REPO_ROOT / "shared-hook-surface.json"
 DEFAULT_SKILL_MANIFEST_PATH = REPO_ROOT / "shared-skill-surface.json"
+DEFAULT_MEMORY_MANIFEST_PATH = REPO_ROOT / "shared-agent-memory-surface.json"
+DEFAULT_AI_ROSTER_MANIFEST_PATH = REPO_ROOT / "shared-ai-roster-surface.json"
 
 
 class SharedSurfaceError(Exception):
@@ -318,6 +322,83 @@ def build_opencode_payload(
     return payload
 
 
+def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
+    agent_name = (
+        str(opencode_cfg.get("default_agent", "openwork")).strip() or "openwork"
+    )
+    display_name = (
+        "OpenWork"
+        if agent_name.lower() == "openwork"
+        else agent_name[:1].upper() + agent_name[1:]
+    )
+    description = str(
+        opencode_cfg.get(
+            "agent_description",
+            "OpenWork default FLOSSI0ULLK worker generated from the shared surface.",
+        )
+    )
+    pointers = opencode_cfg.get("startup_context_pointers", [])
+    if not isinstance(pointers, list) or not all(
+        isinstance(item, str) for item in pointers
+    ):
+        raise SharedSurfaceError(
+            "OpenCode target field `startup_context_pointers` must be a list of strings"
+        )
+    if not pointers:
+        pointers = [
+            ".agent-surface/context/CONTEXT_L0.md",
+            ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
+            ".agent-surface/memory/AGENT_MEMORY.md",
+            "AGENTMEMORY.md",
+        ]
+
+    lines = [
+        "---",
+        f"description: {description}",
+        "mode: primary",
+        "temperature: 0.2",
+        "---",
+        "",
+        f"You are {display_name}.",
+        "",
+        'When the user refers to "you", they mean the OpenWork app and the current workspace.',
+        "",
+        "## Mandatory Startup",
+        "",
+        "Load these surfaces first, selectively and in order:",
+        "",
+    ]
+    for pointer in pointers:
+        lines.append(f"- `{pointer}`")
+    lines.extend(
+        [
+            "",
+            "## Shared Invariants",
+            "",
+            "- Repository canon wins over generated projections, agentmemory recall, and pasted status reports.",
+            "- agentmemory is a recall/federation surface; promote load-bearing conclusions through repo memory, working todo, specs, ADRs, or source-chain claims.",
+            "- Every load-bearing cross-agent handoff should cite or generate provenance packet evidence.",
+            "- Use `.agent-surface/harness/AI_ROSTER.md` for the current aggregated AI/provider/harness roster.",
+            "- Do not hand-edit generated projections when the shared manifest can be updated instead.",
+            "- Use one primary writer for a concrete change set; use other models as critics, voters, or evidence sources.",
+            "",
+            "## Work Loop",
+            "",
+            "- Route context before bulk-loading files.",
+            "- Make the smallest useful change against canon.",
+            "- Run focused verification before claiming success.",
+            "- Append durable traces or update shared memory when a finding must survive this session.",
+            "",
+            "## Privacy Boundary",
+            "",
+            "- Never copy private memory, secrets, tokens, or credentials into repo files.",
+            "- Store only redacted summaries, schemas, stable pointers, and reproducible commands.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
     path = Path(raw_path).expanduser()
     if path.is_absolute():
@@ -449,9 +530,39 @@ def build_vibe_config(
 
     lines = [
         f"active_model = {toml_scalar(vibe_cfg.get('active_model', 'devstral-small'))}",
+        f"default_agent = {toml_scalar(vibe_cfg.get('default_agent', 'default'))}",
+        f"include_project_context = {toml_scalar(bool(vibe_cfg.get('include_project_context', True)))}",
         f"context_warnings = {toml_scalar(bool(vibe_cfg.get('context_warnings', True)))}",
         f"enable_auto_update = {toml_scalar(bool(vibe_cfg.get('enable_auto_update', True)))}",
     ]
+
+    agent_paths = [
+        resolve_manifest_path(workspace_root, raw_path).as_posix()
+        for raw_path in vibe_cfg.get("agent_paths", [])
+    ]
+    if agent_paths:
+        lines.append(f"agent_paths = {toml_list(agent_paths)}")
+
+    enabled_agents = vibe_cfg.get("enabled_agents", [])
+    if enabled_agents:
+        if not isinstance(enabled_agents, list) or not all(
+            isinstance(item, str) for item in enabled_agents
+        ):
+            raise SharedSurfaceError(
+                "Vibe target field `enabled_agents` must be a list of strings"
+            )
+        lines.append(f"enabled_agents = {toml_list(enabled_agents)}")
+
+    disabled_agents = vibe_cfg.get("disabled_agents", [])
+    if disabled_agents:
+        if not isinstance(disabled_agents, list) or not all(
+            isinstance(item, str) for item in disabled_agents
+        ):
+            raise SharedSurfaceError(
+                "Vibe target field `disabled_agents` must be a list of strings"
+            )
+        lines.append(f"disabled_agents = {toml_list(disabled_agents)}")
+
     if skill_paths:
         lines.append(f"skill_paths = {toml_list(skill_paths)}")
     if enabled_skills:
@@ -495,6 +606,56 @@ def build_vibe_config(
                     value = float(value)
                 lines.append(f"{field_name} = {toml_scalar(value)}")
 
+    return "\n".join(lines) + "\n"
+
+
+def build_vibe_startup_prompt(vibe_cfg: dict[str, Any]) -> str:
+    """Build the orientation prompt passed to new interactive Vibe sessions."""
+    pointers = vibe_cfg.get("startup_context_pointers", [])
+    if not isinstance(pointers, list) or not all(
+        isinstance(item, str) for item in pointers
+    ):
+        raise SharedSurfaceError(
+            "Vibe target field `startup_context_pointers` must be a list of strings"
+        )
+    if not pointers:
+        pointers = [
+            ".agent-surface/context/CONTEXT_L0.md",
+            ".agent-surface/context/RESUMPTION.md",
+            ".agent-surface/memory/AGENT_MEMORY.md",
+            ".agent-surface/CONTEXT_POINTERS.md",
+        ]
+
+    lines = [
+        "# FLOSSI0ULLK Vibe Startup",
+        "",
+        "Before proposing work, read the current shared surfaces below and align to them.",
+        "",
+        "## Current Hard Corrections",
+        "",
+        "- MVP Phase 0 substrate viability is complete. DNA/WASM/Tryorama are not the current gate.",
+        "- Do not restart old Tryorama/Phase 0 work unless explicitly asked to audit evidence drift.",
+        "- Current gate is orchestration substrate-bridge validation plus Phase 1 KnowledgeTriple/MVC work.",
+        "- The heartbeat STOP file is intentionally present after the 2026-05-19 Groq token-burn fix.",
+        "- Routine background consensus uses `balanced`; `diverse-max` is intentional spend, not default health checking.",
+        "- Specs and tests lead code changes: update `FLOSS/docs/specs/` before runtime behavior changes.",
+        "",
+        "## Read First",
+        "",
+    ]
+    lines.extend(f"- `{pointer}`" for pointer in pointers)
+    lines.extend(
+        [
+            "",
+            "After reading, answer with:",
+            "",
+            "1. current phase status in one sentence;",
+            "2. any detected drift or uncertainty;",
+            "3. one highest-leverage next action, if the user asks for action.",
+            "",
+            "This file is generated by `FLOSS/scripts/materialize_shared_agent_surface.py`.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -543,11 +704,15 @@ def build_vibe_launcher(vibe_cfg: dict[str, Any]) -> str:
     """Build the PowerShell launcher for the local Vibe workspace projection."""
     env_rel = str(vibe_cfg.get("env_path", "FLOSS/.env"))
     python_exe = str(vibe_cfg.get("python_exe", "C:/Python313/python.exe"))
+    startup_prompt_rel = str(
+        vibe_cfg.get("startup_prompt_path", ".agent-surface/VIBE_STARTUP.md")
+    )
     script = f"""
     $ErrorActionPreference = "Stop"
 
     $workspaceRoot = (Split-Path -Parent $PSCommandPath)
     $envFile = Join-Path $workspaceRoot "{env_rel.replace('/', '\\')}"
+    $startupPromptPath = Join-Path $workspaceRoot "{startup_prompt_rel.replace('/', '\\')}"
     $vibeFallback = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
     $vibeCommand = Get-Command vibe.exe -ErrorAction SilentlyContinue
     if (-not $vibeCommand) {{
@@ -636,15 +801,37 @@ path.write_text(
 
     $argList = [System.Collections.Generic.List[string]]::new()
     $hasWorkdir = $false
+    $hasPromptArg = $false
+    $promptValueOptions = @("-p", "--prompt")
+    $valueOnlyOptions = @("--agent", "--workdir", "--add-dir", "--max-turns", "--max-price", "--enabled-tools", "--output")
+    $utilityOptions = @("-h", "--help", "-v", "--version", "--setup", "--resume", "-c")
+    $expectingValueOnly = $false
     foreach ($arg in $args) {{
+        if ($expectingValueOnly) {{
+            $expectingValueOnly = $false
+            $argList.Add($arg)
+            continue
+        }}
         if ($arg -eq "--workdir") {{
             $hasWorkdir = $true
+        }}
+        if ($utilityOptions -contains $arg) {{
+            $hasPromptArg = $true
+        }} elseif ($promptValueOptions -contains $arg) {{
+            $hasPromptArg = $true
+        }} elseif ($valueOnlyOptions -contains $arg) {{
+            $expectingValueOnly = $true
+        }} elseif (-not $arg.StartsWith("-")) {{
+            $hasPromptArg = $true
         }}
         $argList.Add($arg)
     }}
     if (-not $hasWorkdir) {{
         $argList.Add("--workdir")
         $argList.Add($workspaceRoot)
+    }}
+    if (-not $hasPromptArg -and (Test-Path $startupPromptPath)) {{
+        $argList.Add((Get-Content $startupPromptPath -Raw))
     }}
 
     & $vibeExe @argList
@@ -749,6 +936,42 @@ def materialize(
         results.append(message)
         drift_found = drift_found or changed
 
+        agent_instruction_raw = opencode_cfg.get("agent_instruction_path")
+        if agent_instruction_raw is not None:
+            if (
+                not isinstance(agent_instruction_raw, str)
+                or not agent_instruction_raw.strip()
+            ):
+                raise SharedSurfaceError(
+                    "OpenCode target field `agent_instruction_path` must be a non-empty string"
+                )
+            agent_instruction_path = workspace_root / agent_instruction_raw
+            message, changed = check_or_write_text(
+                agent_instruction_path,
+                build_opencode_agent_instruction(opencode_cfg),
+                check=check,
+                dry_run=dry_run,
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+
+        startup_prompt_raw = vibe_cfg.get("startup_prompt_path")
+        if startup_prompt_raw is not None:
+            if (
+                not isinstance(startup_prompt_raw, str)
+                or not startup_prompt_raw.strip()
+            ):
+                raise SharedSurfaceError(
+                    "Vibe target field `startup_prompt_path` must be a non-empty string"
+                )
+            startup_prompt_path = workspace_root / startup_prompt_raw
+            startup_prompt = build_vibe_startup_prompt(vibe_cfg)
+            message, changed = check_or_write_text(
+                startup_prompt_path, startup_prompt, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+
         agents_dir_raw = vibe_cfg.get("agents_dir")
         if agents_dir_raw is not None and not isinstance(agents_dir_raw, str):
             raise SharedSurfaceError("Vibe target field `agents_dir` must be a string")
@@ -783,6 +1006,16 @@ def materialize(
             results.append(message)
             drift_found = drift_found or changed
 
+    if DEFAULT_AI_ROSTER_MANIFEST_PATH.exists():
+        roster_results, roster_drift = materialize_ai_roster_surface(
+            workspace_root=workspace_root,
+            manifest_path=DEFAULT_AI_ROSTER_MANIFEST_PATH,
+            check=check,
+            dry_run=dry_run,
+        )
+        results.extend(roster_results)
+        drift_found = drift_found or roster_drift
+
     if DEFAULT_CONTEXT_MANIFEST_PATH.exists():
         context_results, context_drift = materialize_context_surface(
             workspace_root=workspace_root,
@@ -815,6 +1048,20 @@ def materialize(
         )
         results.extend(skill_results)
         drift_found = drift_found or skill_drift
+
+    if DEFAULT_MEMORY_MANIFEST_PATH.exists():
+        memory_results = materialize_memory_surface(
+            workspace_root=workspace_root,
+            manifest_path=DEFAULT_MEMORY_MANIFEST_PATH,
+            output_dir=workspace_root / ".agent-surface" / "memory",
+            check=check,
+            dry_run=dry_run,
+        )
+        results.extend(memory_results)
+        drift_found = drift_found or any(
+            message.startswith(("WROTE", "PLAN  WRITE", "CHECK DRIFT"))
+            for message in memory_results
+        )
 
     return results, drift_found
 

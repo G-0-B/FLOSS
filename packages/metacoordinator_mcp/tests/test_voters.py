@@ -155,6 +155,20 @@ def test_profile_alias_resolves_to_underlying_registry_profile():
     }
 
 
+def test_heartbeat_alias_uses_budget_safe_balanced_profile():
+    """Routine heartbeat profile must not expand to diverse-max by alias."""
+    with patched_env(
+        CEREBRAS_API_KEY="test-cerebras-key",
+        GROQ_API_KEY="test-groq-key",
+    ):
+        resolved = resolve_default_voter_specs(profile="heartbeat")
+    assert resolved == {
+        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+    }
+
+
 def test_mistral_profile_enables_when_api_key_is_present():
     """Enable the Mistral free roster when its API key is available."""
     with patched_env(MISTRAL_API_KEY="test-mistral-key"):
@@ -220,6 +234,7 @@ def _run_all() -> int:
         test_flowith_profile_enables_when_api_key_is_present,
         test_flowith_profile_reports_missing_credentials_cleanly,
         test_profile_alias_resolves_to_underlying_registry_profile,
+        test_heartbeat_alias_uses_budget_safe_balanced_profile,
         test_mistral_profile_enables_when_api_key_is_present,
         test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist,
         test_diverse_plus_profile_adds_optional_openai_lane_when_available,

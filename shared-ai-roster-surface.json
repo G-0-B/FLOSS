@@ -1,0 +1,140 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "updated": "2026-05-25",
+  "outputs": {
+    "registry": ".agent-surface/harness/ai-roster.json",
+    "markdown": ".agent-surface/harness/AI_ROSTER.md",
+    "update_packet": ".agent-surface/harness/HARNESS_UPDATE_PACKET.md"
+  },
+  "markdown_model_limit_per_provider": 40,
+  "rules": [
+    "This manifest owns the generated cross-harness AI/provider inventory.",
+    "The JSON roster is the comprehensive machine inventory; the markdown roster is the human-readable summary.",
+    "Generated roster artifacts are not canon by themselves; update this manifest and source configs, then regenerate.",
+    "Provider/model availability is config-derived and may be stale until the owning cloud/provider import is refreshed."
+  ],
+  "invariants": [
+    "Repository canon wins over generated projections, agentmemory recall, and pasted cross-agent status.",
+    "agentmemory is Plane A recall/federation infrastructure; load-bearing conclusions must be promoted through repo memory, working todo, specs, ADRs, or source-chain claims.",
+    "Load-bearing cross-agent handoffs require provenance packet evidence when they bind System/Substrate claims.",
+    "One primary writer owns a change set; other AI surfaces act as critics, voters, retrievers, or evidence sources unless explicitly handed the write lease."
+  ],
+  "named_model_families": [
+    {
+      "id": "openai",
+      "label": "OpenAI / ChatGPT",
+      "patterns": ["openai/", "gpt-", "/o1", "/o3", "/o4"]
+    },
+    {
+      "id": "claude",
+      "label": "Claude / Anthropic",
+      "patterns": ["anthropic/", "claude"]
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini / Google",
+      "patterns": ["google/gemini", "gemini"]
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi / Moonshot",
+      "patterns": ["moonshotai/", "kimi"]
+    },
+    {
+      "id": "grok",
+      "label": "Grok / x.ai",
+      "patterns": ["xai/", "grok"]
+    },
+    {
+      "id": "mistral",
+      "label": "Mistral",
+      "patterns": ["mistral", "codestral", "devstral", "magistral"]
+    },
+    {
+      "id": "groq",
+      "label": "Groq-hosted",
+      "patterns": ["groq/"]
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "patterns": ["deepseek"]
+    },
+    {
+      "id": "qwen",
+      "label": "Qwen / Alibaba",
+      "patterns": ["qwen", "alibaba/"]
+    }
+  ],
+  "mcp_sources": [
+    {
+      "id": "root-shared-mcp",
+      "kind": "mcp_json",
+      "path": ".mcp.json"
+    },
+    {
+      "id": "opworkers-opencode-mcp",
+      "kind": "opencode",
+      "path": "opworkers/opencode.jsonc"
+    }
+  ],
+  "provider_sources": [
+    {
+      "id": "root-openwork-provider-import",
+      "kind": "opencode",
+      "path": "opencode.jsonc"
+    },
+    {
+      "id": "opworkers-openwork-cloud-import",
+      "kind": "openwork_cloud",
+      "path": "opworkers/.opencode/openwork.json"
+    }
+  ],
+  "instruction_surfaces": [
+    {
+      "id": "workspace-agents",
+      "path": "AGENTS.md"
+    },
+    {
+      "id": "workspace-claude",
+      "path": "CLAUDE.md"
+    },
+    {
+      "id": "workspace-gemini",
+      "path": "GEMINI.md"
+    },
+    {
+      "id": "agentmemory-operator",
+      "path": "AGENTMEMORY.md"
+    },
+    {
+      "id": "project-claude",
+      "path": "FLOSS/CLAUDE.md"
+    },
+    {
+      "id": "metaharness-operating-model",
+      "path": "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md"
+    },
+    {
+      "id": "provenance-packet-spec",
+      "path": "FLOSS/docs/specs/provenance-packet.spec.md"
+    }
+  ],
+  "agent_sources": [
+    {
+      "id": "opencode-openwork-agent",
+      "path": "opworkers/.opencode/agents/openwork.md"
+    },
+    {
+      "id": "opencode-skills",
+      "glob": "opworkers/.opencode/skills/*/SKILL.md"
+    },
+    {
+      "id": "vibe-agents",
+      "glob": ".vibe/agents/*.toml"
+    }
+  ],
+  "memory_manifest": "FLOSS/shared-agent-memory-surface.json"
+}

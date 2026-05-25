@@ -7,8 +7,9 @@ the local source chain, and writes a reusable poll summary to disk.
 Default usage:
     python FLOSS/scripts/poll_high_roi_actions.py
 
-By default this uses the `diverse` profile, which is intended for planning
-polls where correlated bias matters more than raw voter count.
+By default this uses the `balanced` profile. Use `--profile diverse` or
+`--profile diverse-max` only when the extra provider breadth is worth the
+token budget.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE_ROOT = REPO_ROOT.parent
 ENV_PATH = REPO_ROOT / ".env"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / ".agent-surface" / "polls"
+DYNAMIC_SLATE_PATH = WORKSPACE_ROOT / ".agent-surface" / "heartbeat" / "next_slate.json"
+DYNAMIC_SLATE_MAX_AGE_SECONDS = 3600  # accept slate up to 1 hour old
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -36,13 +39,131 @@ from packages.metacoordinator_mcp.voters import (  # noqa: E402
     build_default_voters,
     describe_default_roster,
 )
+from packages.activity_log import Action, append_action  # noqa: E402
 
 
 def utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _workspace_rel(path_value: object) -> str:
+    path = Path(str(path_value))
+    try:
+        if path.is_absolute():
+            return path.relative_to(WORKSPACE_ROOT).as_posix()
+    except ValueError:
+        pass
+    return path.as_posix()
+
+
+def _duration_since(started_at: str) -> tuple[str, float]:
+    ended_at = datetime.now(timezone.utc).isoformat()
+    try:
+        start_dt = datetime.fromisoformat(started_at)
+        end_dt = datetime.fromisoformat(ended_at)
+        return ended_at, round((end_dt - start_dt).total_seconds(), 3)
+    except (TypeError, ValueError):
+        return ended_at, 0.0
+
+
+def emit_poll_action(payload: dict[str, Any], started_at: str) -> None:
+    """Tee a completed high-ROI poll into the global Action log."""
+    ended_at, duration = _duration_since(started_at)
+    results = payload.get("results", [])
+    enabled_roster = [
+        item for item in payload.get("roster", [])
+        if isinstance(item, dict) and item.get("enabled")
+    ]
+    json_path = payload.get("json_path")
+    markdown_path = payload.get("markdown_path")
+    staging_paths = [
+        _workspace_rel(path)
+        for path in (json_path, markdown_path)
+        if path
+    ]
+
+    append_action(Action(
+        action_id=f"poll-{payload.get('poll_stamp', utc_stamp())}",
+        kind="high_roi_poll",
+        harness="poll_high_roi_actions.py",
+        started_at=started_at,
+        ended_at=ended_at,
+        duration_seconds=duration,
+        success=True,
+        inputs={
+            "profile": payload.get("profile"),
+            "poll_stamp": payload.get("poll_stamp"),
+            "roster_enabled": [
+                {"name": item.get("name"), "model": item.get("model")}
+                for item in enabled_roster
+            ],
+        },
+        outputs={
+            "result_count": len(results),
+            "top_slug": results[0].get("slug") if results else None,
+            "json_path": _workspace_rel(json_path) if json_path else None,
+            "markdown_path": _workspace_rel(markdown_path) if markdown_path else None,
+        },
+        llm_calls=[{
+            "model": item.get("model"),
+            "provider": item.get("provider", item.get("name")),
+            "prompt_hash": "",
+            "response_hash": "",
+            "duration_seconds": 0.0,
+            "error": None,
+        } for item in enabled_roster],
+        staging_paths=staging_paths,
+    ))
+
+
+def _load_dynamic_slate() -> list[dict[str, Any]] | None:
+    """Return the heartbeat-generated dynamic slate if fresh, else None.
+
+    Reads `.agent-surface/heartbeat/next_slate.json` produced by
+    `heartbeat_slate.py`. Accepts the slate if its file mtime is within
+    DYNAMIC_SLATE_MAX_AGE_SECONDS. Falls back to None (and the static
+    baseline below) on any read/parse/age failure — fail-safe to the
+    hardcoded slate rather than failing the poll.
+    """
+    if not DYNAMIC_SLATE_PATH.exists():
+        return None
+    try:
+        age_seconds = (
+            datetime.now(timezone.utc).timestamp()
+            - DYNAMIC_SLATE_PATH.stat().st_mtime
+        )
+        if age_seconds > DYNAMIC_SLATE_MAX_AGE_SECONDS:
+            return None
+        payload = json.loads(DYNAMIC_SLATE_PATH.read_text(encoding="utf-8"))
+        candidates = payload.get("poll_compatible", [])
+        if not isinstance(candidates, list) or not candidates:
+            return None
+        # Minimal shape check: every candidate must have the keys the poll
+        # uses. Anything malformed → discard the whole slate, fall back to
+        # static. Don't half-trust a corrupted dynamic source.
+        required_keys = {"slug", "proposal_type", "summary", "body", "evidence"}
+        for c in candidates:
+            if not isinstance(c, dict) or not required_keys.issubset(c.keys()):
+                return None
+        return candidates
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+
+
 def candidate_claims() -> list[dict[str, Any]]:
+    """Return the slate to poll. Prefers the dynamic slate when present and
+    fresh; falls back to the hardcoded strategic baseline below.
+
+    The dynamic slate (produced by heartbeat_slate.py) reflects what is
+    actually accumulating in the workspace (filewatch events, staging
+    backlog, etc.). The static slate below is the strategic baseline that
+    runs when nothing newer has been generated — never deleted, always
+    available as a safe fallback.
+    """
+    dynamic = _load_dynamic_slate()
+    if dynamic is not None:
+        return dynamic
+
     shared_evidence = [
         {"type": "spec", "ref": "docs/architecture/METAHARNESS_OPERATING_MODEL.md"},
         {
@@ -172,6 +293,8 @@ def build_markdown_summary(payload: dict[str, Any]) -> str:
 
 
 def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
+    started_at = datetime.now(timezone.utc).isoformat()
+
     if ENV_PATH.exists():
         load_dotenv(ENV_PATH)
 
@@ -246,13 +369,14 @@ def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
     md_path.write_text(build_markdown_summary(payload), encoding="utf-8")
     payload["json_path"] = str(json_path)
     payload["markdown_path"] = str(md_path)
+    emit_poll_action(payload, started_at)
     return payload
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a durable high-ROI action poll")
     parser.add_argument(
-        "--profile", default="diverse", help="Voter profile to use (default: diverse)"
+        "--profile", default="balanced", help="Voter profile to use (default: balanced)"
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser.parse_args()

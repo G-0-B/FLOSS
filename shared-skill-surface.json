@@ -87,6 +87,25 @@
       "upstreams": [
         "holochain-agent-skill"
       ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/reasoning-ensemble",
+      "category": "reasoning",
+      "summary": "Selective Router/Synthesizer workflow for multi-model deliberation on substantive FLOSSI0ULLK decisions.",
+      "upstreams": [
+        "context-engineering-kit",
+        "OpenViking",
+        "atomic-agents"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/recent-open-distributed-intelligence-research",
+      "category": "research",
+      "summary": "Live-source research workflow for recent open distributed intelligence, agent-centric substrates, decentralized MAS, federated learning, and agent interoperability protocols.",
+      "upstreams": [
+        "context-engineering-kit",
+        "OpenViking"
+      ]
     }
   ]
 }

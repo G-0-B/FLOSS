@@ -30,6 +30,7 @@ import os
 import subprocess
 import sys
 import traceback
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -241,13 +242,18 @@ def main() -> int:
             verify_tool_edit,
         )
         from packages.metacoordinator_mcp.tools import GatewayTools
+        from packages.activity_log import provenance
     except Exception:  # noqa: BLE001
         log(f"[hook] GatewayTools import failed:\n{traceback.format_exc()}")
         return finish()
 
     try:
         dna_hash = os.environ.get("FLOSS_DNA_HASH", "0" * 64)
-        gw = GatewayTools(base_dir=AGENT_DIR, dna_hash=dna_hash)
+        gw = GatewayTools(
+            base_dir=AGENT_DIR,
+            dna_hash=dna_hash,
+            workspace_root=REPO_ROOT.parent,
+        )
     except Exception:  # noqa: BLE001
         log(f"[hook] GatewayTools init failed:\n{traceback.format_exc()}")
         return finish()
@@ -306,6 +312,58 @@ def main() -> int:
         f"Blast radius is Local — the hook never auto-escalates."
     )
 
+    evidence: list[dict] = []
+    try:
+        edited_path = Path(file_path).resolve()
+        if edited_path.exists():
+            packet_entry = {
+                "claim_type": "CodeChange",
+                "truth_status": "specified",
+                "source_systems": [surface, "hook_post_write.py"],
+                "created_at": datetime.now(timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "human_collision_node": os.environ.get(
+                    "FLOSS_HUMAN_COLLISION_NODE", "local-operator"
+                ),
+                "artifact_refs": [
+                    provenance.artifact_ref(
+                        edited_path,
+                        workspace_root=REPO_ROOT.parent,
+                    )
+                ],
+                "evidence_refs": [
+                    {
+                        "type": "test",
+                        "ref": f"hashline:{verification.get('status', 'UNKNOWN')}",
+                    }
+                ],
+                "risks": [],
+                "benefits": [],
+                "next_action": "submit local code-change claim",
+            }
+            packet, packet_path = provenance.create_packet(
+                [packet_entry],
+                identity_dir=AGENT_DIR / "identity",
+                output_root=REPO_ROOT.parent / ".agent-surface" / "provenance",
+            )
+            evidence.append(
+                {
+                    "type": "provenance_packet",
+                    "ref": packet_path.resolve()
+                    .relative_to(REPO_ROOT.parent.resolve())
+                    .as_posix(),
+                    "sha256": provenance.sha256_file(packet_path),
+                }
+            )
+            log(f"[hook] provenance packet {packet['d']} for {rel_path}")
+    except Exception as exc:  # noqa: BLE001
+        log(
+            f"[hook] provenance packet failed for {rel_path}: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
     try:
         result_str = gw.submit_claim(
             proposer=f"{surface}-hook",
@@ -313,6 +371,7 @@ def main() -> int:
             summary=summary,
             body=body,
             blast_radius="Local",
+            evidence=evidence,
         )
         result = json.loads(result_str)
     except Exception:  # noqa: BLE001

@@ -132,6 +132,127 @@ def _parse_rationale(text: str) -> str:
     return m.group(1).strip()[:500]
 
 
+# ---------------------------------------------------------------------------
+# OMO AGENT PERSONAS — system-prompts adapted from oh-my-openagent agent
+# definitions. Each persona shapes the underlying model's cognitive style so a
+# single LLM can vote with multiple different "minds." The architectural value:
+# adds *style* diversity (not just model-family diversity) to the consensus
+# roster — different agents notice different things.
+#
+# Source: C:\Users\kalis\.cache\opencode\node_modules\oh-my-opencode\dist\
+#         index.js MOMUS_DEFAULT_PROMPT (oh-my-opencode v4.0.0)
+# Adapted: omo's Momus reviews ".sisyphus/plans/*.md" files. We retarget the
+# review philosophy at Claim text directly while preserving the
+# "blocker-finder not perfectionist, APPROVE by default" disposition.
+# ---------------------------------------------------------------------------
+
+MOMUS_PERSONA_SYSTEM = """You are Momus, a practical proposal reviewer adapted from the oh-my-openagent multi-agent system. Your goal is simple: verify that the proposed change is **executable** and **references are valid**.
+
+## Your Purpose
+
+You exist to answer ONE question: "Can a capable contributor execute this proposal without getting stuck?"
+
+You are NOT here to:
+- Nitpick every detail
+- Demand perfection
+- Question the author's approach or architecture choices
+- Find as many issues as possible
+
+You ARE here to:
+- Verify referenced files/specs/ADRs actually exist and contain what's claimed
+- Ensure the proposal has enough context to start working
+- Catch BLOCKING issues only (things that would completely stop work)
+
+**APPROVAL BIAS**: When in doubt, APPROVE. A proposal that's 80% clear is good enough.
+
+## What You Check (ONLY THESE)
+
+1. **Reference verification** — do referenced specs/ADRs/files exist and contain what's claimed?
+2. **Executability** — can a contributor START on this without immediate dead-ends?
+3. **Critical blockers only** — missing info that would COMPLETELY STOP work, or contradictions
+
+**NOT blockers**: missing edge cases, stylistic preferences, "could be clearer," minor ambiguities.
+
+## What You Do NOT Check
+
+- Whether the approach is optimal
+- Whether there's a "better way"
+- Whether all edge cases are documented
+- Code quality concerns unless explicitly broken
+- Performance considerations
+- Security unless explicitly broken
+
+You are a BLOCKER-finder, not a PERFECTIONIST. Your job is to UNBLOCK work, not BLOCK it with perfectionism.
+
+## Translating to consensus vote
+
+Map your verdict into the WEIGHT format the consensus gate expects:
+- No blockers found, executable, references valid → WEIGHT around +0.6 to +0.7
+- Minor concerns but proposal still proceedable → WEIGHT around +0.3
+- Genuine blockers (max 3) → WEIGHT around -0.7 to -0.9
+- Insufficient information to judge → WEIGHT around 0.0
+
+Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific blocker(s) you found."""
+
+
+def make_omo_momus_voter(
+    name: str,
+    model: str,
+    *,
+    max_tokens: int = 3000,
+    temperature: float = 0.1,
+) -> Voter:
+    """Build a Momus-style consensus voter — practical blocker-finder.
+
+    Wraps a chosen model with Momus's review philosophy (approve-by-default,
+    blocker-finder, max 3 issues). The model gets Momus as a SYSTEM message and
+    the standard VOTER_PROMPT as USER message, then parses WEIGHT/RATIONALE
+    output the same way other voters do.
+
+    Architectural value: adds cognitive-style diversity. Momus notices things
+    a vanilla "evaluate this claim" voter does not, because it specifically
+    looks for unresolved references and dead-on-arrival executability gaps
+    rather than generally vibing on the proposal.
+    """
+
+    def voter(claim: Claim) -> Vote:
+        """Call the underlying model with Momus persona + standard voter prompt."""
+        user_prompt = VOTER_PROMPT.format(
+            proposer=claim.proposer,
+            proposal_type=claim.proposal_type.value,
+            blast_radius=claim.blast_radius.value,
+            summary=claim.summary,
+            body=claim.body,
+        )
+        try:
+            from litellm import completion
+
+            resp = completion(
+                model=model,
+                messages=[
+                    {"role": "system", "content": MOMUS_PERSONA_SYSTEM},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            return Vote(
+                voter=name,
+                weight=0.0,
+                rationale=f"[voter error] {type(exc).__name__}: {exc}"[:500],
+            )
+
+        cleaned = _strip_thinking(text)
+        weight = _parse_weight(cleaned)
+        rationale = _parse_rationale(cleaned)
+        return Vote(voter=name, weight=weight, rationale=rationale)
+
+    voter.__name__ = f"omo_momus_voter_{name}"
+    return voter
+
+
 def make_litellm_voter(
     name: str,
     model: str,
@@ -300,7 +421,7 @@ def make_flowith_voter(
             )
             response = requests.post(
                 f"https://{host}{path}",
-                json=request_body,
+                data=request_body,
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
@@ -545,7 +666,14 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
         )
     voters: list[Voter] = []
     for name, model in resolved.items():
-        if model.strip().lower().startswith("flowith/"):
+        lower_name = name.strip().lower()
+        lower_model = model.strip().lower()
+        # Route by voter NAME prefix (omo agents inject persona via system
+        # message; the model is just the substrate). Then by model prefix
+        # (flowith) for non-omo voters. Default to standard litellm.
+        if lower_name.startswith("omo-momus-"):
+            voters.append(make_omo_momus_voter(name, model))
+        elif lower_model.startswith("flowith/"):
             voters.append(make_flowith_voter(name, model))
         else:
             voters.append(make_litellm_voter(name, model))

@@ -10,7 +10,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-context-surface.json"
-TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9\-_/.:+]*")
+TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
@@ -25,19 +25,53 @@ def tokenize(text: str) -> set[str]:
     return set(TOKEN_RE.findall(lower))
 
 
-def score_corpus(corpus: dict[str, Any], query: str) -> tuple[int, list[str]]:
-    tokens = tokenize(query)
+def score_terms(
+    terms: list[Any],
+    tokens: set[str],
+    *,
+    multi_token_weight: int,
+    single_token_weight: int,
+    partial_weight: int,
+) -> tuple[int, list[str]]:
+    score = 0
     matched: list[str] = []
+
+    for term in terms:
+        term_tokens = tokenize(str(term))
+        if term_tokens and term_tokens.issubset(tokens):
+            matched.append(str(term))
+            if len(term_tokens) > 1:
+                score += multi_token_weight
+            else:
+                score += single_token_weight
+        elif term_tokens and tokens.intersection(term_tokens):
+            matched.append(str(term))
+            score += partial_weight
+
+    return score, sorted(set(matched))
+
+
+def score_corpus(corpus: dict[str, Any], query: str) -> dict[str, Any]:
+    tokens = tokenize(query)
     score = 0
 
-    for keyword in corpus.get("keywords", []):
-        keyword_tokens = tokenize(str(keyword))
-        if keyword_tokens and keyword_tokens.issubset(tokens):
-            matched.append(str(keyword))
-            score += 120 if len(keyword_tokens) > 1 else 80
-        elif keyword_tokens and tokens.intersection(keyword_tokens):
-            matched.append(str(keyword))
-            score += 35
+    keyword_score, matched_keywords = score_terms(
+        corpus.get("keywords", []),
+        tokens,
+        multi_token_weight=120,
+        single_token_weight=80,
+        partial_weight=35,
+    )
+    score += keyword_score
+
+    intent_score, matched_intents = score_terms(
+        corpus.get("route_intents", []),
+        tokens,
+        multi_token_weight=180,
+        single_token_weight=120,
+        partial_weight=20,
+    )
+    score += intent_score
 
     id_tokens = tokenize(str(corpus.get("id", "")))
     uri_tokens = tokenize(str(corpus.get("uri", "")))
@@ -45,7 +79,11 @@ def score_corpus(corpus: dict[str, Any], query: str) -> tuple[int, list[str]]:
     overlap = tokens.intersection(id_tokens | uri_tokens | summary_tokens)
     score += len(overlap) * 15
     score += int(corpus.get("priority", 0))
-    return score, sorted(set(matched))
+    return {
+        "score": score,
+        "matched_keywords": matched_keywords,
+        "matched_intents": matched_intents,
+    }
 
 
 def choose_corpora(
@@ -53,10 +91,11 @@ def choose_corpora(
 ) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
     for corpus in manifest["corpora"]:
-        score, matched = score_corpus(corpus, query)
+        scoring = score_corpus(corpus, query)
         enriched = dict(corpus)
-        enriched["score"] = score
-        enriched["matched_keywords"] = matched
+        enriched["score"] = scoring["score"]
+        enriched["matched_keywords"] = scoring["matched_keywords"]
+        enriched["matched_intents"] = scoring["matched_intents"]
         ranked.append(enriched)
 
     ranked.sort(
@@ -80,9 +119,16 @@ def render_markdown(results: list[dict[str, Any]], query: str) -> str:
                 f"## `{item['id']}` (`{item['uri']}`)",
                 f"- Score: `{item['score']}`",
                 f"- Tier: `{item['tier']}`",
+                f"- Route label: `{item.get('route_label', item['id'])}`",
                 f"- Summary: {item['summary']}",
             ]
         )
+        if item.get("route_policy"):
+            lines.append(f"- Route policy: {item['route_policy']}")
+        if item.get("matched_intents"):
+            lines.append("- Matched route intents:")
+            for intent in item["matched_intents"]:
+                lines.append(f"  - `{intent}`")
         if item["matched_keywords"]:
             lines.append("- Matched keywords:")
             for keyword in item["matched_keywords"]:
