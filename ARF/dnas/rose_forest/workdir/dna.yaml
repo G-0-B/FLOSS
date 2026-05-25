@@ -8,9 +8,15 @@ integrity:
   zomes:
     - name: rose_forest_integrity
       bundled: ../../../target/wasm32-unknown-unknown/release/rose_forest_integrity.wasm
+    - name: consent_integrity
+      bundled: ../../../target/wasm32-unknown-unknown/release/consent_integrity.wasm
 coordinator:
   zomes:
     - name: rose_forest
       bundled: ../../../target/wasm32-unknown-unknown/release/rose_forest.wasm
       dependencies:
         - name: rose_forest_integrity
+    - name: consent
+      bundled: ../../../target/wasm32-unknown-unknown/release/consent.wasm
+      dependencies:
+        - name: consent_integrity

@@ -9,3 +9,9 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 hdi = { workspace = true }
 serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+
+# HDK 0.6 / HDI 0.7 transitively depends on getrandom 0.3.x; wasm32 needs
+# the explicit `wasm_js` feature. Added during the 0.4 -> 0.6 migration.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.org/schemas/consent-payload/v0.1.0",
+  "title": "Consent Gate Schemas",
+  "description": "ConsentPayload and ConsentDecision entry-type schemas for the FLOSSI0ULLK Consent Gate Protocol (ADR-12). Substrate-class governance — enforced at Holochain integrity zome layer where LLMs cannot evade.",
+  "definitions": {
+    "ConsentPayload": {
+      "type": "object",
+      "description": "A request offered to an agent to load, integrate, propagate, or bind a memetic pattern. Written by the proposer; awaits a ConsentDecision from the recipient.",
+      "required": [
+        "payload_id",
+        "pattern_id",
+        "pattern_type",
+        "pattern_hash",
+        "proposer_did",
+        "recipient_did",
+        "blast_radius",
+        "consent_scope",
+        "submitted_at"
+      ],
+      "properties": {
+        "payload_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "description": "UUID v7 (time-sortable) unique per consent request"
+        },
+        "pattern_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable identifier of the pattern being offered (ADR hash, kernel version tag, frame id, voter persona name, claim id, etc.)"
+        },
+        "pattern_type": {
+          "type": "string",
+          "enum": [
+            "kernel",
+            "adr",
+            "frame_translation",
+            "voter_persona",
+            "constitution",
+            "claim",
+            "skill",
+            "memory_entry",
+            "other"
+          ],
+          "description": "Class of memetic pattern. `kernel` and `constitution` are Substrate-class by default; others may vary"
+        },
+        "pattern_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Immutable SHA-256 reference to the exact payload content"
+        },
+        "proposer_did": {
+          "type": "string",
+          "minLength": 1,
+          "description": "DID of who is offering — KERI AID, AD4M DID, or Holochain AgentPubKey"
+        },
+        "recipient_did": {
+          "type": "string",
+          "minLength": 1,
+          "description": "DID of who is being asked. For collective consent (steward vote, constitutional ratification), use a group DID"
+        },
+        "blast_radius": {
+          "type": "string",
+          "enum": ["Local", "Module", "System", "Substrate"],
+          "description": "Mirrors consensus gate radii. Substrate-class consent is non-overridable once given (per ADR-12 §6)"
+        },
+        "consent_scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["read_only", "integrate", "propagate", "bind"]
+          },
+          "description": "Authorization gradient. read_only < integrate < propagate < bind. Higher scopes imply lower scopes for the same pattern_hash"
+        },
+        "refusal_modes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["reject", "bounded_accept", "tourist_observe", "counter_propose"]
+          },
+          "default": ["reject", "bounded_accept", "tourist_observe", "counter_propose"],
+          "description": "Which refusal options the recipient has. All four are first-class operations per ADR-12 §4; constraining this list requires Substrate-class authorization"
+        },
+        "refusable_until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 timestamp by which the recipient must decide. Absence means no deadline (open-ended consent request)"
+        },
+        "parent_consent_id": {
+          "oneOf": [
+            {"type": "string", "format": "uuid"},
+            {"type": "null"}
+          ],
+          "description": "For hierarchical patterns (e.g. constitution → derived claim). Null for root requests"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Optional context explaining why this consent is requested"
+        },
+        "submitted_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConsentDecision": {
+      "type": "object",
+      "description": "An agent's explicit decision on a ConsentPayload. Written by the recipient (or a group's quorum mechanism for collective DIDs). Append-only on source chain.",
+      "required": [
+        "decision_id",
+        "payload_id",
+        "decider_did",
+        "outcome",
+        "scope_granted",
+        "decided_at"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+        },
+        "payload_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "References the ConsentPayload this decision answers"
+        },
+        "decider_did": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "bounded_accept",
+            "tourist_observe",
+            "counter_propose",
+            "rejected"
+          ],
+          "description": "Per ADR-12 §4. `accepted` grants full scope; `bounded_accept` narrows scope; `tourist_observe` per CFIS [auth:tourist]; `counter_propose` adds a counter-frame reference"
+        },
+        "scope_granted": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["read_only", "integrate", "propagate", "bind"]
+          },
+          "description": "Subset of the ConsentPayload's consent_scope actually granted. MUST be a subset of the request's consent_scope. Empty array iff outcome=rejected"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Required when outcome != accepted. The why behind the bound, refusal, or counter-frame"
+        },
+        "counter_frame_ref": {
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {"type": "null"}
+          ],
+          "description": "If outcome=counter_propose: hash or claim_id of the counter-frame attached. Otherwise null"
+        },
+        "expires_at": {
+          "oneOf": [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"}
+          ],
+          "description": "If consent is time-bounded. Null for permanent grants"
+        },
+        "decided_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"outcome": {"const": "rejected"}}},
+          "then": {"properties": {"scope_granted": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"outcome": {"const": "counter_propose"}}},
+          "then": {"required": ["counter_frame_ref"]}
+        },
+        {
+          "if": {"not": {"properties": {"outcome": {"const": "accepted"}}}},
+          "then": {"required": ["rationale"]}
+        }
+      ]
+    }
+  }
+}

@@ -156,8 +156,8 @@ pub fn create_triple(
 pub fn query_by_subject(subject: &str) -> ExternResult<Vec<(ActionHash, KnowledgeTriple)>> {
     let path = Path::from(format!("triples.subject.{}", subject));
     let links = get_links(
-        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesBySubject)?
-            .build(),
+        LinkQuery::try_new(path.path_entry_hash()?, LinkTypes::TriplesBySubject)?,
+        GetStrategy::default(),
     )?;
     fetch_triples_from_links(links)
 }
@@ -166,8 +166,8 @@ pub fn query_by_subject(subject: &str) -> ExternResult<Vec<(ActionHash, Knowledg
 pub fn query_by_predicate(predicate: &str) -> ExternResult<Vec<(ActionHash, KnowledgeTriple)>> {
     let path = Path::from(format!("triples.predicate.{}", predicate));
     let links = get_links(
-        GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::TriplesByPredicate)?
-            .build(),
+        LinkQuery::try_new(path.path_entry_hash()?, LinkTypes::TriplesByPredicate)?,
+        GetStrategy::default(),
     )?;
     fetch_triples_from_links(links)
 }

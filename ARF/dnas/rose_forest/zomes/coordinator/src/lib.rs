@@ -41,7 +41,7 @@ pub struct AddEdgeInput {
 
 #[hdk_extern]
 pub fn add_knowledge(input: AddNodeInput) -> ExternResult<ActionHash> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     consume_budget(&agent, COST_ADD_KNOWLEDGE)?;
     let node = RoseNode {
         content: input.content.clone(),
@@ -67,8 +67,8 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
     let query = Vector::new(input.query_embedding);
     let all_nodes_path = Path::from("all_nodes");
     let links = get_links(
-        GetLinksInputBuilder::try_new(all_nodes_path.path_entry_hash()?, LinkTypes::AllNodes)?
-            .build(),
+        LinkQuery::try_new(all_nodes_path.path_entry_hash()?, LinkTypes::AllNodes)?,
+        GetStrategy::default(),
     )?;
     let mut results: Vec<SearchResult> = Vec::new();
     for link in links {
@@ -106,7 +106,7 @@ pub fn vector_search(input: SearchInput) -> ExternResult<Vec<SearchResult>> {
 
 #[hdk_extern]
 pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     consume_budget(&agent, COST_LINK_EDGE)?;
     let edge = KnowledgeEdge {
         from: input.from.clone(),
@@ -121,7 +121,7 @@ pub fn link_edge(input: AddEdgeInput) -> ExternResult<ActionHash> {
 
 #[hdk_extern]
 pub fn budget_status(_: ()) -> ExternResult<BudgetState> {
-    get_budget_state(&agent_info()?.agent_latest_pubkey)
+    get_budget_state(&agent_info()?.agent_initial_pubkey)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -134,7 +134,7 @@ pub struct CreateThoughtCredentialInput {
 
 #[hdk_extern]
 pub fn create_thought_credential(input: CreateThoughtCredentialInput) -> ExternResult<ActionHash> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     consume_budget(&agent, COST_CREATE_THOUGHT_CREDENTIAL)?;
 
     let thought_credential = ThoughtCredential {
@@ -186,7 +186,7 @@ pub struct QueryTriplesInput {
 
 #[hdk_extern]
 pub fn assert_triple(input: AssertTripleInput) -> ExternResult<ActionHash> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     consume_budget(&agent, COST_VALIDATE_TRIPLE)?;
     ontology::create_triple(
         &agent,

@@ -1,16 +1,37 @@
 [workspace]
+# Active Holochain workspace: only these four zomes participate in the current
+# build and inherit the workspace HDI/HDK pins below. Other Holochain folders
+# such as hrea_*, identity_*, memory_coordinator, ontology_integrity, and
+# dnas/infinity_bridge are excluded pre-migration dev artifacts; migrate them
+# before adding them back as workspace members.
 members = [
     "dnas/rose_forest/zomes/integrity",
     "dnas/rose_forest/zomes/coordinator",
+    "dnas/rose_forest/zomes/consent_integrity",
+    "dnas/rose_forest/zomes/consent_coordinator",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-hdi = "=0.5.1"
-hdk = "=0.4.1"
+# Holochain 0.6 line — bumped 2026-05-19 from hdi=0.5.1 / hdk=0.4.1 (holochain-0.4 line)
+# to align with the `holochain-agent-skill` canonical reference and current
+# Holochain release line. See:
+# - FLOSS/docs/agent-memory/project/holochain-version-line-skew.md
+# - FLOSS/docs/specs/consent-payload.spec.md (validation-status table)
+# Migration impact: get_links call sites must pass GetStrategy as 2nd arg;
+# delete_link(hash) gains required GetOptions arg; op dispatch already on
+# op.flattened::<EntryTypes, LinkTypes>() so no change there.
+hdi = "=0.7.1"
+hdk = "=0.6.1"
+# In HDI 0.7 the `#[hdk_entry_helper]` macro expects the
+# `holochain_serialized_bytes` crate to be resolvable as a direct dependency
+# rather than only transitively through hdi. Pinning here aligns with what
+# hdi 0.7.1 brings in via holo_hash 0.6.1.
+holochain_serialized_bytes = "=0.0.57"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rose_forest_integrity = { path = "dnas/rose_forest/zomes/integrity" }
+consent_integrity = { path = "dnas/rose_forest/zomes/consent_integrity" }
 
 [profile.dev]
 opt-level = "z"
