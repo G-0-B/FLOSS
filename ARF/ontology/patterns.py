@@ -2,17 +2,20 @@
 Pattern Library for ARF.
 Defines standard interaction patterns and logic to match them.
 """
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class InteractionPattern:
     """
     Represents a reusable interaction pattern.
     """
+
     name: str
     description: str
     structure: List[str]  # Steps or phases of the pattern
@@ -21,11 +24,12 @@ class InteractionPattern:
 
     def to_dict(self) -> Dict:
         return {
-            'name': self.name,
-            'description': self.description,
-            'structure': self.structure,
-            'keywords': self.keywords
+            "name": self.name,
+            "description": self.description,
+            "structure": self.structure,
+            "keywords": self.keywords,
         }
+
 
 # Standard Patterns Registry
 SOCRATIC_METHOD = InteractionPattern(
@@ -36,9 +40,9 @@ SOCRATIC_METHOD = InteractionPattern(
         "Student provides an initial answer.",
         "Teacher asks a follow-up question exposing a contradiction or gap.",
         "Student refines the answer.",
-        "Cycle repeats until insight is reached."
+        "Cycle repeats until insight is reached.",
     ],
-    keywords=["why", "how", "define", "example", "contradiction", "suppose"]
+    keywords=["why", "how", "define", "example", "contradiction", "suppose"],
 )
 
 DEBATE = InteractionPattern(
@@ -49,9 +53,9 @@ DEBATE = InteractionPattern(
         "Opponent provides a counter-argument.",
         "Proponent rebuts the counter-argument.",
         "Opponent provides a closing statement.",
-        "Proponent provides a closing statement."
+        "Proponent provides a closing statement.",
     ],
-    keywords=["argue", "disagree", "however", "point", "counter", "evidence"]
+    keywords=["argue", "disagree", "however", "point", "counter", "evidence"],
 )
 
 CONSENSUS_BUILDING = InteractionPattern(
@@ -62,21 +66,23 @@ CONSENSUS_BUILDING = InteractionPattern(
         "Brainstorm solutions.",
         "Discuss pros and cons of each.",
         "Synthesize a proposal.",
-        "Call for consensus (vote or voice)."
+        "Call for consensus (vote or voice).",
     ],
-    keywords=["agree", "proposal", "compromise", "synthesis", "solution", "vote"]
+    keywords=["agree", "proposal", "compromise", "synthesis", "solution", "vote"],
 )
 
 STANDARD_PATTERNS = {
     "socratic": SOCRATIC_METHOD,
     "debate": DEBATE,
-    "consensus": CONSENSUS_BUILDING
+    "consensus": CONSENSUS_BUILDING,
 }
+
 
 class PatternMatcher:
     """
     Matches interaction patterns in conversation history.
     """
+
     def __init__(self, patterns: Dict[str, InteractionPattern] = None):
         self.patterns = patterns or STANDARD_PATTERNS
 
@@ -87,7 +93,7 @@ class PatternMatcher:
         """
         matches = []
         text_lower = conversation_text.lower()
-        
+
         for key, pattern in self.patterns.items():
             score = 0.0
             # Simple keyword matching for now
@@ -95,20 +101,22 @@ class PatternMatcher:
             for kw in pattern.keywords:
                 if kw in text_lower:
                     hits += 1
-            
+
             if pattern.keywords:
                 score = hits / len(pattern.keywords)
-            
+
             # Boost score if pattern name is mentioned
             if pattern.name.lower() in text_lower:
                 score = max(score, 0.8)
 
             if score > 0.3:  # Threshold
-                matches.append({
-                    'pattern': pattern.name,
-                    'confidence': score,
-                    'details': pattern.description
-                })
-        
-        matches.sort(key=lambda x: x['confidence'], reverse=True)
+                matches.append(
+                    {
+                        "pattern": pattern.name,
+                        "confidence": score,
+                        "details": pattern.description,
+                    }
+                )
+
+        matches.sort(key=lambda x: x["confidence"], reverse=True)
         return matches
