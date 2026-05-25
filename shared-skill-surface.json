@@ -106,6 +106,30 @@
         "context-engineering-kit",
         "OpenViking"
       ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/remember",
+      "category": "continuity",
+      "summary": "Cross-session handoff note at .remember/remember.md so any next session (same or different harness) picks up cleanly. Forward-looking, under 20 lines.",
+      "upstreams": [
+        "claude-plugins-official/remember"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/session-report",
+      "category": "observability",
+      "summary": "HTML retrospective of Claude Code session token usage, cache, subagents, skills, and expensive prompts. Includes FLOSSI0ULLK-specific anomaly checks (heartbeat spend, voter diversity, synthesis backpressure).",
+      "upstreams": [
+        "claude-plugins-official/session-report"
+      ]
+    },
+    {
+      "path": "FLOSS/skill-corpus/claude-reflect",
+      "category": "continuity",
+      "summary": "Two-stage self-learning capture: hooks queue corrections, /reflect promotes to CLAUDE.md or FLOSS/docs/agent-memory/. Substrate-level learnings route through consensus + provenance instead of silent overwrite.",
+      "upstreams": [
+        "community/claude-reflect"
+      ]
     }
   ]
 }
