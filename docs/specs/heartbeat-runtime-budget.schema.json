@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floss://specs/heartbeat-runtime-budget.schema.json",
+  "title": "Heartbeat Runtime Budget State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["last_slate_signature", "last_poll_tick", "last_poll_profile"],
+  "properties": {
+    "last_slate_signature": {
+      "type": "string",
+      "description": "Stable hash of the poll-compatible slate last submitted to voters."
+    },
+    "last_poll_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Heartbeat tick count at which the slate was last polled."
+    },
+    "last_poll_profile": {
+      "type": "string",
+      "description": "Voter profile used for the last high-ROI poll."
+    },
+    "last_poll_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of the last scheduled high-ROI poll."
+    },
+    "last_skip_reason": {
+      "type": "string",
+      "description": "Most recent reason a poll was skipped."
+    }
+  }
+}

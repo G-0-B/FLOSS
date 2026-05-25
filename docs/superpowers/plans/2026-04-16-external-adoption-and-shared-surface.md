@@ -242,6 +242,10 @@ Use this shape instead:
   - Generated config: `.vibe/config.toml`
   - Generated agents: `.vibe/agents/*.toml`
   - Generated launcher: `vibe-floss.ps1`
+  - Generated startup prompt: `.agent-surface/VIBE_STARTUP.md`
+  - Default agent: `flossi0ullk-align`, which seeds current phase status,
+    shared memory, runtime-budget posture, and SDD discipline before Mistral
+    Vibe proposes work.
   - Shared inputs:
     - MCP from root `.mcp.json`
     - skills from `FLOSS/skill-corpus/`

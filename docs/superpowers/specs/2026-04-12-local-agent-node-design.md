@@ -1,4 +1,5 @@
 # Specification: Local Agent Node — Cell-Scoped Source Chain & Analog Vote Model
+
 **Version:** 1.0  
 **Date:** 2026-04-12  
 **Status:** Approved — ready for implementation  
@@ -13,6 +14,7 @@ FLOSSIØULLK's long-term substrate is a Holochain DHT: sovereign agents, no glob
 This spec defines the **local agent node** — the personal, file-based representation of one sovereign agent — and the **analog vote model** that replaces the legacy ternary consensus gate. Both are designed as direct precursors to Holochain Cells and source chains, requiring no structural rework when Holochain becomes the transport layer.
 
 ### Phase 0 Blockers Addressed
+
 - Rose Forest DNA build infra (unblocked by cell-scoped structure)
 - `ConversationMemory` / `MultiScaleEmbedding` API mismatch (addressed in §6)
 - ADR-0 Test #4 Human Coherence (unblocked by analog vote model)
@@ -50,6 +52,7 @@ This spec defines the **local agent node** — the personal, file-based represen
 ```
 
 **Key design decisions:**
+
 - No sequential prefixes (`000001_`). Topological ordering is derived exclusively from `previous_hash` links — matching Holochain's source chain model exactly.
 - Each `<dna_hash>` directory represents one Cell (agent × DNA combination). An agent participating in multiple networks has distinct, non-conflated chains.
 - `memory/` is scoped per-cell to maintain context boundaries across networks.
@@ -118,6 +121,7 @@ def entry_hash(data: dict) -> str:
 ```
 
 **Cross-language invariants — any Rust/TypeScript implementation MUST:**
+
 - Reject NaN and ±Inf before serialization (return an error, never serialize them).
 - Normalize `-0.0` to `0.0` before serialization.
 - Round floats to exactly 6 decimal places using round-half-to-even (banker's rounding).
@@ -131,6 +135,7 @@ Float serialization divergence on any of these points breaks chain integrity per
 Multiple agents (Claude, Gemini, Ollama) may attempt to append to the same cell simultaneously.
 
 **Lock protocol:**
+
 - Before any append, acquire `cells/<dna_hash>/.lock` via atomic file creation (`O_CREAT | O_EXCL`).
 - Write the new entry, update `head.json`.
 - Release lock (delete `.lock`).
@@ -228,6 +233,7 @@ No test may use exact `1.0` or `-1.0`.
 ### 5.1 Role
 
 The MCP gateway is a **network switch**. It:
+
 - Accepts Claims from any agent (Claude Code hooks, CLI, OpenCode)
 - Reads the cell source chain to provide context to voters
 - Notifies registered voters (Claude, Gemini, Ollama) that a Claim awaits
@@ -235,6 +241,7 @@ The MCP gateway is a **network switch**. It:
 - Triggers tally when quorum is reached or timeout expires
 
 It does NOT:
+
 - Decide outcomes
 - Command voters
 - Prioritize one model over another
@@ -270,6 +277,7 @@ It does NOT:
 ```
 
 Blast radius auto-detection heuristic:
+
 - `ARF/dnas/*/zomes/integrity/` → SUBSTRATE
 - `ARF/dnas/*/` → SYSTEM  
 - `docs/adr/` or `docs/specs/` → MODULE
@@ -282,6 +290,7 @@ Blast radius auto-detection heuristic:
 **Root cause:** `conversation_memory.py` references `DEFAULT_EMBEDDING_LEVEL` without defining it.
 
 **Fix (one line, in `conversation_memory.py` near other constants):**
+
 ```python
 DEFAULT_EMBEDDING_LEVEL = 'default'
 ```
@@ -292,12 +301,17 @@ This unblocks `MultiScaleEmbedding.add()` calls. No other API changes required �
 
 ## 7. PR #25 Hygiene — Blocking Items
 
-### ADR-017 (`FLOSSI_U_Founding_Kit_v1.6/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md`)
-Current file is a 10-line stub. Missing required sections: Context, Consequences, Validation Criteria. Must be expanded to full ADR template before merge.
+> **Relocation note (2026-05-11):** The `FLOSSI_U_Founding_Kit_v1.6/` directory has been relocated to `C:\~shit\FLOSSI_U/` at workspace top-level — it is a separate sibling project (Free YOU-niversity), not part of the FLOSS / Rose Forest repo. The PR #25 plan below assumed co-location; references below now point to the new location. Whether ADR-017 and LICENSE are still PR #25 blockers depends on whether PR #25 needs FLOSSI U artifacts at all, given the project separation. **Re-plan needed before proceeding.**
 
-### LICENSE (`FLOSSI_U_Founding_Kit_v1.6/LICENSE`)
+### ADR-017 (`../FLOSSI_U/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md`)
+
+Current file is a 10-line stub. Missing required sections: Context, Consequences, Validation Criteria. Must be expanded to full ADR template before merge. **Note:** now lives in FLOSSI U's separate canon; FLOSS PR #25 may no longer require it.
+
+### LICENSE (`../FLOSSI_U/LICENSE`)
+
 Current: `AGPL-3.0 + Carrier Equivalence` (not a valid SPDX identifier).  
 Fix:
+
 - `LICENSE` → `SPDX-License-Identifier: AGPL-3.0-or-later`
 - Create `LEGAL_DEFINITIONS.md` → Carrier Equivalence addendum text
 

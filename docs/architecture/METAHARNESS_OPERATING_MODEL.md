@@ -2,19 +2,22 @@
 
 ```yaml
 id: "flossi0ullk-metaharness-operating-model"
-version: "0.1.0"
+version: "0.2.0"
 kind: "architecture_reference"
 status: "Active"
-updated: "2026-04-17"
+updated: "2026-05-18"
 truth_status: "Specified"
 evidence_sources:
   - "docs/architecture/AGENTIC_OPERATING_MODEL.md"
+  - "docs/research/2026-05-18-metaharness-unification.md"
   - "docs/superpowers/specs/2026-04-12-local-agent-node-design.md"
   - "shared-agent-surface.json"
   - "shared-context-surface.json"
   - "shared-hook-surface.json"
   - "shared-skill-surface.json"
+  - "packages/activity_log/schema.py"
   - "scripts/context_router.py"
+  - "scripts/review_queue.py"
   - "scripts/hook_post_write.py"
   - "packages/metacoordinator_mcp/hashline.py"
   - "packages/metacoordinator_mcp/voters.py"
@@ -138,6 +141,66 @@ Target flow:
 Rule:
 - dev-plane collaboration never bypasses runtime-plane truth
 
+## Unified Conventions
+
+Truth status: Specified with partial implementation evidence as of 2026-05-18.
+
+The metaharness is atomic and holistic by convention, not by one central
+controller. The current convergence target has three shared surfaces:
+
+1. **Atomic interface:** every agentic action SHOULD be representable as one
+   `Action` record from `packages/activity_log/schema.py`.
+2. **Holistic activity surface:** every harness SHOULD tee durable work into the
+   global append-only `.agent-surface/activity.jsonl` while preserving any
+   useful subsystem logs.
+3. **Review queue surface:** staged artifacts SHOULD remain in their native
+   staging directories, while `scripts/review_queue.py` rolls them up into one
+   read-only queue for human review.
+4. **AI/harness roster surface:** provider/model imports, agent instruction
+   files, MCP servers, and startup packets SHOULD roll up through
+   `shared-ai-roster-surface.json` into `.agent-surface/harness/`. The JSON
+   roster is the comprehensive machine inventory; the markdown roster and
+   update packet are compact operator/harness entry points.
+
+Current implementation evidence:
+
+- Verified: `packages/activity_log/schema.py` defines `Action`, `append_action()`, and
+  helper functions for the global activity log.
+- Verified: `packages/reasoning_ensemble/synthesizer.py` emits unified
+  `ensemble_synthesis` actions.
+- Verified: `packages/reasoning_ensemble/router.py` preserves the reasoning
+  subsystem log and tees each `router_decision` into the global Action log.
+- Verified: `scripts/review_queue.py` rolls up `.agent-surface/harvest/staging/` and
+  `docs/knowledge_log/staging/` without mutating staged files.
+- Verified: `heartbeat.py`, `harvest_reuse_ledger.py`,
+  `poll_high_roi_actions.py`, and `autonomous_synthesis_loop.py` emit global
+  Actions for heartbeat work items, harvest terminal events, high-ROI polls,
+  and staged synthesis drafts.
+
+### Runtime Budget Discipline
+
+Truth status: Specified with test coverage as of 2026-05-19.
+
+Heartbeat may run cheap local work frequently, but voter-backed polls must pass
+the runtime budget policy in `docs/specs/heartbeat-runtime-budget.spec.md`.
+The current policy is:
+
+- routine heartbeat polls use the `balanced` voter profile;
+- `diverse-max` is reserved for explicit high-diversity checks or slow
+  confirmation sweeps;
+- unchanged high-ROI slates are skipped instead of repeatedly spending Groq and
+  other provider token budgets;
+- `poll_high_roi_actions.py` defaults to `balanced`;
+- the `heartbeat` voter profile alias resolves to `balanced`;
+- actual poll round counts are parsed when possible so daily caps remain honest.
+
+Operator-facing details live in `docs/architecture/RUNTIME_SURFACES.md`.
+
+The review queue is intentionally a roll-up, not a new staging convention.
+Existing staging locations stay intact so each harness can preserve its local
+debugging shape; the global queue gives agents and humans one place to see what
+needs review.
+
 ## Default Metaharness Loop
 1. Route the task with the context harness.
 2. Load the smallest relevant generated `L0/L1` view, skill, or canon surface.
@@ -146,8 +209,12 @@ Rule:
 5. Land edits through an agent-native client whose config was materialized from canon.
 6. Trigger shared hooks on substantive mutations.
 7. Run cheap consensus and write claims, votes, and traces.
-8. Promote only durable learnings into manifests, skills, ADRs, or plans.
-9. Publish accepted work to the dev-plane substrate.
+8. Emit or tee a unified `Action` record for durable work.
+9. Roll up staged outputs with `scripts/review_queue.py` before promotion.
+10. Refresh the AI/harness roster when provider imports, agent instructions, or
+    shared startup invariants change.
+11. Promote only durable learnings into manifests, skills, ADRs, or plans.
+12. Publish accepted work to the dev-plane substrate.
 
 ## Allocation Policy
 
@@ -207,5 +274,6 @@ Do not force fake portability for surfaces that are not actually shared yet.
 - `AGENTIC_OPERATING_MODEL.md` defines the broader stack and harness roles
 - `HOLISTIC_ARCHITECTURE.md` explains the project at macro scale
 - `CONTEXT_DAEMON_ARCHITECTURE.md` defines the living context stack and compression doctrine
+- `docs/research/2026-05-18-metaharness-unification.md` records the migration plan for unified Action/activity/review conventions
 - `2026-04-16-forward-momentum-radicle-meta-harnesses.md` sequences near-term work
 - `shared-hook-surface.json` is the current canonical hook-policy source

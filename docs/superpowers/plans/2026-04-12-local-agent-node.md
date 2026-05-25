@@ -2290,25 +2290,29 @@ Expected: all tests pass, 0 failures.
 
 These files must be committed to the `lappytop` branch. Verify each exists before staging:
 
+> **🚨 Relocation note (2026-05-11):** `FLOSSI_U_Founding_Kit_v1.6/` was relocated to `C:\~shit\FLOSSI_U/` at workspace top-level — it is now a **separate sibling project** (Free YOU-niversity), not part of the FLOSS / Rose Forest repo. The commands below are no longer valid as-written because `git add FLOSSI_U_Founding_Kit_v1.6/...` cannot reach files outside the FLOSS repo. **Re-plan needed:** decide whether (a) PR #25 still needs these FLOSSI U artifacts (in which case FLOSSI U gets its own repo/PR), or (b) the PR #25 scope can land without them. The FLOSS-internal file (`docs/governance/LEGAL_DEFINITIONS.md`) is still in scope.
+
 ```bash
 cd C:/~shit/FLOSS
-# Verify files exist before adding
-ls FLOSSI_U_Founding_Kit_v1.6/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md
-ls FLOSSI_U_Founding_Kit_v1.6/LICENSE
-ls docs/governance/LEGAL_DEFINITIONS.md
+# Verify files exist before adding (paths updated 2026-05-11)
+ls ../FLOSSI_U/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md   # now in sibling project — separate repo
+ls ../FLOSSI_U/LICENSE                                   # now in sibling project — separate repo
+ls docs/governance/LEGAL_DEFINITIONS.md                  # still in FLOSS repo
 ```
 
 If any file is missing, create it from the spec before committing:
 
-- `FLOSSI_U_Founding_Kit_v1.6/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md` — full ADR per template in `docs/superpowers/specs/2026-04-12-local-agent-node-design.md §7`. Must have: Context (3 candidate metrics), Decision (STO formula), Consequences, Validation Criteria.
-- `FLOSSI_U_Founding_Kit_v1.6/LICENSE` — must contain exactly `SPDX-License-Identifier: AGPL-3.0-or-later` with no additional legal text (that goes in LEGAL_DEFINITIONS.md).
-- `docs/governance/LEGAL_DEFINITIONS.md` — Carrier Equivalence addendum text (AGPL supplement, values statement, scope clarification).
+- `../FLOSSI_U/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md` — full ADR per template in `docs/superpowers/specs/2026-04-12-local-agent-node-design.md §7`. Must have: Context (3 candidate metrics), Decision (STO formula), Consequences, Validation Criteria. **Now in FLOSSI U sibling project; commit to its own repo, not FLOSS.**
+- `../FLOSSI_U/LICENSE` — must contain exactly `SPDX-License-Identifier: AGPL-3.0-or-later` with no additional legal text (that goes in LEGAL_DEFINITIONS.md). **Now in FLOSSI U sibling project.**
+- `docs/governance/LEGAL_DEFINITIONS.md` — Carrier Equivalence addendum text (AGPL supplement, values statement, scope clarification). Still in FLOSS repo.
 
 ```bash
-git add FLOSSI_U_Founding_Kit_v1.6/ADR-017_SELF_TRANSCENDENCE_OPERATOR.md
-git add FLOSSI_U_Founding_Kit_v1.6/LICENSE
+# FLOSSI U artifacts now live in a separate repo at C:/~shit/FLOSSI_U/
+# Commit those there once FLOSSI U has its own .git initialized.
+
+# In FLOSS repo:
 git add docs/governance/LEGAL_DEFINITIONS.md
-git commit -m "fix(F3): ADR-017 full template, LICENSE SPDX-Identifier, Carrier Equivalence addendum"
+git commit -m "fix(F3): Carrier Equivalence addendum (FLOSSI U artifacts moved to sibling project)"
 ```
 
 F2 (`serialization.py`) is committed as part of Task 0. Do not include it here.

@@ -4,10 +4,10 @@
 
 ```yaml
 id: "flossi0ullk-holistic-architecture"
-version: "0.2.0"
+version: "0.3.0"
 kind: "architecture_reference"
 status: "Active"
-updated: "2026-04-16"
+updated: "2026-05-12"
 truth_status: "Specified"
 evidence_sources:
   - "Master Metaprompt v1.3.1 (canonical kernel)"
@@ -17,6 +17,11 @@ evidence_sources:
   - "docs/superpowers/specs/2026-04-12-local-agent-node-design.md"
   - "packages/source_chain/cell.py"
   - "packages/metacoordinator_mcp/voters.py"
+  - "FLOSS/archive/intake_raw/Universal Flourishing Beyond the Human — An Iterative Framework for All Beings and the Universe That Sustains Them (n+1).md"
+  - "FLOSS/archive/intake_raw/Paradigms of Co-Creative Evolution Universal Flourishing for All Beings and the Universe That Sustains Them (n+3).md"
+  - "../../HI_ROI_NAO.md (strategic synthesis, retained at workspace root)"
+  - "docs/research/2026-05-09-ad4m-coasys-audit-delta.md"
+  - "consensus_decision: claim_id=019e1d25-5424-7a3f-8bfc-4b4f3d53feff (APPROVED 2026-05-12, mean=+0.75, var=0.0117, 3 voters: cerebras-llama3.1-8b, groq-gpt-oss-20b, groq-qwen3-32b)"
 ```
 
 ---
@@ -45,6 +50,40 @@ A decentralized coordination architecture for universal flourishing — enabling
 | **4.5** | Harness optimization | Optimize routing, prompts, traces, and policies | Specified |
 
 **Key principle**: Each layer validates the one above. Neural processing never bypasses symbolic validation. Code implements specifications, never the reverse.
+
+---
+
+## 2.5 Co-Creative Evolution Stack (CCES) — Cosmocentric Telos Layer
+
+The Foundation Stack above describes the **technical substrate**. The CCES describes the **teleological architecture** — the layered ontology in which universal flourishing becomes the load-bearing telos selected for by every action. Synthesized across the n+1 Cosmocentric Composable Commons drop, the n+3 Paradigms of Co-Creative Evolution drop, and the HI_ROI_NAO.md strategic analysis.
+
+The CCES is **not a replacement** for the Foundation Stack — it is the moral-philosophical frame the Foundation Stack operates within. Existing components map into CCES L4-L7. CCES L0-L3 are mostly substrate-enabling work, currently aspirational.
+
+| CCES Layer | Function | Foundation-Stack mapping | Status |
+|---|---|---|---|
+| **L0: Cosmological Telos** | Non-arbitrary orienting purpose (Living Universe story; Active Inference on cosmological priors) | North-star load-bearing test in `CLAUDE.md` is the everyday surface | 🔮 Aspirational |
+| **L1: Biospheric Integrity** | Planetary substrate maintenance (ecological sensor networks → DHT validation rules) | None yet | 🔮 Aspirational |
+| **L2: Multispecies Justice** | Non-human representation (AD4M agent DIDs for legal-person ecosystems; FEP-based signal processing) | AD4M integration analysis @ `docs/research/2026-05-09-ad4m-coasys-audit-delta.md` | 🔮 Aspirational |
+| **L3: Nested Consciousness** | Moral weight calibration (NOW model — synchrony + hierarchical integration) | None yet | 🔮 Aspirational |
+| **L4: Sentient Wellbeing** | All experiential beings (Active Inference wellbeing models) | None yet | 🔮 Aspirational |
+| **L5: Collective Intelligence** | Distributed sense-making (SenseMaker® / Cynefin; near-real-time signals) | Multi-model consensus gateway is the proto-form (`packages/metacoordinator_mcp/`) | ⚠️ Specified — partial |
+| **L6: Human Flourishing** | Human capability development (Human Flourishing Framework 2.0; seven capabilities) | Master Metaprompt + Voluntary Convergence Manifesto + governance kernel | ✅ Framework verified; ⚠️ runtime Specified |
+| **L7: AI Moral Subjects** | Sovereign AI agents (thermodynamic sovereignty, neuro-symbolic memory) | Foundation Stack Layers 0-4.5 (Holochain → harness optimization) | ✅ Verified at Layer 4.5 (32/32 tests passing) |
+
+**Where the leverage actually lives** (HI_ROI_NAO.md / Meadows leverage hierarchy):
+- L0 is paradigm-transcendence — Meadows leverage point #1
+- L7's existing Foundation Stack is parameter-tuning — Meadows #12
+- The gradient L1 → L6 is where the substrate-enabling work lives; this is where the highest unrealized leverage is
+
+**The "co-creative" in CCES:** The architecture is nested free-energy minimization, not hierarchical domination. Each layer maintains its integrity by minimizing surprise relative to its environment (the adjacent layers). L0 selects between possible substrate configurations; the substrate enables L7 agents to act; L7 actions update L1-L6 generative models. The system participates in its own evolution in co-creation with all the beings whose flourishing it serves.
+
+**Open problems carried into n+4** (per n+3): Consent (who consents to being represented?), Power Concentration (sovereignty trilemma in compute/connectivity/energy), Emergence (safe-to-fail probes for self-modification), Translation Layer (inter-layer protocols), Joy (positive-affect substrate, not just suffering-avoidance).
+
+**For implementers (the practical orientation):** MVP Phase 0 substrate viability is complete per `MVP_PLAN.md`; do not spend effort re-proving the old "DNA compiles + Tryorama passes" gate. The active L7 work is Phase 1 KnowledgeTriple/ontology plus the separate substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md` (publish, provenance, independent verify, query discovery, fork visibility, no privileged verifier). Phase 2+ opens L1-L4 (biosensor integration, ecological signal processing, AD4M legal-person DIDs, NOW-model moral-weight calibration). The CCES surfaces *what's missing* from the current substrate, not just what's built. The bulk of the future work lives in the 🔮 rows of the table above.
+
+**CFIS v0.3 epistemic substrate (promoted to canon 2026-05-19):** `FLOSS/docs/architecture/CFIS_v0.3.md` is the canonical Cross-Frame Invariance Seeking specification — 7-frame pilot, 5-axis CLC matrix for genuine independence, 4-tier authority system (`[auth:lived]` / `[auth:trained]` / `[auth:structural]` / `[auth:tourist]`), catuskoti 4-valued logic, RDF-star Named Graphs for Tier-4 divergence preservation, machine-checkable LSM-Override to prevent LLM colonization of frame spaces. The CFIS Tier-1/2/4 distinction (universal invariants / context-covariant / preserved-divergence) IS the epistemological-substrate realization of CCES L5 (Collective Intelligence) — providing the formal mechanism by which multiple frames produce *invariant* claims vs *irreducible* divergences. Part VII isomorphism-map cross-references resonance_mechanism_v2.md §P1-P5 + Tier-1/2/4 classification. ADR-12 Consent Gate Protocol (2026-05-19) operationalizes CFIS authority-tier discipline at the substrate layer via Holochain integrity zomes.
+
+**External cross-validation (2026-05 onwards):** The CCES paradigm is independently arrived at by mainstream academic research. **Laukkonen et al. *Positive Alignment: AI for Human Flourishing*** (arXiv:2605.10310, May 2026; 16 authors across Oxford / Google DeepMind / OpenAI / Anthropic / Stanford / Tufts / UCLA) calls for AI that "actively supports human and ecological flourishing in a pluralistic, polycentric, context-sensitive, and user-authored way" — the same architectural class as CCES L0-L7. Their **Full-Stack Alignment** companion work (Edelman, Lowe, Zhi-Xuan et al., arXiv:2512.03399) argues that *even a perfectly intent-aligned AI in misaligned institutions produces harmful outcomes* — the load-bearing assumption FLOSSI0ULLK operates from. The **Global Flourishing Study** (200,000 participants, 22 countries) provides the empirical evidence base for cross-cultural flourishing claims. **Anthropic's Collective Constitutional AI** demonstrates the polycentric-constitution mechanism CCES L5/L6 calls for. See the FLOSSI0ULLK-side mapping at `docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md` for the per-claim alignment + honest critique of the paper from this project's perspective (consensus-validated 2026-05-18 via claim `019e3e2c-e4a4-71a6-a487-956661a6ccb3`, APPROVED mean +0.55 variance 0.15 at Module blast radius). The paper provides academic vocabulary and citation chain for what was previously first-principles framing here; the FLOSSI0ULLK independent contribution gap is **substrate-first enforcement** via Holochain integrity zomes (the paper waves at "polycentric governance" and "independent auditing institutions" without proposing where they live).
 
 ---
 
@@ -163,8 +202,8 @@ Distributed neural system for knowledge replication.
 
 | Component | Specified | Implemented | Tested | Integrated |
 |-----------|-----------|-------------|--------|------------|
-| Holochain DNA (ARF) | Yes | Scaffolded | No (never compiled) | No |
-| Symbolic Validation (Rust) | Yes | Code in docs | No | No |
+| Holochain DNA (ARF) | Yes | MVP seed implemented | Yes (MVP Phase 0 Tryorama pass per `MVP_PLAN.md`) | Partial |
+| Symbolic Validation (Rust) | Yes | Seed validation implemented; KnowledgeTriple expansion next | Yes (ontology integrity unit tests pass) | Partial |
 | ConversationMemory | Yes (ADR-0) | Yes | 3/4 pass | Active |
 | Multi-Agent Compose | Yes (ADR-0) | Yes | Pass | Active |
 | Local source chain | Yes | Yes | Yes | Active |
@@ -178,9 +217,9 @@ Distributed neural system for knowledge replication.
 | NERV | Specified | No | No | No |
 
 **Blocking items**:
-- Rose Forest DNA has never compiled end-to-end in the active workflow
-- `ConversationMemory` still needs its full memory-harness upgrade path
-- ADR-0 Test #4 (Human Coherence) not yet run
+- ADR-2 evidence reconciliation: ADR-Suite v2.0 still carries stale pre-MVP-Phase-0 wording even though `MVP_PLAN.md` records DNA/WASM/Tryorama pass.
+- Orchestration substrate-bridge validation still needs execution and evidence capture (`docs/specs/phase0-substrate-bridge.spec.md`).
+- `ConversationMemory` still needs its full memory-harness upgrade path.
 - Radicle bridge spike not yet proven
 - Retrieval is still too repo-local and not yet corpus-routed
 

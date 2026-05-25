@@ -94,3 +94,6 @@ nul
 *.key
 *_api_key*
 *secret*
+
+# Browser-extension JS dumps from sitegeist intake (2026-05-19) — kept on disk for inspection, excluded from repo.
+docs/research/intake_raw/2026-05-19-root/bundles/sitegeist_extracted/

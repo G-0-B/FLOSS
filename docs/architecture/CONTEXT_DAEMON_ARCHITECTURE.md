@@ -61,6 +61,8 @@ What is live now:
 - `shared-context-surface.json` defines corpora, route order, and operating rules
 - `scripts/context_router.py` chooses corpora before deeper retrieval
 - `scripts/materialize_shared_context_surface.py` generates additive context views
+- `scripts/watch_intake.py` emits normalized intake events into a queue skeleton
+- `scripts/process_intake_events.py` claims and classifies queued events for consolidation follow-up
 - `.agent-surface/context/CONTEXT_BOOTSTRAP.md` exposes the corpus map
 - `.agent-surface/context/CONTEXT_L0.md` and `CONTEXT_L1.md` provide cheap
   loading projections
@@ -70,7 +72,7 @@ What is live now:
 
 What is not live yet:
 
-- a file-watch event bus with normalized change events
+- a continuous file-watch event daemon
 - incremental semantic indexing over the whole workspace
 - a bi-temporal claim / ADR / artifact graph
 - CRDT-backed shared working state
@@ -106,7 +108,7 @@ documents intact.
 
 ## Near-Term Build Order
 1. Harden the current generated `L0/L1` views and keep them aligned with canon.
-2. Add an observer/event log for doc, code, and source-chain changes.
+2. Harden the observer/event queue for doc, code, and source-chain changes.
 3. Add incremental semantic indexing over active corpora.
 4. Represent claims, ADRs, artifacts, and agents in a graph structure.
 5. Add CRDT-backed working memory for active collaboration state.
