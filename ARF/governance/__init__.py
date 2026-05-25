@@ -1,4 +1,3 @@
-"""
-Governance package for ARF.
-"""
+"""Governance package for ARF."""
+
 from .budget import BudgetManager, BudgetConfig, BudgetExceededError
