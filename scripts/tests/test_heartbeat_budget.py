@@ -9,7 +9,7 @@ from pathlib import Path
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
 
-def load_heartbeat_module():
+def load_heartbeat_module(tmp_path: Path, monkeypatch):
     if str(FLOSS_ROOT) not in sys.path:
         sys.path.insert(0, str(FLOSS_ROOT))
     spec = importlib.util.spec_from_file_location(
@@ -19,6 +19,7 @@ def load_heartbeat_module():
     assert spec.loader is not None
     sys.modules["heartbeat_budget_under_test"] = module
     spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "TICK_LOG", tmp_path / "ticks.log", raising=False)
     return module
 
 
@@ -44,7 +45,7 @@ def write_slate(path: Path, slug: str = "review-synthesis-staging") -> None:
 
 
 def test_routine_high_roi_poll_uses_balanced_profile(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     slate = tmp_path / "next_slate.json"
     write_slate(slate)
     monkeypatch.setattr(heartbeat, "DYNAMIC_SLATE_PATH", slate, raising=False)
@@ -59,7 +60,7 @@ def test_routine_high_roi_poll_uses_balanced_profile(tmp_path, monkeypatch):
 
 
 def test_unchanged_slate_skips_repeated_poll(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     slate = tmp_path / "next_slate.json"
     write_slate(slate)
     monkeypatch.setattr(heartbeat, "DYNAMIC_SLATE_PATH", slate, raising=False)
@@ -82,7 +83,7 @@ def test_unchanged_slate_skips_repeated_poll(tmp_path, monkeypatch):
 
 
 def test_completed_poll_records_slate_so_next_tick_skips_repetition(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     slate = tmp_path / "next_slate.json"
     write_slate(slate)
     monkeypatch.setattr(heartbeat, "DYNAMIC_SLATE_PATH", slate, raising=False)
@@ -101,7 +102,7 @@ def test_completed_poll_records_slate_so_next_tick_skips_repetition(tmp_path, mo
 
 
 def test_daily_round_cap_skips_poll_before_voter_spend(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     slate = tmp_path / "next_slate.json"
     write_slate(slate)
     monkeypatch.setattr(heartbeat, "DYNAMIC_SLATE_PATH", slate, raising=False)
@@ -115,7 +116,7 @@ def test_daily_round_cap_skips_poll_before_voter_spend(tmp_path, monkeypatch):
 
 
 def test_default_wide_sweep_does_not_use_diverse_max_every_two_hours(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     slate = tmp_path / "next_slate.json"
     write_slate(slate)
     monkeypatch.setattr(heartbeat, "DYNAMIC_SLATE_PATH", slate, raising=False)
@@ -129,8 +130,8 @@ def test_default_wide_sweep_does_not_use_diverse_max_every_two_hours(tmp_path, m
     assert poll_items[0].args == ["--profile", "balanced"]
 
 
-def test_profile_qualified_poll_name_counts_actual_ranked_actions():
-    heartbeat = load_heartbeat_module()
+def test_profile_qualified_poll_name_counts_actual_ranked_actions(tmp_path, monkeypatch):
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     result = {
         "returncode": 0,
         "stdout_tail": "\n".join(
@@ -148,7 +149,7 @@ def test_profile_qualified_poll_name_counts_actual_ranked_actions():
 
 
 def test_autonomous_synthesis_skips_when_staging_queue_exceeds_cap(tmp_path, monkeypatch):
-    heartbeat = load_heartbeat_module()
+    heartbeat = load_heartbeat_module(tmp_path, monkeypatch)
     staging = tmp_path / "staging"
     staging.mkdir()
     for idx in range(3):
