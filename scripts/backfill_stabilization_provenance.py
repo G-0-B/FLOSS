@@ -572,6 +572,57 @@ COMMITS = [
         ],
         "next_action": "Monitor daily_state.json against the 40-round cap and update working-todo if poll-disable status changes.",
     },
+    # === Codex parallel work + final round 2026-05-26 ===
+    {
+        "sha": "1edca58",
+        "subject": "provenance: backfill phase 2-4 stabilization commits",
+        "claim_type": "provenance_tooling",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/specs/provenance-packet.spec.md"},
+            {"type": "test", "ref": "scripts/tests/test_audit_provenance_packets.py"},
+            {"type": "commit", "ref": "1edca58"},
+        ],
+        "risks": [
+            "Codex's parallel extension of the COMMITS list could have collided with my entries; resolved by inspection — non-overlapping.",
+        ],
+        "benefits": [
+            "Idempotency check (existing packets are skipped) + 13 new COMMITS entries covering my P2-P4 commits. Reduces drift between the two parallel sessions' provenance baselines.",
+        ],
+        "next_action": "Run the extended script; verify total packet count matches branch commit count.",
+    },
+    {
+        "sha": "8b6a8fe",
+        "subject": "test: keep heartbeat budget tests out of live tick log",
+        "claim_type": "test_hardening",
+        "blast_radius": "Local",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "test", "ref": "scripts/tests/test_heartbeat_budget.py"},
+            {"type": "commit", "ref": "8b6a8fe"},
+        ],
+        "risks": [],
+        "benefits": [
+            "Test runs no longer pollute .agent-surface/heartbeat/ticks.log with synthetic spend, which would have confused the 2026-05-26 spec-vs-code reconciliation done in P4.2.",
+        ],
+        "next_action": "No action; defensive test isolation.",
+    },
+    {
+        "sha": "1c22e10",
+        "subject": "memory: record hc cli location in wsl",
+        "claim_type": "memory_entry",
+        "blast_radius": "Local",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "commit", "ref": "1c22e10"},
+        ],
+        "risks": [],
+        "benefits": [
+            "Future sessions discover that holochain-cli 0.6.1 lives in WSL holonix shell (not on Windows PATH) without re-deriving — closes the friction loop the operator's 'oh hc dev is in wsl' message surfaced.",
+        ],
+        "next_action": "When M13 substrate decision lands, link this memory from the M13 follow-up notes.",
+    },
 ]
 
 
