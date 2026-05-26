@@ -97,3 +97,11 @@ nul
 
 # Browser-extension JS dumps from sitegeist intake (2026-05-19) — kept on disk for inspection, excluded from repo.
 docs/research/intake_raw/2026-05-19-root/bundles/sitegeist_extracted/
+
+
+# Holochain build artifacts (regeneratable via `hc dna pack` / `hc app pack`)
+ARF/dnas/rose_forest/workdir/*.dna
+ARF/workdir/*.happ
+
+# Tryorama local sandbox state
+ARF/tests/tryorama/.hc/
