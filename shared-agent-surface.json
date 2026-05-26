@@ -60,6 +60,7 @@
       "agent_instruction_path": "opworkers/.opencode/agents/openwork.md",
       "agent_description": "OpenWork default FLOSSI0ULLK worker generated from the shared surface.",
       "startup_context_pointers": [
+        ".agent-surface/STARTUP_CONTRACT.md",
         ".agent-surface/context/CONTEXT_L0.md",
         ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
         ".agent-surface/harness/AI_ROSTER.md",

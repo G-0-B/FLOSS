@@ -47,11 +47,13 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 - `project-omo-momus-voter`: omo-momus persona voter is wired and approved in production
 - `project-openclaw-token-burn`: OpenClaw consumed the OpenAI token budget, not Codex — The OpenAI usage spike that caused the prior session's "ran out of usage insanely fast" symptom was caused by **OpenClaw**, not Codex. Confirmed by user 2026-05-17.
 - `project-operator-primer-and-reasoning-mcp`: Operator primer is the first human-readable map; reasoning ensemble MCP is registered — As of 2026-05-19, `FLOSS/docs/architecture/OPERATOR_PRIMER.md` is the
+- `project-provenance-audit-doctor`: Provenance Audit Dispositions And Shared-Surface Doctor
 - `project-root-intake-2026-05-19`: Workspace root intake relocated to dated raw holding area — On 2026-05-19, 49 loose workspace-root intake files plus the extracted
 - `project-root-is-intake-mouth`: Workspace root is the intake mouth, not an orphan zone — Files dropped directly into `C:\~shit\` and `C:\~shit\FLOSS\` root are **intake / pre-digestion material**, not stale orphans. The user treats the workspace root as a shared "mouth" where they (and any agentic collaborator) leave things for mutual internalization into the project.
 - `project-truth-label-canon`: Truth-status label scheme is canonical — The four-label truth-status scheme defined in Spine v0.5 has been adopted in canonical architecture documents:
 - `project-v4-kernel-landed`: Meta-Coordination Kernel v4.0 landed as canon (operational-axis pair with CCES)
 - `project-vibe-alignment`: Mistral Vibe now has a generated FLOSSI0ULLK alignment path — Mistral Vibe drifted because its default session could start from project context
+- `project-workflow-branches-unused`: Most work lands in the working tree, not branches; root workspace is not under git
 
 ## Reference
 
