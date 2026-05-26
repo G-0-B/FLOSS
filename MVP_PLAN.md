@@ -21,7 +21,13 @@ rollback_plan: "Each phase ships independently; any phase can stall without brea
 
 ---
 
-Current phase-status note (2026-05-18): MVP Phase 0 substrate viability is complete: DNA compiles to WASM, Holochain hApp/Tryorama integration tests pass, and ontology integrity unit tests pass. Do not confuse this with the separate orchestration substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md`, which remains Specified until publish/provenance/independent-verify/fork-visible criteria are executed and logged.
+Current phase-status note (2026-05-18, **updated 2026-05-26**): MVP Phase 0 substrate viability is **partially verified**:
+
+- ✅ **Verified (2026-05-26):** DNA + hApp compile to WASM in holonix `main-0.6` (`hc 0.6.1`); `hc dna pack` + `hc app pack` succeed; consent_integrity has 10/10 native Rust unit tests passing; rose_forest vector_ops has 8/8 native unit tests passing.
+- ⚠️ **Tryorama integration tests are NOT currently passing end-to-end.** Investigated 2026-05-26 against hc 0.6.1: no `@holochain/tryorama` version pairs cleanly with the 0.6 conductor. tryorama 0.17 expects a separate `hc-sandbox` binary; tryorama 0.18 expects `hc sandbox network webrtc` + `ConfigRootPath(...)` schema not present in 0.6; tryorama 0.19 sends a request shape conductor 0.6.1 cannot deserialize. The 0.6 line is EOL upstream (`crates.io` latest `holochain_cli` is `0.7.0-dev.26`). The earlier "Tryorama integration tests pass" claim was true against the pre-migration hc 0.4 line; it broke when the substrate bumped to `hdi 0.7.1 / hdk 0.6.1` (commit `7e6d4e5`).
+- Path forward: either (a) migrate substrate to `holonix main-0.7-dev` (where tryorama 0.18+ pairs cleanly), (b) write a custom test harness against `@holochain/client 0.19.3` directly (which does install against conductor 0.6.1), or (c) wait for an upstream tryorama-0.6 backport. Tracked as task M13.
+
+Do not confuse MVP Phase 0 with the separate orchestration substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md`, which remains Specified until publish/provenance/independent-verify/fork-visible criteria are executed and logged.
 
 ## The Honest State of Things
 
@@ -34,7 +40,7 @@ Current phase-status note (2026-05-18): MVP Phase 0 substrate viability is compl
 | Coordinator zome (5 extern functions) | 100 Rust | compiles | `coordinator/lib.rs` |
 | ConversationMemory (cross-AI context) | 503 Python | 3/4 pass | `conversation_memory.py` |
 | Fractal embeddings (multi-scale) | ~150 Python | in use | `embedding_frames_of_scale.py` |
-| flake.nix (Holochain 0.4 dev env) | 37 Nix | boots | `flake.nix` |
+| flake.nix (Holochain 0.6 dev env via holonix `main-0.6`) | 37 Nix | boots in WSL (verified 2026-05-26) | `flake.nix` |
 | 5 entry type specs + 4 JSON schemas | ~500 lines | reviewed | `docs/specs/` |
 | 8 ADRs with clear status labels | ~1200 lines | reviewed | `docs/adr/` |
 | Governance stack (kernel, spine, seed packet) | ~800 lines | in use | `docs/governance/` |
@@ -47,10 +53,18 @@ Current phase-status note (2026-05-18): MVP Phase 0 substrate viability is compl
 - KERI/ACDC identity integration
 - Proof-carrying code
 
-### ~~The #1 blocker~~ RESOLVED
+### ~~The #1 blocker~~ RESOLVED (partially — see 2026-05-26 update)
+
 ~~**The Holochain DNA has never compiled to WASM or run in a conductor.**~~
 
-**Phase 0 is COMPLETE.** The DNA compiled to WASM and all tests pass. The round-trip test timed out on first run but passed on second.
+**Phase 0 substrate viability is verified.** The DNA compiles to WASM in holonix `main-0.6`, the hApp packs cleanly with `hc 0.6.1`, and the consent_integrity + rose_forest vector_ops zomes pass all native Rust unit tests (10/10 + 8/8 as of 2026-05-26).
+
+**However**, the original "all tests pass" claim was made against the prior hc 0.4 line. The 2026-05-19 substrate bump to `hdi 0.7.1 / hdk 0.6.1` (commit `7e6d4e5`) broke the Tryorama integration path because no `@holochain/tryorama` version pairs cleanly with the hc 0.6.1 in `holonix main-0.6`:
+- tryorama 0.17 expects separate `hc-sandbox` binary (not in 0.6.x monorepo)
+- tryorama 0.18 expects `hc sandbox network webrtc` + `ConfigRootPath` schema (hc 0.6.1 has only `mem`/`quic` + `DataRootPath`)
+- tryorama 0.19 sends a request shape `holochain conductor 0.6.1` cannot deserialize
+
+`crates.io` latest `holochain_cli` is `0.7.0-dev.26`, confirming the 0.6 line is EOL upstream. Path forward tracked as task M13: either migrate substrate to `holonix main-0.7-dev` (tryorama 0.18+ pairs there), write a custom test harness against `@holochain/client 0.19.3` (which does install against 0.6.1), or wait for an upstream tryorama-0.6 backport.
 
 Architectural cleanup performed:
 - `sharding.rs`, `crdt.rs`, `versioning.rs` removed (Holochain handles these natively)
