@@ -1,7 +1,10 @@
 # ADR-12 — Consent Gate Protocol
 
 **Status:** Draft (implementation-backed) — 2026-05-19
-**Truth status:** ⚠️ Specified with verified implementation slices; JSON schema, Holochain entry types, consent coordinator, DNA wiring, Rust unit tests, static wiring tests, release WASMs, hApp packing, and consent Tryorama scenarios are locally verified; action-time gating, DID/header hardening, and cross-frame validation remain pending before promotion to Accepted
+**Truth status:** ⚠️ Specified with verified implementation slices.
+**Verified (2026-05-26):** JSON schema, Holochain entry types, consent coordinator, DNA wiring, **10/10 native Rust unit tests** in `consent_integrity` (payload_requires_dids, payload_rejects_empty_scope, valid_accepted_decision_passes_shape_validation, non_accepted_decision_requires_rationale, rejected_decision_must_not_grant_scope, non_rejected_decision_must_grant_some_scope, valid_payload_passes_shape_validation, kernel_payload_must_be_substrate_class, payload_rejects_non_lowercase_sha256_hash, counter_proposal_requires_counter_frame_ref), release WASMs (4 zomes clean to wasm32 target), and **hApp packing** (`hc dna pack` + `hc app pack` succeed in holonix dev shell with manifest_version "0" + `path:` fields).
+**Currently NOT verified end-to-end:** Tryorama integration scenarios for `consent_gate.test.ts` fail at `AdminWebsocket.installApp` with `deserialization: Failed to deserialize request`. Root cause: `@holochain/tryorama@^0.19.0` + `@holochain/client@^0.20.0` (bumped during the Holochain 0.6/HDI 0.7 migration) send a request shape incompatible with `holochain conductor 0.6.1`. **Tooling pin issue, NOT a consent zome defect** — the wasm builds, the manifest packs, the validation logic is unit-tested. Pinning compatible client+tryorama versions for the 0.6 conductor line is open as a follow-up (M13) before promotion to Accepted.
+**Pending for promotion to Accepted:** Tryorama scenarios (after M13 tooling pin), action-time gating, DID/header hardening, cross-frame validation.
 **Type:** Substrate-level governance — affects ADR-1, ADR-3, ADR-5, ADR-6, ADR-9, all future memetic-pattern transmission
 **Blast radius:** Substrate (invariant-touching; OVERRIDE FORBIDDEN; APPROVE threshold 0.85)
 **Supersedes:** none (fills the gap explicitly named in ADR-Suite v2.0 §13 Gap 1)
