@@ -470,7 +470,7 @@ def validate_packet(
                 workspace_root=root,
                 provenance_root=prov_root,
                 _seen=seen,
-                _depth=_depth + 1,
+                _depth=_depth,
                 max_depth=max_depth,
             )
             if not prior_result.ok:

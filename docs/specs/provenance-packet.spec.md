@@ -88,8 +88,31 @@ Evidence references form a DAG, not a tree. Validation rules:
 - Cycles are invalid.
 - A packet whose evidence DAG contains no non-packet evidence root is invalid.
 - A `p` reference to a nonexistent prior packet is invalid.
+- `p` is a linear per-agent sequence pointer. It is checked for existence and
+  continuity but does not consume the evidence-DAG recursion budget.
 - Plane B MUST re-run all packet validation steps; it never trusts a cached packet
   digest or a caller-provided hash.
+
+## Audit Disposition
+
+Strict packet validation and operator-facing daily audit are separate views.
+`validate_packet()` remains strict: if an artifact ref no longer hashes to the
+packet's recorded `sha256`, the packet is not valid current evidence.
+
+Daily Plane A audit MAY classify a strict
+`E_PROVENANCE_ARTIFACT_HASH_MISMATCH` as `superseded` instead of active
+`invalid` when the packet is historical evidence for mutable generated outputs
+or when a newer valid packet from the same agent covers the same claim/artifact
+surface. Superseded packets are preserved and reported, but they do not satisfy
+governed-claim evidence requirements and must not be treated as current truth.
+
+The operator-facing audit statuses are:
+
+| Status | Meaning |
+|---|---|
+| `valid` | Strict packet validation passes against the current workspace. |
+| `superseded` | Signature/digest structure is preserved, but artifact refs point at old generated or replaced workspace content covered by later evidence. |
+| `invalid` | The packet has an active validation failure that is not covered by the supersession policy. |
 
 ## Governed Boundary
 

@@ -137,6 +137,45 @@ def test_prior_digest_must_resolve_to_existing_packet(tmp_path, monkeypatch):
     assert "E_PROVENANCE_PRIOR_NOT_FOUND" in result.errors
 
 
+def test_long_linear_prior_chain_is_not_evidence_recursion(tmp_path, monkeypatch):
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+
+    packet_path = None
+    for index in range(10):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-05-24T10:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+
+    assert packet_path is not None
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+
+    assert result.ok is True
+    assert "E_PROVENANCE_RECURSION_DEPTH_EXCEEDED" not in result.errors
+
+
 def test_multi_entry_narrative_emits_one_line_per_entry(tmp_path, monkeypatch):
     from packages.activity_log import provenance
 

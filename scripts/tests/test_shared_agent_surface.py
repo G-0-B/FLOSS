@@ -141,3 +141,82 @@ def test_openwork_instruction_projection_names_shared_packet_and_provenance():
     assert "agentmemory" in content
     assert "provenance packet" in content
     assert "Repository canon wins" in content
+
+
+def test_umbrella_materializer_refreshes_memory_before_context(tmp_path, monkeypatch):
+    surface = load_surface_module()
+    workspace = tmp_path
+    floss = workspace / "FLOSS"
+    floss.mkdir()
+    manifest = floss / "shared-agent-surface.json"
+    manifest.write_text(
+        """
+        {
+          "manifest_version": "0.1.0",
+          "workspace_id": "flossi0ullk",
+          "workspace_name": "FLOSSI0ULLK",
+          "mcp_source": ".mcp.json",
+          "targets": {}
+        }
+        """,
+        encoding="utf-8",
+    )
+    (workspace / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    roster_manifest = floss / "shared-ai-roster-surface.json"
+    memory_manifest = floss / "shared-agent-memory-surface.json"
+    context_manifest = floss / "shared-context-surface.json"
+    for path in (roster_manifest, memory_manifest, context_manifest):
+        path.write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(surface, "DEFAULT_AI_ROSTER_MANIFEST_PATH", roster_manifest)
+    monkeypatch.setattr(surface, "DEFAULT_MEMORY_MANIFEST_PATH", memory_manifest)
+    monkeypatch.setattr(surface, "DEFAULT_CONTEXT_MANIFEST_PATH", context_manifest)
+    monkeypatch.setattr(surface, "DEFAULT_HOOK_MANIFEST_PATH", floss / "missing-hooks.json")
+    monkeypatch.setattr(surface, "DEFAULT_SKILL_MANIFEST_PATH", floss / "missing-skills.json")
+
+    calls: list[str] = []
+
+    def fake_roster(**_kwargs):
+        calls.append("roster")
+        return ["OK roster"], False
+
+    def fake_memory(**_kwargs):
+        calls.append("memory")
+        return ["OK memory"]
+
+    def fake_context(**_kwargs):
+        calls.append("context")
+        return ["OK context"], False
+
+    monkeypatch.setattr(surface, "materialize_ai_roster_surface", fake_roster)
+    monkeypatch.setattr(surface, "materialize_memory_surface", fake_memory)
+    monkeypatch.setattr(surface, "materialize_context_surface", fake_context)
+
+    surface.materialize(workspace, manifest, check=False, dry_run=False)
+
+    assert calls == ["roster", "memory", "context"]
+
+
+def test_doctor_report_summarizes_surface_memory_provenance_and_heartbeat():
+    surface = load_surface_module()
+
+    report = surface.build_doctor_report(
+        workspace_root=Path("C:/~shit"),
+        surface_drift=False,
+        roster_summary={
+            "provider_count": 12,
+            "model_count": 382,
+            "mcp_server_count": 11,
+        },
+        agentmemory_status="healthy",
+        heartbeat_stop_present=True,
+        audit_counts={"valid": 8, "superseded": 2, "invalid": 1},
+    )
+
+    assert "Workspace: `C:/~shit`" in report
+    assert "- Shared surface: `clean`" in report
+    assert "- agentmemory: `healthy`" in report
+    assert "- Heartbeat STOP: `present`" in report
+    assert "- Providers: `12`" in report
+    assert "- Provenance: `8 valid`, `2 superseded`, `1 invalid`" in report

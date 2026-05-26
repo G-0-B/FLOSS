@@ -36,6 +36,7 @@ import json
 from pathlib import Path
 import textwrap
 from typing import Any
+from urllib import error, request
 
 from materialize_shared_context_surface import (
     materialize as materialize_context_surface,
@@ -840,6 +841,121 @@ path.write_text(
     return textwrap.dedent(script).strip() + "\n"
 
 
+def count_audit_statuses(records: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"valid": 0, "superseded": 0, "invalid": 0}
+    for record in records:
+        status = record.get("audit_status", "invalid")
+        if status not in counts:
+            status = "invalid"
+        counts[status] += 1
+    return counts
+
+
+def read_roster_summary(workspace_root: Path) -> dict[str, Any]:
+    roster_path = workspace_root / ".agent-surface" / "harness" / "ai-roster.json"
+    try:
+        roster = load_json(roster_path)
+    except SharedSurfaceError:
+        return {}
+    summary = roster.get("summary")
+    return summary if isinstance(summary, dict) else {}
+
+
+def fetch_agentmemory_status(
+    url: str = "http://localhost:3111/agentmemory/health",
+) -> str:
+    try:
+        with request.urlopen(url, timeout=2) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return f"error:{type(exc).__name__}"
+    status = payload.get("status")
+    if isinstance(status, str) and status.strip():
+        return status
+    health = payload.get("health")
+    if isinstance(health, dict) and isinstance(health.get("status"), str):
+        return health["status"]
+    return "unknown"
+
+
+def build_doctor_report(
+    *,
+    workspace_root: Path,
+    surface_drift: bool,
+    roster_summary: dict[str, Any],
+    agentmemory_status: str,
+    heartbeat_stop_present: bool,
+    audit_counts: dict[str, int],
+) -> str:
+    surface_status = "drift" if surface_drift else "clean"
+    heartbeat_status = "present" if heartbeat_stop_present else "absent"
+    provider_count = roster_summary.get("provider_count", "unknown")
+    model_count = roster_summary.get("model_count", "unknown")
+    mcp_count = roster_summary.get("mcp_server_count", "unknown")
+    valid_count = audit_counts.get("valid", 0)
+    superseded_count = audit_counts.get("superseded", 0)
+    invalid_count = audit_counts.get("invalid", 0)
+
+    lines = [
+        "# Shared Agent Surface Doctor",
+        "",
+        f"Workspace: `{workspace_root.as_posix()}`",
+        "",
+        "## Status",
+        "",
+        f"- Shared surface: `{surface_status}`",
+        f"- agentmemory: `{agentmemory_status}`",
+        f"- Heartbeat STOP: `{heartbeat_status}`",
+        "",
+        "## Harness Roster",
+        "",
+        f"- Providers: `{provider_count}`",
+        f"- Unique models: `{model_count}`",
+        f"- MCP servers: `{mcp_count}`",
+        "",
+        "## Provenance",
+        "",
+        (
+            f"- Provenance: `{valid_count} valid`, "
+            f"`{superseded_count} superseded`, `{invalid_count} invalid`"
+        ),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def run_doctor(workspace_root: Path, manifest_path: Path) -> tuple[str, int]:
+    surface_results, surface_drift = materialize(
+        workspace_root,
+        manifest_path,
+        check=True,
+        dry_run=False,
+    )
+    from audit_provenance_packets import audit_packets
+
+    _invalid_count, audit_records, _audit_lines = audit_packets(
+        workspace_root / ".agent-surface" / "provenance",
+        workspace_root=workspace_root,
+    )
+    audit_counts = count_audit_statuses(audit_records)
+    report = build_doctor_report(
+        workspace_root=workspace_root,
+        surface_drift=surface_drift,
+        roster_summary=read_roster_summary(workspace_root),
+        agentmemory_status=fetch_agentmemory_status(),
+        heartbeat_stop_present=(
+            workspace_root / ".agent-surface" / "heartbeat" / "STOP"
+        ).exists(),
+        audit_counts=audit_counts,
+    )
+    report += "\n## Shared Surface Check\n\n"
+    report += "\n".join(f"- {line}" for line in surface_results) + "\n"
+
+    exit_code = 1 if surface_drift or audit_counts.get("invalid", 0) else 0
+    if not report:
+        exit_code = 1
+    return report, exit_code
+
+
 def check_or_write(
     path: Path, payload: dict[str, Any], *, check: bool, dry_run: bool
 ) -> tuple[str, bool]:
@@ -1016,6 +1132,20 @@ def materialize(
         results.extend(roster_results)
         drift_found = drift_found or roster_drift
 
+    if DEFAULT_MEMORY_MANIFEST_PATH.exists():
+        memory_results = materialize_memory_surface(
+            workspace_root=workspace_root,
+            manifest_path=DEFAULT_MEMORY_MANIFEST_PATH,
+            output_dir=workspace_root / ".agent-surface" / "memory",
+            check=check,
+            dry_run=dry_run,
+        )
+        results.extend(memory_results)
+        drift_found = drift_found or any(
+            message.startswith(("WROTE", "PLAN  WRITE", "CHECK DRIFT"))
+            for message in memory_results
+        )
+
     if DEFAULT_CONTEXT_MANIFEST_PATH.exists():
         context_results, context_drift = materialize_context_surface(
             workspace_root=workspace_root,
@@ -1049,20 +1179,6 @@ def materialize(
         results.extend(skill_results)
         drift_found = drift_found or skill_drift
 
-    if DEFAULT_MEMORY_MANIFEST_PATH.exists():
-        memory_results = materialize_memory_surface(
-            workspace_root=workspace_root,
-            manifest_path=DEFAULT_MEMORY_MANIFEST_PATH,
-            output_dir=workspace_root / ".agent-surface" / "memory",
-            check=check,
-            dry_run=dry_run,
-        )
-        results.extend(memory_results)
-        drift_found = drift_found or any(
-            message.startswith(("WROTE", "PLAN  WRITE", "CHECK DRIFT"))
-            for message in memory_results
-        )
-
     return results, drift_found
 
 
@@ -1092,6 +1208,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Exit non-zero if materialized files drift from the canonical source",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Read-only status report for shared surfaces, harness roster, agentmemory, heartbeat, and provenance",
+    )
     return parser.parse_args()
 
 
@@ -1099,6 +1220,10 @@ def main() -> int:
     args = parse_args()
     workspace_root = args.workspace_root.resolve()
     manifest_path = args.manifest.resolve()
+    if args.doctor:
+        report, exit_code = run_doctor(workspace_root, manifest_path)
+        print(report, end="")
+        return exit_code
     results, drift_found = materialize(
         workspace_root,
         manifest_path,
