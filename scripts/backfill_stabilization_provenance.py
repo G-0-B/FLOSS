@@ -207,6 +207,129 @@ COMMITS = [
         ],
         "next_action": "Phase 2 P2.4 distills Levin Corpus -> CCES implications; P2.5 distills ODI Scan -> landscape delta.",
     },
+    # === Meta-workflow detour (M-track) commits added 2026-05-26 ===
+    {
+        "sha": "edad4cd",
+        "subject": "plan: dump Phase 2/3/4 resumption packet for cross-session pickup",
+        "claim_type": "plan_artifact",
+        "blast_radius": "Local",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/superpowers/plans/2026-05-25-phases-2-3-4-resumption-packet.md"},
+            {"type": "commit", "ref": "edad4cd"},
+        ],
+        "risks": [
+            "Resumption packet captures Phase 2/3/4 state as of 2026-05-25; if work resumes after significant working-tree drift the packet may need refresh.",
+        ],
+        "benefits": [
+            "Allows the active conversation to shed Phase 2/3/4 detail and any next session to reload cheaply.",
+        ],
+        "next_action": "M8: Reload resumption packet when continuing P2.4 Levin distillation.",
+    },
+    {
+        "sha": "fef7a89",
+        "subject": "provenance: backfill 10 stabilization-sweep packets via dedicated script",
+        "claim_type": "provenance_tooling",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/specs/provenance-packet.spec.md"},
+            {"type": "test", "ref": "packages/activity_log/tests/test_provenance.py"},
+            {"type": "commit", "ref": "fef7a89"},
+        ],
+        "risks": [
+            "Genesis-tier backfill avoided default max_depth=8; Codex's parallel _depth=_depth fix (commit 7e2a3ac) makes chaining feasible going forward, so future backfill passes can opt into chains.",
+        ],
+        "benefits": [
+            "Re-runnable + extendable. Closes the retroactive gap at consensus-gate INV-015 for the stabilization sweep.",
+        ],
+        "next_action": "Extend with future bulk-sweep commit specs as needed.",
+    },
+    {
+        "sha": "7d4cffa",
+        "subject": "skills: land remember + session-report + claude-reflect into shared corpus",
+        "claim_type": "skill_addition",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "FLOSS/skill-corpus/remember/SKILL.md"},
+            {"type": "spec", "ref": "FLOSS/skill-corpus/session-report/SKILL.md"},
+            {"type": "spec", "ref": "FLOSS/skill-corpus/claude-reflect/SKILL.md"},
+            {"type": "commit", "ref": "7d4cffa"},
+        ],
+        "risks": [
+            "session-report references a Claude Code marketplace path that may move on plugin update.",
+            "claude-reflect upstream plugin still owns the capture hook; this projection only documents the user-facing surface.",
+        ],
+        "benefits": [
+            "3 cross-session/observability/learning skills now live in canon + materialized across all 4 AI surfaces.",
+        ],
+        "next_action": "Use remember at end of every substantive session; session-report weekly; claude-reflect when patterns emerge.",
+    },
+    {
+        "sha": "f6b88d4",
+        "subject": "contract: wire FLOSSI0ULLK Startup Contract across harness pointers",
+        "claim_type": "governance_artifact",
+        "blast_radius": "System",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": ".agent-surface/STARTUP_CONTRACT.md"},
+            {"type": "adr", "ref": "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md"},
+            {"type": "adr", "ref": "docs/adr/ADR-12-consent-gate-protocol.md"},
+            {"type": "commit", "ref": "f6b88d4"},
+        ],
+        "risks": [
+            "Contract enforcement is observational — agents that ignore the contract still operate, just incoherently.",
+            "Per-harness SessionStart-equivalents land in subsequent commit (59550dc); Gemini/Codex/OpenCode start sessions via ambient-context references rather than auto-injection.",
+        ],
+        "benefits": [
+            "Single canonical statement of the 5 non-negotiable disciplines (kernel mode, truth labels, provenance for substrate, consent for governed patterns, activity log).",
+            "Claude SessionStart hook injects 4875 bytes automatically.",
+        ],
+        "next_action": "Continue enforcing kernel-mode response format on substantive work; emit provenance for substrate changes; reroute decisions through reasoning ensemble where applicable.",
+    },
+    {
+        "sha": "7e2a3ac",
+        "subject": "codex: parallel materializer doctor + audit hardening + provenance _depth fix",
+        "claim_type": "tooling_hardening",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "test", "ref": "packages/activity_log/tests/test_provenance.py"},
+            {"type": "test", "ref": "scripts/tests/test_audit_provenance_packets.py"},
+            {"type": "test", "ref": "scripts/tests/test_shared_agent_surface.py"},
+            {"type": "spec", "ref": "docs/specs/provenance-packet.spec.md"},
+            {"type": "commit", "ref": "7e2a3ac"},
+        ],
+        "risks": [
+            "Not authored by this session; preserved verbatim from working-tree state Codex landed in parallel.",
+        ],
+        "benefits": [
+            "validate_packet prior-chain depth fix enables chained provenance packets beyond the default depth-8 limit.",
+            "Materializer + audit doctor mode reports cross-AI surface health in one place.",
+        ],
+        "next_action": "Run `python scripts/materialize_shared_agent_surface.py --doctor` for a periodic health check.",
+    },
+    {
+        "sha": "59550dc",
+        "subject": "contract: wire STARTUP_CONTRACT into OpenCode startup pointers + memory regen",
+        "claim_type": "governance_artifact",
+        "blast_radius": "System",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": ".agent-surface/STARTUP_CONTRACT.md"},
+            {"type": "spec", "ref": "shared-agent-surface.json"},
+            {"type": "commit", "ref": "59550dc"},
+        ],
+        "risks": [
+            "Codex AGENTS.md + workspace-root GEMINI.md/CLAUDE.md edits live outside this repo (root not under git); their stability depends on the operator preserving the SESSION START PROTOCOL + Mandatory Startup sections.",
+        ],
+        "benefits": [
+            "OpenCode openwork agent prompt now loads STARTUP_CONTRACT.md FIRST.",
+            "All 4 AI harnesses have a path to the contract (auto-inject for Claude; ambient context for Gemini/Codex/OpenCode).",
+        ],
+        "next_action": "M9 follow-up: durable build_codex_payload target in materializer so Codex MCP wiring auto-syncs with .mcp.json.",
+    },
     {
         "sha": "94dc3de",
         "subject": "adr: replace ADR-3 with amended v1.1.0 (Accepted + Empirical Grounding); archive v1.0.0",
