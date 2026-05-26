@@ -128,6 +128,14 @@ Root drops remaining (not moved): ADR-003-Metaprompt-Kernelization.md (handled
 separately: replaced canonical ADR-3 with amended v1.1.0 + archived v1.0.0 in
 commit `94dc3de`).
 
+### A.10 Substrate migration: Holochain 0.6 → 0.7-dev (M14, planned 2026-05-26)
+
+**Status:** ⚠️ Specified — full plan + 7 sequential gates + rollback at [`docs/superpowers/plans/2026-05-26-holochain-0.7-migration.md`](../superpowers/plans/2026-05-26-holochain-0.7-migration.md). Branch reserved: `working/2026-05-26-holochain-0.7-migration` off current stabilization-canon. Operator chose option (a) of M13's three-option fork ([memory](../agent-memory/project/holochain-0-7-migration-pending.md)).
+
+**Why now:** `hc 0.6.1` is EOL upstream (`crates.io` latest `holochain_cli` is `0.7.0-dev.26` per 2026-05-26 check). No `@holochain/tryorama` version pairs cleanly with 0.6.1 — three attempted version pairs documented in [`tryorama-tooling-gap-2026-05-26`](../agent-memory/project/tryorama-tooling-gap-2026-05-26.md). Tryorama end-to-end is the unblocker for the ADR-12 + MVP Phase 0 truth-status claims (corrected to NOT-verified in commits `f4a70cf` + `5969d09`).
+
+**Substrate blast radius — substrate-class commits require provenance packets per ADR-12 INV-015 + consent-gate APPROVE ≥ 0.85.** ADR-13 ("Holochain 0.7-dev migration") drafted alongside the work, not after.
+
 ### A.4 SocratiCode install (UNBLOCKED — Docker running post-reboot)
 
 **Status:** Docker server 29.4.3 is now running. SocratiCode install was blocked on Docker availability in prior session. Plugin marketplace already added via `claude plugin marketplace add giancarloerra/socraticode`.

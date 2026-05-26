@@ -8,11 +8,15 @@ applies_to:
 title: Most work lands in the working tree, not branches; root workspace is not under git
 ---
 
-## What's actually true about the FLOSSI0ULLK git workflow
+## 2026-05-26 update — root is now under git (Phase 5)
+
+The root-workspace-not-versioned concern is **resolved as of 2026-05-26** by commits `7bc5ea5` (init: root workspace canon) + `58e5a7a` (gitignore final sweep) on branch `codex/document-holochain-zomes` AT ROOT (different repo than FLOSS's branch of the same name). Canonical operator surface, `.agent-surface/` canon projections, `.mcp.json` + lenses, per-agent configs, and 4 fresh root intake drops are now versioned. `_reference/` (11GB) + sub-repos (`FLOSS/`, `FLOSSI_U/`) excluded per `.gitignore`. The original-state description below is preserved for context.
+
+## What's actually true about the FLOSSI0ULLK git workflow (pre-2026-05-26)
 
 As of 2026-05-25, surveying the workspace produced these findings — they're load-bearing for any agent trying to figure out "what's the latest work":
 
-- **Root workspace `C:\~shit\` is not a git repo.** `git status` reports "no commits"; every root-level artifact (`.agent-surface/`, root intake drops, `AGENTMEMORY.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, the fresh research drops) is unversioned and recoverable only from the local disk.
+- **Root workspace `C:\~shit\` is not a git repo.** ⚠️ **No longer accurate as of 2026-05-26 — see update above.** `git status` reports "no commits"; every root-level artifact (`.agent-surface/`, root intake drops, `AGENTMEMORY.md`, `INDEX.md`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, the fresh research drops) is unversioned and recoverable only from the local disk.
 - **`FLOSS/` is the git repo**, but most live work happens directly in the working tree rather than on branches. The branch `codex/document-holochain-zomes` is 2+ weeks stale (HEAD `5b5cefd`), identical to `lappytop`, and its name no longer reflects work done on it — the 40 commits ahead of `main` are DeepSource hygiene + consensus-gateway hardening + ADR-9, not zome documentation.
 - **The `quirky-mcnulty` worktree under `FLOSS/.claude/worktrees/`** is a goop/image dump (806 files, mostly PNGs in `wtfaimgen/` and a `bash.exe.stackdump`) — not load-bearing for main project work.
 - Substrate-level artifacts often live only as untracked working-tree files. As of 2026-05-25 the untracked-but-load-bearing set includes:

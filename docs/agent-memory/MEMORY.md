@@ -36,6 +36,7 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 - `project-filewatch-intake-skeleton`: Filewatch metaharness intake skeleton landed — A minimal filewatch + consolidation skeleton has landed under `FLOSS/scripts/`:
 - `project-floss-subprojects`: FLOSS subprojects — FLOSSI U and YumeiCHAN — The FLOSSI0ULLK family contains **multiple sibling projects**, not a monolithic codebase. Distinguishing them is critical for the cull triage and for future architecture decisions.
 - `project-heartbeat-running`: Heartbeat loop is budget-gated; diverse-max is no longer routine
+- `project-holochain-0-7-migration-pending`: M14 — Holochain 0.6 → 0.7-dev substrate migration is the next substrate work
 - `project-holochain-version-line-skew`: Substrate WAS holochain-0.4; migrated to holochain-0.6 (2026-05-19) aligned with skill canonical reference — Current operational shortcut: on Windows, run Holochain CLI work through
 - `project-installation-not-adoption`: Installation ≠ adoption — standing rule for reuse-ledger adapter_test gate — Standing rule established 2026-05-19 after demotion of ledger entry 0013 (holochain-agent-skill) from `adopt` back to `investigate`. Consensus claim `019e412d-7ce9-750f-b7cc-1c0260c6410c` APPROVED mean +0.90 ratifies this as standing rule.
 - `project-itmd-shipped-parallel-session`: ITMD (idle-time metaharness driver) shipped via parallel Claude session — A parallel Claude session, working ~2026-05-07, designed and shipped an idle-time metaharness driver (ITMD) without this main session's involvement. Key facts to load when relevant:
@@ -51,6 +52,7 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 - `project-root-intake-2026-05-19`: Workspace root intake relocated to dated raw holding area — On 2026-05-19, 49 loose workspace-root intake files plus the extracted
 - `project-root-is-intake-mouth`: Workspace root is the intake mouth, not an orphan zone — Files dropped directly into `C:\~shit\` and `C:\~shit\FLOSS\` root are **intake / pre-digestion material**, not stale orphans. The user treats the workspace root as a shared "mouth" where they (and any agentic collaborator) leave things for mutual internalization into the project.
 - `project-truth-label-canon`: Truth-status label scheme is canonical — The four-label truth-status scheme defined in Spine v0.5 has been adopted in canonical architecture documents:
+- `project-tryorama-tooling-gap-2026-05-26`: No @holochain/tryorama version pairs with hc 0.6.1 (M13 finding)
 - `project-v4-kernel-landed`: Meta-Coordination Kernel v4.0 landed as canon (operational-axis pair with CCES)
 - `project-vibe-alignment`: Mistral Vibe now has a generated FLOSSI0ULLK alignment path — Mistral Vibe drifted because its default session could start from project context
 - `project-workflow-branches-unused`: Most work lands in the working tree, not branches; root workspace is not under git
