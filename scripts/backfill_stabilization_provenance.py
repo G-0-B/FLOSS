@@ -13,6 +13,7 @@ Usage: python scripts/backfill_stabilization_provenance.py
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -352,6 +353,225 @@ COMMITS = [
         ],
         "next_action": "No action; ADR-3 stabilized at v1.1.0.",
     },
+    # === Phase 2/3/4 + M13 commits added 2026-05-26 ===
+    {
+        "sha": "52224e1",
+        "subject": "provenance: extend backfill script with 6 meta-workflow commits",
+        "claim_type": "provenance_tooling",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/specs/provenance-packet.spec.md"},
+            {"type": "test", "ref": "scripts/tests/test_audit_provenance_packets.py"},
+            {"type": "commit", "ref": "52224e1"},
+        ],
+        "risks": [
+            "The backfill script was still append-only and could duplicate packets before the 2026-05-26 idempotency update.",
+        ],
+        "benefits": [
+            "Extended retroactive packet coverage from the first stabilization sweep into the meta-workflow commits.",
+        ],
+        "next_action": "Keep backfill script idempotent and extend it when future governed commits land without live packets.",
+    },
+    {
+        "sha": "d2a4541",
+        "subject": 'hc-pack: manifest_version "0" + path: fields; ADR-12 truth-status correction',
+        "claim_type": "packaging_tooling",
+        "blast_radius": "Module",
+        "proposal_type": "config_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/workdir/dna.yaml"},
+            {"type": "spec", "ref": "ARF/workdir/happ.yaml"},
+            {"type": "commit", "ref": "d2a4541"},
+        ],
+        "risks": [
+            "Local hApp/DNA manifest fixes do not prove Tryorama end-to-end execution.",
+            "Tooling version drift around hc 0.6.1 remains unresolved on Windows PATH.",
+        ],
+        "benefits": [
+            "Updated Holochain pack manifests to the hc 0.6 schema shape (`manifest_version` 0 and `path` fields).",
+            "Kept ADR-12 truth status honest while packaging evidence was corrected.",
+        ],
+        "next_action": "Run hc dna pack and hc app pack inside a compatible holonix/hc 0.6 environment.",
+    },
+    {
+        "sha": "f4a70cf",
+        "subject": "adr-12: honest truth-status correction - Tryorama scenarios NOT verified",
+        "claim_type": "adr_change",
+        "blast_radius": "System",
+        "proposal_type": "adr_change",
+        "evidence_refs": [
+            {"type": "adr", "ref": "docs/adr/ADR-12-consent-gate-protocol.md"},
+            {"type": "commit", "ref": "f4a70cf"},
+        ],
+        "risks": [
+            "ADR-12 still lacks Tryorama-level end-to-end evidence until M13 tooling is resolved.",
+        ],
+        "benefits": [
+            "Removed a premature verification claim and separated native unit/build evidence from E2E Holochain evidence.",
+        ],
+        "next_action": "Keep ADR-12 at Specified until the consent_gate Tryorama scenarios or equivalent Holochain integration proof pass.",
+    },
+    {
+        "sha": "5969d09",
+        "subject": "m13: tryorama pin 0.18.3/0.19.3 + MVP_PLAN.md truth-status correction",
+        "claim_type": "test_tooling_investigation",
+        "blast_radius": "Module",
+        "proposal_type": "config_change",
+        "evidence_refs": [
+            {"type": "test", "ref": "ARF/tests/tryorama/package.json"},
+            {"type": "test", "ref": "ARF/tests/tryorama/package-lock.json"},
+            {"type": "spec", "ref": "MVP_PLAN.md"},
+            {"type": "commit", "ref": "5969d09"},
+        ],
+        "risks": [
+            "Pinned Tryorama package versions document the investigation but do not yet produce a passing end-to-end run.",
+        ],
+        "benefits": [
+            "MVP_PLAN now distinguishes native build/unit evidence from blocked Tryorama evidence.",
+            "The M13 tooling gap has concrete package-state evidence instead of a vague blocker label.",
+        ],
+        "next_action": "Choose the M13 route: holonix main-0.7-dev migration, custom @holochain/client harness, or wait for upstream compatibility.",
+    },
+    {
+        "sha": "c8bc0de",
+        "subject": "distill: Levin Corpus -> CCES implications (2026-05-26-levin-corpus-cces-implications.md)",
+        "claim_type": "research_distillation",
+        "blast_radius": "Module",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/research/2026-05-26-levin-corpus-cces-implications.md"},
+            {"type": "commit", "ref": "c8bc0de"},
+        ],
+        "risks": [
+            "Research distillation is design input, not validated substrate behavior.",
+        ],
+        "benefits": [
+            "Converted the Levin Corpus intake into CCES-relevant implications with repo-owned traceability.",
+        ],
+        "next_action": "Route validated implications into the CCES planning surface without treating the research note as canonical architecture by itself.",
+    },
+    {
+        "sha": "9d15a36",
+        "subject": "gitignore: hc-pack artifacts + tryorama sandbox state; + codex provenance-audit-doctor memory",
+        "claim_type": "tooling_hygiene",
+        "blast_radius": "Local",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": ".gitignore"},
+            {"type": "spec", "ref": "docs/agent-memory/project/provenance-audit-doctor.md"},
+            {"type": "commit", "ref": "9d15a36"},
+        ],
+        "risks": [
+            "Generated hc/tryorama sandbox state can still appear as local untracked files if ignore patterns miss nested paths or files were created before the pattern change.",
+        ],
+        "benefits": [
+            "Keeps hc-pack generated artifacts and tryorama sandbox state out of normal code review.",
+            "Preserves Codex provenance-audit doctor guidance in repo-owned memory.",
+        ],
+        "next_action": "Check `git status --ignored` before committing any M13/tryorama follow-up.",
+    },
+    {
+        "sha": "c251875",
+        "subject": "distill: ODI Scan delta vs LANDSCAPE-ENTRY + 2026-05-22 digestion",
+        "claim_type": "research_distillation",
+        "blast_radius": "Module",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/research/2026-05-26-odi-scan-delta-vs-landscape.md"},
+            {"type": "commit", "ref": "c251875"},
+        ],
+        "risks": [
+            "ODI landscape deltas remain source-bounded research input until promoted through normal architecture/spec gates.",
+        ],
+        "benefits": [
+            "Compared the Open Distributed Intelligence scan against the existing landscape entry instead of creating an unbounded duplicate report.",
+        ],
+        "next_action": "Use the delta for the next anti-duplication fit check before adding new distributed-intelligence substrate code.",
+    },
+    {
+        "sha": "ff37a95",
+        "subject": "working-todo: A.3 - close 2026-05-25 intake pass loop",
+        "claim_type": "operational_state_update",
+        "blast_radius": "Local",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/research/2026-05-15-working-todo-list.md"},
+            {"type": "commit", "ref": "ff37a95"},
+        ],
+        "risks": [
+            "Working-todo status is intentionally mutable operational state and can drift quickly after heartbeat/autonomy resumes.",
+        ],
+        "benefits": [
+            "Closed the 2026-05-25 intake loop in the master operational surface.",
+        ],
+        "next_action": "Refresh Section A after the next intake or heartbeat state transition.",
+    },
+    {
+        "sha": "a52f1e0",
+        "subject": "docs(zomes): write 5 READMEs - the branch's named purpose finally done",
+        "claim_type": "zome_documentation",
+        "blast_radius": "System",
+        "proposal_type": "spec_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "ARF/Cargo.toml"},
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/zomes/README.md"},
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/zomes/consent_integrity/README.md"},
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/zomes/consent_coordinator/README.md"},
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/zomes/integrity/README.md"},
+            {"type": "spec", "ref": "ARF/dnas/rose_forest/zomes/coordinator/README.md"},
+            {"type": "commit", "ref": "a52f1e0"},
+        ],
+        "risks": [
+            "Zome docs are verified against Cargo workspace membership and native tests, not Tryorama end-to-end behavior.",
+        ],
+        "benefits": [
+            "Documented the four active Holochain zomes and explicitly marked six pre-migration folders as excluded dev artifacts.",
+        ],
+        "next_action": "Keep zome README status blocks aligned whenever ARF/Cargo.toml workspace membership changes.",
+    },
+    {
+        "sha": "cb1447e",
+        "subject": "synthesis: commit 112 staged drafts to source chain; regen knowledge log",
+        "claim_type": "knowledge_log_update",
+        "blast_radius": "Module",
+        "proposal_type": "code_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/knowledge_log/APPEND_ONLY_KNOWLEDGE_LOG.md"},
+            {"type": "test", "ref": "scripts/triage_review_queue.py"},
+            {"type": "commit", "ref": "cb1447e"},
+        ],
+        "risks": [
+            "Synthesis drafts are LLM analyses and source-chain entries, not canonical truth claims.",
+            "Bulk committing analysis can make future review noisy unless the queue remains actively triaged.",
+        ],
+        "benefits": [
+            "Drained 112 staged synthesis drafts into the source chain and regenerated the append-only knowledge log.",
+            "Added a read-only review queue triage script to avoid misclassifying synthesis draft schemas.",
+        ],
+        "next_action": "Triage the remaining harvest drafts through the ADR-7 license gate before promotion.",
+    },
+    {
+        "sha": "4d7a2ad",
+        "subject": "working-todo: A.1 - heartbeat RESUMED 2026-05-26 after spec/code recon",
+        "claim_type": "runtime_state_update",
+        "blast_radius": "System",
+        "proposal_type": "config_change",
+        "evidence_refs": [
+            {"type": "spec", "ref": "docs/specs/heartbeat-runtime-budget.spec.md"},
+            {"type": "test", "ref": "scripts/tests/test_heartbeat_budget.py"},
+            {"type": "spec", "ref": "docs/research/2026-05-15-working-todo-list.md"},
+            {"type": "commit", "ref": "4d7a2ad"},
+        ],
+        "risks": [
+            "Heartbeat state is live runtime state and must be rechecked against ticks.log and daily_state.json before later claims.",
+            "The working-todo note can stale as soon as polls resume or daily counters advance.",
+        ],
+        "benefits": [
+            "Documented STOP removal only after budget defaults matched code and heartbeat budget tests passed.",
+        ],
+        "next_action": "Monitor daily_state.json against the 40-round cap and update working-todo if poll-disable status changes.",
+    },
 ]
 
 
@@ -377,12 +597,38 @@ def changed_files_for_commit(sha: str) -> list[str]:
     return paths
 
 
+def existing_commit_activity_ids() -> set[str]:
+    """Return commit activity ids already represented by valid packets."""
+
+    seen: set[str] = set()
+    if not PROVENANCE_ROOT.exists():
+        return seen
+
+    for packet_path in PROVENANCE_ROOT.rglob("*.json"):
+        try:
+            packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        for entry in packet.get("a", []):
+            activity_id = entry.get("prov_o_activity_id")
+            if isinstance(activity_id, str) and activity_id.startswith("commit:"):
+                seen.add(activity_id)
+    return seen
+
+
 def main() -> int:
     written: list[tuple[str, Path]] = []
     skipped: list[str] = []
+    existing = existing_commit_activity_ids()
 
     for spec in COMMITS:
         sha = spec["sha"]
+        activity_id = f"commit:{sha}"
+        if activity_id in existing:
+            skipped.append(f"  - commit {sha}: packet already exists")
+            continue
+
         changed = changed_files_for_commit(sha)
 
         artifact_refs = []
@@ -442,6 +688,7 @@ def main() -> int:
                 prior_digest=None,
             )
             written.append((sha, packet_path))
+            existing.add(activity_id)
         except Exception as e:  # noqa: BLE001 — surface backfill failures loudly
             skipped.append(f"  ! commit {sha}: create_packet failed: {e}")
 
