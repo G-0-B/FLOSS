@@ -96,6 +96,36 @@ Language/Social-DNA integration, use sidecar only as the proof-of-fit spike,
 and freeze new `source_chain/`, `packages/memory/`, identity, semantic graph, or
 neighbourhood/runtime expansion until that spike records pass/fail evidence.
 
+2026-05-26 addendum: 7 fresh root drops (Levin Corpus 48KB sha256 `766b9d98…`,
+Open Distributed Intelligence Research Scan 62KB sha256 `46f8b817…`,
+LANDSCAPE-ENTRY ODI 2026-05, info_firehose_ingestion, AD4M-hosting research,
+Perplexity ODI-skill transcript, InfoQ Architecting Autonomy II 9MB PDF) moved
+to `FLOSS/docs/research/intake_raw/2026-05-25-root/` (`reports/` + `reference/`
+buckets). Move log: `.agent-surface/intake/root-intake-moves-2026-05-25.json`.
+Digestion map: `FLOSS/docs/research/2026-05-25-root-intake-digestion.md`.
+Two HIGH-leverage distillations landed:
+- `FLOSS/docs/research/2026-05-26-levin-corpus-cces-implications.md` — maps each
+  CCES layer (L0…L7) to Levin meta-themes + names three load-bearing structural
+  isomorphisms (Holochain validation ≅ morphogenetic attractor; consensus
+  gateway ≅ heterarchical cortical coordination; causal integration as the
+  durable metric). Forwards 4 open research questions.
+- `FLOSS/docs/research/2026-05-26-odi-scan-delta-vs-landscape.md` — delta lens
+  against 2026-05-22 digestion + LANDSCAPE-ENTRY. NEW since 5/22: §5 production
+  cases on Holochain (Arkology, Sensorica PEP Master, ISEK 6-stage protocol,
+  OpenCLAW-P2P Lean 4 verified, DIN/DHIN healthcare); §6 co-improvement
+  framing (Weston+Foerster, Chaffer Incentivized Symbiosis, Hu+Rong
+  Self-Sovereign Experiential AI with DePIN+TEE); §7 NEW security lane
+  (TRiSM, multi-agent threat taxonomy, ZK-ML/zkLLM verifiable inference) —
+  FLOSSI0ULLK has no equivalent, candidate gap. 2 ADR candidates on watchlist
+  (TRiSM adversarial robustness; ZK-ML verifiable inference) — both gated by
+  Now/Later/Never evidence pass per Master Metaprompt §2.
+Cross-distillation pattern: both surface "voter diversity matters LESS at high
+capability" as testable hypothesis for reasoning-ensemble pilot data
+(working-todo §A.6).
+Root drops remaining (not moved): ADR-003-Metaprompt-Kernelization.md (handled
+separately: replaced canonical ADR-3 with amended v1.1.0 + archived v1.0.0 in
+commit `94dc3de`).
+
 ### A.4 SocratiCode install (UNBLOCKED — Docker running post-reboot)
 
 **Status:** Docker server 29.4.3 is now running. SocratiCode install was blocked on Docker availability in prior session. Plugin marketplace already added via `claude plugin marketplace add giancarloerra/socraticode`.
