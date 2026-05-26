@@ -13,6 +13,10 @@ source: claude_session_with_user_verification
 title: Substrate WAS holochain-0.4; migrated to holochain-0.6 (2026-05-19) aligned with skill canonical reference
 ---
 
+Current operational shortcut: on Windows, run Holochain CLI work through
+WSL/Ubuntu + the ARF Nix dev shell; ordinary PowerShell PATH may not expose
+`hc`.
+
 ## Status: RESOLVED 2026-05-19
 
 User-explicit directive ("def worth it now rather than later we dont have
@@ -34,6 +38,29 @@ blockers; migrate each excluded zome before adding it back to
 `FLOSS/ARF/Cargo.toml` workspace members.
 
 Original gap documented below for historical reference.
+
+## Holochain CLI location: WSL, not Windows PATH
+
+✅ Verified 2026-05-26: `hc` is available from WSL/Ubuntu, not from the
+ordinary Windows PowerShell PATH used by Codex shell commands.
+
+Use this command shape when a Windows agent says "`hc` is missing":
+
+```powershell
+wsl.exe -d Ubuntu -- bash -lc "cd /mnt/c/~shit/FLOSS/ARF && nix develop --command bash -lc 'command -v hc && hc --version'"
+```
+
+Current verified result:
+
+- WSL distro: `Ubuntu`
+- direct WSL cargo path exists: `/home/kalis/.cargo/bin/hc`
+- ARF Nix dev shell resolves `hc` to
+  `/nix/store/nds89skk59hrzfzfhvcnkjkmfnzhk1hn-hc-0.6.1/bin/hc`
+- version: `holochain_cli 0.6.1`
+
+Operational rule: do not mark Holochain packaging or Tryorama work blocked just
+because `Get-Command hc` fails in Windows PowerShell. Re-run the check through
+WSL + `nix develop` first.
 
 ---
 

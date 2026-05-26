@@ -36,7 +36,7 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 - `project-filewatch-intake-skeleton`: Filewatch metaharness intake skeleton landed — A minimal filewatch + consolidation skeleton has landed under `FLOSS/scripts/`:
 - `project-floss-subprojects`: FLOSS subprojects — FLOSSI U and YumeiCHAN — The FLOSSI0ULLK family contains **multiple sibling projects**, not a monolithic codebase. Distinguishing them is critical for the cull triage and for future architecture decisions.
 - `project-heartbeat-running`: Heartbeat loop is budget-gated; diverse-max is no longer routine
-- `project-holochain-version-line-skew`: Substrate WAS holochain-0.4; migrated to holochain-0.6 (2026-05-19) aligned with skill canonical reference
+- `project-holochain-version-line-skew`: Substrate WAS holochain-0.4; migrated to holochain-0.6 (2026-05-19) aligned with skill canonical reference — Current operational shortcut: on Windows, run Holochain CLI work through
 - `project-installation-not-adoption`: Installation ≠ adoption — standing rule for reuse-ledger adapter_test gate — Standing rule established 2026-05-19 after demotion of ledger entry 0013 (holochain-agent-skill) from `adopt` back to `investigate`. Consensus claim `019e412d-7ce9-750f-b7cc-1c0260c6410c` APPROVED mean +0.90 ratifies this as standing rule.
 - `project-itmd-shipped-parallel-session`: ITMD (idle-time metaharness driver) shipped via parallel Claude session — A parallel Claude session, working ~2026-05-07, designed and shipped an idle-time metaharness driver (ITMD) without this main session's involvement. Key facts to load when relevant:
 - `project-januscope-wired`: JanuScope wired in front of both MCP servers
