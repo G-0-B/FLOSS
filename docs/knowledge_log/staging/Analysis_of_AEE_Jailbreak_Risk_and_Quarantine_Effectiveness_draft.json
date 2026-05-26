@@ -1,6 +1,0 @@
-{
-  "file_path": "C:\\~shit\\FLOSS\\docs\\research\\Analysis of AEE Jailbreak Risk and Quarantine Effectiveness.md",
-  "model": "cerebras/llama3.1-8b",
-  "staged_at": "20260422T073246Z",
-  "insights": "### Chunk 1/1\n**Fractal Semantic Extraction:**\n\n### 1. **Key Paradigm Shifts / Vision**\n- **Decentralized Governance**: AEE ensures agent sovereignty, voluntary migration, and immutable integrity zomes.\n- **Holochain-based Architecture**: DHT rejects invalid entries, and swarm mutations prioritize IK (integration with Shared Graph).\n- **Overflow Invariant**: Prevents micro-drift and ensures net positive flow post-needs.\n\n### 2. **Architectural Constraints or Invariants**\n- **Immutable Integrity Zomes**: Axioms (Consent, Sovereignty, Non-Siloing, RecursiveBenefit) ensure system integrity.\n- **Conjunctive Guard**: Accept(P) ⇒ OI(P) ∧ Simulate(P) ∧ Consensus(P) ⇒ ∧(ΔL≥-ε, ΔΛ≥-ε, ΔK≥-ε) ∧ ∑Δ≥θ.\n- **Fitness Non-Gameable**: Filter(OI) prior ∧ w-tuning gated by Meta-OI ⇒ PrioritizeK(P) ∧ ¬OI(P) → Reject(P).\n\n### 3. **Missing links or open contradictions**\n- **Q has failure mode**: Oscillation/potential de facto permanence via unverifiable realign.\n- **Patch Proof 3 gap**: Anti-oscillation mechanism not fully addressed.\n- **System integrity maintained with Patches**: Drift-bound OI, Q timeout/witnesses, oscillation cap."
-}
