@@ -13,7 +13,7 @@
     "@holochain/client": "^0.18.0"
   },
   "devDependencies": {
-    "vitest": "^1.6.0",
+    "vitest": "^4.1.8",
     "typescript": "^5.4.0",
     "ajv": "^8.17.0"
   }
