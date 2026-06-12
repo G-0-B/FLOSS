@@ -51,6 +51,12 @@
       "enabled": true,
       "mode": "materialized-copy",
       "install_path": "opworkers/.opencode/skills"
+    },
+    "cowork": {
+      "enabled": false,
+      "mode": "skill-zip-manual",
+      "install_path": "(not filesystem-addressable)",
+      "note": "Cowork/Claude-desktop skill store cannot be written directly. Distribution: zip the corpus skill dir as <name>.skill and install via the Save-skill button (Settings > Capabilities). Disabled so the materializer skips it; documented here per one-canonical-manifest rule. First materialized: flossi0ullk-orient v0.2.0, 2026-06-11."
     }
   },
   "skills": [
