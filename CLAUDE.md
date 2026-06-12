@@ -104,8 +104,9 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 
 ### Inference Posture
 
+- **Cowork (Fable 5) — master metaplanner (time-boxed window, until 2026-06-22):** Anthropic runs 2× usage limits through Cowork, and Fable 5 burns 2× tokens — so Cowork is the designated agent-orchestration-manager surface for Fable 5: plan-of-action authoring, delegation design, and metaplanning that Claude Code sessions (Opus-class models) then execute for optimal token usage. **Fable 5 plan access ends 2026-06-22** (paid-credits-only after); front-load Fable-5-grade planning into this window. Doctrine recorded by Anthony 2026-06-12.
+- **Claude Code (Opus-class):** proposer, integrator, high-risk executor, and final technical synthesis — the execution surface for Cowork-authored plans.
 - **Groq + Cerebras:** cheap background voters, reviewers, explorers, and trace triage. Use these first for repetitive loops.
-- **Claude Code:** proposer, integrator, high-risk executor, and final technical synthesis.
 - **Gemini:** multimodal analysis, research digestion, design review, writing, and independent dissent.
 
 The current default LiteLLM voter roster already exercises the Groq/Cerebras path; the premium surfaces should not be burned on routine reviewer traffic.
