@@ -1,0 +1,74 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "archive/**"
+      - "ai-conversations/**"
+      - "media/**"
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "archive/**"
+      - "ai-conversations/**"
+      - "media/**"
+  merge_group:
+    types: [checks_requested]
+  schedule:
+    - cron: "34 17 * * 0"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: rust
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: +security-and-quality
+          config: |
+            paths-ignore:
+              - archive/**
+              - ai-conversations/**
+              - docs/research/intake_raw/**
+              - "**/node_modules/**"
+              - "**/target/**"
+              - "**/dist/**"
+              - "**/build/**"
+              - "**/*.min.js"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
