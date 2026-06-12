@@ -2,15 +2,15 @@
 
 **Date:** 2026-05-19
 **Type:** Research / Funding artifact draft
-**Truth status:** ⚠️ Specified (draft) — content load-bearing, formatting + eligibility verification + final tone pass still needed before submission
-**Target grant:** NLnet NGI Zero Commons Fund — €5,000–€50,000, **13th call deadline 2026-06-01 12:00 CEST (noon)**
+**Truth status:** ⚠️ Specified (draft) — content load-bearing; eligibility ✅ verified; formatting + final tone pass still needed before submission
+**Target grant:** NLnet NGI Zero Commons Fund — €5,000–€50,000. ~~13th call deadline 2026-06-01 12:00 CEST~~ **passed unsubmitted; current target is the next call, deadline 2026-08-01** (per Context Continuation Packet 2026-06-09 §4d — ~7 weeks of runway as of 2026-06-12)
 **Submission portal:** nlnet.nl/commonsfund/
 **Coordinator:** Michiel Leenaars, ngizero-coordinator@nlnet.nl
 **Applicant:** Anthony Garrett (`kalisam` / GH `kalisam` / G-0-B org)
 **Project:** FLOSSI0ULLK / Rose Forest Holochain DNA + Layer 4.5 Consensus Gateway
 
 **Critical prerequisites before submission:**
-- [ ] Verify US-individual geographic eligibility (named as critical unknown in `FLOSS/docs/research/intake_raw/2026-05-19-root/reports/CONTEXT_CONTINUATION_2026-05-14_scenarios-recognition-resources.md` §6 + §7 open items)
+- [x] Verify US-individual geographic eligibility — ✅ **VERIFIED eligible, confirmed by Anthony 2026-06-12** (was the critical unknown carried since `CONTEXT_CONTINUATION_2026-05-14_scenarios-recognition-resources.md` §6 + §7)
 - [ ] Final-pass tone calibration (per consensus claim 019e3e2c voter feedback: alignment-map tone "potentially over-confident" on critiques)
 - [ ] Confirm latest CFIS Phase 0 + ADR-12 status maps to NGI Zero scope categories
 
@@ -134,9 +134,9 @@ Per consensus claim voter feedback + anti-sycophancy standing rule, named upfron
 
 ---
 
-## Submission checklist (before 2026-06-01 12:00 CEST)
+## Submission checklist (before 2026-08-01 — next call; the 2026-06-01 call passed unsubmitted)
 
-- [ ] Verify NLnet US-individual geographic eligibility (open item carried since 2026-05-14)
+- [x] Verify NLnet US-individual geographic eligibility — ✅ verified eligible per Anthony 2026-06-12 (open item carried since 2026-05-14, now closed)
 - [ ] Refine cost-line breakdown with honest hourly-rate assumptions
 - [ ] Add CV-tier bio for Anthony Garrett (kalisam GH + G-0-B org + 14-month track record)
 - [ ] Reference letter / endorsement from one external party who has reviewed FLOSSI0ULLK work (Codex / ChatGPT / multi-AI-collaborator context as documented in CONTEXT_CONTINUATION packets)

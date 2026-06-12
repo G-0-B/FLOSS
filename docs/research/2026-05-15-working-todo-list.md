@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-05-23 (DecentMem/DAMCS memory-harness delta)
+**Last refreshed:** 2026-06-12 (root-intake digestion + N-queue closure + NLnet unblock)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -9,6 +9,20 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 ---
 
 ## Section A — Immediate threads (this session or next)
+
+### A.00 Root-intake digestion + N-queue closure + NLnet unblock (2026-06-12)
+
+**Status:** ✅ LANDED 2026-06-12 — full alignment pass executed after multi-agent scatter. (1) **Root-intake digestion:** 17 files + `mcps/` schema-snapshot dir classified by 15 parallel agents and relocated to `FLOSS/docs/research/intake_raw/2026-06-12-root/{reports,reference,vision}/` with pre/post-move sha256 verification; ledger `.agent-surface/intake/root-intake-moves-2026-06-12.json`; map + verdicts + NEVER-flags + distillation queue in `FLOSS/docs/research/2026-06-12-root-intake-digestion.md`. Ember seed pack + Context Continuation Packet 2026-06-09 intentionally left at root (live). (2) **N-queue (seed pack file 01 §5) closed N1–N4:** N1 script inventory → INDEX.md "Metaharness Script Layer" section (31 scripts, grouped A–J); N2 context-materializer analysis complete (L0/L1 = projections of `FLOSS/shared-context-surface.json`, ObjectGraph-spike structural notes recorded in digestion map §4); N3 `poll_high_roi_actions.py` CLI default flipped `balanced`→`diverse` (balanced = 2 surfaces/3 families, fails diversity policy; heartbeat unaffected — pins `--profile` explicitly); N4 `review_queue.py --triage` merged from `triage_review_queue.py` (now a deprecation shim; harvest coverage added; live result: 36 queued = 25 synthesis + 11 harvest, 0 orphans). (3) **NLnet:** US-individual eligibility ✅ VERIFIED (Anthony 2026-06-12); draft doc updated — the 2026-06-01 call passed unsubmitted, current target deadline **2026-08-01**; remaining blockers are tone pass + cost lines + bio + endorsement. (4) **T0/T1/T2 resolved:** local `FLOSS` origin = `G-0-B/FLOSS` (Anthony's org; kalisam/FLOSS is the fork; PR ledger upstream); local README already fixed on `working/2026-05-25-stabilize-canon` — public staleness is an unpushed-branch issue. (5) Skill projections healed — gemini + opencode now at orient v0.2.0, `--check` OK across all targets (closes A.0(d)). (6) CONTEXT_L0/L1 regenerated via `materialize_shared_context_surface.py` (clears A.0(c) staleness flag).
+
+**Open (re-ask):** (a) **N5 spec-gate (D7)** — adopt fail-closed registry spec-stub check? wire into materializer `--check`, post-write hook, or both? (needs Anthony); (b) **N6 ObjectGraph spike** resume go/no-go — N1–N3 prerequisites now met (needs Anthony); (c) **synthesis staging `--commit`** — 25 drafts preview clean in dry-run, chain commit remains human-gated (needs Anthony); (d) **push `working/2026-05-25-stabilize-canon`** to `G-0-B/FLOSS` to fix the public README before NLnet reviewers see it (outward action, needs Anthony); (e) seed pack files 02 (TAME) and 03 (atomic-data hold) remain gated on their stated conditions.
+
+### A.0 orient skill v0.2.0 + probe landed (2026-06-11)
+
+**Status:** ✅ LANDED 2026-06-11 — root-intake handoff packet `ccp-orient-skill-v020-handoff` (two identical copies at workspace root) reconciled against live repo and installed. Corpus `FLOSS/skill-corpus/flossi0ullk-orient/`: `SKILL.md` + `CHANGELOG.md` byte-exact per packet sha256 (`177dcd1b…`, `37c3f0a2…`); `references/entry-points.md` reconciled — all former verification tags resolved (no `FLOSS/crates/` → `FLOSS/ARF/dnas/<dna>/zomes/`; lock convention CONFIRMED as `.agent-surface/events/locks/*.lock` via `lock_file()` in watch_intake/process_intake_events; router contract confirmed live, `--limit` defaults to 3) — new sha256 `c230cec536fdbf9c…`. Probe installed at `FLOSS/scripts/orient_probe.py` with lock-scan patch (events/locks primary + defensive context scan). Live validation: exit 0, JSON valid, 10/10 canonical files present, CONTEXT_L0 flagged stale (15.7d > 14d — regenerate). Tests: **4/4** `FLOSS/tests/test_orient_probe.py` (handoff decision #9 ✅ done). Cowork distribution documented in `shared-skill-surface.json` (`cowork` target, disabled/manual: zip → Save-skill); `flossi0ullk-orient.skill` built. Handoff decision #1 truth_status → **Verified (live)**.
+
+**Deferred (decision #10, Anthony 2026-06-11):** CI/pre-commit canary running `orient_probe.py --json`.
+
+**Open (re-ask):** (a) decision #8 — kernel-vs-ADR read-precedence in the skill: open ADR or confirm current ordering; (b) cross-skill Step-0 delegation — should `flossi0ullk-shared-surface` + `flossi0ullk-consensus-gateway` delegate orientation to this skill (canon-drift prevention)? ~~(c) CONTEXT_L0 regeneration (stale >14d)~~ ✅ regenerated 2026-06-12 (see A.00); ~~(d) rerun `materialize_shared_skill_surface.py` on Windows~~ ✅ ran clean 2026-06-12 — gemini + opencode projections now v0.2.0, `--check` OK on all targets; (e) packet CHANGELOG carries internal date 2026-04-22 vs origin 2026-06-09 — left byte-exact per hash discipline, flag only.
 
 ### A.1 Heartbeat service via Servy
 

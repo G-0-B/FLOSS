@@ -11,5 +11,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "context7-plugin@context7-marketplace": true
   }
 }
