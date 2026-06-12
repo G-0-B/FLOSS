@@ -257,6 +257,73 @@ def render_markdown(items: list[ReviewItem], limit: int | None = None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_triage(items: list[ReviewItem], workspace_root: Path | str = WORKSPACE_ROOT) -> str:
+    """Classify staged drafts by source survival, size, and area.
+
+    Merged from the former `triage_review_queue.py` (metaharness-inventory
+    decision D6 consolidation pass, 2026-06-12), extended to cover harvest
+    drafts as well as synthesis drafts.
+    """
+    root = Path(workspace_root).resolve()
+    lines = ["# Review Queue Triage", ""]
+
+    synthesis = [item for item in items if item.kind == "synthesis_draft"]
+    harvest = [item for item in items if item.kind == "harvest_draft"]
+
+    lines.append(f"Synthesis drafts: {len(synthesis)}")
+    if synthesis:
+        exists_in_canon = 0
+        orphans: list[tuple[str, str]] = []
+        sizes: list[int] = []
+        by_area: Counter[str] = Counter()
+        for item in synthesis:
+            source = str(item.metadata.get("source_file", ""))
+            rel = source
+            for prefix in ("C:/~shit/", "c:/~shit/"):
+                if rel.startswith(prefix):
+                    rel = rel[len(prefix):]
+                    break
+            by_area[rel.split("/")[0] if rel else "?"] += 1
+            sizes.append(int(item.metadata.get("insights_chars", 0) or 0))
+            if rel and (root / rel).exists():
+                exists_in_canon += 1
+            elif len(orphans) < 8:
+                orphans.append((item.item_id, rel or "<no source recorded>"))
+        missing = len(synthesis) - exists_in_canon
+        lines.append(f"  Source still in canon: {exists_in_canon}")
+        lines.append(f"  Source missing (moved/deleted): {missing}")
+        if sizes:
+            ordered = sorted(sizes)
+            mid = len(ordered) // 2
+            median = (
+                ordered[mid]
+                if len(ordered) % 2
+                else (ordered[mid - 1] + ordered[mid]) / 2
+            )
+            lines.append(
+                f"  Insights total: {sum(sizes) / 1024:.1f} KB  "
+                f"median={median:.0f}  max={max(sizes)}"
+            )
+        lines.extend(["", "  By source area:"])
+        for area, count in by_area.most_common():
+            lines.append(f"    {count:>4}  {area}")
+        if orphans:
+            lines.extend(["", "  Sample missing-source drafts (orphans):"])
+            for item_id, rel in orphans:
+                lines.append(f"    {item_id[:70]}")
+                lines.append(f"        <- {rel[:90]}")
+
+    lines.extend(["", f"Harvest drafts: {len(harvest)}"])
+    if harvest:
+        reviewed = sum(1 for item in harvest if item.status == "reviewed")
+        lines.append(f"  Reviewed: {reviewed}")
+        lines.append(f"  Needs review: {len(harvest) - reviewed}")
+        with_source = sum(1 for item in harvest if item.metadata.get("source_url"))
+        lines.append(f"  With source_url provenance: {with_source}")
+
+    return "\n".join(lines) + "\n"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Roll up staged metaharness review items.")
     parser.add_argument(
@@ -266,6 +333,11 @@ def parse_args() -> argparse.Namespace:
         help="Output format.",
     )
     parser.add_argument("--limit", type=int, default=None, help="Limit displayed items.")
+    parser.add_argument(
+        "--triage",
+        action="store_true",
+        help="Classify staged drafts by source survival, size, and area.",
+    )
     parser.add_argument(
         "--workspace-root",
         default=str(WORKSPACE_ROOT),
@@ -277,7 +349,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     items = collect_review_items(Path(args.workspace_root))
-    if args.format == "json":
+    if args.triage:
+        print(render_triage(items, Path(args.workspace_root)), end="")
+    elif args.format == "json":
         print(render_json(items, args.limit))
     else:
         print(render_markdown(items, args.limit), end="")

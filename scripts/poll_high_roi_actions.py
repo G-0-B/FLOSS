@@ -7,9 +7,17 @@ the local source chain, and writes a reusable poll summary to disk.
 Default usage:
     python FLOSS/scripts/poll_high_roi_actions.py
 
-By default this uses the `balanced` profile. Use `--profile diverse` or
-`--profile diverse-max` only when the extra provider breadth is worth the
-token budget.
+By default this uses the `diverse` profile (4 provider surfaces / 6 model
+families), because manual invocations of this script are nontrivial polls and
+the diversity policy requires >=3 provider surfaces and >=4 model families for
+those. `balanced` (2 surfaces / 3 families) does NOT meet that bar — it exists
+as the cheap routine profile, and the heartbeat loop always pins it explicitly
+via `--profile` (see FLOSS_HEARTBEAT_PROFILE and
+docs/specs/heartbeat-runtime-budget.spec.md), so this CLI default does not
+affect heartbeat spend. Use `--profile balanced` for cheap smoke polls and
+`--profile diverse-max` only when full breadth is worth the token budget.
+(Default flipped balanced->diverse 2026-06-12, closing metaharness-inventory
+risk (i): same-distribution correlated consensus on nontrivial polls.)
 """
 
 from __future__ import annotations
@@ -376,7 +384,7 @@ def run_poll(profile: str, output_dir: Path) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a durable high-ROI action poll")
     parser.add_argument(
-        "--profile", default="balanced", help="Voter profile to use (default: balanced)"
+        "--profile", default="diverse", help="Voter profile to use (default: diverse)"
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     return parser.parse_args()
