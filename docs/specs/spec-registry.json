@@ -1,0 +1,302 @@
+{
+  "version": "0.1.0",
+  "updated": "2026-06-12",
+  "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
+  "gated_surfaces": [
+    "FLOSS/scripts",
+    "FLOSS/docs/specs",
+    "FLOSS/docs/adr"
+  ],
+  "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated — continuation/seed artifacts are pre-spec by definition.",
+  "entries": {
+    "FLOSS/docs/adr/ADR-0-recognition-protocol.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-0: Recognition Protocol - First Coherent Transmission)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-0.1-cross-ai-validation.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-0.1: Cross-AI Transmission Validation)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-1-carrier-equivalence.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-1: The Carrier Equivalence Principle)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-3-metaprompt-kernelization.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-003: Metaprompt Kernelization)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-4-spec-driven-development.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-4: Specification-Driven Development with Spec as Source of Truth)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-5-cognitive-virology-pattern.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-5: Cognitive Virology as Architectural Pattern)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-6-four-system-integration.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-6: Four-System Meta-Orchestration Integration)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-7-agpl-cascade.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-7: Embracing AGPL-3.0 Copyleft Cascade)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-8: Radicle as the Canonical Dev-Plane Code Substrate)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-9-self-perceptual-evolution.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Status)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF — Upgraded ADR Suite v2.0)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/TERNARY_COMPATIBILITY.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Ternary/Signed Gradient Compatibility Map)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/budget-entry.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (budget-entry.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/budget-entry.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (BudgetEntry Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/consensus-gate.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (consensus-gate.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/consensus-gate.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Consensus Gate Specification (Seam 1))",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/consent-payload.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (consent-payload.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/consent-payload.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Consent Payload Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/harvest-protocol.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (HARVEST Protocol Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/heartbeat-runtime-budget.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (heartbeat-runtime-budget.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Heartbeat Runtime Budget Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/intake-event.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (intake-event.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/intake-event.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Intake Event Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/knowledge-edge.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (knowledge-edge.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/knowledge-edge.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (KnowledgeEdge Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/knowledge-triple.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (knowledge-triple.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/knowledge-triple.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Knowledge Triple Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/provenance-packet.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (provenance-packet.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/provenance-packet.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Provenance Packet Spec v1.4)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/reasoning-ensemble-mcp.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble MCP Server Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/reasoning-ensemble-router.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Router Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/reasoning-ensemble-synthesizer.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/rose-node.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (rose-node.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/rose-node.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (RoseNode Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/self-perceptual-evolution.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (self-perceptual-evolution.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/self-perceptual-evolution.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Self-Perceptual Evolution (n+1) Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/spec-gate.spec.md": {
+      "spec": "Spec for the -1-layer spec-gate check (D7, adopted 2026-06-12)"
+    },
+    "FLOSS/docs/specs/spec-registry.json": {
+      "spec": "Spec-gate registry: one-line spec stubs for gated artifacts (this file)",
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+    },
+    "FLOSS/docs/specs/spec-registry.schema.json": {
+      "spec": "JSON Schema for the spec-gate registry",
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+    },
+    "FLOSS/docs/specs/thought-credential.schema.json": {
+      "spec": "GRANDFATHERED 2026-06-12 (thought-credential.schema)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/specs/thought-credential.spec.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ThoughtCredential Specification)",
+      "grandfathered": true
+    },
+    "FLOSS/scripts/artifact_actions.py": {
+      "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
+    },
+    "FLOSS/scripts/audit_provenance_packets.py": {
+      "spec": "Audit provenance packets: valid / superseded / invalid"
+    },
+    "FLOSS/scripts/autonomous_synthesis_loop.py": {
+      "spec": "Human-gated synthesis loop: staged drafts -> source-chain commit"
+    },
+    "FLOSS/scripts/backfill_kalisam_fork.py": {
+      "spec": "Backfill kalisam_fork URLs in harvest staging drafts"
+    },
+    "FLOSS/scripts/backfill_stabilization_provenance.py": {
+      "spec": "Backfill provenance packets for the 2026-05-25 stabilization commits"
+    },
+    "FLOSS/scripts/context_router.py": {
+      "spec": "Deterministic query -> corpus-roots routing (RAGRoute-style keyword scorer)"
+    },
+    "FLOSS/scripts/fork_ancestry_gather.py": {
+      "spec": "Gather upstream metadata + README excerpts for kalisam forks (ancestry sweep)"
+    },
+    "FLOSS/scripts/harvest_batch.sh": {
+      "spec": "Batch driver for harvest_reuse_ledger runs"
+    },
+    "FLOSS/scripts/harvest_reuse_ledger.py": {
+      "spec": "Harvest reuse-ledger entry candidates from upstream repos into staging"
+    },
+    "FLOSS/scripts/heartbeat.py": {
+      "spec": "Plane A heartbeat loop: budget-capped work-item rotation, STOP-file halt",
+      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
+    },
+    "FLOSS/scripts/heartbeat_slate.py": {
+      "spec": "Dynamic candidate-slate generator for high-ROI action polling",
+      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
+    },
+    "FLOSS/scripts/hook_bg_round.py": {
+      "spec": "Detached background consensus-round runner spawned by hook_post_write"
+    },
+    "FLOSS/scripts/hook_post_write.py": {
+      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
+    },
+    "FLOSS/scripts/hook_pre_write.py": {
+      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    },
+    "FLOSS/scripts/materialize_gemini_mcp.py": {
+      "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
+    },
+    "FLOSS/scripts/materialize_shared_agent_memory.py": {
+      "spec": "Agent-memory canonical markdown -> registry + per-client projections"
+    },
+    "FLOSS/scripts/materialize_shared_agent_surface.py": {
+      "spec": "Shared agent-surface manifest -> per-client projections"
+    },
+    "FLOSS/scripts/materialize_shared_ai_roster.py": {
+      "spec": "AI/harness roster manifest -> roster projections + update packet"
+    },
+    "FLOSS/scripts/materialize_shared_context_surface.py": {
+      "spec": "Context manifest -> CONTEXT_L0/L1 + context registries"
+    },
+    "FLOSS/scripts/materialize_shared_hook_surface.py": {
+      "spec": "Hook manifest -> per-client hook projections"
+    },
+    "FLOSS/scripts/materialize_shared_skill_surface.py": {
+      "spec": "Skill manifest -> per-client skill projections"
+    },
+    "FLOSS/scripts/objectgraph_spike.py": {
+      "spec": "Typed node-level projection + read-only resolve over skill-corpus (N6 pilot, concept-not-import)",
+      "spec_ref": "FLOSS/docs/superpowers/specs/2026-06-12-objectgraph-spike.md"
+    },
+    "FLOSS/scripts/orient_probe.py": {
+      "spec": "Deterministic orientation packet: presence/mtime/sha + router shortlist",
+      "spec_ref": "C:/~shit/.claude/skills/flossi0ullk-orient/SKILL.md"
+    },
+    "FLOSS/scripts/poll_high_roi_actions.py": {
+      "spec": "Durable high-ROI action poll through the consensus gateway (default profile: diverse)"
+    },
+    "FLOSS/scripts/process_intake_events.py": {
+      "spec": "Intake event consolidator over the claim-by-rename queue",
+      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    },
+    "FLOSS/scripts/review_queue.py": {
+      "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
+    },
+    "FLOSS/scripts/session_start_inject.py": {
+      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
+    },
+    "FLOSS/scripts/smoke_test_gateway.py": {
+      "spec": "Smoke test: consensus gateway end-to-end"
+    },
+    "FLOSS/scripts/smoke_test_inference.py": {
+      "spec": "Smoke test: inference provider reachability"
+    },
+    "FLOSS/scripts/smoke_test_voters.py": {
+      "spec": "Smoke test: voter roster resolution + credentials"
+    },
+    "FLOSS/scripts/spec_gate.py": {
+      "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+    },
+    "FLOSS/scripts/triage_review_queue.py": {
+      "spec": "DEPRECATED shim -> review_queue.py --triage"
+    },
+    "FLOSS/scripts/watch_intake.py": {
+      "spec": "Polling intake watcher: root drops -> IntakeEvents",
+      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    }
+  }
+}

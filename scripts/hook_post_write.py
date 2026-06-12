@@ -21,6 +21,12 @@ Guarantees:
     - Never burns free-tier budget on routine work: the path filter is
       intentionally narrow — broaden only when we're sure we want voters
       to evaluate edits in a given directory
+
+Spec-gate advisory (D7, adopted 2026-06-12): before the substantive filter,
+mutating writes into gated surfaces (scripts/, docs/specs/, docs/adr/) get a
+read-only registry check via spec_gate.advisory_note(); unregistered artifacts
+surface a warning in the hook log and stdout-JSON additionalContext. Advisory
+only — it submits nothing, spawns nothing, and never blocks.
 """
 
 from __future__ import annotations
@@ -64,11 +70,27 @@ def log(msg: str) -> None:
         pass  # logging must never break the hook
 
 
+_HOOK_CONTEXT: list[str] = []
+
+
 def finish() -> int:
     """Exit helper for agent CLIs that require a JSON response on stdout."""
     if EMIT_STDOUT_JSON:
         try:
-            sys.stdout.write("{}\n")
+            if _HOOK_CONTEXT:
+                sys.stdout.write(
+                    json.dumps(
+                        {
+                            "hookSpecificOutput": {
+                                "hookEventName": "PostToolUse",
+                                "additionalContext": "\n".join(_HOOK_CONTEXT),
+                            }
+                        }
+                    )
+                    + "\n"
+                )
+            else:
+                sys.stdout.write("{}\n")
             sys.stdout.flush()
         except Exception:
             pass
@@ -224,6 +246,22 @@ def main() -> int:
 
     if not is_mutating_tool(tool_name):
         return finish()
+
+    # Spec-gate advisory (D7): runs BEFORE the substantive filter because
+    # scripts/ and docs/{specs,adr}/ are exactly the surfaces that filter
+    # skips. Read-only registry lookup; advisory only; never raises.
+    try:
+        _scripts_dir = str(Path(__file__).resolve().parent)
+        if _scripts_dir not in sys.path:
+            sys.path.insert(0, _scripts_dir)
+        from spec_gate import advisory_note
+
+        _note = advisory_note(file_path)
+        if _note:
+            log(f"[spec-gate] {_note}")
+            _HOOK_CONTEXT.append(_note)
+    except Exception:  # noqa: BLE001 — advisory must never break the hook
+        pass
 
     if not is_substantive(file_path):
         # Uncomment for verbose debugging:
