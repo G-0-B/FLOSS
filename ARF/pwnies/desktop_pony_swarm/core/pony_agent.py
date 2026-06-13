@@ -67,9 +67,16 @@ class DesktopPonyAgent:
             "MOCK" if use_mock else "REAL",
         )
 
-    async def __aenter__(self):
-        """Asynchronously initializes the Horde.AI client upon entering a context."""
-        # Import the appropriate client
+    async def _ensure_horde_client(self):
+        """Lazily initialize the right client, honoring `use_mock`.
+
+        `HordeClient` / `MockHordeClient` are imported locally (never at module
+        scope), so callers must route through here rather than referencing the
+        names directly — otherwise a lazy init raises NameError and ignores the
+        mock flag.
+        """
+        if self.horde_client:
+            return
         if self.use_mock:
             from .mock_horde_client import MockHordeClient
 
@@ -78,6 +85,10 @@ class DesktopPonyAgent:
             from .horde_client import HordeClient
 
             self.horde_client = await HordeClient().__aenter__()
+
+    async def __aenter__(self):
+        """Asynchronously initializes the Horde.AI client upon entering a context."""
+        await self._ensure_horde_client()
         return self
 
     async def __aexit__(self, *args):
@@ -180,8 +191,7 @@ class DesktopPonyAgent:
         Returns:
             A string containing the generated response.
         """
-        if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()  # noqa: F821
+        await self._ensure_horde_client()
 
         # Add pony personality to prompt
         full_prompt = f"""You are {self.pony_name}, a helpful desktop assistant.
@@ -227,8 +237,7 @@ Your response:"""
         Returns:
             A list of floats representing the embedding vector.
         """
-        if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()  # noqa: F821
+        await self._ensure_horde_client()
 
         return await self.horde_client.generate_embedding(text)
 

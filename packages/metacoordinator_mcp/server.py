@@ -57,14 +57,20 @@ def submit_claim(
     summary: str,
     body: str,
     blast_radius: str,
+    evidence: list[dict] | None = None,
 ) -> str:
     """Submit a proposed change to the consensus gate.
 
     proposal_type: CodeChange | ConfigChange | SpecChange | AdrChange | Other
     blast_radius: Local | Module | System | Substrate
+    evidence: optional list of provenance packets. Required for governed claims
+        (System/Substrate blast radius with SpecChange/ConfigChange/AdrChange);
+        without it those claims fail closed with E_GOVERNED_PROVENANCE_REQUIRED.
     Returns JSON with entry_hash and claim_id, or {"error": "..."} on failure.
     """
-    return _gateway.submit_claim(proposer, proposal_type, summary, body, blast_radius)
+    return _gateway.submit_claim(
+        proposer, proposal_type, summary, body, blast_radius, evidence=evidence
+    )
 
 
 def cast_vote(claim_id: str, voter: str, weight: float, rationale: str) -> str:

@@ -401,7 +401,20 @@ def _verify_replace_like(
     old_present = bool(old_matches) if old_string else False
     new_present = bool(new_matches) if new_string else False
 
-    if new_present and (not old_present or old_string == new_string):
+    if not new_string:
+        # Intentional deletion: success is the old snippet being gone. Without
+        # this branch a clean deletion has old_present=False AND new_present=False
+        # and falls into the final MISMATCH branch, so every successful deletion
+        # reads as a failed write to the verifier and downstream hook claims.
+        if old_present:
+            status = "MISMATCH"
+            reason = "Deletion incomplete — the old snippet is still present after the write."
+        else:
+            status = "VERIFIED"
+            reason = (
+                "Old snippet was deleted (empty replacement) and is no longer present."
+            )
+    elif new_present and (not old_present or old_string == new_string):
         status = "VERIFIED"
         reason = "New snippet landed and the old snippet is no longer present."
     elif new_present and old_present:

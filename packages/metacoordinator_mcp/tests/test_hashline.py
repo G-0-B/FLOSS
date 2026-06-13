@@ -18,6 +18,39 @@ from packages.metacoordinator_mcp.hashline import (  # noqa: E402
 )
 
 
+def test_verify_replace_treats_empty_new_string_as_deletion_success():
+    """An intentional deletion (new_string == '') is VERIFIED when the old snippet is gone.
+
+    Regression: without a deletion branch, old_present=False and new_present=False
+    fell through to MISMATCH, so every clean deletion looked like a failed write.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        # Post-edit state: the deleted line is already gone.
+        path.write_text("def answer():\n    return 43\n", encoding="utf-8")
+        result = verify_tool_edit(
+            str(path),
+            "replace",
+            {"old_string": "    # TODO: remove me\n", "new_string": ""},
+        )
+        assert result["status"] == "VERIFIED", result
+
+
+def test_verify_replace_reports_mismatch_when_deletion_incomplete():
+    """A deletion whose old snippet is still present must be MISMATCH, not success."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        path.write_text(
+            "def answer():\n    # TODO: remove me\n    return 43\n", encoding="utf-8"
+        )
+        result = verify_tool_edit(
+            str(path),
+            "replace",
+            {"old_string": "    # TODO: remove me\n", "new_string": ""},
+        )
+        assert result["status"] == "MISMATCH", result
+
+
 def test_verify_replace_reports_verified_when_new_lands_cleanly():
     """Replace verification should pass when only the new snippet remains."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -190,6 +223,8 @@ def _run_all() -> int:
         test_verify_write_reports_exact_file_match,
         test_verify_multiedit_aggregates_subchecks,
         test_verify_multiedit_empty_payload_is_unverified,
+        test_verify_replace_treats_empty_new_string_as_deletion_success,
+        test_verify_replace_reports_mismatch_when_deletion_incomplete,
         test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches,
         test_verify_replace_reports_mismatch_when_exact_post_image_diverges,
         test_render_verification_section_includes_hashlined_evidence,
