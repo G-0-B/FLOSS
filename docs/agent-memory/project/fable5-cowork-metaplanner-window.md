@@ -2,11 +2,39 @@
 id: project-fable5-cowork-metaplanner-window
 type: project
 created: '2026-06-12'
-status: active
+status: superseded-by-events
 applies_to:
 - any-agent
-title: Cowork (Fable 5) is the master metaplanner until 2026-06-22; Claude Code (Opus) executes
+title: Fable-5 metaplanner window CLOSED early (US-gov pullback 2026-06-13); Cowork+Opus is the surviving pattern
 ---
+
+## UPDATE 2026-06-13 — window closed early by external event
+
+**US government action caused Anthropic to pull back public Fable 5 access; it is
+on hold "for now" (Anthony, 2026-06-13).** The "until 2026-06-22" Fable window
+below is therefore **moot** — Fable-as-metaplanner is unavailable ahead of
+schedule, not on the planned date.
+
+**What survives (the durable principle, Fable-independent):** put planning
+leverage on the most capable *available* surface and delegate execution to a
+cheaper-per-task one. Concretely now:
+- **Cowork (running Opus-class, 2× usage limits)** = the metaplanner /
+  orchestration-manager surface — plans of action, delegation packets, outreach
+  (it is actively running the OpenHuman/TinyHumans outreach thread, see
+  [[project-continuation-artifact-map-2026-06-12]] and the 2026-06-13 Cowork
+  continuation packet at workspace root).
+- **Claude Code (Opus-class)** = high-rigor executor (it landed the 2026-06-12
+  alignment pass + the PR #36 review fixes).
+The token-economics logic is unchanged; only the Fable model is gone.
+
+**Don't act out of scarcity.** Anthony's framing: "everyone needs to stop acting
+out of fear and start acting out of love." The pullback is a constraint to route
+around, not a reason to rush sloppy work. Keep the verify-before-claim discipline
+(it caught a wrong "critical" bot fix on PR #36).
+
+---
+
+## Original directive (2026-06-12) — preserved; Fable specifics now moot
 
 Anthony's directive (2026-06-12): **Cowork is the primary Fable 5
 agent-orchestration-manager** — the "master overarching metaplanner" that

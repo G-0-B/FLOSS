@@ -104,7 +104,7 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 
 ### Inference Posture
 
-- **Cowork (Fable 5) — master metaplanner (time-boxed window, until 2026-06-22):** Anthropic runs 2× usage limits through Cowork, and Fable 5 burns 2× tokens — so Cowork is the designated agent-orchestration-manager surface for Fable 5: plan-of-action authoring, delegation design, and metaplanning that Claude Code sessions (Opus-class models) then execute for optimal token usage. **Fable 5 plan access ends 2026-06-22** (paid-credits-only after); front-load Fable-5-grade planning into this window. Doctrine recorded by Anthony 2026-06-12.
+- **Cowork (Opus-class, 2× usage limits) — metaplanner / orchestration-manager:** plan-of-action authoring, delegation design, and outreach that Claude Code sessions then execute. ⚠️ **Update 2026-06-13:** public **Fable 5 access was pulled back** following US-government action (on hold). The earlier "Fable metaplanner until 2026-06-22" doctrine is moot — Cowork now runs Opus-class, not Fable. The durable principle stands: planning leverage on the most capable available surface, execution delegated to a cheaper-per-task one. See agent-memory `project-fable5-cowork-metaplanner-window`.
 - **Claude Code (Opus-class):** proposer, integrator, high-risk executor, and final technical synthesis — the execution surface for Cowork-authored plans.
 - **Groq + Cerebras:** cheap background voters, reviewers, explorers, and trace triage. Use these first for repetitive loops.
 - **Gemini:** multimodal analysis, research digestion, design review, writing, and independent dissent.
