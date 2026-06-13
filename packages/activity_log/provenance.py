@@ -103,25 +103,31 @@ def load_or_create_identity(identity_dir: Path | str) -> Identity:
     private_path = root / "private.key"
     public_path = root / "public.key"
     aid_path = root / "aid"
+    lock_path = root / ".identity.lock"
+    token = _acquire_lock(lock_path)
+    try:
+        if private_path.exists():
+            seed = _b64url_decode(private_path.read_text(encoding="utf-8").strip())
+            signing_key = SigningKey(seed)
+        else:
+            signing_key = SigningKey.generate()
+            private_path.write_text(
+                _b64url_encode(bytes(signing_key)) + "\n", encoding="utf-8"
+            )
+            try:
+                os.chmod(private_path, 0o600)
+            except OSError:
+                pass
 
-    if private_path.exists():
-        seed = _b64url_decode(private_path.read_text(encoding="utf-8").strip())
-        signing_key = SigningKey(seed)
-    else:
-        signing_key = SigningKey.generate()
-        private_path.write_text(
-            _b64url_encode(bytes(signing_key)) + "\n", encoding="utf-8"
+        verify_key = signing_key.verify_key
+        aid = "D" + _b64url_encode(bytes(verify_key))
+        public_path.write_text(
+            _b64url_encode(bytes(verify_key)) + "\n", encoding="utf-8"
         )
-        try:
-            os.chmod(private_path, 0o600)
-        except OSError:
-            pass
-
-    verify_key = signing_key.verify_key
-    aid = "D" + _b64url_encode(bytes(verify_key))
-    public_path.write_text(_b64url_encode(bytes(verify_key)) + "\n", encoding="utf-8")
-    aid_path.write_text(aid + "\n", encoding="utf-8")
-    return Identity(signing_key=signing_key, verify_key=verify_key, aid=aid)
+        aid_path.write_text(aid + "\n", encoding="utf-8")
+        return Identity(signing_key=signing_key, verify_key=verify_key, aid=aid)
+    finally:
+        _release_lock(lock_path, token)
 
 
 def _acquire_lock(lock_path: Path) -> str:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 FLOSS_ROOT = Path(__file__).resolve().parents[3]
@@ -174,6 +176,65 @@ def test_long_linear_prior_chain_is_not_evidence_recursion(tmp_path, monkeypatch
 
     assert result.ok is True
     assert "E_PROVENANCE_RECURSION_DEPTH_EXCEEDED" not in result.errors
+
+
+def test_concurrent_first_packet_creation_converges_on_one_identity(
+    tmp_path, monkeypatch
+):
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    original_generate = provenance.SigningKey.generate
+
+    def slow_generate():
+        time.sleep(0.02)
+        return original_generate()
+
+    monkeypatch.setattr(
+        provenance.SigningKey, "generate", staticmethod(slow_generate)
+    )
+
+    worker_count = 12
+    identity_dir = tmp_path / "identity"
+    output_root = tmp_path / "packets"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    def packet_entry(index: int) -> dict[str, object]:
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": f"2026-06-13T12:{index:02d}:00Z",
+            "human_collision_node": "anthony",
+            "artifact_refs": [
+                provenance.artifact_ref(artifact, workspace_root=tmp_path)
+            ],
+            "evidence_refs": [{"type": "test", "ref": "identity-race"}],
+            "risks": [],
+            "benefits": [],
+            "next_action": "none",
+        }
+
+    def create_one(index: int) -> dict[str, object]:
+        packet, _packet_path = provenance.create_packet(
+            [packet_entry(index)],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        return packet
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        packets = list(executor.map(create_one, range(worker_count)))
+
+    ordered = sorted(packets, key=lambda packet: int(packet["s"]))
+
+    assert len({packet["i"] for packet in packets}) == 1
+    assert sum(1 for packet in packets if packet["p"] is None) == 1
+    assert [int(packet["s"]) for packet in ordered] == list(range(worker_count))
+    assert ordered[0]["p"] is None
+    for previous, current in zip(ordered, ordered[1:]):
+        assert current["p"] == previous["d"]
 
 
 def test_multi_entry_narrative_emits_one_line_per_entry(tmp_path, monkeypatch):
