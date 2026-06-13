@@ -258,8 +258,8 @@ describe("Substrate Bridge Validation", () => {
       const aliceCall = getZomeCaller(alice.cells[0], ZOME);
       const bobCall = getZomeCaller(bob.cells[0], ZOME);
 
-      // Alice creates a triple
-      const hash = await aliceCall<ActionHash>("assert_triple", {
+      // Alice creates a triple (Criterion 4 discovers it by query, not by hash)
+      await aliceCall<ActionHash>("assert_triple", {
         subject: "rose_forest",
         predicate: "part_of",
         object: "flossi0ullk_ecosystem",

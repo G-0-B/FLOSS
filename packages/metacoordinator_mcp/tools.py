@@ -325,9 +325,17 @@ class GatewayTools:
             except (KeyError, TypeError, ValueError) as exc:
                 return _err(f"E_SUBMIT_CLAIM_INVALID_EVIDENCE: {exc}")
 
-        has_packet, has_consent, provenance_errors = self._validate_provenance_evidence(
-            ev_refs
-        )
+        # Only validate provenance when evidence was actually supplied. This keeps
+        # ordinary non-governed claims (Local/CodeChange with no evidence) from
+        # importing the provenance extras (blake3/jcs/nacl), which may be absent
+        # in lean gateway installs. Governed claims with no evidence are still
+        # rejected below, because has_packet/has_consent stay False.
+        if ev_refs:
+            has_packet, has_consent, provenance_errors = (
+                self._validate_provenance_evidence(ev_refs)
+            )
+        else:
+            has_packet, has_consent, provenance_errors = False, False, []
         if provenance_errors:
             return _err(
                 "E_SUBMIT_CLAIM_INVALID_PROVENANCE: "
