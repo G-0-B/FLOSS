@@ -470,14 +470,38 @@ def _verify_multiedit(file_text: str, *, edits: list[dict[str, Any]]) -> dict[st
             "subchecks": [],
         }
 
-    checks = [
-        _verify_replace_like(
-            file_text,
-            old_string=(edit.get("old_string", "") or ""),
-            new_string=(edit.get("new_string", "") or ""),
-        )
+    norm = [
+        (edit.get("old_string", "") or "", edit.get("new_string", "") or "")
         for edit in edits
     ]
+    checks: list[dict[str, Any]] = []
+    for index, (old_string, new_string) in enumerate(norm):
+        check = _verify_replace_like(
+            file_text, old_string=old_string, new_string=new_string
+        )
+        # Chained-edit reconciliation (no exact checkpoint available): sub-edits
+        # apply sequentially, so an earlier sub-edit's new snippet can be
+        # consumed by a later sub-edit's old snippet (e.g. foo->bar then
+        # bar->baz leaves no `bar` in the final file). Verifying each sub-edit
+        # against only the final contents would mark the earlier one MISMATCH
+        # even though the tool succeeded. If this sub-edit's new snippet was
+        # consumed downstream, treat it as a verified intermediate state.
+        if check["status"] == "MISMATCH" and new_string:
+            consumed_downstream = any(
+                later_old and new_string in later_old
+                for later_old, _later_new in norm[index + 1 :]
+            )
+            if consumed_downstream:
+                check = {
+                    **check,
+                    "status": "VERIFIED",
+                    "reason": (
+                        "Superseded by a later sub-edit (chained MultiEdit): the "
+                        "intermediate new snippet was consumed as a downstream "
+                        "old snippet, which is expected sequential behavior."
+                    ),
+                }
+        checks.append(check)
     mismatch_count = sum(1 for check in checks if check["status"] == "MISMATCH")
     unverified_count = sum(1 for check in checks if check["status"] == "UNVERIFIED")
     verified_count = sum(1 for check in checks if check["status"] == "VERIFIED")

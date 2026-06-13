@@ -134,6 +134,51 @@ def test_verify_multiedit_aggregates_subchecks():
         assert "2/2 verified" in result["reason"]
 
 
+def test_verify_multiedit_chained_edits_not_mismatched():
+    """Chained sub-edits (foo->bar then bar->baz) must not false-MISMATCH the first.
+
+    Regression: without checkpointed pre-image replay, each sub-edit was verified
+    against only the final file, so the intermediate `bar` (consumed by the second
+    sub-edit) read as a failed write even though the MultiEdit succeeded.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        # Final state after foo->bar->baz applied sequentially: only baz remains.
+        path.write_text("value = baz\n", encoding="utf-8")
+        result = verify_tool_edit(
+            str(path),
+            "multiedit",
+            {
+                "edits": [
+                    {"old_string": "foo", "new_string": "bar"},
+                    {"old_string": "bar", "new_string": "baz"},
+                ]
+            },
+        )
+        assert result["status"] == "VERIFIED", result
+        assert "2/2 verified" in result["reason"]
+
+
+def test_verify_multiedit_real_missing_edit_still_mismatches():
+    """The chained-edit reconciliation must not mask a genuinely failed sub-edit."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        # 'qux' never landed and is not consumed by any later sub-edit.
+        path.write_text("value = baz\n", encoding="utf-8")
+        result = verify_tool_edit(
+            str(path),
+            "multiedit",
+            {
+                "edits": [
+                    {"old_string": "foo", "new_string": "bar"},
+                    {"old_string": "bar", "new_string": "baz"},
+                    {"old_string": "nope", "new_string": "qux"},
+                ]
+            },
+        )
+        assert result["status"] == "MISMATCH", result
+
+
 def test_verify_multiedit_empty_payload_is_unverified():
     """Empty multiedit payloads should not produce a false green verification."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -222,6 +267,8 @@ def _run_all() -> int:
         test_verify_replace_reports_mismatch_when_new_is_absent,
         test_verify_write_reports_exact_file_match,
         test_verify_multiedit_aggregates_subchecks,
+        test_verify_multiedit_chained_edits_not_mismatched,
+        test_verify_multiedit_real_missing_edit_still_mismatches,
         test_verify_multiedit_empty_payload_is_unverified,
         test_verify_replace_treats_empty_new_string_as_deletion_success,
         test_verify_replace_reports_mismatch_when_deletion_incomplete,

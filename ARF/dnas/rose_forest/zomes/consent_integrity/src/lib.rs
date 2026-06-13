@@ -281,14 +281,33 @@ pub enum LinkTypes {
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store) => match store {
-            OpEntry::CreateEntry { app_entry, .. } | OpEntry::UpdateEntry { app_entry, .. } => {
-                match app_entry {
-                    EntryTypes::ConsentPayload(payload) => validate_consent_payload(&payload),
-                    EntryTypes::ConsentDecision(decision) => validate_consent_decision(&decision),
-                }
-            }
+            OpEntry::CreateEntry { app_entry, .. } => match app_entry {
+                EntryTypes::ConsentPayload(payload) => validate_consent_payload(&payload),
+                EntryTypes::ConsentDecision(decision) => validate_consent_decision(&decision),
+            },
+            // ConsentPayload / ConsentDecision are append-only governance
+            // records: a decision is superseded by authoring a NEW entry (with a
+            // fresh consent decision), never by mutating an existing one.
+            // Accepting an update would let a recorded consent be silently
+            // replaced on the DHT without a new decision. Reject the update.
+            OpEntry::UpdateEntry { .. } => Ok(ValidateCallbackResult::Invalid(
+                "E_CONSENT_APPEND_ONLY: ConsentPayload/ConsentDecision entries are \
+                 append-only and cannot be updated — author a new entry instead"
+                    .to_string(),
+            )),
             _ => Ok(ValidateCallbackResult::Valid),
         },
+        // This integrity zome governs only the two append-only consent entry
+        // types, so any update/delete action routed here concerns one of them.
+        // Both are forbidden — consent history is immutable.
+        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Invalid(
+            "E_CONSENT_APPEND_ONLY: ConsentPayload/ConsentDecision entries cannot be updated"
+                .to_string(),
+        )),
+        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Invalid(
+            "E_CONSENT_APPEND_ONLY: ConsentPayload/ConsentDecision entries cannot be deleted"
+                .to_string(),
+        )),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
