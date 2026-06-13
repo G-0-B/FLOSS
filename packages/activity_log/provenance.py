@@ -12,6 +12,7 @@ import base64
 import json
 import os
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -172,35 +173,63 @@ def _write_state(path: Path, state: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+@contextmanager
+def _sequence_lock(identity_dir: Path):
+    """Hold the per-identity sequence lock for an entire critical section.
+
+    Reserving a sequence and committing the new chain head must be atomic
+    relative to other writers: if the lock is dropped between reserve and
+    commit, a second writer can reserve the next sequence while `head` still
+    points at the old packet, producing a wrong `p` back-link or letting one
+    commit clobber the other's head. Holding the lock across reserve → write →
+    commit serializes writers per identity and keeps the chain linear.
+    """
+    lock_path = identity_dir / ".sequence.lock"
+    token = _acquire_lock(lock_path)
+    try:
+        yield
+    finally:
+        _release_lock(lock_path, token)
+
+
+def _reserve_sequence_locked(
+    identity_dir: Path, aid: str, prior_digest: str | None | object
+) -> tuple[int, str | None, dict[str, Any]]:
+    """Reserve the next sequence number. Caller MUST hold `_sequence_lock`."""
+    path = _state_path(identity_dir, aid)
+    state = _load_state(path)
+    sequence = int(state["next_sequence"])
+    prior = state.get("head") if prior_digest is _AUTO_PRIOR else prior_digest
+    state["next_sequence"] = sequence + 1
+    _write_state(path, state)
+    return sequence, prior, state
+
+
+def _commit_sequence_head_locked(
+    identity_dir: Path, aid: str, packet_digest: str
+) -> None:
+    """Set the chain head. Caller MUST hold `_sequence_lock`."""
+    path = _state_path(identity_dir, aid)
+    state = _load_state(path)
+    state["head"] = packet_digest
+    _write_state(path, state)
+
+
 def _reserve_sequence(
     identity_dir: Path, aid: str, prior_digest: str | None | object
 ) -> tuple[int, str | None, dict[str, Any]]:
-    """Reserve the next monotonic sequence number under a file lock."""
+    """Reserve the next monotonic sequence number under its own file lock.
 
-    lock_path = identity_dir / ".sequence.lock"
-    token = _acquire_lock(lock_path)
-    try:
-        path = _state_path(identity_dir, aid)
-        state = _load_state(path)
-        sequence = int(state["next_sequence"])
-        prior = state.get("head") if prior_digest is _AUTO_PRIOR else prior_digest
-        state["next_sequence"] = sequence + 1
-        _write_state(path, state)
-        return sequence, prior, state
-    finally:
-        _release_lock(lock_path, token)
+    Standalone wrapper retained for back-compat. `create_packet` does NOT use
+    this — it holds the lock across reserve+commit via `_sequence_lock`.
+    """
+    with _sequence_lock(identity_dir):
+        return _reserve_sequence_locked(identity_dir, aid, prior_digest)
 
 
 def _commit_sequence_head(identity_dir: Path, aid: str, packet_digest: str) -> None:
-    lock_path = identity_dir / ".sequence.lock"
-    token = _acquire_lock(lock_path)
-    try:
-        path = _state_path(identity_dir, aid)
-        state = _load_state(path)
-        state["head"] = packet_digest
-        _write_state(path, state)
-    finally:
-        _release_lock(lock_path, token)
+    with _sequence_lock(identity_dir):
+        _commit_sequence_head_locked(identity_dir, aid, packet_digest)
 
 
 def _packet_date(entries: list[dict[str, Any]]) -> str:
@@ -251,33 +280,38 @@ def create_packet(
 
     identity_path = Path(identity_dir)
     identity = load_or_create_identity(identity_path)
-    sequence, prior, _state = _reserve_sequence(
-        identity_path, identity.aid, prior_digest
-    )
 
-    packet: dict[str, Any] = {
-        "v": VERSION_PLACEHOLDER,
-        "t": "prov",
-        "d": SAID_PLACEHOLDER,
-        "i": identity.aid,
-        "s": str(sequence),
-        "p": prior,
-        "a": entries,
-        "sigs": [],
-    }
+    # Hold the sequence lock across reserve → sign → write → commit-head so a
+    # concurrent writer for the same identity cannot reserve the next sequence
+    # against a stale head (which would fork/misorder the per-agent chain).
+    with _sequence_lock(identity_path):
+        sequence, prior, _state = _reserve_sequence_locked(
+            identity_path, identity.aid, prior_digest
+        )
 
-    packet["d"] = _said_digest(packet)
-    packet["sigs"] = [SIGNATURE_PLACEHOLDER]
-    packet["v"] = _version_with_size(packet)
-    packet["sigs"] = []
-    packet["d"] = _said_digest(packet)
-    signature = identity.signing_key.sign(_signing_bytes(packet)).signature
-    packet["sigs"] = ["0B" + _b64url_encode(signature)]
+        packet: dict[str, Any] = {
+            "v": VERSION_PLACEHOLDER,
+            "t": "prov",
+            "d": SAID_PLACEHOLDER,
+            "i": identity.aid,
+            "s": str(sequence),
+            "p": prior,
+            "a": entries,
+            "sigs": [],
+        }
 
-    packet_path = Path(output_root) / _packet_date(entries) / f"{packet['d']}.json"
-    packet_path.parent.mkdir(parents=True, exist_ok=True)
-    packet_path.write_bytes(canonical_bytes(packet) + b"\n")
-    _commit_sequence_head(identity_path, identity.aid, packet["d"])
+        packet["d"] = _said_digest(packet)
+        packet["sigs"] = [SIGNATURE_PLACEHOLDER]
+        packet["v"] = _version_with_size(packet)
+        packet["sigs"] = []
+        packet["d"] = _said_digest(packet)
+        signature = identity.signing_key.sign(_signing_bytes(packet)).signature
+        packet["sigs"] = ["0B" + _b64url_encode(signature)]
+
+        packet_path = Path(output_root) / _packet_date(entries) / f"{packet['d']}.json"
+        packet_path.parent.mkdir(parents=True, exist_ok=True)
+        packet_path.write_bytes(canonical_bytes(packet) + b"\n")
+        _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
     return packet, packet_path
 
 

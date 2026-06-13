@@ -107,6 +107,7 @@ Usage as library:
 CLI:
     python FLOSS/packages/reasoning_ensemble/synthesizer.py "Should we adopt OAuth2?"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -152,13 +153,22 @@ DEFAULT_VOTER_POOL = [
     # after a 4-voter heavy pool (gemma3:12b + llama3.1 + phi4-mini + qwen-coder-3b)
     # hit 3-of-4 timeouts due to GPU serialization. The heavy models become
     # ensemble voters in v0.2 once we tier voter pools by latency budget.
-    {"voter_id": "phi4-mini",         "model": "phi4-mini:latest",         "family": "phi"},
-    {"voter_id": "llama3.2-3b",       "model": "llama3.2:3b-instruct-q4_K_S",
-                                                                            "family": "llama"},
-    {"voter_id": "granite-code-3b",   "model": "granite-code:3b-instruct-128k-q4_K_S",
-                                                                            "family": "granite"},
-    {"voter_id": "qwen2.5-coder-3b",  "model": "hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16",
-                                                                            "family": "qwen"},
+    {"voter_id": "phi4-mini", "model": "phi4-mini:latest", "family": "phi"},
+    {
+        "voter_id": "llama3.2-3b",
+        "model": "llama3.2:3b-instruct-q4_K_S",
+        "family": "llama",
+    },
+    {
+        "voter_id": "granite-code-3b",
+        "model": "granite-code:3b-instruct-128k-q4_K_S",
+        "family": "granite",
+    },
+    {
+        "voter_id": "qwen2.5-coder-3b",
+        "model": "hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16",
+        "family": "qwen",
+    },
 ]
 # Minimum voters required to call it an ensemble — per ADR-Suite v2.0 diversity
 # floor (≥3 providers, ≥4 model families). Below this we degrade to single-strong.
@@ -179,13 +189,16 @@ CLUSTER_SIMILARITY_THRESHOLD = 0.75
 # Coherence threshold for the anti-sycophancy override (v0.2 §12.5).
 # A single-voter dissent is only surfaced verbatim if its response_length and
 # internal_coherence_proxy meet a minimum bar. Otherwise logged but not surfaced.
-COHERENCE_MIN_RESPONSE_CHARS = 100   # Below this = too short to count as substantive dissent
-COHERENCE_MIN_SENTENCE_COUNT = 2     # Below this = too fragmentary
+COHERENCE_MIN_RESPONSE_CHARS = (
+    100  # Below this = too short to count as substantive dissent
+)
+COHERENCE_MIN_SENTENCE_COUNT = 2  # Below this = too fragmentary
 
 
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class VoterResponse:
@@ -211,13 +224,13 @@ class VoterResponse:
 
 @dataclass
 class TierClassification:
-    tier: str                              # "tier1" | "tier2" | "tier4"
-    cluster_assignments: dict[str, int]    # voter_id → cluster_id
-    cluster_sizes: dict[int, int]          # cluster_id → count
+    tier: str  # "tier1" | "tier2" | "tier4"
+    cluster_assignments: dict[str, int]  # voter_id → cluster_id
+    cluster_sizes: dict[int, int]  # cluster_id → count
     largest_cluster_id: int
     largest_cluster_fraction: float
-    minority_coherent_voters: list[str]    # voter_ids of small but coherent dissenters
-    similarity_matrix: list[list[float]]   # N×N for log/debug
+    minority_coherent_voters: list[str]  # voter_ids of small but coherent dissenters
+    similarity_matrix: list[list[float]]  # N×N for log/debug
 
 
 @dataclass
@@ -236,40 +249,51 @@ class EnsembleSynthesis:
 # Ollama helpers
 # ---------------------------------------------------------------------------
 
+
 def _ollama_request(path: str, payload: dict, timeout: int) -> dict:
     url = f"{OLLAMA_BASE_URL.rstrip('/')}{path}"
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST",
-                                  headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(
+        url, data=data, method="POST", headers={"Content-Type": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
 def ollama_embed(text: str) -> list[float]:
     """Get a 1024-d mxbai embedding for text. Raises on failure."""
-    response = _ollama_request("/api/embeddings",
-                               {"model": EMBED_MODEL, "prompt": text},
-                               timeout=EMBED_TIMEOUT_SECONDS)
+    response = _ollama_request(
+        "/api/embeddings",
+        {"model": EMBED_MODEL, "prompt": text},
+        timeout=EMBED_TIMEOUT_SECONDS,
+    )
     emb = response.get("embedding", [])
     if not emb:
         raise RuntimeError(f"Empty embedding from {EMBED_MODEL}")
     return emb
 
 
-def ollama_generate(model: str, prompt: str, timeout: int = VOTER_TIMEOUT_SECONDS) -> str:
+def ollama_generate(
+    model: str, prompt: str, timeout: int = VOTER_TIMEOUT_SECONDS
+) -> str:
     """Single non-streaming generate call. Returns response text."""
-    response = _ollama_request("/api/generate", {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.4, "num_predict": 600},
-    }, timeout=timeout)
+    response = _ollama_request(
+        "/api/generate",
+        {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.4, "num_predict": 600},
+        },
+        timeout=timeout,
+    )
     return response.get("response", "")
 
 
 # ---------------------------------------------------------------------------
 # Voter dispatch
 # ---------------------------------------------------------------------------
+
 
 def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
     """Call one voter. Wraps errors into the response. Never raises."""
@@ -278,10 +302,16 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
         text = ollama_generate(voter["model"], prompt)
         duration = time.perf_counter() - started
         if not text:
-            return VoterResponse(voter_id=voter["voter_id"], model=voter["model"],
-                                  family=voter["family"], response="",
-                                  response_hash="", response_embedding=None,
-                                  duration_seconds=duration, error="empty_response")
+            return VoterResponse(
+                voter_id=voter["voter_id"],
+                model=voter["model"],
+                family=voter["family"],
+                response="",
+                response_hash="",
+                response_embedding=None,
+                duration_seconds=duration,
+                error="empty_response",
+            )
         # Embed in this voter's thread to keep things parallel-friendly
         try:
             emb = ollama_embed(text)
@@ -300,12 +330,20 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
             duration_seconds=round(duration, 3),
             error=embed_err,
         )
-    except (urllib.error.URLError, RuntimeError, json.JSONDecodeError,
-            TimeoutError) as e:
+    except (
+        urllib.error.URLError,
+        RuntimeError,
+        json.JSONDecodeError,
+        TimeoutError,
+    ) as e:
         duration = time.perf_counter() - started
         return VoterResponse(
-            voter_id=voter["voter_id"], model=voter["model"], family=voter["family"],
-            response="", response_hash="", response_embedding=None,
+            voter_id=voter["voter_id"],
+            model=voter["model"],
+            family=voter["family"],
+            response="",
+            response_hash="",
+            response_embedding=None,
             duration_seconds=round(duration, 3),
             error=f"{type(e).__name__}: {e}",
         )
@@ -321,11 +359,10 @@ def dispatch_parallel(voter_pool: list[dict], prompt: str) -> list[VoterResponse
     """
     voter_prompt = _build_voter_prompt(prompt)
     responses: list[VoterResponse] = []
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(voter_pool)
-    ) as executor:
-        futures = {executor.submit(_dispatch_voter, v, voter_prompt): v
-                   for v in voter_pool}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(voter_pool)) as executor:
+        futures = {
+            executor.submit(_dispatch_voter, v, voter_prompt): v for v in voter_pool
+        }
         for fut in concurrent.futures.as_completed(futures):
             responses.append(fut.result())
     # Preserve canonical ordering by voter_id for reproducible logs
@@ -351,6 +388,7 @@ YOUR REASONING + ANSWER:"""
 # Clustering + Tier classification
 # ---------------------------------------------------------------------------
 
+
 def cosine(a: list[float], b: list[float]) -> float:
     if len(a) != len(b) or not a:
         return 0.0
@@ -371,14 +409,15 @@ def pairwise_similarity_matrix(responses: list[VoterResponse]) -> list[list[floa
             if i == j:
                 matrix[i][j] = 1.0
             elif responses[i].response_embedding and responses[j].response_embedding:
-                matrix[i][j] = cosine(responses[i].response_embedding,
-                                       responses[j].response_embedding)
+                matrix[i][j] = cosine(
+                    responses[i].response_embedding, responses[j].response_embedding
+                )
     return matrix
 
 
-def greedy_cluster(responses: list[VoterResponse],
-                   similarity: list[list[float]],
-                   threshold: float) -> dict[str, int]:
+def greedy_cluster(
+    responses: list[VoterResponse], similarity: list[list[float]], threshold: float
+) -> dict[str, int]:
     """Simple greedy single-link clustering for small N.
 
     Assigns cluster IDs starting from 0. Two voters share a cluster iff their
@@ -429,9 +468,11 @@ def greedy_cluster(responses: list[VoterResponse],
     return assignments
 
 
-def classify_tier(responses: list[VoterResponse],
-                  similarity: list[list[float]],
-                  assignments: dict[str, int]) -> TierClassification:
+def classify_tier(
+    responses: list[VoterResponse],
+    similarity: list[list[float]],
+    assignments: dict[str, int],
+) -> TierClassification:
     """Tier-1/2/4 from cluster sizes + coherence-guard for minority surfaces."""
     cluster_sizes: dict[int, int] = {}
     for cid in assignments.values():
@@ -444,11 +485,19 @@ def classify_tier(responses: list[VoterResponse],
 
     # Tier classification per v0.2 §12.3:
     #   Tier-1: all responses in one cluster
-    #   Tier-2: dominant cluster (≥ ⌈N/2⌉)
-    #   Tier-4: roughly equal clusters OR small coherent minority
+    #   Tier-2: dominant cluster (≥ ⌈N/2⌉) that is the unique largest
+    #   Tier-4: roughly equal clusters (incl. an even split like 2/2 or 1/1)
+    #           OR small coherent minority
+    # Compare cluster COUNTS, not a fraction-with-epsilon: an even split with a
+    # genuine plurality (e.g. 4 voters splitting 2/1/1) has largest_fraction
+    # exactly 0.5 and must qualify as Tier-2, while a 2/2 tie must not.
+    ceil_half = (total + 1) // 2
+    unique_largest = (
+        sum(1 for size in cluster_sizes.values() if size == largest_size) == 1
+    )
     if len(cluster_sizes) == 1:
         tier = "tier1"
-    elif largest_fraction >= 0.5 + 1e-9:
+    elif largest_size >= ceil_half and unique_largest:
         tier = "tier2"
     else:
         tier = "tier4"
@@ -477,47 +526,63 @@ def classify_tier(responses: list[VoterResponse],
 # Synthesis writeup
 # ---------------------------------------------------------------------------
 
-def write_synthesis(prompt: str, responses: list[VoterResponse],
-                    tier_class: TierClassification) -> str:
+
+def write_synthesis(
+    prompt: str, responses: list[VoterResponse], tier_class: TierClassification
+) -> str:
     """Produce the human-readable synthesis. Tier-aware formatting."""
     voter_by_id = {r.voter_id: r for r in responses}
     largest_cluster_voters = [
-        v_id for v_id, cid in tier_class.cluster_assignments.items()
+        v_id
+        for v_id, cid in tier_class.cluster_assignments.items()
         if cid == tier_class.largest_cluster_id
     ]
     minority_voters = [
-        v_id for v_id in tier_class.cluster_assignments
+        v_id
+        for v_id in tier_class.cluster_assignments
         if v_id not in largest_cluster_voters
     ]
 
     lines: list[str] = []
     lines.append(f"# Ensemble synthesis — {tier_class.tier.upper()}")
     lines.append("")
-    lines.append(f"**Voters:** {len(responses)} ({', '.join(r.family for r in responses)})")
-    lines.append(f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
-                 f"({100 * tier_class.largest_cluster_fraction:.0f}%)")
+    lines.append(
+        f"**Voters:** {len(responses)} ({', '.join(r.family for r in responses)})"
+    )
+    lines.append(
+        f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
+        f"({100 * tier_class.largest_cluster_fraction:.0f}%)"
+    )
     lines.append("")
 
     if tier_class.tier == "tier1":
         lines.append("## Unanimous consensus")
         lines.append("")
         # Pick the most coherent / longest response from the cluster as the synthesis
-        rep = max((voter_by_id[v] for v in largest_cluster_voters),
-                  key=lambda r: len(r.response))
+        rep = max(
+            (voter_by_id[v] for v in largest_cluster_voters),
+            key=lambda r: len(r.response),
+        )
         lines.append(f"> {rep.response}")
         lines.append("")
-        lines.append(f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
-                     f"All {len(responses)} voters converged.)_")
+        lines.append(
+            f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
+            f"All {len(responses)} voters converged.)_"
+        )
 
     elif tier_class.tier == "tier2":
         lines.append("## Majority consensus (with named dissent)")
         lines.append("")
-        rep = max((voter_by_id[v] for v in largest_cluster_voters),
-                  key=lambda r: len(r.response))
+        rep = max(
+            (voter_by_id[v] for v in largest_cluster_voters),
+            key=lambda r: len(r.response),
+        )
         lines.append(f"> {rep.response}")
         lines.append("")
-        lines.append(f"_(Representative: {rep.voter_id}. "
-                     f"{len(largest_cluster_voters)}/{len(responses)} voters in this cluster.)_")
+        lines.append(
+            f"_(Representative: {rep.voter_id}. "
+            f"{len(largest_cluster_voters)}/{len(responses)} voters in this cluster.)_"
+        )
         lines.append("")
         if tier_class.minority_coherent_voters:
             lines.append("## Named dissent (passed coherence guard)")
@@ -527,9 +592,11 @@ def write_synthesis(prompt: str, responses: list[VoterResponse],
                 lines.append(f"**{v.voter_id} / {v.family}:**")
                 lines.append(f"> {v.response}")
         elif minority_voters:
-            lines.append(f"_(Minority voters {', '.join(minority_voters)} dissented but "
-                         "their responses failed the coherence guard — "
-                         "logged to activity log but not surfaced.)_")
+            lines.append(
+                f"_(Minority voters {', '.join(minority_voters)} dissented but "
+                "their responses failed the coherence guard — "
+                "logged to activity log but not surfaced.)_"
+            )
 
     else:  # tier4
         lines.append("## Tier-4 divergence preserved")
@@ -541,16 +608,22 @@ def write_synthesis(prompt: str, responses: list[VoterResponse],
         for v_id, cid in tier_class.cluster_assignments.items():
             clusters.setdefault(cid, []).append(v_id)
         for cid, members in sorted(clusters.items(), key=lambda kv: -len(kv[1])):
-            rep_v = max((voter_by_id[m] for m in members), key=lambda r: len(r.response))
-            lines.append(f"### Position {cid + 1} — {len(members)} voter(s): "
-                         f"{', '.join(members)}")
+            rep_v = max(
+                (voter_by_id[m] for m in members), key=lambda r: len(r.response)
+            )
+            lines.append(
+                f"### Position {cid + 1} — {len(members)} voter(s): "
+                f"{', '.join(members)}"
+            )
             lines.append("")
             lines.append(f"> {rep_v.response}")
             lines.append("")
-        lines.append("_This divergence is preserved as Tier-4 per CFIS v0.3 — it is "
-                     "high-information, not noise. Per Inline Reasoning Ensemble v0.2 "
-                     "§12.3 the minority-but-coherent cluster is sometimes correct on "
-                     "hard questions; the user adjudicates._")
+        lines.append(
+            "_This divergence is preserved as Tier-4 per CFIS v0.3 — it is "
+            "high-information, not noise. Per Inline Reasoning Ensemble v0.2 "
+            "§12.3 the minority-but-coherent cluster is sometimes correct on "
+            "hard questions; the user adjudicates._"
+        )
 
     return "\n".join(lines)
 
@@ -559,9 +632,10 @@ def write_synthesis(prompt: str, responses: list[VoterResponse],
 # Top-level orchestration
 # ---------------------------------------------------------------------------
 
-def synthesize(prompt: str,
-               voter_pool: Optional[list[dict]] = None,
-               stage_artifact: bool = True) -> EnsembleSynthesis:
+
+def synthesize(
+    prompt: str, voter_pool: Optional[list[dict]] = None, stage_artifact: bool = True
+) -> EnsembleSynthesis:
     """Run the full ensemble: voters → embed → cluster → tier → synthesize."""
     pool = voter_pool or DEFAULT_VOTER_POOL
     if len(pool) < MIN_VOTERS:
@@ -580,14 +654,17 @@ def synthesize(prompt: str,
         # Degraded — log + return a sentinel
         duration = time.perf_counter() - started_perf
         result = EnsembleSynthesis(
-            prompt=prompt, prompt_hash=p_hash, timestamp=started_iso,
+            prompt=prompt,
+            prompt_hash=p_hash,
+            timestamp=started_iso,
             duration_seconds=round(duration, 3),
             voter_responses=responses,
             tier_classification=TierClassification(
                 tier="degraded",
                 cluster_assignments={r.voter_id: 0 for r in responses},
                 cluster_sizes={0: len(responses)},
-                largest_cluster_id=0, largest_cluster_fraction=1.0,
+                largest_cluster_id=0,
+                largest_cluster_fraction=1.0,
                 minority_coherent_voters=[],
                 similarity_matrix=[],
             ),
@@ -595,16 +672,22 @@ def synthesize(prompt: str,
                 f"# Ensemble synthesis — DEGRADED\n\n"
                 f"Fewer than {MIN_VOTERS} voters produced embeddings "
                 f"({len(embedded)}/{len(responses)}). Cannot run cluster-based Tier "
-                f"classification. Raw voter responses follow:\n\n" +
-                "\n\n---\n\n".join(
+                f"classification. Raw voter responses follow:\n\n"
+                + "\n\n---\n\n".join(
                     f"**{r.voter_id} ({r.family})** "
                     f"{'OK' if not r.error else 'ERR: ' + r.error}\n\n{r.response}"
                     for r in responses
                 )
             ),
         )
-        _log_synthesis_action(result, prompt, p_hash, started_iso, success=False,
-                              error=f"insufficient_voters: {len(embedded)}/{len(responses)}")
+        _log_synthesis_action(
+            result,
+            prompt,
+            p_hash,
+            started_iso,
+            success=False,
+            error=f"insufficient_voters: {len(embedded)}/{len(responses)}",
+        )
         return result
 
     # 4: cluster
@@ -624,21 +707,29 @@ def synthesize(prompt: str,
         ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
         try:
-            out_path.write_text(json.dumps({
-                "prompt": prompt,
-                "prompt_hash": p_hash,
-                "timestamp": started_iso,
-                "tier": tier_class.tier,
-                "voter_count": len(responses),
-                "embedded_voter_count": len(embedded),
-                "cluster_assignments": tier_class.cluster_assignments,
-                "cluster_sizes": tier_class.cluster_sizes,
-                "largest_cluster_fraction": tier_class.largest_cluster_fraction,
-                "minority_coherent_voters": tier_class.minority_coherent_voters,
-                "similarity_matrix": tier_class.similarity_matrix,
-                "voter_responses": [asdict(r) for r in responses],
-                "final_synthesis": final,
-            }, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+            out_path.write_text(
+                json.dumps(
+                    {
+                        "prompt": prompt,
+                        "prompt_hash": p_hash,
+                        "timestamp": started_iso,
+                        "tier": tier_class.tier,
+                        "voter_count": len(responses),
+                        "embedded_voter_count": len(embedded),
+                        "cluster_assignments": tier_class.cluster_assignments,
+                        "cluster_sizes": tier_class.cluster_sizes,
+                        "largest_cluster_fraction": tier_class.largest_cluster_fraction,
+                        "minority_coherent_voters": tier_class.minority_coherent_voters,
+                        "similarity_matrix": tier_class.similarity_matrix,
+                        "voter_responses": [asdict(r) for r in responses],
+                        "final_synthesis": final,
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                    default=str,
+                ),
+                encoding="utf-8",
+            )
             staging_path = str(out_path.relative_to(WORKSPACE_ROOT).as_posix())
         except OSError as e:
             print(f"[synthesizer] WARN: failed to stage artifact: {e}", file=sys.stderr)
@@ -660,19 +751,27 @@ def synthesize(prompt: str,
     return result
 
 
-def _log_synthesis_action(result: EnsembleSynthesis, prompt: str, p_hash: str,
-                          started_iso: str, success: bool,
-                          error: Optional[str] = None) -> None:
-    llm_calls = [{
-        "model": r.model,
-        "provider": "ollama-local",
-        "voter_id": r.voter_id,
-        "family": r.family,
-        "prompt_hash": p_hash,
-        "response_hash": r.response_hash,
-        "duration_seconds": r.duration_seconds,
-        "error": r.error,
-    } for r in result.voter_responses]
+def _log_synthesis_action(
+    result: EnsembleSynthesis,
+    prompt: str,
+    p_hash: str,
+    started_iso: str,
+    success: bool,
+    error: Optional[str] = None,
+) -> None:
+    llm_calls = [
+        {
+            "model": r.model,
+            "provider": "ollama-local",
+            "voter_id": r.voter_id,
+            "family": r.family,
+            "prompt_hash": p_hash,
+            "response_hash": r.response_hash,
+            "duration_seconds": r.duration_seconds,
+            "error": r.error,
+        }
+        for r in result.voter_responses
+    ]
     action = Action(
         action_id=f"ensemble-{p_hash}",
         kind="ensemble_synthesis",
@@ -681,11 +780,16 @@ def _log_synthesis_action(result: EnsembleSynthesis, prompt: str, p_hash: str,
         ended_at=utc_iso(),
         duration_seconds=result.duration_seconds,
         success=success,
-        inputs={"prompt_preview": prompt[:200], "voter_count": len(result.voter_responses)},
+        inputs={
+            "prompt_preview": prompt[:200],
+            "voter_count": len(result.voter_responses),
+        },
         outputs={
             "tier": result.tier_classification.tier,
             "largest_cluster_fraction": result.tier_classification.largest_cluster_fraction,
-            "minority_coherent_count": len(result.tier_classification.minority_coherent_voters),
+            "minority_coherent_count": len(
+                result.tier_classification.minority_coherent_voters
+            ),
             "synthesis_preview": result.final_synthesis[:400],
         },
         llm_calls=llm_calls,
@@ -699,11 +803,15 @@ def _log_synthesis_action(result: EnsembleSynthesis, prompt: str, p_hash: str,
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     parser.add_argument("prompt", help="Question for the ensemble to deliberate")
-    parser.add_argument("--summary-only", action="store_true",
-                        help="Print only the synthesis text, not the JSON envelope")
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print only the synthesis text, not the JSON envelope",
+    )
     return parser.parse_args()
 
 
@@ -713,15 +821,20 @@ def main() -> int:
     if args.summary_only:
         print(result.final_synthesis)
     else:
-        print(json.dumps({
-            "tier": result.tier_classification.tier,
-            "duration_seconds": result.duration_seconds,
-            "voter_count": len(result.voter_responses),
-            "cluster_sizes": result.tier_classification.cluster_sizes,
-            "largest_cluster_fraction": result.tier_classification.largest_cluster_fraction,
-            "minority_coherent_voters": result.tier_classification.minority_coherent_voters,
-            "staging_path": result.staging_path,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "tier": result.tier_classification.tier,
+                    "duration_seconds": result.duration_seconds,
+                    "voter_count": len(result.voter_responses),
+                    "cluster_sizes": result.tier_classification.cluster_sizes,
+                    "largest_cluster_fraction": result.tier_classification.largest_cluster_fraction,
+                    "minority_coherent_voters": result.tier_classification.minority_coherent_voters,
+                    "staging_path": result.staging_path,
+                },
+                indent=2,
+            )
+        )
         print()
         print(result.final_synthesis)
     return 0

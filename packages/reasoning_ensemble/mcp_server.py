@@ -98,6 +98,7 @@ Environment variables (also honored by router.py / synthesizer.py):
     FLOSS_ROUTER_MODEL       default phi4-mini:latest
     FLOSS_EMBED_MODEL        default mxbai-embed-large
 """
+
 from __future__ import annotations
 
 import json
@@ -131,6 +132,7 @@ ENSEMBLE_DIR = REASONING_DIR / "ensemble"
 # Tool implementations
 # ---------------------------------------------------------------------------
 
+
 def route_prompt(prompt: str, force_mode: str | None = None) -> str:
     """Classify a prompt into pass_through / single_strong / ensemble mode.
 
@@ -148,6 +150,7 @@ def route_prompt(prompt: str, force_mode: str | None = None) -> str:
     try:
         decision: RouterDecision = router_classify(prompt, force_mode=force_mode)
         from dataclasses import asdict
+
         return json.dumps(asdict(decision), ensure_ascii=False, indent=2)
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
@@ -190,15 +193,18 @@ def deliberate(prompt: str, force_mode: str | None = None) -> str:
             },
         }
 
-        # Step 2: For ensemble mode, run synthesizer
+        # Step 2: For ensemble mode, run synthesizer.
+        # synthesize() returns an EnsembleSynthesis dataclass (not a dict), with
+        # the cluster/tier data nested under .tier_classification.
         if decision.mode == "ensemble":
             synth_result = synthesizer_mod.synthesize(prompt=prompt)
-            out["tier"] = synth_result.get("tier")
-            out["synthesis_path"] = synth_result.get("synthesis_path")
-            out["final_synthesis"] = synth_result.get("final_synthesis")
-            out["voter_count"] = synth_result.get("voter_count")
-            out["largest_cluster_fraction"] = synth_result.get("largest_cluster_fraction")
-            out["minority_coherent_voters"] = synth_result.get("minority_coherent_voters", [])
+            tier_cls = synth_result.tier_classification
+            out["tier"] = tier_cls.tier
+            out["synthesis_path"] = synth_result.staging_path
+            out["final_synthesis"] = synth_result.final_synthesis
+            out["voter_count"] = len(synth_result.voter_responses)
+            out["largest_cluster_fraction"] = tier_cls.largest_cluster_fraction
+            out["minority_coherent_voters"] = tier_cls.minority_coherent_voters
         else:
             out["note"] = (
                 f"mode={decision.mode}: caller invokes their normal model surface; "
@@ -208,9 +214,12 @@ def deliberate(prompt: str, force_mode: str | None = None) -> str:
 
         return json.dumps(out, ensure_ascii=False, indent=2)
     except AttributeError:
-        return json.dumps({
-            "error": "synthesizer.synthesize() not callable — check FLOSS/packages/reasoning_ensemble/synthesizer.py exposes a synthesize(prompt) function"
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "error": "synthesizer.synthesize() not callable — check FLOSS/packages/reasoning_ensemble/synthesizer.py exposes a synthesize(prompt) function"
+            },
+            ensure_ascii=False,
+        )
     except Exception as exc:  # noqa: BLE001
         return json.dumps({"error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
 
@@ -224,9 +233,11 @@ def get_recent_decisions(limit: int = 10) -> str:
     if not ACTIVITY_LOG.exists():
         return json.dumps([], ensure_ascii=False)
     try:
-        lines = ACTIVITY_LOG.read_text(encoding='utf-8').strip().splitlines()
+        lines = ACTIVITY_LOG.read_text(encoding="utf-8").strip().splitlines()
     except OSError as exc:
-        return json.dumps({"error": f"activity log read failed: {exc}"}, ensure_ascii=False)
+        return json.dumps(
+            {"error": f"activity log read failed: {exc}"}, ensure_ascii=False
+        )
     out = []
     for line in reversed(lines):
         if not line.strip():
@@ -256,17 +267,21 @@ def get_ensemble_drafts(limit: int = 5) -> str:
     out = []
     for f in files:
         try:
-            d = json.loads(f.read_text(encoding='utf-8'))
-            out.append({
-                "filename": f.name,
-                "tier": d.get("tier"),
-                "voter_count": d.get("voter_count"),
-                "largest_cluster_fraction": d.get("largest_cluster_fraction"),
-                "minority_coherent_count": len(d.get("minority_coherent_voters", [])),
-                "prompt_preview": (d.get("prompt") or "")[:200],
-                "final_synthesis_preview": (d.get("final_synthesis") or "")[:500],
-                "full_path": str(f.relative_to(_WORKSPACE_ROOT).as_posix()),
-            })
+            d = json.loads(f.read_text(encoding="utf-8"))
+            out.append(
+                {
+                    "filename": f.name,
+                    "tier": d.get("tier"),
+                    "voter_count": d.get("voter_count"),
+                    "largest_cluster_fraction": d.get("largest_cluster_fraction"),
+                    "minority_coherent_count": len(
+                        d.get("minority_coherent_voters", [])
+                    ),
+                    "prompt_preview": (d.get("prompt") or "")[:200],
+                    "final_synthesis_preview": (d.get("final_synthesis") or "")[:500],
+                    "full_path": str(f.relative_to(_WORKSPACE_ROOT).as_posix()),
+                }
+            )
         except Exception:  # noqa: BLE001
             continue
     return json.dumps(out, ensure_ascii=False, indent=2)
@@ -275,6 +290,7 @@ def get_ensemble_drafts(limit: int = 5) -> str:
 # ---------------------------------------------------------------------------
 # MCP server boilerplate (matches metacoordinator_mcp/server.py pattern)
 # ---------------------------------------------------------------------------
+
 
 def _create_mcp():
     """Build the FastMCP app when the optional MCP SDK is available."""
