@@ -134,6 +134,13 @@ except ImportError:
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 ENSEMBLE_STAGING = WORKSPACE_ROOT / ".agent-surface" / "reasoning" / "ensemble"
+# Same file the Router appends its decision rows to and scans in
+# check_tier4_similarity_bias(). The synthesizer must record the tier here (not
+# only in the global Action) so the Tier-4 similarity bias can fire for adjacent
+# prompts.
+REASONING_ACTIVITY_LOG = (
+    WORKSPACE_ROOT / ".agent-surface" / "reasoning" / "activity.jsonl"
+)
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
@@ -797,6 +804,31 @@ def _log_synthesis_action(
         error=error,
     )
     append_action(action)
+
+    # Also write a top-level row to the reasoning activity log, where the
+    # Router's check_tier4_similarity_bias() actually looks. The global Action
+    # above is off that scan path, and the Router seeds tier_classification=None
+    # on its own row — so without this, a real Tier-4 divergence never biases the
+    # adjacent-prompt routing it promises. For Tier-4 we also record the prompt
+    # embedding (the field the similarity check requires); best-effort, non-fatal.
+    tier = result.tier_classification.tier
+    row: dict = {
+        "event": "ensemble_synthesis",
+        "prompt_hash": p_hash,
+        "prompt_preview": prompt[:200],
+        "tier_classification": tier,
+    }
+    if tier == "tier4":
+        try:
+            row["prompt_embedding"] = ollama_embed(prompt)
+        except Exception:  # noqa: BLE001 — embedding is best-effort
+            pass
+    try:
+        REASONING_ACTIVITY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with REASONING_ACTIVITY_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
