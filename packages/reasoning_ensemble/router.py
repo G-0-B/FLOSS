@@ -161,8 +161,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from packages.activity_log import Action, append_action  # noqa: E402
 
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")  # 127.0.0.1 not localhost — Python urllib on Windows tries IPv6 first and Ollama is IPv4-only
-ROUTER_MODEL = os.environ.get("FLOSS_ROUTER_MODEL", "phi4-mini:latest")  # 2.5GB, fits fully on 16GB VRAM alongside mxbai-embed-large; ~10s warm vs gemma3:12b's 40-50s. Equivalent classification accuracy on calibration sample. Set FLOSS_ROUTER_MODEL=gemma3:12b-it-qat to revert.
+OLLAMA_BASE_URL = os.environ.get(
+    "OLLAMA_BASE_URL", "http://127.0.0.1:11434"
+)  # 127.0.0.1 not localhost — Python urllib on Windows tries IPv6 first and Ollama is IPv4-only
+ROUTER_MODEL = os.environ.get(
+    "FLOSS_ROUTER_MODEL", "phi4-mini:latest"
+)  # 2.5GB, fits fully on 16GB VRAM alongside mxbai-embed-large; ~10s warm vs gemma3:12b's 40-50s. Equivalent classification accuracy on calibration sample. Set FLOSS_ROUTER_MODEL=gemma3:12b-it-qat to revert.
 EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
 
 # Upgrade A: activity-log-similarity bias.
@@ -220,6 +224,7 @@ OUTPUT FORMAT — JSON ONLY, no prose preamble:
 @dataclass
 class RouterDecision:
     """The classification result + provenance for the activity log."""
+
     mode: str
     reason: str
     confidence: float
@@ -246,17 +251,20 @@ def _ollama_request(path: str, payload: dict, timeout: int) -> dict:
     """POST to Ollama HTTP API. Returns parsed JSON. Raises on error."""
     url = f"{OLLAMA_BASE_URL.rstrip('/')}{path}"
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST",
-                                  headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(
+        url, data=data, method="POST", headers={"Content-Type": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
 def ollama_embed(text: str) -> list[float]:
     """Return the mxbai-embed-large embedding of `text` (1024-d vector)."""
-    response = _ollama_request("/api/embeddings",
-                               {"model": EMBED_MODEL, "prompt": text},
-                               timeout=EMBED_TIMEOUT_SECONDS)
+    response = _ollama_request(
+        "/api/embeddings",
+        {"model": EMBED_MODEL, "prompt": text},
+        timeout=EMBED_TIMEOUT_SECONDS,
+    )
     embedding = response.get("embedding", [])
     if not embedding:
         raise RuntimeError(f"Empty embedding from {EMBED_MODEL}")
@@ -296,7 +304,9 @@ def _read_activity_tail(n_lines: int = ACTIVITY_LOOKBACK) -> list[dict]:
     return out
 
 
-def check_tier4_similarity_bias(prompt_embedding: list[float]) -> tuple[Optional[str], Optional[float]]:
+def check_tier4_similarity_bias(
+    prompt_embedding: list[float],
+) -> tuple[Optional[str], Optional[float]]:
     """Upgrade A: If a recent activity-log entry has a Tier-4 tag and the
     incoming prompt's embedding is similar to that entry's embedding above
     threshold, return (prior_prompt_hash, similarity_score) to trigger a
@@ -337,28 +347,37 @@ def _parse_router_output(raw: str) -> dict:
     end = raw.rfind("}")
     if start == -1 or end == -1 or end < start:
         raise ValueError(f"No JSON object found in router output: {raw[:200]}")
-    return json.loads(raw[start:end + 1])
+    return json.loads(raw[start : end + 1])
 
 
 def invoke_router(prompt: str) -> tuple[dict, float, str]:
     """Call the local Router model. Returns (parsed_decision, duration_s, raw_output)."""
-    full_prompt = f"{ROUTER_SYSTEM_PROMPT}\n\nPROMPT TO CLASSIFY:\n{prompt}\n\nJSON OUTPUT:"
+    full_prompt = (
+        f"{ROUTER_SYSTEM_PROMPT}\n\nPROMPT TO CLASSIFY:\n{prompt}\n\nJSON OUTPUT:"
+    )
     started = time.perf_counter()
-    response = _ollama_request("/api/generate", {
-        "model": ROUTER_MODEL,
-        "prompt": full_prompt,
-        "stream": False,
-        "format": "json",  # request structured JSON output
-        "options": {"temperature": 0.1, "num_predict": 256},
-    }, timeout=ROUTER_TIMEOUT_SECONDS)
+    response = _ollama_request(
+        "/api/generate",
+        {
+            "model": ROUTER_MODEL,
+            "prompt": full_prompt,
+            "stream": False,
+            "format": "json",  # request structured JSON output
+            "options": {"temperature": 0.1, "num_predict": 256},
+        },
+        timeout=ROUTER_TIMEOUT_SECONDS,
+    )
     duration = time.perf_counter() - started
     raw = response.get("response", "")
     parsed = _parse_router_output(raw)
     return parsed, duration, raw
 
 
-def append_activity(decision: RouterDecision, prompt: str,
-                    prompt_embedding: Optional[list[float]] = None) -> None:
+def append_activity(
+    decision: RouterDecision,
+    prompt: str,
+    prompt_embedding: Optional[list[float]] = None,
+) -> None:
     """Append a one-line JSON event to the reasoning activity log."""
     record = asdict(decision)
     record["event"] = "router_decision"
@@ -379,46 +398,50 @@ def append_activity(decision: RouterDecision, prompt: str,
         print(f"[router] WARN: failed to append activity log: {e}", file=sys.stderr)
 
     response_hash = (
-        prompt_hash(decision.raw_model_output)
-        if decision.raw_model_output
-        else ""
+        prompt_hash(decision.raw_model_output) if decision.raw_model_output else ""
     )
-    append_action(Action(
-        action_id=f"router-{decision.prompt_hash}",
-        kind="router_decision",
-        harness="reasoning_ensemble/router.py",
-        started_at=decision.timestamp,
-        ended_at=decision.timestamp,
-        duration_seconds=decision.duration_seconds,
-        success=True,
-        inputs={
-            "prompt_hash": decision.prompt_hash,
-            "prompt_preview": prompt[:200],
-            "prompt_embedding_present": bool(prompt_embedding),
-        },
-        outputs={
-            "mode": decision.mode,
-            "confidence": decision.confidence,
-            "reason": decision.reason,
-            "bias_applied": decision.bias_applied,
-            "similar_prior_prompt_hash": decision.similar_prior_prompt_hash,
-            "similar_prior_similarity": decision.similar_prior_similarity,
-        },
-        llm_calls=[{
-            "model": decision.model,
-            "provider": "ollama-local" if decision.model != "forced" else "caller",
-            "prompt_hash": decision.prompt_hash,
-            "response_hash": response_hash,
-            "duration_seconds": decision.duration_seconds,
-            "error": None,
-        }],
-        routing_decision={
-            "mode": decision.mode,
-            "reason": decision.reason,
-            "confidence": decision.confidence,
-            "bias_applied": decision.bias_applied,
-        },
-    ))
+    append_action(
+        Action(
+            action_id=f"router-{decision.prompt_hash}",
+            kind="router_decision",
+            harness="reasoning_ensemble/router.py",
+            started_at=decision.timestamp,
+            ended_at=decision.timestamp,
+            duration_seconds=decision.duration_seconds,
+            success=True,
+            inputs={
+                "prompt_hash": decision.prompt_hash,
+                "prompt_preview": prompt[:200],
+                "prompt_embedding_present": bool(prompt_embedding),
+            },
+            outputs={
+                "mode": decision.mode,
+                "confidence": decision.confidence,
+                "reason": decision.reason,
+                "bias_applied": decision.bias_applied,
+                "similar_prior_prompt_hash": decision.similar_prior_prompt_hash,
+                "similar_prior_similarity": decision.similar_prior_similarity,
+            },
+            llm_calls=[
+                {
+                    "model": decision.model,
+                    "provider": (
+                        "ollama-local" if decision.model != "forced" else "caller"
+                    ),
+                    "prompt_hash": decision.prompt_hash,
+                    "response_hash": response_hash,
+                    "duration_seconds": decision.duration_seconds,
+                    "error": None,
+                }
+            ],
+            routing_decision={
+                "mode": decision.mode,
+                "reason": decision.reason,
+                "confidence": decision.confidence,
+                "bias_applied": decision.bias_applied,
+            },
+        )
+    )
 
 
 def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
@@ -458,13 +481,20 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
         similar_hash, similar_sim = check_tier4_similarity_bias(prompt_embedding)
         if similar_hash is not None:
             bias_applied = "tier4_similarity"
-    except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        RuntimeError,
+        json.JSONDecodeError,
+    ) as e:
         # Embedding failure is non-fatal — Router can still classify without it.
         # TimeoutError covers a stalled Ollama that accepts the connection but
         # never responds within the urlopen timeout (socket.timeout aliases
         # TimeoutError since 3.10), which is not a URLError.
-        print(f"[router] WARN: embed step failed (continuing without similarity bias): {e}",
-              file=sys.stderr)
+        print(
+            f"[router] WARN: embed step failed (continuing without similarity bias): {e}",
+            file=sys.stderr,
+        )
 
     # If similarity bias triggered, short-circuit to ensemble without invoking the Router LLM
     if bias_applied == "tier4_similarity":
@@ -490,8 +520,10 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
         # Hard failure — fall back to single_strong (conservative default).
         # TimeoutError included so a stalled Ollama degrades gracefully here too.
-        print(f"[router] ERROR: Router invocation failed; defaulting to single_strong: {e}",
-              file=sys.stderr)
+        print(
+            f"[router] ERROR: Router invocation failed; defaulting to single_strong: {e}",
+            file=sys.stderr,
+        )
         decision = RouterDecision(
             mode="single_strong",
             reason=f"Router failed ({type(e).__name__}); conservative fallback",
@@ -509,14 +541,30 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     # Validate mode field
     mode = parsed.get("mode", "single_strong")
     if mode not in ("pass_through", "single_strong", "ensemble"):
-        print(f"[router] WARN: Router returned invalid mode {mode!r}; coercing to single_strong",
-              file=sys.stderr)
+        print(
+            f"[router] WARN: Router returned invalid mode {mode!r}; coercing to single_strong",
+            file=sys.stderr,
+        )
         mode = "single_strong"
+
+    # Coerce confidence in the same guarded path as mode: a non-float value
+    # ("high", null, ...) from Ollama must not raise here (outside the
+    # invocation fallback) and make routing unavailable. Default + clamp.
+    try:
+        confidence = float(parsed.get("confidence", 0.5))
+    except (TypeError, ValueError):
+        print(
+            f"[router] WARN: Router returned non-numeric confidence "
+            f"{parsed.get('confidence')!r}; defaulting to 0.5",
+            file=sys.stderr,
+        )
+        confidence = 0.5
+    confidence = max(0.0, min(1.0, confidence))
 
     decision = RouterDecision(
         mode=mode,
         reason=str(parsed.get("reason", "(no reason)"))[:400],
-        confidence=float(parsed.get("confidence", 0.5)),
+        confidence=confidence,
         prompt_hash=p_hash,
         model=ROUTER_MODEL,
         embed_model=EMBED_MODEL,
@@ -533,6 +581,7 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _test_suite() -> int:
     """Run a small calibration suite of representative prompts.
 
@@ -548,9 +597,15 @@ def _test_suite() -> int:
         ("Explain what this regex matches", "single_strong"),
         ("Write a unit test for the parse_url function", "single_strong"),
         ("Fix the bug in the for-loop on line 142", "single_strong"),
-        ("Refactor the authentication module to use OAuth2 instead of session cookies, touching 5 files including the database migration", "ensemble"),
+        (
+            "Refactor the authentication module to use OAuth2 instead of session cookies, touching 5 files including the database migration",
+            "ensemble",
+        ),
         ("Design the schema for a new event-sourcing layer", "ensemble"),
-        ("Should we switch the consensus gateway from analog vote to weighted analog with reputation?", "ensemble"),
+        (
+            "Should we switch the consensus gateway from analog vote to weighted analog with reputation?",
+            "ensemble",
+        ),
         ("Propose an ADR for the new threat model", "ensemble"),
     ]
     print(f"Router test — model={ROUTER_MODEL}, embed={EMBED_MODEL}")
@@ -563,24 +618,32 @@ def _test_suite() -> int:
         marker = "✓" if d.mode == expected else "✗"
         if d.mode == expected:
             correct += 1
-        print(f"\n[{i:2d}] {marker} expected={expected:14s} got={d.mode:14s} "
-              f"conf={d.confidence:.2f} dur={d.duration_seconds:.1f}s"
-              + (f" [bias={d.bias_applied}]" if d.bias_applied else ""))
+        print(
+            f"\n[{i:2d}] {marker} expected={expected:14s} got={d.mode:14s} "
+            f"conf={d.confidence:.2f} dur={d.duration_seconds:.1f}s"
+            + (f" [bias={d.bias_applied}]" if d.bias_applied else "")
+        )
         print(f"     prompt:  {prompt[:90]}{'...' if len(prompt) > 90 else ''}")
         print(f"     reason:  {d.reason[:120]}")
     print(f"\n{'=' * 80}")
     print(f"Score: {correct}/{len(cases)} ({100 * correct / len(cases):.0f}%)")
-    print(f"Note: classification is probabilistic; treat as calibration aid, not strict test.")
+    print(
+        f"Note: classification is probabilistic; treat as calibration aid, not strict test."
+    )
     return 0
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     parser.add_argument("prompt", nargs="?", help="Prompt to classify")
-    parser.add_argument("--test", action="store_true",
-                        help="Run the calibration test suite")
-    parser.add_argument("--force", choices=["pass_through", "single_strong", "ensemble"],
-                        help="Force a mode without invoking the classifier")
+    parser.add_argument(
+        "--test", action="store_true", help="Run the calibration test suite"
+    )
+    parser.add_argument(
+        "--force",
+        choices=["pass_through", "single_strong", "ensemble"],
+        help="Force a mode without invoking the classifier",
+    )
     return parser.parse_args()
 
 

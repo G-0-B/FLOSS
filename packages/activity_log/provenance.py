@@ -389,6 +389,30 @@ def _has_non_packet_evidence(packet: dict[str, Any]) -> bool:
     return False
 
 
+# Per-entry contract from provenance-packet.spec.md "Payload Entry". Validated
+# here so a governed claim cannot pass the System/Substrate hard block with a
+# packet whose `a[]` entry omits the required v1.4 fields while still carrying a
+# consent_ref and a non-packet evidence root.
+_ENTRY_REQUIRED_STR_FIELDS = ("claim_type", "truth_status", "created_at", "next_action")
+_ENTRY_REQUIRED_LIST_FIELDS = ("source_systems", "risks", "benefits")
+
+
+def _payload_entry_errors(entries: list[Any]) -> list[str]:
+    errors: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            errors.append("E_PROVENANCE_ENTRY_INVALID")
+            continue
+        for field_name in _ENTRY_REQUIRED_STR_FIELDS:
+            value = entry.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"E_PROVENANCE_ENTRY_FIELD_MISSING:{field_name}")
+        for field_name in _ENTRY_REQUIRED_LIST_FIELDS:
+            if not isinstance(entry.get(field_name), list):
+                errors.append(f"E_PROVENANCE_ENTRY_FIELD_MISSING:{field_name}")
+    return errors
+
+
 def _recursive_evidence_errors(
     packet: dict[str, Any],
     *,
@@ -504,6 +528,8 @@ def validate_packet(
         errors.append("E_PROVENANCE_TYPE_INVALID")
     if not isinstance(packet.get("a"), list) or not packet["a"]:
         errors.append("E_PROVENANCE_PAYLOAD_EMPTY")
+    else:
+        errors.extend(_payload_entry_errors(packet["a"]))
 
     errors.extend(_artifact_errors(packet, root))
 

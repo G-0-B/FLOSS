@@ -190,9 +190,7 @@ def test_concurrent_first_packet_creation_converges_on_one_identity(
         time.sleep(0.02)
         return original_generate()
 
-    monkeypatch.setattr(
-        provenance.SigningKey, "generate", staticmethod(slow_generate)
-    )
+    monkeypatch.setattr(provenance.SigningKey, "generate", staticmethod(slow_generate))
 
     worker_count = 12
     identity_dir = tmp_path / "identity"
@@ -301,14 +299,23 @@ def test_dag_root_satisfied_by_valid_child_packet(tmp_path, monkeypatch):
 
     monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
     out = tmp_path / ".agent-surface" / "provenance"
+
+    def _entry(**overrides):
+        base = {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": "2026-06-13T00:00:00Z",
+            "risks": [],
+            "benefits": [],
+            "next_action": "noop",
+        }
+        base.update(overrides)
+        return base
+
     # Child carries a real non-packet (test) root.
     _child, child_path = provenance.create_packet(
-        [
-            {
-                "created_at": "2026-06-13T00:00:00Z",
-                "evidence_refs": [{"type": "test", "ref": "hashline:VERIFIED"}],
-            }
-        ],
+        [_entry(evidence_refs=[{"type": "test", "ref": "hashline:VERIFIED"}])],
         identity_dir=tmp_path / "child_id",
         output_root=out,
         prior_digest=None,
@@ -318,16 +325,16 @@ def test_dag_root_satisfied_by_valid_child_packet(tmp_path, monkeypatch):
     # evidence (NO direct non-packet root of its own).
     _parent, parent_path = provenance.create_packet(
         [
-            {
-                "created_at": "2026-06-13T00:00:01Z",
-                "evidence_refs": [
+            _entry(
+                created_at="2026-06-13T00:00:01Z",
+                evidence_refs=[
                     {
                         "type": "provenance_packet",
                         "ref": rel,
                         "sha256": provenance.sha256_file(child_path),
                     }
                 ],
-            }
+            )
         ],
         identity_dir=tmp_path / "parent_id",
         output_root=out,
@@ -388,3 +395,34 @@ def test_discontinuous_prior_sequence_is_rejected(tmp_path, monkeypatch):
     )
     assert result.ok is False
     assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in result.errors
+
+
+def test_payload_entry_missing_required_field_is_invalid(tmp_path, monkeypatch):
+    """A packet whose entry omits required v1.4 fields is invalid even with consent + a root.
+
+    Guards the governed hard block: validate_packet().ok must not pass for a
+    malformed entry that carries only consent_ref + a non-packet evidence root.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    _p, path = provenance.create_packet(
+        [
+            {
+                # claim_type / truth_status / source_systems / next_action /
+                # risks / benefits all omitted on purpose.
+                "created_at": "2026-06-13T00:00:00Z",
+                "consent_ref": {"decision_action_hash": "uhCAk" + ("a" * 32)},
+                "evidence_refs": [{"type": "test", "ref": "x"}],
+            }
+        ],
+        identity_dir=tmp_path / "id",
+        output_root=out,
+        prior_digest=None,
+    )
+    result = provenance.validate_packet(
+        path, workspace_root=tmp_path, provenance_root=out
+    )
+    assert result.ok is False
+    assert any(e.startswith("E_PROVENANCE_ENTRY_FIELD_MISSING") for e in result.errors)

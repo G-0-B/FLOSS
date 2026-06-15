@@ -92,10 +92,10 @@
         },
         "parent_consent_id": {
           "oneOf": [
-            {"type": "string", "format": "uuid"},
+            {"type": "string"},
             {"type": "null"}
           ],
-          "description": "For hierarchical patterns (e.g. constitution → derived claim). Null for root requests"
+          "description": "Holochain ActionHash of the parent ConsentPayload for hierarchical patterns (e.g. constitution → derived claim). Null for root requests. This is an action hash, not a UUID — the coordinator and integrity entry type deserialize it as Option<ActionHash>."
         },
         "rationale": {
           "type": "string",
