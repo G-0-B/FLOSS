@@ -458,8 +458,11 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
         similar_hash, similar_sim = check_tier4_similarity_bias(prompt_embedding)
         if similar_hash is not None:
             bias_applied = "tier4_similarity"
-    except (urllib.error.URLError, RuntimeError, json.JSONDecodeError) as e:
+    except (urllib.error.URLError, TimeoutError, RuntimeError, json.JSONDecodeError) as e:
         # Embedding failure is non-fatal — Router can still classify without it.
+        # TimeoutError covers a stalled Ollama that accepts the connection but
+        # never responds within the urlopen timeout (socket.timeout aliases
+        # TimeoutError since 3.10), which is not a URLError.
         print(f"[router] WARN: embed step failed (continuing without similarity bias): {e}",
               file=sys.stderr)
 
@@ -484,8 +487,9 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     # Normal Router classification path
     try:
         parsed, model_duration, raw = invoke_router(prompt)
-    except (urllib.error.URLError, ValueError, json.JSONDecodeError) as e:
+    except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as e:
         # Hard failure — fall back to single_strong (conservative default).
+        # TimeoutError included so a stalled Ollama degrades gracefully here too.
         print(f"[router] ERROR: Router invocation failed; defaulting to single_strong: {e}",
               file=sys.stderr)
         decision = RouterDecision(

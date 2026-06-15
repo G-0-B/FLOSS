@@ -459,7 +459,12 @@ def validate_packet(
 
     errors: list[str] = []
     digest = packet.get("d")
-    seen = _seen if _seen is not None else set()
+    # Branch-local copy of the traversal path: cycle detection must reject only
+    # cycles on the CURRENT path, not shared evidence reached via sibling
+    # branches (two entries citing the same child packet, or a child that is
+    # both the `p` prior and an evidence ref). A shared mutable set would leave a
+    # sibling's digest behind and mis-flag E_PROVENANCE_CYCLE_DETECTED.
+    seen = set(_seen) if _seen is not None else set()
     if isinstance(digest, str):
         if digest in seen:
             return PacketValidation(ok=False, errors=["E_PROVENANCE_CYCLE_DETECTED"])

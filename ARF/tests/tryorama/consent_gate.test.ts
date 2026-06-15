@@ -27,12 +27,12 @@ function validConsentPayload() {
   return {
     payload_id: "018f6d7a-7f2c-7aa1-a2b1-7b3a3f0e0101",
     pattern_id: "ADR-12",
-    pattern_type: "Adr",
+    pattern_type: "adr",
     pattern_hash: "a".repeat(64),
     proposer_did: "did:floss:alice",
     recipient_did: "did:floss:bob",
     blast_radius: "System",
-    consent_scope: ["ReadOnly", "Integrate"],
+    consent_scope: ["read_only", "integrate"],
     refusal_modes: null,
     refusable_until: null,
     parent_consent_id: null,
@@ -55,14 +55,14 @@ describe("Consent Gate", () => {
 
       const payload = await call<any>("get_consent_payload", payloadHash);
       assert.equal(payload.pattern_id, "ADR-12");
-      assert.deepEqual(payload.consent_scope, ["ReadOnly", "Integrate"]);
+      assert.deepEqual(payload.consent_scope, ["read_only", "integrate"]);
 
       const decisionHash = await call<ActionHash>("create_consent_decision", {
         decision_id: "018f6d7a-7f2c-7aa1-a2b1-7b3a3f0e0102",
         payload_action_hash: payloadHash,
         decider_did: "did:floss:bob",
-        outcome: "BoundedAccept",
-        scope_granted: ["ReadOnly"],
+        outcome: "bounded_accept",
+        scope_granted: ["read_only"],
         rationale: "Read-only inspection is acceptable; integration remains gated.",
         counter_frame_ref: null,
         expires_at: null,
@@ -71,8 +71,8 @@ describe("Consent Gate", () => {
       assert.ok(decisionHash, "create_consent_decision should return an ActionHash");
 
       const decision = await call<any>("get_consent_decision", decisionHash);
-      assert.equal(decision.outcome, "BoundedAccept");
-      assert.deepEqual(decision.scope_granted, ["ReadOnly"]);
+      assert.equal(decision.outcome, "bounded_accept");
+      assert.deepEqual(decision.scope_granted, ["read_only"]);
 
       const linked = await call<Array<[ActionHash, any]>>(
         "get_consent_decisions_for_payload",
@@ -99,8 +99,8 @@ describe("Consent Gate", () => {
           decision_id: "018f6d7a-7f2c-7aa1-a2b1-7b3a3f0e0103",
           payload_action_hash: payloadHash,
           decider_did: "did:floss:bob",
-          outcome: "Accepted",
-          scope_granted: ["Bind"],
+          outcome: "accepted",
+          scope_granted: ["bind"],
           rationale: null,
           counter_frame_ref: null,
           expires_at: null,

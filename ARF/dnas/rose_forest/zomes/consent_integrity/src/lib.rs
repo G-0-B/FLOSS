@@ -60,6 +60,7 @@ use serde::{Deserialize, Serialize};
 /// `constitution` are inherently Substrate-class per ADR-12 §6 — the
 /// integrity zome enforces this in `validate_consent_payload`.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum PatternType {
     Kernel,
     Adr,
@@ -85,6 +86,7 @@ pub enum BlastRadius {
 /// Authorization gradient. Higher scopes imply lower scopes for the same
 /// `pattern_hash` (read_only < integrate < propagate < bind).
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum ConsentScope {
     ReadOnly,
     Integrate,
@@ -97,6 +99,7 @@ pub enum ConsentScope {
 /// CFIS Tier-4 divergence into a substrate-level operation by routing the
 /// counter through the consensus gateway as a new Claim.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum RefusalMode {
     Reject,
     BoundedAccept,
@@ -108,6 +111,7 @@ pub enum RefusalMode {
 /// `bounded_accept` narrows it; `tourist_observe` per CFIS; `counter_propose`
 /// adds a counter-frame reference; `rejected` declines entirely.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, SerializedBytes)]
+#[serde(rename_all = "snake_case")]
 pub enum Outcome {
     Accepted,
     BoundedAccept,

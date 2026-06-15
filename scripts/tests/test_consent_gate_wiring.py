@@ -12,8 +12,10 @@ ROSE_FOREST = FLOSS_ROOT / "ARF" / "dnas" / "rose_forest"
 def test_consent_integrity_zome_is_packaged_in_rose_forest_dna():
     dna_yaml = yaml.safe_load((ROSE_FOREST / "workdir" / "dna.yaml").read_text())
 
+    # hc manifests use `path:` for unbundled zome wasm and `bundled:` for the
+    # packed form — support both so the test works against either manifest style.
     integrity_zomes = {
-        zome["name"]: zome["bundled"]
+        zome["name"]: zome.get("bundled") or zome.get("path")
         for zome in dna_yaml["integrity"]["zomes"]
     }
 
@@ -29,9 +31,8 @@ def test_consent_integrity_zome_is_packaged_in_rose_forest_dna():
         if zome["name"] == "consent"
     )
     assert (
-        consent_coord["bundled"]
-        == "../../../target/wasm32-unknown-unknown/release/consent.wasm"
-    )
+        consent_coord.get("bundled") or consent_coord.get("path")
+    ) == "../../../target/wasm32-unknown-unknown/release/consent.wasm"
     dependencies = {dep["name"] for dep in consent_coord["dependencies"]}
     assert "consent_integrity" in dependencies
 

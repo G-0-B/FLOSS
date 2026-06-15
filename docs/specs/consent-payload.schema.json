@@ -113,7 +113,7 @@
       "description": "An agent's explicit decision on a ConsentPayload. Written by the recipient (or a group's quorum mechanism for collective DIDs). Append-only on source chain.",
       "required": [
         "decision_id",
-        "payload_id",
+        "payload_action_hash",
         "decider_did",
         "outcome",
         "scope_granted",
@@ -125,10 +125,14 @@
           "format": "uuid",
           "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
         },
+        "payload_action_hash": {
+          "type": "string",
+          "description": "Holochain ActionHash of the ConsentPayload this decision answers. This is the binding the coordinator's create_consent_decision requires (the source-chain address), not the payload's UUID."
+        },
         "payload_id": {
           "type": "string",
           "format": "uuid",
-          "description": "References the ConsentPayload this decision answers"
+          "description": "Optional UUID cross-reference to the ConsentPayload. The coordinator binds by payload_action_hash; this is informational."
         },
         "decider_did": {
           "type": "string",
