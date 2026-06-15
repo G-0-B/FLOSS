@@ -24,7 +24,7 @@ import Ajv from "ajv/dist/2020.js";
 // ── Setup ────────────────────────────────────────────
 const hAppPath = path.resolve(
   fileURLToPath(import.meta.url),
-  "../../../workdir/rose_forest.happ"
+  "../../workdir/rose_forest.happ"
 );
 
 const ZOME = "rose_forest";

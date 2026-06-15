@@ -401,6 +401,12 @@ def _recursive_evidence_errors(
     errors: list[str] = []
     if depth > max_depth:
         return ["E_PROVENANCE_RECURSION_DEPTH_EXCEEDED"]
+    # The root requirement is across the whole evidence DAG, not per node: a
+    # packet satisfies it if it carries a direct non-packet evidence root OR it
+    # references a valid child packet. A child that validates ok necessarily
+    # carries a non-packet root in its own subtree (this same check runs for it),
+    # so chained/cross-agent handoffs (derived -> prior -> test/spec) are valid.
+    subtree_has_root = _has_non_packet_evidence(packet)
     for entry in packet.get("a", []):
         for ref in entry.get("evidence_refs", []) or []:
             if not isinstance(ref, dict) or ref.get("type") != "provenance_packet":
@@ -418,9 +424,11 @@ def _recursive_evidence_errors(
                 _depth=depth + 1,
                 max_depth=max_depth,
             )
-            if not child.ok:
+            if child.ok:
+                subtree_has_root = True
+            else:
                 errors.extend(child.errors)
-    if not _has_non_packet_evidence(packet):
+    if not subtree_has_root:
         errors.append("E_PROVENANCE_ROOT_REQUIRED")
     return errors
 
@@ -515,6 +523,18 @@ def validate_packet(
             )
             if not prior_result.ok:
                 errors.extend(prior_result.errors)
+            # Per-agent chain continuity: the prior must belong to the same
+            # author and its sequence must directly precede this one. Without
+            # this, a signed packet could point at another agent's packet or
+            # skip/fork its sequence while still validating.
+            prior_packet = prior_result.packet or {}
+            if prior_packet.get("i") != packet.get("i"):
+                errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
+            try:
+                if int(prior_packet.get("s")) != int(packet.get("s")) - 1:
+                    errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+            except (TypeError, ValueError):
+                errors.append("E_PROVENANCE_SEQUENCE_INVALID")
 
     errors.extend(
         _recursive_evidence_errors(

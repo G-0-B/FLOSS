@@ -474,31 +474,46 @@ def _verify_multiedit(file_text: str, *, edits: list[dict[str, Any]]) -> dict[st
         (edit.get("old_string", "") or "", edit.get("new_string", "") or "")
         for edit in edits
     ]
+    # First pass: verify each sub-edit independently against the final contents.
+    raw = [
+        _verify_replace_like(file_text, old_string=old_string, new_string=new_string)
+        for old_string, new_string in norm
+    ]
+    # Second pass: chained-edit reconciliation. Sub-edits apply sequentially, so
+    # an earlier sub-edit's new snippet can be consumed by a later sub-edit's old
+    # snippet (e.g. foo->bar then bar->baz leaves no `bar` in the final file).
+    # Only treat an earlier MISMATCH as a verified intermediate state when BOTH:
+    #   (1) its own old snippet is absent — the earlier replacement actually
+    #       happened (guards against a partial/intervened edit where the old
+    #       snippet is still present), and
+    #   (2) its new snippet was consumed by a LATER sub-edit that itself landed
+    #       (not MISMATCH) — guards against an unrelated `xx<new>xx` replacement
+    #       coincidentally containing the new snippet.
     checks: list[dict[str, Any]] = []
-    for index, (old_string, new_string) in enumerate(norm):
-        check = _verify_replace_like(
-            file_text, old_string=old_string, new_string=new_string
-        )
-        # Chained-edit reconciliation (no exact checkpoint available): sub-edits
-        # apply sequentially, so an earlier sub-edit's new snippet can be
-        # consumed by a later sub-edit's old snippet (e.g. foo->bar then
-        # bar->baz leaves no `bar` in the final file). Verifying each sub-edit
-        # against only the final contents would mark the earlier one MISMATCH
-        # even though the tool succeeded. If this sub-edit's new snippet was
-        # consumed downstream, treat it as a verified intermediate state.
-        if check["status"] == "MISMATCH" and new_string:
+    for index, check in enumerate(raw):
+        old_string, new_string = norm[index]
+        if (
+            check["status"] == "MISMATCH"
+            and new_string
+            and not check.get("old_present", True)
+        ):
             consumed_downstream = any(
-                later_old and new_string in later_old
-                for later_old, _later_new in norm[index + 1 :]
+                later_old
+                and new_string in later_old
+                and later_check["status"] != "MISMATCH"
+                for later_check, (later_old, _later_new) in zip(
+                    raw[index + 1 :], norm[index + 1 :]
+                )
             )
             if consumed_downstream:
                 check = {
                     **check,
                     "status": "VERIFIED",
                     "reason": (
-                        "Superseded by a later sub-edit (chained MultiEdit): the "
-                        "intermediate new snippet was consumed as a downstream "
-                        "old snippet, which is expected sequential behavior."
+                        "Superseded by a later sub-edit (chained MultiEdit): the old "
+                        "snippet is gone and the intermediate new snippet was consumed "
+                        "as a verified downstream old snippet — expected sequential "
+                        "behavior."
                     ),
                 }
         checks.append(check)

@@ -159,6 +159,30 @@ def test_verify_multiedit_chained_edits_not_mismatched():
         assert "2/2 verified" in result["reason"]
 
 
+def test_verify_multiedit_partial_edit_old_present_stays_mismatch():
+    """Chained reconciliation must not upgrade when the earlier old snippet is still present.
+
+    Counterexample: edit1 (FOO->BAR) did NOT apply (FOO still present); edit2
+    replaced an independent `xxBARxx`->`BAZ`. edit1's new snippet (BAR) is a
+    substring of edit2's old snippet, but edit1 genuinely failed — the result
+    must stay MISMATCH, not be reconciled to VERIFIED.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        path.write_text("FOO\nBAZ\n", encoding="utf-8")
+        result = verify_tool_edit(
+            str(path),
+            "multiedit",
+            {
+                "edits": [
+                    {"old_string": "FOO", "new_string": "BAR"},
+                    {"old_string": "xxBARxx", "new_string": "BAZ"},
+                ]
+            },
+        )
+        assert result["status"] == "MISMATCH", result
+
+
 def test_verify_multiedit_real_missing_edit_still_mismatches():
     """The chained-edit reconciliation must not mask a genuinely failed sub-edit."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -268,6 +292,7 @@ def _run_all() -> int:
         test_verify_write_reports_exact_file_match,
         test_verify_multiedit_aggregates_subchecks,
         test_verify_multiedit_chained_edits_not_mismatched,
+        test_verify_multiedit_partial_edit_old_present_stays_mismatch,
         test_verify_multiedit_real_missing_edit_still_mismatches,
         test_verify_multiedit_empty_payload_is_unverified,
         test_verify_replace_treats_empty_new_string_as_deletion_success,

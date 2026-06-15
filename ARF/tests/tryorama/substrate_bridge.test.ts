@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 // ── Setup ────────────────────────────────────────────
 const hAppPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../../workdir/rose_forest.happ"
+  "../../workdir/rose_forest.happ"
 );
 
 const ZOME = "rose_forest";

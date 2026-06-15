@@ -280,7 +280,6 @@ def main() -> int:
             verify_tool_edit,
         )
         from packages.metacoordinator_mcp.tools import GatewayTools
-        from packages.activity_log import provenance
     except Exception:  # noqa: BLE001
         log(f"[hook] GatewayTools import failed:\n{traceback.format_exc()}")
         return finish()
@@ -352,6 +351,13 @@ def main() -> int:
 
     evidence: list[dict] = []
     try:
+        # Deferred here (not in the GatewayTools import block above) so that on
+        # lean installs without the provenance extras (blake3/jcs/nacl) the
+        # ImportError is caught locally and the hook still submits the Local
+        # CodeChange claim with empty evidence — provenance packets are
+        # best-effort and Local claims don't require them.
+        from packages.activity_log import provenance
+
         edited_path = Path(file_path).resolve()
         if edited_path.exists():
             packet_entry = {

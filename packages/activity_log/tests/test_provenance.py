@@ -293,3 +293,98 @@ def test_multi_entry_narrative_emits_one_line_per_entry(tmp_path, monkeypatch):
     assert "target -> second.txt" in lines[1]
     assert "evidence: 2 refs" in lines[1]
     assert "governed: yes" in lines[1]
+
+
+def test_dag_root_satisfied_by_valid_child_packet(tmp_path, monkeypatch):
+    """Root requirement is across the DAG: a packet may delegate it to a valid child."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    # Child carries a real non-packet (test) root.
+    _child, child_path = provenance.create_packet(
+        [
+            {
+                "created_at": "2026-06-13T00:00:00Z",
+                "evidence_refs": [{"type": "test", "ref": "hashline:VERIFIED"}],
+            }
+        ],
+        identity_dir=tmp_path / "child_id",
+        output_root=out,
+        prior_digest=None,
+    )
+    rel = child_path.resolve().relative_to(tmp_path.resolve()).as_posix()
+    # Parent: separate identity, genesis, references the child as its only
+    # evidence (NO direct non-packet root of its own).
+    _parent, parent_path = provenance.create_packet(
+        [
+            {
+                "created_at": "2026-06-13T00:00:01Z",
+                "evidence_refs": [
+                    {
+                        "type": "provenance_packet",
+                        "ref": rel,
+                        "sha256": provenance.sha256_file(child_path),
+                    }
+                ],
+            }
+        ],
+        identity_dir=tmp_path / "parent_id",
+        output_root=out,
+        prior_digest=None,
+    )
+    result = provenance.validate_packet(
+        parent_path, workspace_root=tmp_path, provenance_root=out
+    )
+    assert result.ok is True, result.errors
+
+
+def test_packet_with_no_root_in_dag_is_invalid(tmp_path, monkeypatch):
+    """A packet whose evidence DAG has no non-packet root is rejected."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    _packet, packet_path = provenance.create_packet(
+        [{"created_at": "2026-06-13T00:00:00Z"}],  # no evidence_refs at all
+        identity_dir=tmp_path / "id",
+        output_root=out,
+        prior_digest=None,
+    )
+    result = provenance.validate_packet(
+        packet_path, workspace_root=tmp_path, provenance_root=out
+    )
+    assert result.ok is False
+    assert "E_PROVENANCE_ROOT_REQUIRED" in result.errors
+
+
+def test_discontinuous_prior_sequence_is_rejected(tmp_path, monkeypatch):
+    """A packet whose prior sequence does not directly precede it is invalid."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    idd = tmp_path / "id"
+    root_ref = [{"type": "test", "ref": "x"}]
+    c0, _ = provenance.create_packet(
+        [{"created_at": "2026-06-13T00:00:00Z", "evidence_refs": root_ref}],
+        identity_dir=idd,
+        output_root=out,
+    )
+    provenance.create_packet(  # s=1, p=c0
+        [{"created_at": "2026-06-13T00:00:01Z", "evidence_refs": root_ref}],
+        identity_dir=idd,
+        output_root=out,
+    )
+    # c2 is forced to point back at the genesis (s=0) while its own s=2.
+    _c2, c2_path = provenance.create_packet(
+        [{"created_at": "2026-06-13T00:00:02Z", "evidence_refs": root_ref}],
+        identity_dir=idd,
+        output_root=out,
+        prior_digest=c0["d"],
+    )
+    result = provenance.validate_packet(
+        c2_path, workspace_root=tmp_path, provenance_root=out
+    )
+    assert result.ok is False
+    assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in result.errors
