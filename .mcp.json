@@ -1,0 +1,41 @@
+{
+  "_comment": "Shared MCP servers wrapped through JanuScope (https://github.com/giancarloerra/JanuScope) for audit logging + instruction injection. Lens configs under .mcp/lenses/. Takes effect on next MCP-aware session start. Pre-JanuScope config preserved at .mcp.json.pre-januscope.bak.",
+  "mcpServers": {
+    "serena": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/serena.yaml"
+      ]
+    },
+    "flossiullk-consensus": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/flossiullk-consensus.yaml"
+      ]
+    },
+    "flossiullk-reasoning-ensemble": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/flossiullk-reasoning-ensemble.yaml"
+      ]
+    },
+    "agentmemory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "januscope@latest",
+        "--config",
+        "C:/~shit/.mcp/lenses/agentmemory.yaml"
+      ]
+    }
+  }
+}

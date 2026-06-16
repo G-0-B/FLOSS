@@ -1,0 +1,24 @@
+{
+  "name": "memory_smart_search",
+  "description": "Hybrid semantic+keyword search with progressive disclosure.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query"
+      },
+      "expandIds": {
+        "type": "string",
+        "description": "Comma-separated observation IDs to expand"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Max results (default 10)"
+      }
+    },
+    "required": [
+      "query"
+    ]
+  }
+}

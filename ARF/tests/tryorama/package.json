@@ -3,18 +3,19 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "postinstall": "node fix-libsodium-esm.mjs"
-  },
+  "_comment_pin_2026-05-26": "@holochain/client and @holochain/tryorama versions investigated 2026-05-26 in WSL holonix (hc 0.6.1). Findings: NO tryorama version pairs cleanly with hc 0.6.1. tryorama 0.17 expects a separate hc-sandbox binary not present in hc 0.6.x. tryorama 0.18 expects `hc sandbox network webrtc` (only `mem`/`quic` in 0.6.1) AND `ConfigRootPath(...)` stdout (now `DataRootPath(...)`). tryorama 0.19 sends a request shape conductor 0.6.1 cannot deserialize. crates.io latest holochain_cli is 0.7.0-dev.26 — the 0.6 line is EOL upstream. Tryorama-based tests require migrating the substrate to holonix main-0.7-dev OR writing a custom test harness against @holochain/client directly. ADR-12 + MVP_PLAN.md updated to reflect this on 2026-05-26. See docs/agent-memory/project/holochain-version-line-skew.md. Pinned to 0.18.3/0.19.3 as the closest pair to the 0.6 line; this gets past installApp but fails at sandbox network create.",
   "dependencies": {
-    "@holochain/tryorama": "^0.17.0",
-    "@holochain/client": "^0.18.0"
+    "@holochain/client": "^0.19.3",
+    "@holochain/tryorama": "^0.18.3",
+    "@msgpack/msgpack": "3.0.0-beta2"
   },
   "devDependencies": {
-    "vitest": "^1.6.0",
+    "ajv": "^8.17.0",
     "typescript": "^5.4.0",
-    "ajv": "^8.17.0"
+    "vitest": "^1.6.0"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "^0.21.5",
+    "@rollup/rollup-linux-x64-gnu": "^4.60.1"
   }
 }

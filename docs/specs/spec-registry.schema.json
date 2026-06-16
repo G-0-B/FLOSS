@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floss://specs/spec-registry.schema.json",
+  "title": "Spec-Gate Registry",
+  "description": "Registry of one-line spec stubs for artifacts on gated canon surfaces (decision D7, adopted 2026-06-12). Checked fail-closed by FLOSS/scripts/spec_gate.py --check and advisorily by hook_post_write.py.",
+  "type": "object",
+  "required": ["version", "updated", "gated_surfaces", "entries"],
+  "properties": {
+    "version": { "type": "string" },
+    "updated": { "type": "string", "format": "date" },
+    "decision": { "type": "string" },
+    "gated_surfaces": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Workspace-relative directory prefixes whose files require registration."
+    },
+    "exempt_note": { "type": "string" },
+    "entries": {
+      "type": "object",
+      "description": "Workspace-relative forward-slash path -> spec stub entry.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["spec"],
+        "properties": {
+          "spec": {
+            "type": "string",
+            "minLength": 8,
+            "description": "One-line statement of intent — the '-1 layer'. What is this artifact FOR?"
+          },
+          "spec_ref": {
+            "type": "string",
+            "description": "Optional pointer to a fuller spec/design doc."
+          },
+          "grandfathered": {
+            "type": "boolean",
+            "description": "True when registered en masse at gate introduction (2026-06-12) without a deliberate spec pass. Backfill on next touch."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

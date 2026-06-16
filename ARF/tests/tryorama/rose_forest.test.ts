@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 // Path to the .happ bundle (built by: hc app pack workdir/)
 const hAppPath = path.resolve(
   fileURLToPath(import.meta.url),
-  "../../../workdir/rose_forest.happ"
+  "../../workdir/rose_forest.happ"
 );
 
 // Zome name matches the coordinator crate name in dna.yaml

@@ -3,19 +3,26 @@
 Infinity Bridge Demo
 Demonstrates discovery, subscription, and data streaming
 """
+
 import asyncio
 import sys
 import os
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
-from orchestrator.discovery import MockBridgeDiscovery
+
+def _get_demo_dependencies():
+    """Import demo-only orchestrator types after local path bootstrap."""
+    from orchestrator.discovery import MockBridgeDiscovery
+    from orchestrator.mcp_server import InfinityBridgeMCPServer, MockBridgeStream
+
+    return InfinityBridgeMCPServer, MockBridgeStream, MockBridgeDiscovery
 
 
 async def demo_basic_discovery():
     """Demo 1: Basic bridge discovery"""
+    InfinityBridgeMCPServer, _, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 1: Basic Bridge Discovery")
     print("=" * 60)
@@ -42,6 +49,7 @@ async def demo_basic_discovery():
 
 async def demo_capability_search():
     """Demo 2: Search bridges by capability"""
+    _, _, MockBridgeDiscovery = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 2: Capability-Based Discovery")
     print("=" * 60)
@@ -67,6 +75,7 @@ async def demo_capability_search():
 
 async def demo_streaming():
     """Demo 3: Subscribe and stream data"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("\n" + "=" * 60)
     print("DEMO 3: Stream Subscription and Data Reading")
     print("=" * 60)
@@ -76,6 +85,7 @@ async def demo_streaming():
 
     # Override with mock stream for demo
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the demo server."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)
@@ -120,6 +130,7 @@ async def demo_streaming():
 
 async def demo_mcp_resources():
     """Demo 4: MCP resource URIs"""
+    InfinityBridgeMCPServer, _, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 4: MCP Resource URIs")
     print("=" * 60)
@@ -143,6 +154,7 @@ async def demo_mcp_resources():
 
 async def demo_correlation():
     """Demo 5: Cross-correlation of acoustic and vibration"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("=" * 60)
     print("DEMO 5: Acoustic-Vibration Correlation")
     print("=" * 60)
@@ -152,6 +164,7 @@ async def demo_correlation():
 
     # Mock stream override
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the correlation demo."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)
@@ -162,10 +175,14 @@ async def demo_correlation():
     server.subscribe_to_stream = mock_subscribe
 
     print("\n1. Subscribing to acoustic stream...")
-    acoustic_stream = await server.subscribe_to_stream("acoustic-esp32-001", "acoustic/spectrum")
+    acoustic_stream = await server.subscribe_to_stream(
+        "acoustic-esp32-001", "acoustic/spectrum"
+    )
 
     print("2. Subscribing to vibration stream...")
-    vibration_stream = await server.subscribe_to_stream("vibration-rp2040-001", "vibration/time_series")
+    vibration_stream = await server.subscribe_to_stream(
+        "vibration-rp2040-001", "vibration/time_series"
+    )
 
     if acoustic_stream and vibration_stream:
         print("✓ Both streams connected\n")
@@ -181,7 +198,9 @@ async def demo_correlation():
             print(f"✓ Vibration sample at {vibration_sample.timestamp_ns} ns")
 
             # Calculate time sync quality
-            time_diff_ms = abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+            time_diff_ms = (
+                abs(acoustic_sample.timestamp_ns - vibration_sample.timestamp_ns) / 1e6
+            )
             print(f"\nTime synchronization: {time_diff_ms:.2f} ms")
 
             if time_diff_ms < 50:
@@ -193,17 +212,22 @@ async def demo_correlation():
             print("\n4. Computing cross-correlation...")
 
             # Take first N bins for correlation
-            N = min(len(acoustic_sample.frequencies), len(vibration_sample.frequencies), 256)
+            N = min(
+                len(acoustic_sample.frequencies), len(vibration_sample.frequencies), 256
+            )
             acoustic_data = acoustic_sample.frequencies[:N]
             vibration_data = vibration_sample.frequencies[:N]
 
             # Simple correlation coefficient
             import statistics
+
             acoustic_mean = statistics.mean(acoustic_data)
             vibration_mean = statistics.mean(vibration_data)
 
-            numerator = sum((a - acoustic_mean) * (v - vibration_mean)
-                          for a, v in zip(acoustic_data, vibration_data))
+            numerator = sum(
+                (a - acoustic_mean) * (v - vibration_mean)
+                for a, v in zip(acoustic_data, vibration_data)
+            )
 
             acoustic_std = statistics.stdev(acoustic_data)
             vibration_std = statistics.stdev(vibration_data)
@@ -228,6 +252,7 @@ async def demo_correlation():
 
 async def demo_performance_metrics():
     """Demo 6: Performance metrics validation"""
+    InfinityBridgeMCPServer, MockBridgeStream, _ = _get_demo_dependencies()
     print("\n" + "=" * 60)
     print("DEMO 6: Performance Metrics")
     print("=" * 60)
@@ -236,6 +261,7 @@ async def demo_performance_metrics():
 
     # Measure discovery time
     import time
+
     print("\n1. Testing bridge discovery latency...")
     t0 = time.time()
     await server.start()
@@ -249,6 +275,7 @@ async def demo_performance_metrics():
 
     # Mock stream override
     async def mock_subscribe(bridge_id: str, stream_type: str):
+        """Create a mock stream subscription for the performance demo."""
         bridge = server.discovery.get_bridge(bridge_id)
         if bridge:
             stream = MockBridgeStream(bridge, stream_type)

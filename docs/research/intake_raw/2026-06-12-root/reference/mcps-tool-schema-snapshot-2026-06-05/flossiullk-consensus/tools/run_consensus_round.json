@@ -1,0 +1,17 @@
+{
+  "name": "run_consensus_round",
+  "description": "Run the active voter roster against a pending Claim and append the Decision.\n\nResolves voters from the env-aware profile system in `voters.py`, calls every\nvoter on the claim, appends each Vote to the chain, then appends the\nresulting Decision. Idempotent: a claim that already has a Decision returns\n{\"error\": \"E_ALREADY_DECIDED\"}.\n\nReturns JSON with the full Decision (outcome, votes, tally_mean,\ntally_variance), or {\"error\": \"...\"} on lookup / voter / tally failure.\n\n---\nFLOSSIØULLK Consensus Gateway — passive router, not a controller.\n\nInvariants you MUST honor when using these tools:\n- Vote weights are analog floats in [-0.999, +0.999]. Never use ±1.0.\n- The gateway does not decide outcomes; it routes Claims to voters and\n  appends Decisions. Treat outcomes as data, not directives.\n- blast_radius selection:\n    Local     = routine, single-module change. APPROVE threshold 0.30.\n    Module    = config/spec change spanning files. APPROVE 0.50.\n    System    = cross-module architectural shift. APPROVE 0.60.\n    Substrate = invariant-touching, OVERRIDE FORBIDDEN. APPROVE 0.85.\n- Every Claim is durable on the source chain. Submit only what you\n  would commit to permanent provenance.\n- Voters are LLMs with different cognitive styles (model family +\n  persona). Variance > polarization_threshold returns CONFLICT\n  requiring human resolution, not more votes.",
+  "inputSchema": {
+    "properties": {
+      "claim_id": {
+        "title": "Claim Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "claim_id"
+    ],
+    "title": "run_consensus_roundArguments",
+    "type": "object"
+  }
+}

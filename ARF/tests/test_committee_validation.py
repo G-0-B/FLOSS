@@ -10,7 +10,6 @@ Tests cover:
 """
 
 import pytest
-import asyncio
 import time
 from pathlib import Path
 import sys
@@ -21,7 +20,11 @@ import shutil
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from validation.models import (
-    Vote, VoteDecision, ValidationResult, ValidatorConfig, ConsensusMetrics
+    Vote,
+    VoteDecision,
+    ValidationResult,
+    ValidatorConfig,
+    ConsensusMetrics,
 )
 from validation.agent_pool import ValidatorPool, MockValidatorBackend, Validator
 from validation.committee import TripleValidationCommittee
@@ -37,7 +40,7 @@ class TestVote:
             validator_id="validator-01",
             decision=VoteDecision.YES,
             confidence=0.85,
-            reasoning="Triple is factually correct"
+            reasoning="Triple is factually correct",
         )
         assert vote.validator_id == "validator-01"
         assert vote.decision == VoteDecision.YES
@@ -46,19 +49,11 @@ class TestVote:
     def test_vote_confidence_validation(self):
         """Test confidence must be between 0 and 1."""
         with pytest.raises(ValueError):
-            Vote(
-                validator_id="validator-01",
-                decision=VoteDecision.YES,
-                confidence=1.5
-            )
+            Vote(validator_id="validator-01", decision=VoteDecision.YES, confidence=1.5)
 
     def test_vote_decision_string_conversion(self):
         """Test decision can be created from string."""
-        vote = Vote(
-            validator_id="validator-01",
-            decision="YES",
-            confidence=0.8
-        )
+        vote = Vote(validator_id="validator-01", decision="YES", confidence=0.8)
         assert vote.decision == VoteDecision.YES
 
 
@@ -83,7 +78,7 @@ class TestValidationResult:
             total_votes=5,
             yes_votes=3,
             no_votes=2,
-            abstain_votes=0
+            abstain_votes=0,
         )
 
         assert result.has_consensus is True
@@ -107,7 +102,7 @@ class TestValidationResult:
             total_votes=5,
             yes_votes=5,
             no_votes=0,
-            abstain_votes=0
+            abstain_votes=0,
         )
 
         assert result.has_consensus is True
@@ -129,14 +124,14 @@ class TestValidationResult:
             yes_votes=1,
             no_votes=1,
             abstain_votes=0,
-            duration_ms=250.5
+            duration_ms=250.5,
         )
 
         data = result.to_dict()
-        assert data['accepted'] is False
-        assert data['total_votes'] == 2
-        assert data['duration_ms'] == 250.5
-        assert len(data['votes']) == 2
+        assert data["accepted"] is False
+        assert data["total_votes"] == 2
+        assert data["duration_ms"] == 250.5
+        assert len(data["votes"]) == 2
 
 
 class TestConsensusMetrics:
@@ -169,7 +164,7 @@ class TestConsensusMetrics:
             yes_votes=3,
             no_votes=2,
             abstain_votes=0,
-            duration_ms=200.0
+            duration_ms=200.0,
         )
 
         metrics.update(result)
@@ -373,10 +368,7 @@ class TestTripleValidationCommittee:
 
         # Perform multiple validations
         for i in range(5):
-            await committee.validate(
-                ("Subject", "is_a", "Object"),
-                f"Context {i}"
-            )
+            await committee.validate(("Subject", "is_a", "Object"), f"Context {i}")
 
         metrics = committee.get_metrics()
         assert metrics.total_validations == 5
@@ -410,7 +402,7 @@ class TestConversationMemoryIntegration:
             agent_id="test-agent",
             storage_path=self.temp_dir,
             use_committee_validation=True,
-            committee_use_mock=True
+            committee_use_mock=True,
         )
 
         assert memory.use_committee_validation is True
@@ -422,16 +414,16 @@ class TestConversationMemoryIntegration:
             agent_id="test-agent",
             storage_path=self.temp_dir,
             use_committee_validation=True,
-            committee_use_mock=True
+            committee_use_mock=True,
         )
 
         # Set high acceptance rate for test
         memory.committee.validator_pool.backend.acceptance_rate = 0.9
 
         understanding = {
-            'content': "GPT-4 is a large language model",
-            'context': "Discussing AI models",
-            'coherence': 0.95
+            "content": "GPT-4 is a large language model",
+            "context": "Discussing AI models",
+            "coherence": 0.95,
         }
 
         ref = memory.transmit(understanding)
@@ -445,36 +437,36 @@ class TestConversationMemoryIntegration:
             agent_id="test-agent",
             storage_path=self.temp_dir,
             use_committee_validation=True,
-            committee_use_mock=True
+            committee_use_mock=True,
         )
 
         # Set low acceptance rate to force rejection
         memory.committee.validator_pool.backend.acceptance_rate = 0.0
 
         understanding = {
-            'content': "GPT-4 is a large language model",
-            'context': "Test context",
+            "content": "GPT-4 is a large language model",
+            "context": "Test context",
         }
 
         ref = memory.transmit(understanding)
 
         # Should be rejected by committee
         assert ref is None
-        assert memory.validation_stats['validation_failed'] > 0
+        assert memory.validation_stats["validation_failed"] > 0
 
     def test_memory_fallback_to_basic_validation(self):
         """Test fallback to basic validation when committee disabled."""
         memory = ConversationMemory(
             agent_id="test-agent",
             storage_path=self.temp_dir,
-            use_committee_validation=False
+            use_committee_validation=False,
         )
 
         assert memory.committee is None
 
         understanding = {
-            'content': "GPT-4 is a large language model",
-            'context': "Test",
+            "content": "GPT-4 is a large language model",
+            "context": "Test",
         }
 
         ref = memory.transmit(understanding)

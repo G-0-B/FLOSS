@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" data-darkreader-mode="static"><head><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta charset="UTF-8" /><meta name="generator" content="ReSpec 35.9.0" /><style>span.example-title{text-transform:none}
+:is(aside,div).example,div.illegal-example{padding:.5em;margin:1em 0;position:relative;clear:both}
+div.illegal-example{color:red}
+div.illegal-example p{color:#000}
+aside.example div.example{border-left-width:.1em;border-color:#999;background:#fff}</style><style>.issue-label{text-transform:initial}
+.warning&gt;p:first-child{margin-top:0}
+.warning{padding:.5em;border-left-width:.5em;border-left-style:solid}
+span.warning{padding:.1em .5em .15em}
+.issue.closed span.issue-number{text-decoration:line-through}
+.issue.closed span.issue-number::after{content:" (Closed)";font-size:smaller}
+.warning{border-color:#f11;border-color:var(--warning-border,#f11);border-width:.2em;border-style:solid;background:#fbe9e9;background:var(--warning-bg,#fbe9e9);color:#000;color:var(--text,#000)}
+.warning-title:before{content:"⚠";font-size:1.3em;float:left;padding-right:.3em;margin-top:-.3em}
+li.task-list-item{list-style:none}
+input.task-list-item-checkbox{margin:0 .35em .25em -1.6em;vertical-align:middle}
+.issue a.respec-gh-label{padding:5px;margin:0 2px 0 2px;font-size:10px;text-transform:none;text-decoration:none;font-weight:700;border-radius:4px;position:relative;bottom:2px;border:none;display:inline-block}</style><style>dfn{cursor:pointer}
+.dfn-panel{position:absolute;z-index:35;min-width:300px;max-width:500px;padding:.5em .75em;margin-top:.6em;font-family:"Helvetica Neue",sans-serif;font-size:small;background:#fff;background:var(--indextable-hover-bg,#fff);color:#000;color:var(--text,#000);box-shadow:0 1em 3em -.4em rgba(0,0,0,.3),0 0 1px 1px rgba(0,0,0,.05);box-shadow:0 1em 3em -.4em var(--tocsidebar-shadow,rgba(0,0,0,.3)),0 0 1px 1px var(--tocsidebar-shadow,rgba(0,0,0,.05));border-radius:2px}
+.dfn-panel:not(.docked)&gt;.caret{position:absolute;top:-9px}
+.dfn-panel:not(.docked)&gt;.caret::after,.dfn-panel:not(.docked)&gt;.caret::before{content:"";position:absolute;border:10px solid transparent;border-top:0;border-bottom:10px solid #fff;border-bottom-color:var(--indextable-hover-bg,#fff);top:0}
+.dfn-panel:not(.docked)&gt;.caret::before{border-bottom:9px solid #a2a9b1;border-bottom-color:var(--indextable-hover-bg,#a2a9b1)}
+.dfn-panel *{margin:0}
+.dfn-panel b{display:block;color:#000;color:var(--text,#000);margin-top:.25em}
+.dfn-panel ul a[href]{color:#333;color:var(--text,#333)}
+.dfn-panel&gt;div{display:flex}
+.dfn-panel a.self-link{font-weight:700;margin-right:auto}
+.dfn-panel .marker{padding:.1em;margin-left:.5em;border-radius:.2em;text-align:center;white-space:nowrap;font-size:90%;color:#040b1c}
+.dfn-panel .marker.dfn-exported{background:#d1edfd;box-shadow:0 0 0 .125em #1ca5f940}
+.dfn-panel .marker.idl-block{background:#8ccbf2;box-shadow:0 0 0 .125em #0670b161}
+.dfn-panel a:not(:hover){text-decoration:none!important;border-bottom:none!important}
+.dfn-panel a[href]:hover{border-bottom-width:1px}
+.dfn-panel ul{padding:0}
+.dfn-panel li{margin-left:1em}
+.dfn-panel.docked{position:fixed;left:.5em;top:unset;bottom:2em;margin:0 auto;max-width:calc(100vw - .75em * 2 - .5em - .2em * 2);max-height:30vh;overflow:auto}</style>
+    
+    
+    <title>Universal DID Native Addressing (UDNA) — Community Group Draft</title>
+    <meta name="description" content="UDNA provides a universal, decentralized addressing layer built on W3C DIDs, Verifiable Credentials, and DIDComm. Community Group Draft / Incubation specification." />
+
+    <style id="dark-reader-style" class="darkreader" type="text/css">/* Common theme */
+html,
+body,
+:not([style*="background-color:"]):not(iframe) {
+    background-color: rgb(16, 20, 23) !important;
+}
+html,
+body,
+:not([style*="color:"]),
+.sr-reader *:not([class*='sr-pivot']) {
+    color: rgb(167, 158, 139) !important;
+}
+h1:not([style*="color:"]),
+h2:not([style*="color:"]),
+h3:not([style*="color:"]),
+h4:not([style*="color:"]),
+h5:not([style*="color:"]),
+h6:not([style*="color:"]) {
+    color: rgb(247, 142, 102) !important;
+}
+cite:not([style*="color:"]) {
+    color: rgb(128, 204, 148) !important;
+}
+input:not([style*="background-color:"]),
+textarea:not([style*="background-color:"]),
+button:not([style*="background-color:"]),
+[role="button"] {
+    background-color: rgb(32, 48, 64) !important;
+}
+input:not([style*="background-color:"]):hover,
+textarea:not([style*="background-color:"]):hover,
+button:not([style*="background-color:"]):hover,
+[role="button"]:hover {
+    background-color: rgb(30, 54, 78) !important;
+}
+input:not([style*="background-color:"]):active, input:not([style*="background-color:"]):focus,
+textarea:not([style*="background-color:"]):active, textarea:not([style*="background-color:"]):focus,
+button:not([style*="background-color:"]):active, button:not([style*="background-color:"]):focus,
+[role="button"]:active, [role="button"]:focus {
+    background-color: rgb(29, 56, 83) !important;
+}
+a:not([style*="color:"]) {
+    color: rgb(128, 182, 204) !important;
+}
+a:not([style*="color:"]):hover {
+    color: rgb(142, 193, 217) !important;
+}
+a:not([style*="color:"]):active, a:not([style*="color:"]):focus {
+    color: rgb(155, 203, 230) !important;
+}
+:not([style*="border-color:"]),
+::before,
+::after {
+    border-color: rgb(80, 115, 134) !important;
+}
+div:empty,
+.sr-reader *,
+.sr-backdrop {
+    background-color: rgba(16, 20, 23, 0.5) !important;
+}
+input::placeholder,
+textarea::placeholder {
+    color: rgba(167, 158, 139, 0.5) !important;
+}
+input:not([style*="background-image:"]),
+textarea:not([style*="background-image:"]) {
+    background-image: none !important;
+}
+/* Font */
+*:not(pre, pre *, code, [aria-hidden="true"], [class*="fa-"], .fa, .fab, .fad, .fal, .far, .fas, .fass, .fasr, .fat, .icofont, [style*="font-"], [class*="icon"], [class*="Icon"], [class*="symbol"], [class*="Symbol"], .glyphicon, [class*="material-symbol"], [class*="material-icon"], mu, [class*="mu-"], .typcn, [class*="vjs-"]) {
+  font-family: system-ui !important;
+  -webkit-text-stroke: 0.5px !important;
+  text-stroke: 0.5px !important;
+}</style>
+
+    
+
+    <style>
+        /* Subtle enhancements on top of ReSpec default styles */
+        pre {
+            border-left: 4px solid #005a9c !important;
+        }
+        #comparison-table th {
+            background-color: #005a9c;
+            color: #fff;
+        }
+        .appendix &gt; h2 {
+            font-style: italic;
+        }
+        @media print {
+            .note, .issue { break-inside: avoid; }
+        }
+    </style>
+<style id="respec-mainstyle">@keyframes pop{
+0%{transform:scale(1,1)}
+25%{transform:scale(1.25,1.25);opacity:.75}
+100%{transform:scale(1,1)}
+}
+a.internalDFN{color:inherit;border-bottom:1px solid #99c;text-decoration:none}
+a.externalDFN{color:inherit;border-bottom:1px dotted #ccc;text-decoration:none}
+a.bibref{text-decoration:none}
+.respec-offending-element:target{animation:pop .25s ease-in-out 0s 1}
+.respec-offending-element,a[href].respec-offending-element{text-decoration:red wavy underline}
+@supports not (text-decoration:red wavy underline){
+.respec-offending-element:not(pre){display:inline-block}
+.respec-offending-element{background:url(data:image/gif;base64,R0lGODdhBAADAPEAANv///8AAP///wAAACwAAAAABAADAEACBZQjmIAFADs=) bottom repeat-x}
+}
+#references :target{background:#eaf3ff;animation:pop .4s ease-in-out 0s 1}
+cite .bibref{font-style:italic}
+a[href].orcid{padding-left:4px;padding-right:4px}
+a[href].orcid&gt;svg{margin-bottom:-2px}
+ol.tof,ul.tof{list-style:none outside none}
+.caption{margin-top:.5em;font-style:italic}
+#issue-summary&gt;ul{column-count:2}
+#issue-summary li{list-style:none;display:inline-block}
+details.respec-tests-details{margin-left:1em;display:inline-block;vertical-align:top}
+details.respec-tests-details&gt;*{padding-right:2em}
+details.respec-tests-details[open]{z-index:999999;position:absolute;border:thin solid #cad3e2;border-radius:.3em;background-color:#fff;padding-bottom:.5em}
+details.respec-tests-details[open]&gt;summary{border-bottom:thin solid #cad3e2;padding-left:1em;margin-bottom:1em;line-height:2em}
+details.respec-tests-details&gt;ul{width:100%;margin-top:-.3em}
+details.respec-tests-details&gt;li{padding-left:1em}
+.self-link:hover{opacity:1;text-decoration:none;background-color:transparent}
+aside.example .marker&gt;a.self-link{color:inherit}
+.header-wrapper{display:flex;align-items:baseline}
+:is(h2,h3,h4,h5,h6):not(#toc&gt;h2,#abstract&gt;h2,#sotd&gt;h2,.head&gt;h2){position:relative;left:-.5em}
+:is(h2,h3,h4,h5,h6):not(#toch2)+a.self-link{color:inherit;order:-1;position:relative;left:-1.1em;font-size:1rem;opacity:.5}
+:is(h2,h3,h4,h5,h6)+a.self-link::before{content:"§";text-decoration:none;color:var(--heading-text)}
+:is(h2,h3)+a.self-link{top:-.2em}
+:is(h4,h5,h6)+a.self-link::before{color:#000}
+@media (max-width:767px){
+dd{margin-left:0}
+}
+@media print{
+.removeOnSave{display:none}
+}</style><meta name="color-scheme" content="light" /><meta name="description" content="Universal DID Native Addressing (UDNA) defines a lightweight, extensible addressing&#xA;        scheme that makes Decentralized Identifiers (DIDs) native&#xA;        to resource location and service discovery on the Web. UDNA provides a uniform udna:// URI&#xA;        scheme that encodes a DID and a resource path, enabling secure, cryptographically verifiable interactions&#xA;        across decentralized systems. This specification builds on W3C Recommendations ([DID-CORE],&#xA;        [VC-DATA-MODEL]) and the DIDComm v2 messaging protocol ([DIDCOMM]). It is an incubation deliverable&#xA;        of the UDNA W3C Community Group and does not represent consensus of the broader&#xA;        W3C Membership." /><style>.hljs{--base:#fafafa;--mono-1:#383a42;--mono-2:#686b77;--mono-3:#717277;--hue-1:#0b76c5;--hue-2:#336ae3;--hue-3:#a626a4;--hue-4:#42803c;--hue-5:#ca4706;--hue-5-2:#c91243;--hue-6:#986801;--hue-6-2:#9a6a01}
+@media (prefers-color-scheme:dark){
+.hljs{--base:#282c34;--mono-1:#abb2bf;--mono-2:#818896;--mono-3:#5c6370;--hue-1:#56b6c2;--hue-2:#61aeee;--hue-3:#c678dd;--hue-4:#98c379;--hue-5:#e06c75;--hue-5-2:#be5046;--hue-6:#d19a66;--hue-6-2:#e6c07b}
+}
+.hljs{display:block;overflow-x:auto;padding:.5em;color:#383a42;color:var(--mono-1,#383a42);background:#fafafa;background:var(--base,#fafafa)}
+.hljs-comment,.hljs-quote{color:#717277;color:var(--mono-3,#717277);font-style:italic}
+.hljs-doctag,.hljs-formula,.hljs-keyword{color:#a626a4;color:var(--hue-3,#a626a4)}
+.hljs-deletion,.hljs-name,.hljs-section,.hljs-selector-tag,.hljs-subst{color:#ca4706;color:var(--hue-5,#ca4706);font-weight:700}
+.hljs-literal{color:#0b76c5;color:var(--hue-1,#0b76c5)}
+.hljs-addition,.hljs-attribute,.hljs-meta-string,.hljs-regexp,.hljs-string{color:#42803c;color:var(--hue-4,#42803c)}
+.hljs-built_in,.hljs-class .hljs-title{color:#9a6a01;color:var(--hue-6-2,#9a6a01)}
+.hljs-attr,.hljs-number,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-pseudo,.hljs-template-variable,.hljs-type,.hljs-variable{color:#986801;color:var(--hue-6,#986801)}
+.hljs-bullet,.hljs-link,.hljs-meta,.hljs-selector-id,.hljs-symbol,.hljs-title{color:#336ae3;color:var(--hue-2,#336ae3)}
+.hljs-emphasis{font-style:italic}
+.hljs-strong{font-weight:700}
+.hljs-link{text-decoration:underline}</style><style>var:hover{text-decoration:underline;cursor:pointer}
+var.respec-hl{color:var(--color,#000);background-color:var(--bg-color);box-shadow:0 0 0 2px var(--bg-color)}
+@media (prefers-color-scheme:dark){
+var.respec-hl{filter:saturate(.9) brightness(.9)}
+}
+var.respec-hl-c1{--bg-color:#f4d200}
+var.respec-hl-c2{--bg-color:#ff87a2}
+var.respec-hl-c3{--bg-color:#96e885}
+var.respec-hl-c4{--bg-color:#3eeed2}
+var.respec-hl-c5{--bg-color:#eacfb6}
+var.respec-hl-c6{--bg-color:#82ddff}
+var.respec-hl-c7{--bg-color:#ffbcf2}
+@media print{
+var.respec-hl{background:0 0;color:#000;box-shadow:unset}
+}</style><style>var{position:relative;cursor:pointer}
+var[data-type]::after,var[data-type]::before{position:absolute;left:50%;top:-6px;opacity:0;transition:opacity .4s;pointer-events:none}
+var[data-type]::before{content:"";transform:translateX(-50%);border-width:4px 6px 0 6px;border-style:solid;border-color:transparent;border-top-color:#222}
+var[data-type]::after{content:attr(data-type);transform:translateX(-50%) translateY(-100%);background:#222;text-align:center;font-family:"Dank Mono","Fira Code",monospace;font-style:normal;padding:6px;border-radius:3px;color:#daca88;text-indent:0;font-weight:400}
+var[data-type]:hover::after,var[data-type]:hover::before{opacity:1}</style><script id="initialUserConfig" type="application/json">{
+  "specStatus": "CG-DRAFT",
+  "group": "cg/did-native-addr",
+  "shortName": "udna-core",
+  "edDraftURI": "https://w3c-cg.github.io/udna/spec/",
+  "github": {
+    "repoURL": "https://github.com/w3c-cg/udna",
+    "branch": "main"
+  },
+  "editors": [
+    {
+      "name": "Amir Hameed Mir",
+      "url": "https://github.com/w3c-cg/udna",
+      "company": "UDNA W3C Community Group",
+      "companyURL": "https://www.w3.org/groups/cg/did-native-addr/"
+    }
+  ],
+  "authors": [
+    {
+      "name": "UDNA Community Group Participants",
+      "url": "https://www.w3.org/groups/cg/did-native-addr/participants"
+    }
+  ],
+  "license": "w3c-software-doc",
+  "copyrightStart": "2025",
+  "maxTocLevel": 3,
+  "noRecTrack": true,
+  "isPreview": false,
+  "latestVersion": "https://w3c-cg.github.io/udna/spec/",
+  "xref": [
+    "did-core",
+    "vc-data-model"
+  ],
+  "localBiblio": {
+    "DID-CORE": {
+      "title": "Decentralized Identifiers (DIDs) v1.0",
+      "href": "https://www.w3.org/TR/did-core/",
+      "status": "W3C Recommendation",
+      "publisher": "W3C",
+      "id": "did-core"
+    },
+    "VC-DATA-MODEL": {
+      "title": "Verifiable Credentials Data Model v2.0",
+      "href": "https://www.w3.org/TR/vc-data-model-2.0/",
+      "status": "W3C Recommendation",
+      "publisher": "W3C",
+      "id": "vc-data-model"
+    },
+    "DIDCOMM": {
+      "title": "DIDComm Messaging v2.0",
+      "href": "https://identity.foundation/didcomm-messaging/spec/",
+      "publisher": "Decentralized Identity Foundation",
+      "id": "didcomm"
+    },
+    "URL": {
+      "title": "URL Standard",
+      "href": "https://url.spec.whatwg.org/",
+      "publisher": "WHATWG",
+      "id": "url"
+    },
+    "RFC6570": {
+      "title": "URI Template",
+      "href": "https://www.rfc-editor.org/rfc/rfc6570",
+      "publisher": "IETF",
+      "status": "Proposed Standard",
+      "id": "rfc6570"
+    },
+    "SOLID": {
+      "title": "Solid Protocol",
+      "href": "https://solidproject.org/TR/protocol",
+      "publisher": "Solid Community Group",
+      "id": "solid"
+    }
+  },
+  "lint": {
+    "no-unused-dfns": false,
+    "check-punctuation": true
+  },
+  "otherLinks": [
+    {
+      "key": "Participate",
+      "data": [
+        {
+          "value": "GitHub w3c-cg/udna",
+          "href": "https://github.com/w3c-cg/udna"
+        },
+        {
+          "value": "File an issue",
+          "href": "https://github.com/w3c-cg/udna/issues"
+        },
+        {
+          "value": "Mailing list",
+          "href": "mailto:public-did-native-addr@w3.org"
+        },
+        {
+          "value": "Join the CG",
+          "href": "https://www.w3.org/groups/cg/did-native-addr/"
+        }
+      ]
+    },
+    {
+      "key": "Incubation stage",
+      "data": [
+        {
+          "value": "Community Group Draft — not a W3C Standard",
+          "href": "https://www.w3.org/community/about/agreements/"
+        }
+      ]
+    }
+  ],
+  "publishISODate": "2026-04-02T00:00:00.000Z",
+  "generatedSubtitle": "Draft Community Group Report 02 April 2026"
+}</script><link rel="stylesheet" href="https://www.w3.org/StyleSheets/TR/2021/cg-draft" /></head>
+
+<body class="h-entry" data-cite="did-core vc-data-model"><div class="head">
+    
+    <h1 id="title" class="title">Universal DID Native Addressing (UDNA) — Community Group Draft</h1> 
+    <p id="w3c-state">
+      <a href="https://www.w3.org/standards/types#reports">Draft Community Group Report</a>
+      <time class="dt-published" datetime="2026-04-02">02 April 2026</time>
+    </p>
+    <dl>
+      
+      <dt>Latest published version:</dt><dd>
+              <a href="https://w3c-cg.github.io/udna/spec/">https://w3c-cg.github.io/udna/spec/</a>
+            </dd>
+      <dt>Latest editor's draft:</dt><dd><a href="https://w3c-cg.github.io/udna/spec/">https://w3c-cg.github.io/udna/spec/</a></dd>
+      
+      
+      
+      
+      <dt>Editor:</dt><dd class="editor p-author h-card vcard">
+    <a class="u-url url p-name fn" href="https://github.com/w3c-cg/udna">Amir Hameed Mir</a> (<a class="p-org org h-org" href="https://www.w3.org/groups/cg/did-native-addr/">UDNA W3C Community Group</a>)
+  </dd>
+      
+      <dt>Author:</dt><dd class="editor p-author h-card vcard">
+    <a class="u-url url p-name fn" href="https://www.w3.org/groups/cg/did-native-addr/participants">UDNA Community Group Participants</a>
+  </dd>
+      <dt>Feedback:</dt><dd>
+        <a href="https://github.com/w3c-cg/udna/">GitHub w3c-cg/udna</a>
+        (<a href="https://github.com/w3c-cg/udna/pulls/">pull requests</a>,
+        <a href="https://github.com/w3c-cg/udna/issues/new/choose">new issue</a>,
+        <a href="https://github.com/w3c-cg/udna/issues/">open issues</a>)
+      </dd>
+      <dt>Participate</dt><dd>
+    <a href="https://github.com/w3c-cg/udna">GitHub w3c-cg/udna</a>
+  </dd><dd>
+    <a href="https://github.com/w3c-cg/udna/issues">File an issue</a>
+  </dd><dd>
+    <a href="mailto:public-did-native-addr@w3.org">Mailing list</a>
+  </dd><dd>
+    <a href="https://www.w3.org/groups/cg/did-native-addr/">Join the CG</a>
+  </dd><dt>Incubation stage</dt><dd>
+    <a href="https://www.w3.org/community/about/agreements/">Community Group Draft — not a W3C Standard</a>
+  </dd>
+    </dl>
+    
+    <p class="copyright">
+          <a href="https://www.w3.org/policies/#copyright">Copyright</a>
+          ©
+          2025-2026
+          
+          the Contributors to the Universal DID Native Addressing (UDNA) — Community Group Draft
+          Specification, published by the
+          <a href="https://www.w3.org/groups/cg/did-native-addr">Universal DID-Native Addressing (UDNA) Community Group</a> under the
+          <a href="https://www.w3.org/community/about/agreements/cla/">W3C Community Contributor License Agreement (CLA)</a>. A human-readable
+                <a href="https://www.w3.org/community/about/agreements/cla-deed/">summary</a>
+                is available.
+              
+        </p>
+    <hr title="Separator for header" />
+  </div>
+
+
+<section id="abstract" class="introductory"><h2>Abstract</h2>
+    <p>
+        <strong>Universal DID Native Addressing (UDNA)</strong> defines a lightweight, extensible addressing
+        scheme that makes <a href="https://www.w3.org/TR/did-core/">Decentralized Identifiers (DIDs)</a> native
+        to resource location and service discovery on the Web. UDNA provides a uniform <code>udna://</code> URI
+        scheme that encodes a DID and a resource path, enabling secure, cryptographically verifiable interactions
+        across decentralized systems. This specification builds on W3C Recommendations ([<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>],
+        [<cite><a class="bibref" data-link-type="biblio" href="#bib-vc-data-model" title="Verifiable Credentials Data Model v2.0">VC-DATA-MODEL</a></cite>]) and the DIDComm v2 messaging protocol ([<cite><a class="bibref" data-link-type="biblio" href="#bib-didcomm" title="DIDComm Messaging v2.0">DIDCOMM</a></cite>]). It is an incubation deliverable
+        of the <strong>UDNA W3C Community Group</strong> and does not represent consensus of the broader
+        W3C Membership.
+    </p>
+</section>
+
+
+<section id="sotd" class="introductory"><h2>Status of This Document</h2><p>
+      This specification was published by the
+      <a href="https://www.w3.org/groups/cg/did-native-addr">Universal DID-Native Addressing (UDNA) Community Group</a>. It is not a W3C Standard nor is it
+      on the W3C Standards Track.
+      
+            Please note that under the
+            <a href="https://www.w3.org/community/about/agreements/cla/">W3C Community Contributor License Agreement (CLA)</a>
+            there is a limited opt-out and other conditions apply.
+          
+      Learn more about
+      <a href="https://www.w3.org/community/">W3C Community and Business Groups</a>.
+    </p>
+    <p>
+        This document is a <strong>Community Group Draft</strong> produced by the
+        <a href="https://www.w3.org/groups/cg/did-native-addr/">W3C Community Group for DID Native Addressing</a>.
+        It is not a W3C Standard nor on the W3C Standards Track. Publication by the W3C does not imply
+        endorsement by the W3C Membership. This is a draft document and may be updated, replaced, or
+        obsoleted by other documents at any time. It is inappropriate to cite this document as other than
+        work in progress.
+    </p>
+    <p>
+        This specification is being developed to explore the intersection of decentralized identifiers,
+        native addressing, and universal service discovery. The goal is to mature the proposal toward a
+        future W3C Working Group deliverable. The CG welcomes
+        <a href="https://github.com/w3c-cg/udna/issues">issues and pull requests</a> on GitHub. Before
+        contributing, please review the
+        <a href="https://www.w3.org/community/about/agreements/cla/">W3C Community Contributor License Agreement</a>.
+    </p>
+    <p>
+        The CG has received early reviews from implementers of Solid, DIDComm, and Hyperledger Aries, and
+        expects to conduct multiple interoperability events during 2026.
+    </p>
+<p>
+    <a href="https://github.com/w3c-cg/udna/issues/">GitHub Issues</a> are preferred for
+          discussion of this specification.
+        
+    
+  </p></section><nav id="toc"><h2 class="introductory" id="table-of-contents">Table of Contents</h2><ol class="toc"><li class="tocline"><a class="tocxref" href="#abstract">Abstract</a></li><li class="tocline"><a class="tocxref" href="#sotd">Status of This Document</a></li><li class="tocline"><a class="tocxref" href="#introduction"><bdi class="secno">1. </bdi>Introduction</a></li><li class="tocline"><a class="tocxref" href="#conformance"><bdi class="secno">2. </bdi>Conformance</a></li><li class="tocline"><a class="tocxref" href="#terminology"><bdi class="secno">3. </bdi>Terminology</a></li><li class="tocline"><a class="tocxref" href="#udna-scheme"><bdi class="secno">4. </bdi>UDNA URI Scheme</a><ol class="toc"><li class="tocline"><a class="tocxref" href="#scheme-syntax"><bdi class="secno">4.1 </bdi>Scheme Syntax</a></li><li class="tocline"><a class="tocxref" href="#scheme-components"><bdi class="secno">4.2 </bdi>Components</a></li></ol></li><li class="tocline"><a class="tocxref" href="#resolution-model"><bdi class="secno">5. </bdi>Resolution Model</a><ol class="toc"><li class="tocline"><a class="tocxref" href="#resolution-algorithm"><bdi class="secno">5.1 </bdi>Resolution Algorithm</a></li><li class="tocline"><a class="tocxref" href="#resolution-example"><bdi class="secno">5.2 </bdi>Example Resolution</a></li></ol></li><li class="tocline"><a class="tocxref" href="#security-privacy"><bdi class="secno">6. </bdi>Security and Privacy Considerations</a><ol class="toc"><li class="tocline"><a class="tocxref" href="#endpoint-confidentiality"><bdi class="secno">6.1 </bdi>Endpoint Confidentiality</a></li><li class="tocline"><a class="tocxref" href="#authentication"><bdi class="secno">6.2 </bdi>Authentication</a></li><li class="tocline"><a class="tocxref" href="#correlation-privacy"><bdi class="secno">6.3 </bdi>Correlation and Privacy</a></li><li class="tocline"><a class="tocxref" href="#denial-of-service"><bdi class="secno">6.4 </bdi>Denial of Service</a></li></ol></li><li class="tocline"><a class="tocxref" href="#extensibility"><bdi class="secno">7. </bdi>Extensibility and Versioning</a></li><li class="tocline"><a class="tocxref" href="#comparison-integration"><bdi class="secno">8. </bdi>Relationship with Other Web Standards</a></li><li class="tocline"><a class="tocxref" href="#incubation-roadmap"><bdi class="secno">9. </bdi>Incubation Roadmap and Next Steps</a></li><li class="tocline"><a class="tocxref" href="#example-implementations"><bdi class="secno">A. </bdi>Example Implementations</a><ol class="toc"><li class="tocline"><a class="tocxref" href="#js-example"><bdi class="secno">A.1 </bdi>Resolving a UDNA Address in JavaScript</a></li><li class="tocline"><a class="tocxref" href="#did-doc-example"><bdi class="secno">A.2 </bdi>DID Document with UDNA Service Endpoints</a></li></ol></li><li class="tocline"><a class="tocxref" href="#IANA"><bdi class="secno">B. </bdi>IANA Considerations</a></li><li class="tocline"><a class="tocxref" href="#acknowledgments"><bdi class="secno">C. </bdi>Acknowledgments</a></li><li class="tocline"><a class="tocxref" href="#references"><bdi class="secno">D. </bdi>References</a><ol class="toc"><li class="tocline"><a class="tocxref" href="#normative-references"><bdi class="secno">D.1 </bdi>Normative references</a></li></ol></li></ol></nav>
+
+
+<section id="introduction"><div class="header-wrapper"><h2 id="x1-introduction"><bdi class="secno">1. </bdi>Introduction</h2><a class="self-link" href="#introduction" aria-label="Permalink for Section 1."></a></div>
+    
+
+    <p>
+        The Web's addressing model is built on URLs that bind authority to domain names, which in turn rely
+        on centralized DNS and certificate authorities. While this has enabled massive growth, it introduces
+        identity silos, privacy leaks, and intermediary dependency. Decentralized Identifiers (DIDs) offer
+        self-sovereign, cryptographically verifiable identities, but they lack a native addressing scheme
+        to directly locate resources, APIs, or services tied to a DID.
+    </p>
+    <p>
+        <strong>UDNA fills this gap.</strong> By introducing the <code>udna://</code> URI scheme and a
+        deterministic resolution mechanism, UDNA allows any entity with a DID to publish service endpoints,
+        resources, and sub-paths that can be resolved in a secure, privacy-preserving way. UDNA leverages
+        [<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>] for identity, [<cite><a class="bibref" data-link-type="biblio" href="#bib-didcomm" title="DIDComm Messaging v2.0">DIDCOMM</a></cite>] for secure messaging, and [<cite><a class="bibref" data-link-type="biblio" href="#bib-vc-data-model" title="Verifiable Credentials Data Model v2.0">VC-DATA-MODEL</a></cite>] for
+        authorization policies.
+    </p>
+
+    <div class="note" role="note" id="issue-container-generatedID"><div role="heading" class="note-title marker" id="h-note" aria-level="3"><span>Note</span><span class="issue-label">: Incubation status</span></div><aside class="">
+        <p>
+            This draft is a proposal incubated by the UDNA Community Group. It has received early reviews
+            from implementers of Solid, DIDComm, and Hyperledger Aries. The CG expects to conduct multiple
+            interoperability events during 2026.
+        </p>
+    </aside></div>
+</section>
+
+
+<section id="conformance"><div class="header-wrapper"><h2 id="x2-conformance"><bdi class="secno">2. </bdi>Conformance</h2><a class="self-link" href="#conformance" aria-label="Permalink for Section 2."></a></div><p>As well as sections marked as non-normative, all authoring guidelines, diagrams, examples, and notes in this specification are non-normative. Everything else in this specification is normative.</p><p>
+        The key words <em class="rfc2119">MAY</em>, <em class="rfc2119">MUST</em>, <em class="rfc2119">MUST NOT</em>, <em class="rfc2119">OPTIONAL</em>, <em class="rfc2119">RECOMMENDED</em>, <em class="rfc2119">REQUIRED</em>, <em class="rfc2119">SHALL</em>, <em class="rfc2119">SHALL NOT</em>, <em class="rfc2119">SHOULD</em>, and <em class="rfc2119">SHOULD NOT</em> in this document
+        are to be interpreted as described in
+        <a href="https://www.rfc-editor.org/info/bcp14">BCP 14</a>
+        [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc2119" title="Key words for use in RFCs to Indicate Requirement Levels">RFC2119</a></cite>] [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc8174" title="Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words">RFC8174</a></cite>]
+        when, and only when, they appear in all
+        capitals, as shown here.
+      </p>
+    <p>
+        As well as sections marked as non-normative, all authoring guidelines, diagrams, examples, and
+        notes in this specification are non-normative. Everything else in this specification is normative.
+    </p>
+    <p>
+        The key words <em class="rfc2119"><em class="rfc2119">MAY</em></em>, <em class="rfc2119"><em class="rfc2119">MUST</em></em>,
+        <em class="rfc2119"><em class="rfc2119">MUST NOT</em></em>, <em class="rfc2119"><em class="rfc2119">OPTIONAL</em></em>,
+        <em class="rfc2119"><em class="rfc2119">RECOMMENDED</em></em>, <em class="rfc2119"><em class="rfc2119">REQUIRED</em></em>,
+        <em class="rfc2119"><em class="rfc2119">SHALL</em></em>, <em class="rfc2119"><em class="rfc2119">SHALL NOT</em></em>,
+        <em class="rfc2119"><em class="rfc2119">SHOULD</em></em>, and <em class="rfc2119"><em class="rfc2119">SHOULD NOT</em></em>
+        in this document are to be interpreted as described in
+        <a href="https://www.rfc-editor.org/rfc/rfc2119">BCP 14</a> [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc2119" title="Key words for use in RFCs to Indicate Requirement Levels">RFC2119</a></cite>] [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc8174" title="Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words">RFC8174</a></cite>]
+        when, and only when, they appear in all capitals, as shown here.
+    </p>
+</section>
+
+
+<section id="terminology"><div class="header-wrapper"><h2 id="x3-terminology"><bdi class="secno">3. </bdi>Terminology</h2><a class="self-link" href="#terminology" aria-label="Permalink for Section 3."></a></div>
+    
+
+    <p>
+        This section defines the terms used throughout this specification.
+    </p>
+
+    <dl>
+        <dt><dfn id="dfn-udna-address" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">UDNA Address</dfn></dt>
+        <dd>
+            A URI conforming to the <code>udna</code> scheme, composed of a DID component, an optional
+            service segment, and a resource path. Formally specified in <a href="#udna-scheme" class="sec-ref"><bdi class="secno">4. </bdi>UDNA URI Scheme</a>.
+        </dd>
+
+        <dt><dfn id="dfn-did-resolution" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">DID Resolution</dfn></dt>
+        <dd>
+            The process defined in [<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>] by which a DID string is dereferenced to obtain a
+            DID Document containing public keys and service endpoints.
+        </dd>
+
+        <dt><dfn id="dfn-udna-resolver" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">UDNA Resolver</dfn></dt>
+        <dd>
+            An implementation that accepts a <a data-link-type="dfn|abstract-op" href="#dfn-udna-address" class="internalDFN" id="ref-for-dfn-udna-address-1">UDNA Address</a>, extracts the embedded DID, performs
+            <a data-link-type="dfn|abstract-op" href="#dfn-did-resolution" class="internalDFN" id="ref-for-dfn-did-resolution-1">DID Resolution</a>, and executes endpoint selection according to the algorithm in
+            <a href="#resolution-algorithm" class="sec-ref"><bdi class="secno">5.1 </bdi>Resolution Algorithm</a>.
+        </dd>
+
+        <dt><dfn id="dfn-native-addressing" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">Native Addressing</dfn></dt>
+        <dd>
+            An addressing model where the identifier of an entity (a DID) is an integral part of the
+            resource locator, enabling direct, verifiable interactions without external naming authorities.
+        </dd>
+
+        <dt><dfn id="dfn-service-endpoint" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">Service Endpoint</dfn></dt>
+        <dd>
+            A network address defined within a DID Document under the <code>service</code> array property,
+            expressed as a URI string, a set of URI strings, or a DIDComm endpoint object.
+        </dd>
+
+        <dt><dfn id="dfn-udnaroot-service" tabindex="0" aria-haspopup="dialog" data-dfn-type="dfn">UDNARoot Service</dfn></dt>
+        <dd>
+            The default service entry used by UDNA resolution when no explicit service segment is present.
+            Identified by <code>type: "UDNARoot"</code> or the fragment identifier <code>#udna-root</code>
+            in the DID Document.
+        </dd>
+    </dl>
+</section>
+
+
+<section id="udna-scheme"><div class="header-wrapper"><h2 id="x4-udna-uri-scheme"><bdi class="secno">4. </bdi>UDNA URI Scheme</h2><a class="self-link" href="#udna-scheme" aria-label="Permalink for Section 4."></a></div>
+    
+
+    <section id="scheme-syntax"><div class="header-wrapper"><h3 id="x4-1-scheme-syntax"><bdi class="secno">4.1 </bdi>Scheme Syntax</h3><a class="self-link" href="#scheme-syntax" aria-label="Permalink for Section 4.1"></a></div>
+        
+
+        <p>The <code>udna</code> URI scheme follows the ABNF syntax below (extending [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc3986" title="Uniform Resource Identifier (URI): Generic Syntax">RFC3986</a></cite>]):</p>
+
+        <pre class="nohighlight">udna-URI   = "udna://" did-string [ "/" service-id ] path [ "?" query ] [ "#" fragment ]
+did-string = scheme ":" method-specific-id
+             ; a valid DID per [[DID-CORE]]
+service-id = *( unreserved / pct-encoded )
+path       = *( "/" segment )
+query      = *( pchar / "/" / "?" )
+fragment   = *( pchar / "/" / "?" )</pre>
+
+        <p>A complete example illustrating all components:</p>
+
+        <pre class="nohighlight">udna://did:example:123456/service/api/resource?version=1#section</pre>
+    </section>
+
+    <section id="scheme-components"><div class="header-wrapper"><h3 id="x4-2-components"><bdi class="secno">4.2 </bdi>Components</h3><a class="self-link" href="#scheme-components" aria-label="Permalink for Section 4.2"></a></div>
+        
+
+        <dl>
+            <dt>DID (<em>mandatory</em>)</dt>
+            <dd>
+                A valid DID string per [<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>], e.g., <code>did:key:z6Mkp…</code> or
+                <code>did:web:example.com</code>. The DID forms the authority component of the
+                <a data-link-type="dfn|abstract-op" href="#dfn-udna-address" class="internalDFN" id="ref-for-dfn-udna-address-2">UDNA Address</a>.
+            </dd>
+            <dt>Service segment (<em>optional</em>)</dt>
+            <dd>
+                Identifies a specific service endpoint by matching the <code>id</code> fragment of
+                a service entry in the resolved DID Document. If omitted, the resolver selects the
+                <a data-link-type="dfn|abstract-op" href="#dfn-udnaroot-service" class="internalDFN" id="ref-for-dfn-udnaroot-service-1">UDNARoot Service</a>.
+            </dd>
+            <dt>Path</dt>
+            <dd>
+                A hierarchical path that is opaque to the UDNA resolution layer but meaningful to
+                the target service after resolution.
+            </dd>
+            <dt>Query and Fragment</dt>
+            <dd>
+                Standard URI semantics per [<cite><a class="bibref" data-link-type="biblio" href="#bib-url" title="URL Standard">URL</a></cite>], interpreted by the target service after resolution
+                is complete.
+            </dd>
+        </dl>
+
+        <div class="note" role="note" id="issue-container-generatedID-0"><div role="heading" class="note-title marker" id="h-note-0" aria-level="4"><span>Note</span><span class="issue-label">: DID method agnosticism</span></div><aside class="">
+            <p>
+                UDNA does not introduce new DID methods. Any DID method is compatible provided its
+                DID Document conforms to [<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>] and expresses valid service endpoints.
+            </p>
+        </aside></div>
+    </section>
+</section>
+
+
+<section id="resolution-model"><div class="header-wrapper"><h2 id="x5-resolution-model"><bdi class="secno">5. </bdi>Resolution Model</h2><a class="self-link" href="#resolution-model" aria-label="Permalink for Section 5."></a></div>
+    
+
+    <section id="resolution-algorithm"><div class="header-wrapper"><h3 id="x5-1-resolution-algorithm"><bdi class="secno">5.1 </bdi>Resolution Algorithm</h3><a class="self-link" href="#resolution-algorithm" aria-label="Permalink for Section 5.1"></a></div>
+        
+
+        <p>
+            To resolve a <a data-link-type="dfn|abstract-op" href="#dfn-udna-address" class="internalDFN" id="ref-for-dfn-udna-address-3">UDNA Address</a>, a conformant <a data-link-type="dfn|abstract-op" href="#dfn-udna-resolver" class="internalDFN" id="ref-for-dfn-udna-resolver-1">UDNA Resolver</a> <em class="rfc2119">MUST</em> perform the
+            following steps in order:
+        </p>
+
+        <ol>
+            <li>
+                Parse the UDNA address to extract the DID string, service segment (if present),
+                path, query, and fragment components per the syntax in
+                <a href="#scheme-syntax" class="sec-ref"><bdi class="secno">4.1 </bdi>Scheme Syntax</a>.
+            </li>
+            <li>
+                Resolve the DID to a DID Document using the appropriate DID method resolver, as
+                specified in [<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>]. If resolution fails, return a resolution error of type
+                <code>notFound</code>.
+            </li>
+            <li>
+                Perform service selection:
+                <ul>
+                    <li>
+                        If a service segment is present, locate the entry in the DID Document's
+                        <code>service</code> array whose <code>id</code> fragment matches the given
+                        segment. If no match is found, return error <code>serviceNotFound</code>.
+                    </li>
+                    <li>
+                        If no service segment is provided, select the entry whose <code>type</code>
+                        contains <code>"UDNARoot"</code> or whose <code>id</code> fragment equals
+                        <code>udna-root</code>. If neither is found, return error
+                        <code>defaultServiceNotFound</code>.
+                    </li>
+                </ul>
+            </li>
+            <li>
+                Obtain the <code>serviceEndpoint</code> value from the selected service entry.
+                This value <em class="rfc2119">MAY</em> be a URI string, a set of URI strings, or a DIDComm endpoint object.
+            </li>
+            <li>
+                Construct the final target URL by appending the path, query, and fragment to the
+                resolved endpoint base URI. If the endpoint is a URI template ([<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc6570" title="URI Template">RFC6570</a></cite>]),
+                template expansion <em class="rfc2119">MUST</em> be applied using available context variables.
+            </li>
+            <li>
+                Return a resolution result containing: <code>targetUrl</code>,
+                <code>didDocument</code>, <code>didDocumentMetadata</code>, and
+                <code>verificationMethods</code> associated with the selected service.
+            </li>
+        </ol>
+
+        <p>
+            Resolvers <em class="rfc2119">SHOULD</em> implement caching with appropriate TTL derived from DID Document
+            metadata (<code>created</code>, <code>updated</code>). Resolvers <em class="rfc2119">MUST</em> respect HTTP
+            cache headers when resolving <code>did:web</code> identifiers.
+        </p>
+    </section>
+
+    <section id="resolution-example"><div class="header-wrapper"><h3 id="x5-2-example-resolution"><bdi class="secno">5.2 </bdi>Example Resolution</h3><a class="self-link" href="#resolution-example" aria-label="Permalink for Section 5.2"></a></div>
+        
+
+        <aside class="example" id="example-resolving-a-did-web-udna-address"><div class="marker">
+    <a class="self-link" href="#example-resolving-a-did-web-udna-address">Example<bdi> 1</bdi></a><span class="example-title">: Resolving a did:web UDNA Address</span>
+  </div>
+            <pre aria-busy="false"><code class="hljs javascript"><span class="hljs-title class_">Input</span>:  <span class="hljs-attr">udna</span>:<span class="hljs-comment">//did:web:example.com/app/profile#me</span>
+
+<span class="hljs-title class_">Step</span> <span class="hljs-number">1</span> — <span class="hljs-title class_">Parse</span>:
+  <span class="hljs-variable constant_">DID</span>      = <span class="hljs-attr">did</span>:<span class="hljs-attr">web</span>:example.<span class="hljs-property">com</span>
+  path     = <span class="hljs-regexp">/app/</span>profile
+  fragment = me
+
+<span class="hljs-title class_">Step</span> <span class="hljs-number">2</span> — <span class="hljs-title class_">Resolve</span> <span class="hljs-variable constant_">DID</span> → <span class="hljs-variable constant_">DID</span> <span class="hljs-title class_">Document</span> (simplified):
+{
+  <span class="hljs-string">"@context"</span>: <span class="hljs-string">"https://www.w3.org/ns/did/v1"</span>,
+  <span class="hljs-string">"id"</span>: <span class="hljs-string">"did:web:example.com"</span>,
+  <span class="hljs-string">"service"</span>: [{
+    <span class="hljs-string">"id"</span>: <span class="hljs-string">"#udna-root"</span>,
+    <span class="hljs-string">"type"</span>: <span class="hljs-string">"UDNARoot"</span>,
+    <span class="hljs-string">"serviceEndpoint"</span>: <span class="hljs-string">"https://api.example.com/udna"</span>
+  }]
+}
+
+<span class="hljs-title class_">Step</span> <span class="hljs-number">3</span> — <span class="hljs-title class_">No</span> service segment → select <span class="hljs-title class_">UDNARoot</span>:
+  serviceEndpoint = <span class="hljs-string">"https://api.example.com/udna"</span>
+
+<span class="hljs-title class_">Step</span> <span class="hljs-number">4</span> — <span class="hljs-title class_">Construct</span> target <span class="hljs-attr">URL</span>:
+  <span class="hljs-attr">https</span>:<span class="hljs-comment">//api.example.com/udna/app/profile#me</span>
+
+<span class="hljs-title class_">Step</span> <span class="hljs-number">5</span> — <span class="hljs-title class_">Return</span> resolution <span class="hljs-attr">result</span>:
+  { <span class="hljs-attr">targetUrl</span>: <span class="hljs-string">"https://api.example.com/udna/app/profile#me"</span>, ... }</code></pre>
+        </aside>
+    </section>
+</section>
+
+
+<section id="security-privacy"><div class="header-wrapper"><h2 id="x6-security-and-privacy-considerations"><bdi class="secno">6. </bdi>Security and Privacy Considerations</h2><a class="self-link" href="#security-privacy" aria-label="Permalink for Section 6."></a></div>
+    
+
+    <p>
+        UDNA inherits the security properties of the underlying DID methods and DIDComm. The
+        following considerations apply specifically to the UDNA addressing layer.
+    </p>
+
+    <section id="endpoint-confidentiality"><div class="header-wrapper"><h3 id="x6-1-endpoint-confidentiality"><bdi class="secno">6.1 </bdi>Endpoint Confidentiality</h3><a class="self-link" href="#endpoint-confidentiality" aria-label="Permalink for Section 6.1"></a></div>
+        
+        <p>
+            UDNA addresses may expose service endpoints in plaintext within the resolved DID Document.
+            For private services, implementers <em class="rfc2119">SHOULD</em> use DIDComm-based routing or encrypted
+            <code>serviceEndpoint</code> values.
+        </p>
+    </section>
+
+    <section id="authentication"><div class="header-wrapper"><h3 id="x6-2-authentication"><bdi class="secno">6.2 </bdi>Authentication</h3><a class="self-link" href="#authentication" aria-label="Permalink for Section 6.2"></a></div>
+        
+        <p>
+            When accessing resolved endpoints, clients <em class="rfc2119">SHOULD</em> demonstrate proof-of-possession of a
+            private key associated with the resolving DID, or delegate access via a Verifiable
+            Credential issued under [<cite><a class="bibref" data-link-type="biblio" href="#bib-vc-data-model" title="Verifiable Credentials Data Model v2.0">VC-DATA-MODEL</a></cite>].
+        </p>
+    </section>
+
+    <section id="correlation-privacy"><div class="header-wrapper"><h3 id="x6-3-correlation-and-privacy"><bdi class="secno">6.3 </bdi>Correlation and Privacy</h3><a class="self-link" href="#correlation-privacy" aria-label="Permalink for Section 6.3"></a></div>
+        
+        <p>
+            UDNA addresses do not inherently create persistent trackable identifiers because DIDs
+            can be rotated. However, repeated resolution of the same DID across different network
+            contexts could enable correlation. To mitigate this, implementers <em class="rfc2119">SHOULD</em> use pairwise
+            DIDs per relationship where strong privacy is required.
+        </p>
+    </section>
+
+    <section id="denial-of-service"><div class="header-wrapper"><h3 id="x6-4-denial-of-service"><bdi class="secno">6.4 </bdi>Denial of Service</h3><a class="self-link" href="#denial-of-service" aria-label="Permalink for Section 6.4"></a></div>
+        
+        <p>
+            Resolvers <em class="rfc2119">SHOULD</em> enforce rate limiting on DID resolution requests and employ aggressive
+            caching policies to mitigate amplification attacks against DID method infrastructure.
+        </p>
+    </section>
+
+    <div class="issue" id="issue-container-number-1"><div role="heading" class="issue-title marker" id="h-issue" aria-level="3"><a href="https://github.com/w3c-cg/udna/issues/1"><span class="issue-number">Issue 1</span></a><span class="issue-label">: DID method resolution latency <a class="respec-gh-label" style="background-color: rgb(170, 170, 170); color: rgb(0, 0, 0);" href="https://github.com/w3c-cg/udna/issues/?q=is%3Aissue+is%3Aopen+label%3A%22DID_WG_Discussion%22" aria-label="GitHub label: DID_WG_Discussion">DID_WG_Discussion</a></span></div><aside class="">
+        <p>
+            Some DID methods (e.g., <code>did:indy</code>, <code>did:btcr</code>) introduce
+            significant resolution latency. The CG is exploring a lightweight "resolution hints"
+            mechanism embedded in the UDNA URI to accelerate resolution without compromising
+            decentralization properties.
+        </p>
+    </aside></div>
+</section>
+
+
+<section id="extensibility"><div class="header-wrapper"><h2 id="x7-extensibility-and-versioning"><bdi class="secno">7. </bdi>Extensibility and Versioning</h2><a class="self-link" href="#extensibility" aria-label="Permalink for Section 7."></a></div>
+    
+
+    <p>
+        UDNA follows a <strong>minimal core + extension</strong> model. Core behavior is defined
+        by this specification; optional capabilities are registered via the <code>udna-ext</code>
+        query parameter (<code>?udna-ext=https://…</code>). The following extensions are known
+        at the time of publication:
+    </p>
+
+    <dl>
+        <dt>Batch Operations</dt>
+        <dd>
+            Enables resolving multiple <a data-link-type="dfn|abstract-op" href="#dfn-udna-address" class="internalDFN" id="ref-for-dfn-udna-address-4">UDNA Address</a>es in a single roundtrip, reducing
+            resolution overhead in high-frequency use cases.
+        </dd>
+        <dt>Gateway Forwarding</dt>
+        <dd>
+            Defines behavior for relays and gateways that bridge UDNA resolution to legacy HTTP
+            URLs, enabling progressive adoption in existing infrastructure.
+        </dd>
+        <dt>Resource Integrity</dt>
+        <dd>
+            Allows embedding cryptographic integrity hashes (e.g., SHA-256) for content-addressed
+            resources referenced via a <a data-link-type="dfn|abstract-op" href="#dfn-udna-address" class="internalDFN" id="ref-for-dfn-udna-address-5">UDNA Address</a>.
+        </dd>
+    </dl>
+
+    <p>
+        Versioning of the core scheme is indicated via the <code>udna-version</code> query
+        parameter. The default value for this specification is <code>1.0</code>. Future versions
+        <em class="rfc2119">MUST</em> be backward-compatible at the resolution layer unless a breaking version increment
+        is declared.
+    </p>
+</section>
+
+
+<section id="comparison-integration"><div class="header-wrapper"><h2 id="x8-relationship-with-other-web-standards"><bdi class="secno">8. </bdi>Relationship with Other Web Standards</h2><a class="self-link" href="#comparison-integration" aria-label="Permalink for Section 8."></a></div>
+    
+
+    <p>
+        UDNA is not intended to replace the following protocols but to unify them under a common
+        addressing layer that respects decentralized identity. Implementations <em class="rfc2119">MAY</em> embed UDNA
+        support as a complementary naming and discovery mechanism.
+    </p>
+
+    <table id="comparison-table" class="simple">
+        <caption>Relationship of UDNA to related specifications and protocols.</caption>
+        <thead>
+            <tr>
+                <th>Framework / Protocol</th>
+                <th>Focus</th>
+                <th>UDNA Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>[<cite><a class="bibref" data-link-type="biblio" href="#bib-did-core" title="Decentralized Identifiers (DIDs) v1.0">DID-CORE</a></cite>]</td>
+                <td>Identifier and DID Document</td>
+                <td>UDNA uses DID as the naming authority and cryptographic trust anchor.</td>
+            </tr>
+            <tr>
+                <td>[<cite><a class="bibref" data-link-type="biblio" href="#bib-didcomm" title="DIDComm Messaging v2.0">DIDCOMM</a></cite>]</td>
+                <td>Secure encrypted messaging</td>
+                <td>UDNA addresses can resolve to DIDComm service endpoints for encrypted channel establishment.</td>
+            </tr>
+            <tr>
+                <td>Solid (WebID) [<cite><a class="bibref" data-link-type="biblio" href="#bib-solid" title="Solid Protocol">SOLID</a></cite>]</td>
+                <td>Personal linked-data pods</td>
+                <td>UDNA can replace WebID URLs, enabling DID-based access control for Solid pods.</td>
+            </tr>
+            <tr>
+                <td>ActivityPub</td>
+                <td>Federated social web</td>
+                <td>UDNA provides identity-native addressing for actors and objects, removing dependency on domain-based actor URIs.</td>
+            </tr>
+            <tr>
+                <td>IPFS / IPNS</td>
+                <td>Content-addressed distributed storage</td>
+                <td>UDNA addresses can reference IPFS resources and supply DID identity context for access control.</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+
+<section id="incubation-roadmap"><div class="header-wrapper"><h2 id="x9-incubation-roadmap-and-next-steps"><bdi class="secno">9. </bdi>Incubation Roadmap and Next Steps</h2><a class="self-link" href="#incubation-roadmap" aria-label="Permalink for Section 9."></a></div>
+    
+
+    <p>
+        The UDNA Community Group is actively incubating this specification. The following are
+        current priorities for the 2026 incubation cycle:
+    </p>
+
+    <ul>
+        <li>
+            <strong>Interoperability test suite</strong> — multi-language resolver implementations
+            targeting JavaScript (Node.js), Rust, and Python reference libraries.
+        </li>
+        <li>
+            <strong>DID method profiling</strong> — concrete guidelines for <code>did:web</code>,
+            <code>did:key</code>, and <code>did:tdw</code> to correctly expose UDNA service
+            endpoints in their DID Documents.
+        </li>
+        <li>
+            <strong>Security review</strong> — formal analysis of the resolution algorithm,
+            including potential endpoint confusion and injection attack vectors.
+        </li>
+        <li>
+            <strong>Integration pilots</strong> — live integration tests with Solid pod servers
+            and Matrix homeservers to validate real-world addressing patterns and performance.
+        </li>
+    </ul>
+
+    <div class="note" role="note" id="issue-container-generatedID-1"><div role="heading" class="note-title marker" id="h-note-1" aria-level="3"><span>Note</span><span class="issue-label">: Invitation to participate</span></div><aside class="">
+        <p>
+            The CG invites participation from browser vendors, digital identity solution providers,
+            and decentralized web projects. The eventual goal is to transition this work to a
+            W3C Working Group for formal standardization. Join the CG at
+            <a href="https://www.w3.org/groups/cg/did-native-addr/">w3.org/groups/cg/did-native-addr</a>.
+        </p>
+    </aside></div>
+</section>
+
+
+<section id="example-implementations" class="appendix informative"><div class="header-wrapper"><h2 id="a-example-implementations"><bdi class="secno">A. </bdi>Example Implementations</h2><a class="self-link" href="#example-implementations" aria-label="Permalink for Appendix A."></a></div><p><em>This section is non-normative.</em></p>
+    
+
+    <p><em>This appendix is informative.</em></p>
+
+    <section id="js-example"><div class="header-wrapper"><h3 id="a-1-resolving-a-udna-address-in-javascript"><bdi class="secno">A.1 </bdi>Resolving a UDNA Address in JavaScript</h3><a class="self-link" href="#js-example" aria-label="Permalink for Appendix A.1"></a></div>
+        
+
+        <aside class="example" id="example-javascript-resolver-usage"><div class="marker">
+    <a class="self-link" href="#example-javascript-resolver-usage">Example<bdi> 2</bdi></a><span class="example-title">: JavaScript resolver usage</span>
+  </div>
+            <pre aria-busy="false"><code class="hljs javascript"><span class="hljs-keyword">import</span> { <span class="hljs-title class_">UDNAResolver</span> } <span class="hljs-keyword">from</span> <span class="hljs-string">'@udna/resolver'</span>;
+
+<span class="hljs-keyword">const</span> resolver = <span class="hljs-keyword">new</span> <span class="hljs-title class_">UDNAResolver</span>({
+  <span class="hljs-attr">didResolvers</span>: {
+    <span class="hljs-attr">web</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">WebDIDResolver</span>(),
+    <span class="hljs-attr">key</span>: <span class="hljs-keyword">new</span> <span class="hljs-title class_">KeyDIDResolver</span>()
+  }
+});
+
+<span class="hljs-keyword">const</span> address =
+  <span class="hljs-string">"udna://did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1bZZw7pf9c7Dg5bKBz5tP/api/messages"</span>;
+
+<span class="hljs-keyword">const</span> resolved = <span class="hljs-keyword">await</span> resolver.<span class="hljs-title function_">resolve</span>(address);
+<span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(resolved.<span class="hljs-property">targetUrl</span>);
+<span class="hljs-comment">// → "https://didcomm.example.com/msg"</span></code></pre>
+        </aside>
+    </section>
+
+    <section id="did-doc-example"><div class="header-wrapper"><h3 id="a-2-did-document-with-udna-service-endpoints"><bdi class="secno">A.2 </bdi>DID Document with UDNA Service Endpoints</h3><a class="self-link" href="#did-doc-example" aria-label="Permalink for Appendix A.2"></a></div>
+        
+
+        <aside class="example" id="example-did-document-expressing-udna-services"><div class="marker">
+    <a class="self-link" href="#example-did-document-expressing-udna-services">Example<bdi> 3</bdi></a><span class="example-title">: DID Document expressing UDNA services</span>
+  </div>
+            <pre aria-busy="false"><code class="hljs json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"@context"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"https://www.w3.org/ns/did/v1"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"id"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"did:example:123"</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">"service"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">"id"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"#udna-root"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"UDNARoot"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"serviceEndpoint"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"https://udna-gateway.example/endpoint"</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">"id"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"#chat"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"UDNAChatService"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"serviceEndpoint"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"wss://chat.example/ws"</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span>
+<span class="hljs-punctuation">}</span></code></pre>
+        </aside>
+    </section>
+</section>
+
+
+<section id="IANA" class="appendix"><div class="header-wrapper"><h2 id="b-iana-considerations"><bdi class="secno">B. </bdi>IANA Considerations</h2><a class="self-link" href="#IANA" aria-label="Permalink for Appendix B."></a></div>
+    
+
+    <p>
+        This document requests registration of the <code>udna</code> URI scheme with IANA. The
+        scheme syntax conforms to the rules defined in <a href="#scheme-syntax" class="sec-ref"><bdi class="secno">4.1 </bdi>Scheme Syntax</a> and the URI
+        generic syntax of [<cite><a class="bibref" data-link-type="biblio" href="#bib-rfc3986" title="Uniform Resource Identifier (URI): Generic Syntax">RFC3986</a></cite>]. The CG will submit a formal registration request to IANA
+        upon reaching draft stability and completing at least two interoperability events.
+    </p>
+
+    <dl>
+        <dt>URI Scheme Name</dt>
+        <dd><code>udna</code></dd>
+        <dt>Status</dt>
+        <dd>Provisional (pending IANA submission)</dd>
+        <dt>URI Scheme Syntax</dt>
+        <dd>Defined in <a href="#scheme-syntax" class="sec-ref"><bdi class="secno">4.1 </bdi>Scheme Syntax</a> of this specification.</dd>
+        <dt>URI Scheme Semantics</dt>
+        <dd>Defined in <a href="#resolution-model" class="sec-ref"><bdi class="secno">5. </bdi>Resolution Model</a> of this specification.</dd>
+        <dt>Contact</dt>
+        <dd><a href="mailto:public-did-native-addr@w3.org">public-did-native-addr@w3.org</a></dd>
+        <dt>References</dt>
+        <dd>This document.</dd>
+    </dl>
+</section>
+
+
+<section id="acknowledgments" class="appendix informative"><div class="header-wrapper"><h2 id="c-acknowledgments"><bdi class="secno">C. </bdi>Acknowledgments</h2><a class="self-link" href="#acknowledgments" aria-label="Permalink for Appendix C."></a></div><p><em>This section is non-normative.</em></p>
+    
+
+    <p>
+        The editor, <strong>Amir Hameed Mir</strong>, and the UDNA Community Group thank
+        contributors from the Decentralized Identity Foundation (DIF), W3C DID Working Group
+        alumni, and participants of the Solid and ActivityPub communities. Special thanks to the
+        early implementers who stress-tested the addressing model and provided interoperability
+        feedback during the initial incubation phase.
+    </p>
+</section>
+
+
+<section id="references" class="appendix"><div class="header-wrapper"><h2 id="d-references"><bdi class="secno">D. </bdi>References</h2><a class="self-link" href="#references" aria-label="Permalink for Appendix D."></a></div><section id="normative-references"><div class="header-wrapper"><h3 id="d-1-normative-references"><bdi class="secno">D.1 </bdi>Normative references</h3><a class="self-link" href="#normative-references" aria-label="Permalink for Appendix D.1"></a></div>
+    
+    <dl class="bibliography"><dt id="bib-did-core">[DID-CORE]</dt><dd>
+      <a href="https://www.w3.org/TR/did-core/"><cite>Decentralized Identifiers (DIDs) v1.0</cite></a>.  W3C. W3C Recommendation. URL: <a href="https://www.w3.org/TR/did-core/">https://www.w3.org/TR/did-core/</a>
+    </dd><dt id="bib-didcomm">[DIDCOMM]</dt><dd>
+      <a href="https://identity.foundation/didcomm-messaging/spec/"><cite>DIDComm Messaging v2.0</cite></a>.  Decentralized Identity Foundation. URL: <a href="https://identity.foundation/didcomm-messaging/spec/">https://identity.foundation/didcomm-messaging/spec/</a>
+    </dd><dt id="bib-rfc2119">[RFC2119]</dt><dd>
+      <a href="https://www.rfc-editor.org/rfc/rfc2119"><cite>Key words for use in RFCs to Indicate Requirement Levels</cite></a>. S. Bradner.  IETF. March 1997. Best Current Practice. URL: <a href="https://www.rfc-editor.org/rfc/rfc2119">https://www.rfc-editor.org/rfc/rfc2119</a>
+    </dd><dt id="bib-rfc3986">[RFC3986]</dt><dd>
+      <a href="https://www.rfc-editor.org/rfc/rfc3986"><cite>Uniform Resource Identifier (URI): Generic Syntax</cite></a>. T. Berners-Lee; R. Fielding; L. Masinter.  IETF. January 2005. Internet Standard. URL: <a href="https://www.rfc-editor.org/rfc/rfc3986">https://www.rfc-editor.org/rfc/rfc3986</a>
+    </dd><dt id="bib-rfc6570">[RFC6570]</dt><dd>
+      <a href="https://www.rfc-editor.org/rfc/rfc6570"><cite>URI Template</cite></a>.  IETF. Proposed Standard. URL: <a href="https://www.rfc-editor.org/rfc/rfc6570">https://www.rfc-editor.org/rfc/rfc6570</a>
+    </dd><dt id="bib-rfc8174">[RFC8174]</dt><dd>
+      <a href="https://www.rfc-editor.org/rfc/rfc8174"><cite>Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words</cite></a>. B. Leiba.  IETF. May 2017. Best Current Practice. URL: <a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>
+    </dd><dt id="bib-solid">[SOLID]</dt><dd>
+      <a href="https://solidproject.org/TR/protocol"><cite>Solid Protocol</cite></a>.  Solid Community Group. URL: <a href="https://solidproject.org/TR/protocol">https://solidproject.org/TR/protocol</a>
+    </dd><dt id="bib-url">[URL]</dt><dd>
+      <a href="https://url.spec.whatwg.org/"><cite>URL Standard</cite></a>.  WHATWG. URL: <a href="https://url.spec.whatwg.org/">https://url.spec.whatwg.org/</a>
+    </dd><dt id="bib-vc-data-model">[VC-DATA-MODEL]</dt><dd>
+      <a href="https://www.w3.org/TR/vc-data-model-2.0/"><cite>Verifiable Credentials Data Model v2.0</cite></a>.  W3C. W3C Recommendation. URL: <a href="https://www.w3.org/TR/vc-data-model-2.0/">https://www.w3.org/TR/vc-data-model-2.0/</a>
+    </dd></dl>
+  </section></section><p role="navigation" id="back-to-top">
+    <a href="#title"><abbr title="Back to Top">↑</abbr></a>
+  </p><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-udna-address" aria-label="Links in this document to definition: UDNA Address">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-udna-address" aria-label="Permalink for definition: UDNA Address. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+    <li>
+      <a href="#ref-for-dfn-udna-address-1" title="§ 3. Terminology">§ 3. Terminology</a> 
+    </li><li>
+      <a href="#ref-for-dfn-udna-address-2" title="§ 4.2 Components">§ 4.2 Components</a> 
+    </li><li>
+      <a href="#ref-for-dfn-udna-address-3" title="§ 5.1 Resolution Algorithm">§ 5.1 Resolution Algorithm</a> 
+    </li><li>
+      <a href="#ref-for-dfn-udna-address-4" title="§ 7. Extensibility and Versioning">§ 7. Extensibility and Versioning</a> <a href="#ref-for-dfn-udna-address-5" title="Reference 2">(2)</a> 
+    </li>
+  </ul>
+    </div><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-did-resolution" aria-label="Links in this document to definition: DID Resolution">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-did-resolution" aria-label="Permalink for definition: DID Resolution. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+    <li>
+      <a href="#ref-for-dfn-did-resolution-1" title="§ 3. Terminology">§ 3. Terminology</a> 
+    </li>
+  </ul>
+    </div><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-udna-resolver" aria-label="Links in this document to definition: UDNA Resolver">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-udna-resolver" aria-label="Permalink for definition: UDNA Resolver. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+    <li>
+      <a href="#ref-for-dfn-udna-resolver-1" title="§ 5.1 Resolution Algorithm">§ 5.1 Resolution Algorithm</a> 
+    </li>
+  </ul>
+    </div><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-native-addressing" aria-label="Links in this document to definition: Native Addressing">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-native-addressing" aria-label="Permalink for definition: Native Addressing. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+      <li>Not referenced in this document.</li>
+    </ul>
+    </div><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-service-endpoint" aria-label="Links in this document to definition: Service Endpoint">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-service-endpoint" aria-label="Permalink for definition: Service Endpoint. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+      <li>Not referenced in this document.</li>
+    </ul>
+    </div><div class="dfn-panel" hidden="" role="dialog" aria-modal="true" id="dfn-panel-for-dfn-udnaroot-service" aria-label="Links in this document to definition: UDNARoot Service">
+      <span class="caret"></span>
+      <div>
+        <a class="self-link" href="#dfn-udnaroot-service" aria-label="Permalink for definition: UDNARoot Service. Activate to close this dialog.">Permalink</a>
+         
+      </div>
+      <p><b>Referenced in:</b></p>
+      <ul>
+    <li>
+      <a href="#ref-for-dfn-udnaroot-service-1" title="§ 4.2 Components">§ 4.2 Components</a> 
+    </li>
+  </ul>
+    </div><script id="respec-highlight-vars">(() =&gt; {
+// @ts-check
+
+if (document.respec) {
+  document.respec.ready.then(setupVarHighlighter);
+} else {
+  setupVarHighlighter();
+}
+
+function setupVarHighlighter() {
+  document
+    .querySelectorAll("var")
+    .forEach(varElem =&gt; varElem.addEventListener("click", highlightListener));
+}
+
+function highlightListener(ev) {
+  ev.stopPropagation();
+  const { target: varElem } = ev;
+  const hightligtedElems = highlightVars(varElem);
+  const resetListener = () =&gt; {
+    const hlColor = getHighlightColor(varElem);
+    hightligtedElems.forEach(el =&gt; removeHighlight(el, hlColor));
+    [...HL_COLORS.keys()].forEach(key =&gt; HL_COLORS.set(key, true));
+  };
+  if (hightligtedElems.length) {
+    document.body.addEventListener("click", resetListener, { once: true });
+  }
+}
+
+// availability of highlight colors. colors from var.css
+const HL_COLORS = new Map([
+  ["respec-hl-c1", true],
+  ["respec-hl-c2", true],
+  ["respec-hl-c3", true],
+  ["respec-hl-c4", true],
+  ["respec-hl-c5", true],
+  ["respec-hl-c6", true],
+  ["respec-hl-c7", true],
+]);
+
+function getHighlightColor(target) {
+  // return current colors if applicable
+  const { value } = target.classList;
+  const re = /respec-hl-\w+/;
+  const activeClass = re.test(value) &amp;&amp; value.match(re);
+  if (activeClass) return activeClass[0];
+
+  // first color preference
+  if (HL_COLORS.get("respec-hl-c1") === true) return "respec-hl-c1";
+
+  // otherwise get some other available color
+  return [...HL_COLORS.keys()].find(c =&gt; HL_COLORS.get(c)) || "respec-hl-c1";
+}
+
+function highlightVars(varElem) {
+  const textContent = norm(varElem.textContent);
+  const parent = varElem.closest(".algorithm, section");
+  const highlightColor = getHighlightColor(varElem);
+
+  const varsToHighlight = [...parent.querySelectorAll("var")].filter(
+    el =&gt;
+      norm(el.textContent) === textContent &amp;&amp;
+      el.closest(".algorithm, section") === parent
+  );
+
+  // update availability of highlight color
+  const colorStatus = varsToHighlight[0].classList.contains("respec-hl");
+  HL_COLORS.set(highlightColor, colorStatus);
+
+  // highlight vars
+  if (colorStatus) {
+    varsToHighlight.forEach(el =&gt; removeHighlight(el, highlightColor));
+    return [];
+  } else {
+    varsToHighlight.forEach(el =&gt; addHighlight(el, highlightColor));
+  }
+  return varsToHighlight;
+}
+
+function removeHighlight(el, highlightColor) {
+  el.classList.remove("respec-hl", highlightColor);
+  // clean up empty class attributes so they don't come in export
+  if (!el.classList.length) el.removeAttribute("class");
+}
+
+function addHighlight(elem, highlightColor) {
+  elem.classList.add("respec-hl", highlightColor);
+}
+
+/**
+ * Same as `norm` from src/core/utils, but our build process doesn't allow
+ * imports in runtime scripts, so duplicated here.
+ * @param {string} str
+ */
+function norm(str) {
+  return str.trim().replace(/\s+/g, " ");
+}
+})()</script><script id="respec-dfn-panel">(() =&gt; {
+// @ts-check
+if (document.respec) {
+  document.respec.ready.then(setupPanel);
+} else {
+  setupPanel();
+}
+
+function setupPanel() {
+  const listener = panelListener();
+  document.body.addEventListener("keydown", listener);
+  document.body.addEventListener("click", listener);
+}
+
+function panelListener() {
+  /** @type {HTMLElement} */
+  let panel = null;
+  return event =&gt; {
+    const { target, type } = event;
+
+    if (!(target instanceof HTMLElement)) return;
+
+    // For keys, we only care about Enter key to activate the panel
+    // otherwise it's activated via a click.
+    if (type === "keydown" &amp;&amp; event.key !== "Enter") return;
+
+    const action = deriveAction(event);
+
+    switch (action) {
+      case "show": {
+        hidePanel(panel);
+        /** @type {HTMLElement} */
+        const dfn = target.closest("dfn, .index-term");
+        panel = document.getElementById(`dfn-panel-for-${dfn.id}`);
+        const coords = deriveCoordinates(event);
+        displayPanel(dfn, panel, coords);
+        break;
+      }
+      case "dock": {
+        panel.style.left = null;
+        panel.style.top = null;
+        panel.classList.add("docked");
+        break;
+      }
+      case "hide": {
+        hidePanel(panel);
+        panel = null;
+        break;
+      }
+    }
+  };
+}
+
+/**
+ * @param {MouseEvent|KeyboardEvent} event
+ */
+function deriveCoordinates(event) {
+  const target = /** @type HTMLElement */ (event.target);
+
+  // We prevent synthetic AT clicks from putting
+  // the dialog in a weird place. The AT events sometimes
+  // lack coordinates, so they have clientX/Y = 0
+  const rect = target.getBoundingClientRect();
+  if (
+    event instanceof MouseEvent &amp;&amp;
+    event.clientX &gt;= rect.left &amp;&amp;
+    event.clientY &gt;= rect.top
+  ) {
+    // The event probably happened inside the bounding rect...
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  // Offset to the middle of the element
+  const x = rect.x + rect.width / 2;
+  // Placed at the bottom of the element
+  const y = rect.y + rect.height;
+  return { x, y };
+}
+
+/**
+ * @param {Event} event
+ */
+function deriveAction(event) {
+  const target = /** @type {HTMLElement} */ (event.target);
+  const hitALink = !!target.closest("a");
+  if (target.closest("dfn:not([data-cite]), .index-term")) {
+    return hitALink ? "none" : "show";
+  }
+  if (target.closest(".dfn-panel")) {
+    if (hitALink) {
+      return target.classList.contains("self-link") ? "hide" : "dock";
+    }
+    const panel = target.closest(".dfn-panel");
+    return panel.classList.contains("docked") ? "hide" : "none";
+  }
+  if (document.querySelector(".dfn-panel:not([hidden])")) {
+    return "hide";
+  }
+  return "none";
+}
+
+/**
+ * @param {HTMLElement} dfn
+ * @param {HTMLElement} panel
+ * @param {{ x: number, y: number }} clickPosition
+ */
+function displayPanel(dfn, panel, { x, y }) {
+  panel.hidden = false;
+  // distance (px) between edge of panel and the pointing triangle (caret)
+  const MARGIN = 20;
+
+  const dfnRects = dfn.getClientRects();
+  // Find the `top` offset when the `dfn` can be spread across multiple lines
+  let closestTop = 0;
+  let minDiff = Infinity;
+  for (const rect of dfnRects) {
+    const { top, bottom } = rect;
+    const diffFromClickY = Math.abs((top + bottom) / 2 - y);
+    if (diffFromClickY &lt; minDiff) {
+      minDiff = diffFromClickY;
+      closestTop = top;
+    }
+  }
+
+  const top = window.scrollY + closestTop + dfnRects[0].height;
+  const left = x - MARGIN;
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+
+  // Find if the panel is flowing out of the window
+  const panelRect = panel.getBoundingClientRect();
+  const SCREEN_WIDTH = Math.min(window.innerWidth, window.screen.width);
+  if (panelRect.right &gt; SCREEN_WIDTH) {
+    const newLeft = Math.max(MARGIN, x + MARGIN - panelRect.width);
+    const newCaretOffset = left - newLeft;
+    panel.style.left = `${newLeft}px`;
+    /** @type {HTMLElement} */
+    const caret = panel.querySelector(".caret");
+    caret.style.left = `${newCaretOffset}px`;
+  }
+
+  // As it's a dialog, we trap focus.
+  // TODO: when &lt;dialog&gt; becomes a implemented, we should really
+  // use that.
+  trapFocus(panel, dfn);
+}
+
+/**
+ * @param {HTMLElement} panel
+ * @param {HTMLElement} dfn
+ * @returns
+ */
+function trapFocus(panel, dfn) {
+  /** @type NodeListOf&lt;HTMLAnchorElement&gt; elements */
+  const anchors = panel.querySelectorAll("a[href]");
+  // No need to trap focus
+  if (!anchors.length) return;
+
+  // Move focus to first anchor element
+  const first = anchors.item(0);
+  first.focus();
+
+  const trapListener = createTrapListener(anchors, panel, dfn);
+  panel.addEventListener("keydown", trapListener);
+
+  // Hiding the panel releases the trap
+  const mo = new MutationObserver(records =&gt; {
+    const [record] = records;
+    const target = /** @type HTMLElement */ (record.target);
+    if (target.hidden) {
+      panel.removeEventListener("keydown", trapListener);
+      mo.disconnect();
+    }
+  });
+  mo.observe(panel, { attributes: true, attributeFilter: ["hidden"] });
+}
+
+/**
+ *
+ * @param {NodeListOf&lt;HTMLAnchorElement&gt;} anchors
+ * @param {HTMLElement} panel
+ * @param {HTMLElement} dfn
+ * @returns
+ */
+function createTrapListener(anchors, panel, dfn) {
+  const lastIndex = anchors.length - 1;
+  let currentIndex = 0;
+  return event =&gt; {
+    switch (event.key) {
+      // Hitting "Tab" traps us in a nice loop around elements.
+      case "Tab": {
+        event.preventDefault();
+        currentIndex += event.shiftKey ? -1 : +1;
+        if (currentIndex &lt; 0) {
+          currentIndex = lastIndex;
+        } else if (currentIndex &gt; lastIndex) {
+          currentIndex = 0;
+        }
+        anchors.item(currentIndex).focus();
+        break;
+      }
+
+      // Hitting "Enter" on an anchor releases the trap.
+      case "Enter":
+        hidePanel(panel);
+        break;
+
+      // Hitting "Escape" returns focus to dfn.
+      case "Escape":
+        hidePanel(panel);
+        dfn.focus();
+        return;
+    }
+  };
+}
+
+/** @param {HTMLElement} panel */
+function hidePanel(panel) {
+  if (!panel) return;
+  panel.hidden = true;
+  panel.classList.remove("docked");
+}
+})()</script><script src="https://www.w3.org/scripts/TR/2021/fixup.js"></script></body></html>

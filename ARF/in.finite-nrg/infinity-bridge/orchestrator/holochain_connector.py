@@ -2,6 +2,7 @@
 Holochain Connector for Infinity Bridge
 Provides real DHT connection for bridge registry operations
 """
+
 import asyncio
 import json
 import uuid
@@ -14,6 +15,7 @@ import websockets
 @dataclass
 class BridgeRegistration:
     """Bridge registration data for DHT"""
+
     bridge_id: str
     capabilities: List[str]
     transport: List[str]
@@ -28,7 +30,11 @@ class BridgeRegistration:
             "capabilities": self.capabilities,
             "transport": self.transport,
             "endpoint": self.endpoint,
-            "signature": self.signature.hex() if isinstance(self.signature, bytes) else self.signature,
+            "signature": (
+                self.signature.hex()
+                if isinstance(self.signature, bytes)
+                else self.signature
+            ),
             "timestamp": self.timestamp.isoformat(),
         }
 
@@ -40,8 +46,16 @@ class BridgeRegistration:
             capabilities=data["capabilities"],
             transport=data["transport"],
             endpoint=data["endpoint"],
-            signature=bytes.fromhex(data["signature"]) if isinstance(data["signature"], str) else data["signature"],
-            timestamp=datetime.fromisoformat(data["timestamp"]) if isinstance(data["timestamp"], str) else data["timestamp"],
+            signature=(
+                bytes.fromhex(data["signature"])
+                if isinstance(data["signature"], str)
+                else data["signature"]
+            ),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"])
+                if isinstance(data["timestamp"], str)
+                else data["timestamp"]
+            ),
         )
 
 
@@ -56,7 +70,7 @@ class HolochainConnector:
         conductor_url: str = "ws://localhost:8888",
         app_port: int = 8888,
         cell_id: Optional[List[str]] = None,
-        timeout: float = 10.0
+        timeout: float = 10.0,
     ):
         """
         Initialize Holochain connector
@@ -84,8 +98,7 @@ class HolochainConnector:
         """
         try:
             self.websocket = await asyncio.wait_for(
-                websockets.connect(self.conductor_url),
-                timeout=self.timeout
+                websockets.connect(self.conductor_url), timeout=self.timeout
             )
             self.connected = True
             print(f"[HolochainConnector] Connected to {self.conductor_url}")
@@ -110,7 +123,7 @@ class HolochainConnector:
         zome_name: str,
         fn_name: str,
         payload: Any = None,
-        timeout: Optional[float] = None
+        timeout: Optional[float] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Call a zome function
@@ -145,8 +158,8 @@ class HolochainConnector:
                     "payload": payload,
                     "cap_secret": None,
                     "provenance": self.cell_id[1],  # agent_pub_key
-                }
-            }
+                },
+            },
         }
 
         try:
@@ -156,8 +169,7 @@ class HolochainConnector:
             # Wait for response
             timeout_val = timeout or self.timeout
             response_str = await asyncio.wait_for(
-                self.websocket.recv(),
-                timeout=timeout_val
+                self.websocket.recv(), timeout=timeout_val
             )
 
             response = json.loads(response_str)
@@ -194,19 +206,22 @@ class HolochainConnector:
         payload = registration.to_dict()
 
         result = await self.call_zome(
-            zome_name="registry",
-            fn_name="register_bridge",
-            payload=payload
+            zome_name="registry", fn_name="register_bridge", payload=payload
         )
 
         if result:
             print(f"[HolochainConnector] Bridge registered: {registration.bridge_id}")
             return True
-        else:
-            print(f"[HolochainConnector] Failed to register bridge: {registration.bridge_id}")
-            return False
 
-    async def discover_bridges(self, timeout: Optional[float] = None) -> List[BridgeRegistration]:
+        print(
+            "[HolochainConnector] Failed to register bridge: "
+            f"{registration.bridge_id}"
+        )
+        return False
+
+    async def discover_bridges(
+        self, timeout: Optional[float] = None
+    ) -> List[BridgeRegistration]:
         """
         Discover all registered bridges from DHT
 
@@ -220,7 +235,7 @@ class HolochainConnector:
             zome_name="registry",
             fn_name="discover_bridges",
             payload=None,
-            timeout=timeout
+            timeout=timeout,
         )
 
         if not result:
@@ -235,7 +250,10 @@ class HolochainConnector:
             if isinstance(bridge_list, dict) and "bridges" in bridge_list:
                 bridge_list = bridge_list["bridges"]
             else:
-                print(f"[HolochainConnector] Unexpected response format: {type(bridge_list)}")
+                print(
+                    "[HolochainConnector] Unexpected response format: "
+                    f"{type(bridge_list)}"
+                )
                 return []
 
         for bridge_data in bridge_list:
@@ -254,9 +272,7 @@ class HolochainConnector:
         return bridges
 
     async def discover_by_capability(
-        self,
-        capability: str,
-        timeout: Optional[float] = None
+        self, capability: str, timeout: Optional[float] = None
     ) -> List[BridgeRegistration]:
         """
         Discover bridges with specific capability
@@ -272,7 +288,7 @@ class HolochainConnector:
             zome_name="registry",
             fn_name="discover_by_capability",
             payload=capability,
-            timeout=timeout
+            timeout=timeout,
         )
 
         if not result:
@@ -286,7 +302,10 @@ class HolochainConnector:
             if isinstance(bridge_list, dict) and "bridges" in bridge_list:
                 bridge_list = bridge_list["bridges"]
             else:
-                print(f"[HolochainConnector] Unexpected response format: {type(bridge_list)}")
+                print(
+                    "[HolochainConnector] Unexpected response format: "
+                    f"{type(bridge_list)}"
+                )
                 return []
 
         for bridge_data in bridge_list:
@@ -298,14 +317,14 @@ class HolochainConnector:
                 print(f"[HolochainConnector] Failed to parse bridge entry: {e}")
                 continue
 
-        print(f"[HolochainConnector] Found {len(bridges)} bridges with capability '{capability}'")
+        print(
+            "[HolochainConnector] Found "
+            f"{len(bridges)} bridges with capability '{capability}'"
+        )
         return bridges
 
     async def register_stream(
-        self,
-        bridge_id: str,
-        stream_type: str,
-        metadata: Dict[str, Any]
+        self, bridge_id: str, stream_type: str, metadata: Dict[str, Any]
     ) -> bool:
         """
         Register a data stream for a bridge
@@ -325,17 +344,18 @@ class HolochainConnector:
         }
 
         result = await self.call_zome(
-            zome_name="registry",
-            fn_name="register_stream",
-            payload=payload
+            zome_name="registry", fn_name="register_stream", payload=payload
         )
 
         if result:
             print(f"[HolochainConnector] Stream registered: {bridge_id}/{stream_type}")
             return True
-        else:
-            print(f"[HolochainConnector] Failed to register stream: {bridge_id}/{stream_type}")
-            return False
+
+        print(
+            "[HolochainConnector] Failed to register stream: "
+            f"{bridge_id}/{stream_type}"
+        )
+        return False
 
     async def get_bridge_streams(self, bridge_id: str) -> List[Dict[str, Any]]:
         """
@@ -348,9 +368,7 @@ class HolochainConnector:
             List of stream metadata
         """
         result = await self.call_zome(
-            zome_name="registry",
-            fn_name="get_bridge_streams",
-            payload=bridge_id
+            zome_name="registry", fn_name="get_bridge_streams", payload=bridge_id
         )
 
         if not result:
@@ -359,10 +377,12 @@ class HolochainConnector:
         stream_list = result.get("data", result) if isinstance(result, dict) else result
 
         if isinstance(stream_list, list):
-            print(f"[HolochainConnector] Found {len(stream_list)} streams for {bridge_id}")
+            print(
+                f"[HolochainConnector] Found {len(stream_list)} streams for {bridge_id}"
+            )
             return stream_list
-        else:
-            return []
+
+        return []
 
     async def ping(self) -> bool:
         """
@@ -379,12 +399,9 @@ class HolochainConnector:
             test_msg = {"type": "ping", "id": str(uuid.uuid4())}
             await self.websocket.send(json.dumps(test_msg))
 
-            response_str = await asyncio.wait_for(
-                self.websocket.recv(),
-                timeout=2.0
-            )
+            await asyncio.wait_for(self.websocket.recv(), timeout=2.0)
             return True
-        except:
+        except:  # noqa: E722
             return False
 
     def __repr__(self) -> str:
@@ -417,35 +434,35 @@ class MockHolochainConnector(HolochainConnector):
         print(f"[MockHolochainConnector] Mock registered: {registration.bridge_id}")
         return True
 
-    async def discover_bridges(self, timeout: Optional[float] = None) -> List[BridgeRegistration]:
+    async def discover_bridges(
+        self, timeout: Optional[float] = None
+    ) -> List[BridgeRegistration]:
         """Return mock bridges"""
         return list(self.mock_bridges.values())
 
     async def discover_by_capability(
-        self,
-        capability: str,
-        timeout: Optional[float] = None
+        self, capability: str, timeout: Optional[float] = None
     ) -> List[BridgeRegistration]:
         """Filter mock bridges by capability"""
         return [
-            bridge for bridge in self.mock_bridges.values()
+            bridge
+            for bridge in self.mock_bridges.values()
             if capability in bridge.capabilities
         ]
 
     async def register_stream(
-        self,
-        bridge_id: str,
-        stream_type: str,
-        metadata: Dict[str, Any]
+        self, bridge_id: str, stream_type: str, metadata: Dict[str, Any]
     ) -> bool:
         """Mock stream registration"""
         if bridge_id not in self.mock_streams:
             self.mock_streams[bridge_id] = []
 
-        self.mock_streams[bridge_id].append({
-            "stream_type": stream_type,
-            "metadata": metadata,
-        })
+        self.mock_streams[bridge_id].append(
+            {
+                "stream_type": stream_type,
+                "metadata": metadata,
+            }
+        )
         return True
 
     async def get_bridge_streams(self, bridge_id: str) -> List[Dict[str, Any]]:
@@ -460,6 +477,7 @@ class MockHolochainConnector(HolochainConnector):
 if __name__ == "__main__":
     # Test Holochain connector
     async def test_connector():
+        """Run the connector module smoke test."""
         print("=== Holochain Connector Test ===\n")
 
         # Use mock connector for testing
@@ -481,7 +499,7 @@ if __name__ == "__main__":
             transport=["tcp"],
             endpoint="tcp://192.168.1.100:9999",
             signature=b"\x00" * 64,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         if await connector.register_bridge(registration):
@@ -509,7 +527,7 @@ if __name__ == "__main__":
         if await connector.register_stream(
             "test-esp32-001",
             "acoustic/spectrum",
-            {"sample_rate": 44100, "fft_size": 1024}
+            {"sample_rate": 44100, "fft_size": 1024},
         ):
             print("✓ Stream registered\n")
 

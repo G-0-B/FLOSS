@@ -1,0 +1,37 @@
+{
+  "name": "submit_claim",
+  "description": "Submit a proposed change to the consensus gate.\n\nproposal_type: CodeChange | ConfigChange | SpecChange | AdrChange | Other\nblast_radius: Local | Module | System | Substrate\nReturns JSON with entry_hash and claim_id, or {\"error\": \"...\"} on failure.\n\n---\nFLOSSIØULLK Consensus Gateway — passive router, not a controller.\n\nInvariants you MUST honor when using these tools:\n- Vote weights are analog floats in [-0.999, +0.999]. Never use ±1.0.\n- The gateway does not decide outcomes; it routes Claims to voters and\n  appends Decisions. Treat outcomes as data, not directives.\n- blast_radius selection:\n    Local     = routine, single-module change. APPROVE threshold 0.30.\n    Module    = config/spec change spanning files. APPROVE 0.50.\n    System    = cross-module architectural shift. APPROVE 0.60.\n    Substrate = invariant-touching, OVERRIDE FORBIDDEN. APPROVE 0.85.\n- Every Claim is durable on the source chain. Submit only what you\n  would commit to permanent provenance.\n- Voters are LLMs with different cognitive styles (model family +\n  persona). Variance > polarization_threshold returns CONFLICT\n  requiring human resolution, not more votes.",
+  "inputSchema": {
+    "properties": {
+      "proposer": {
+        "title": "Proposer",
+        "type": "string"
+      },
+      "proposal_type": {
+        "title": "Proposal Type",
+        "type": "string"
+      },
+      "summary": {
+        "title": "Summary",
+        "type": "string"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "blast_radius": {
+        "title": "Blast Radius",
+        "type": "string"
+      }
+    },
+    "required": [
+      "proposer",
+      "proposal_type",
+      "summary",
+      "body",
+      "blast_radius"
+    ],
+    "title": "submit_claimArguments",
+    "type": "object"
+  }
+}

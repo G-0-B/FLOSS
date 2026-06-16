@@ -28,7 +28,9 @@ pub fn consume_budget(agent: &AgentPubKey, cost: f32) -> ExternResult<()> {
     let mut budget_state = get_budget_state(agent)?;
 
     if budget_state.remaining_ru < cost {
-        return Err(wasm_error!(WasmErrorInner::Guest("E_BUDGET_EXCEEDED: Agent budget exceeded.".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "E_BUDGET_EXCEEDED: Agent budget exceeded.".into()
+        )));
     }
 
     budget_state.remaining_ru -= cost;
@@ -51,9 +53,10 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     let mut latest_budget: Option<BudgetEntry> = None;
     // Iterate in reverse (most recent source chain action first)
     for record in records.iter().rev() {
-        if let Some(budget_entry) = record.entry()
+        if let Some(budget_entry) = record
+            .entry()
             .to_app_option::<BudgetEntry>()
-            .ok()       // treat deserialization errors (non-BudgetEntry types) as None
+            .ok() // treat deserialization errors (non-BudgetEntry types) as None
             .flatten()
         {
             if budget_entry.agent == agent_address {
@@ -66,14 +69,25 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
     let now_secs = now.as_seconds_and_nanos().0;
 
     match latest_budget {
-        Some(budget) if (now_secs - budget.window_start.as_seconds_and_nanos().0) < BUDGET_WINDOW_SECONDS => {
-            Ok(BudgetState { agent: agent_address, remaining_ru: budget.remaining_ru, window_start: budget.window_start })
-        },
+        Some(budget)
+            if (now_secs - budget.window_start.as_seconds_and_nanos().0)
+                < BUDGET_WINDOW_SECONDS =>
+        {
+            Ok(BudgetState {
+                agent: agent_address,
+                remaining_ru: budget.remaining_ru,
+                window_start: budget.window_start,
+            })
+        }
         _ => {
             // Fresh or expired budget — no entry created until actually consumed.
             // This avoids the previous bug where get_budget_state created a 100 RU
             // entry that competed with the real consumed-budget entry.
-            Ok(BudgetState { agent: agent_address, remaining_ru: MAX_RU_PER_WINDOW, window_start: now })
+            Ok(BudgetState {
+                agent: agent_address,
+                remaining_ru: MAX_RU_PER_WINDOW,
+                window_start: now,
+            })
         }
     }
 }
@@ -81,8 +95,16 @@ pub fn get_budget_state(agent: &AgentPubKey) -> ExternResult<BudgetState> {
 /// Persist a budget snapshot to the agent's source chain.
 /// Budget is agent-local state — the source chain is the authoritative record.
 /// No DHT links needed; we query the source chain directly in get_budget_state.
-fn save_budget_entry(agent: &AgentPubKey, remaining_ru: f32, window_start: Timestamp) -> ExternResult<ActionHash> {
-    let budget_entry = BudgetEntry { agent: agent.clone(), remaining_ru, window_start };
+fn save_budget_entry(
+    agent: &AgentPubKey,
+    remaining_ru: f32,
+    window_start: Timestamp,
+) -> ExternResult<ActionHash> {
+    let budget_entry = BudgetEntry {
+        agent: agent.clone(),
+        remaining_ru,
+        window_start,
+    };
     let hash = create_entry(EntryTypes::BudgetEntry(budget_entry))?;
     Ok(hash)
 }
@@ -108,14 +130,12 @@ impl BudgetEngine {
             consume_budget(agent, amount)?;
             Ok(())
         } else {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!(
-                    "E_INSUFFICIENT_RU: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
-                    amount,
-                    budget_state.remaining_ru,
-                    budget_state.window_start.as_seconds_and_nanos().0 + BUDGET_WINDOW_SECONDS
-                )
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "E_INSUFFICIENT_RU: need {:.2} RU, have {:.2} RU. Budget resets at {:?}",
+                amount,
+                budget_state.remaining_ru,
+                budget_state.window_start.as_seconds_and_nanos().0 + BUDGET_WINDOW_SECONDS
+            ))))
         }
     }
 

@@ -1,0 +1,76 @@
+{
+  "aliases": {
+    "default": "balanced",
+    "free": "balanced",
+    "subscriptions": "flowith",
+    "mistral-free": "mistral",
+    "roi": "diverse",
+    "provider-diverse": "diverse",
+    "roi-plus": "diverse-plus",
+    "max": "diverse-max",
+    "high-capability": "diverse-max",
+    "heartbeat": "balanced"
+  },
+  "profiles": {
+    "balanced": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b"
+    },
+    "fast": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b"
+    },
+    "flowith": {
+      "flowith-gpt-4.1-mini": "flowith/gpt-4.1-mini",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat"
+    },
+    "mistral": {
+      "mistral-open-nemo": "mistral/open-mistral-nemo",
+      "mistral-ministral-8b": "mistral/ministral-8b-2410",
+      "mistral-devstral-small": "mistral/devstral-small-2507"
+    },
+    "amplified": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash"
+    },
+    "diverse": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "mistral-devstral-small": "mistral/devstral-small-2507",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat"
+    },
+    "diverse-plus": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "mistral-devstral-small": "mistral/devstral-small-2507",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-deepseek-chat": "flowith/deepseek-chat",
+      "openai-gpt-4.1-mini": "openai/gpt-4.1-mini"
+    },
+    "diverse-max": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "groq-llama-3.3-70b-versatile": "groq/llama-3.3-70b-versatile",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-llama-4-scout": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+      "groq-llama-4-maverick": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+      "mistral-devstral-small": "mistral/devstral-small-2507",
+      "mistral-ministral-8b": "mistral/ministral-8b-2410",
+      "mistral-open-mistral-nemo": "mistral/open-mistral-nemo",
+      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
+      "flowith-claude-sonnet-4": "flowith/claude-sonnet-4",
+      "flowith-gpt-4o": "flowith/gpt-4o",
+      "flowith-deepseek-chat": "flowith/deepseek-chat",
+      "omo-momus-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "omo-momus-llama-3.3-70b": "groq/llama-3.3-70b-versatile"
+    }
+  }
+}

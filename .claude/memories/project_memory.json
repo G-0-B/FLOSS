@@ -1,0 +1,20 @@
+{
+  "memories": [],
+  "manual_memories": [],
+  "realtime_memories": [
+    {
+      "type": "message",
+      "content": "You are advising on integrating Serena into a shared MCP surface for a multi-agent coding workspace. Given official Serena docs recommend 'serena start-mcp-server --context=codex --project-from-cwd' f",
+      "added_at": "2026-04-16T17:13:36.592868",
+      "source": "realtime_capture"
+    },
+    {
+      "type": "message",
+      "content": "Given this workspace state: shared MCP surface now includes Serena and FLOSSI0ULLK consensus; Flowith, Groq, and Cerebras are working voter providers; next bottlenecks are shared context/memory, skill",
+      "added_at": "2026-04-16T18:20:03.234392",
+      "source": "realtime_capture"
+    }
+  ],
+  "created_at": "2026-04-16T17:13:36.592754",
+  "updated_at": "2026-04-16T18:20:03.234434"
+}

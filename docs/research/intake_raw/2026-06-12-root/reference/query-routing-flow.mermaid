@@ -1,0 +1,33 @@
+flowchart TB
+    subgraph "Query Processing"
+        Q[Query Received] --> CC[Check Cache]
+        CC --> |Cache Hit| CR[Return Cached Result]
+        CC --> |Cache Miss| QR[Query Router]
+        QR --> |Phase 1| HC[Hash Computation]
+        HC --> LSH[LSH Lookup]
+        LSH --> |Get Candidate Nodes| CN[Candidate Selection]
+        
+        CN --> |Phase 2| PQ[Parallel Query]
+        PQ --> |Query Subset| QN[Query Nodes]
+        QN --> AG[Aggregate Results]
+        AG --> |Update Cache| UC[Update Cache]
+        UC --> FR[Final Result]
+    end
+    
+    subgraph "Dynamic Scaling"
+        NJ[New Node Joins] --> BI[Bootstrap Integration]
+        BI --> |Phase 1| MD[Metadata Download]
+        MD --> |Phase 2| VT[Vector Transfer]
+        VT --> |Phase 3| IR[Index Rebuild]
+        IR --> RB[Rebalance]
+        
+        RB --> |Monitor| MT[Metrics Tracking]
+        MT --> |Threshold Check| TC[Load Check]
+        TC --> |If Needed| RB
+    end
+    
+    subgraph "Health Monitoring"
+        MT --> |Real-time| HM[Health Metrics]
+        HM --> |Update| RS[Routing Strategy]
+        RS --> QR
+    end

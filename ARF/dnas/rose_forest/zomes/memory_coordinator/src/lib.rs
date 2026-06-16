@@ -1,12 +1,15 @@
 use hdk::prelude::*;
-use serde::{Deserialize, Serialize};
-use ontology_integrity::{KnowledgeTriple, validate_triple};
-use sha2::{Sha256, Digest};
+use ontology_integrity::{validate_triple, KnowledgeTriple};
 use rose_forest_integrity::BudgetEntry;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 mod budget;
 use budget::{consume_budget, get_budget_state, BudgetState};
-use budget::{COST_TRANSMIT_UNDERSTANDING, COST_RECALL_UNDERSTANDINGS, COST_COMPOSE_MEMORIES, COST_VALIDATE_TRIPLE};
+use budget::{
+    COST_COMPOSE_MEMORIES, COST_RECALL_UNDERSTANDINGS, COST_TRANSMIT_UNDERSTANDING,
+    COST_VALIDATE_TRIPLE,
+};
 
 /// Entry types for the memory coordinator zome
 #[hdk_entry_defs]
@@ -51,6 +54,18 @@ pub struct Understanding {
 
     /// Extracted knowledge triple
     pub triple: KnowledgeTriple,
+
+    /// Whether this understanding records a decision.
+    pub is_decision: bool,
+
+    /// Coherence score supplied by the caller or derived locally.
+    pub coherence_score: f32,
+
+    /// Optional committee-validation outcome captured at write time.
+    pub committee_validation: Option<CommitteeValidation>,
+
+    /// Interaction patterns detected during preflight analysis.
+    pub patterns: Vec<DetectedPattern>,
 
     /// When this was created
     pub created_at: Timestamp,
@@ -124,6 +139,25 @@ pub struct InterpretationRule {
     pub content: String,
 }
 
+/// Committee-validation metadata captured by the Python coordinator.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct CommitteeValidation {
+    pub accepted: bool,
+    pub yes_votes: u32,
+    pub no_votes: u32,
+    pub total_votes: u32,
+    pub confidence: f32,
+    pub reasoning: Vec<String>,
+}
+
+/// Pattern-detection metadata captured during understanding preparation.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, SerializedBytes)]
+pub struct DetectedPattern {
+    pub pattern: String,
+    pub confidence: f32,
+    pub details: String,
+}
+
 /// Represents an Architecture Decision Record (ADR).
 ///
 /// ADRs are a key component of "Specification-Driven Development" (SDD),
@@ -157,7 +191,7 @@ pub struct ADR {
 ///
 /// This entry provides a verifiable record of "Federated Reasoning" in action,
 /// capturing which agents' memories were composed, what strategy was used, and
-_summary_of_the_outcome />
+/// a summary of the outcome.
 ///
 /// TODO: Needs refinement by a human expert.
 #[hdk_entry_helper]
@@ -188,6 +222,10 @@ pub struct CompositionStats {
 pub struct UnderstandingInput {
     pub content: String,
     pub context: Option<String>,
+    pub is_decision: Option<bool>,
+    pub coherence_score: Option<f32>,
+    pub committee_validation: Option<CommitteeValidation>,
+    pub patterns: Option<Vec<DetectedPattern>>,
 
     // AD4M semantic layer fields
     pub perspectives: Option<Vec<PerspectiveHash>>,
@@ -237,14 +275,22 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
     let triple = extract_triple(&input.content)?;
 
     // Validate triple against ontology
-    validate_triple(&triple)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Ontology validation failed: {:?}", e))))?;
+    validate_triple(&triple).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Ontology validation failed: {:?}",
+            e
+        )))
+    })?;
 
     // Create Understanding entry
     let understanding = Understanding {
         content: input.content.clone(),
         context: input.context,
         triple: triple.clone(),
+        is_decision: input.is_decision.unwrap_or(false),
+        coherence_score: input.coherence_score.unwrap_or(0.0),
+        committee_validation: input.committee_validation,
+        patterns: input.patterns.unwrap_or_default(),
         created_at: sys_time()?,
         agent: agent_key.clone(),
         content_hash: hash_content(&input.content),
@@ -262,7 +308,7 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
         agent_key.clone(),
         understanding_hash.clone(),
         LinkTypes::AgentToUnderstanding,
-        ()
+        (),
     )?;
 
     // Create the triple entry
@@ -273,7 +319,7 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
         triple_hash,
         understanding_hash.clone(),
         LinkTypes::TripleToUnderstanding,
-        ()
+        (),
     )?;
 
     // Create links from AD4M perspectives to understanding (if provided)
@@ -286,7 +332,7 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
             perspective_anchor.path_entry_hash()?,
             understanding_hash.clone(),
             LinkTypes::PerspectiveToUnderstanding,
-            ()
+            (),
         )?;
     }
 
@@ -299,7 +345,7 @@ pub fn transmit_understanding(input: UnderstandingInput) -> ExternResult<ActionH
             context_anchor.path_entry_hash()?,
             understanding_hash.clone(),
             LinkTypes::SemanticContextToUnderstanding,
-            ()
+            (),
         )?;
     }
 
@@ -329,8 +375,7 @@ pub fn recall_understandings(query: RecallQuery) -> ExternResult<Vec<Understandi
     // Query by agent
     if let Some(agent) = query.agent {
         let links = get_links(
-            GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToUnderstanding)?
-                .build()
+            GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToUnderstanding)?.build(),
         )?;
 
         for link in links {
@@ -345,8 +390,11 @@ pub fn recall_understandings(query: RecallQuery) -> ExternResult<Vec<Understandi
         // If no agent specified, search the current agent's understandings
         let agent_info = agent_info()?;
         let links = get_links(
-            GetLinksInputBuilder::try_new(agent_info.agent_latest_pubkey, LinkTypes::AgentToUnderstanding)?
-                .build()
+            GetLinksInputBuilder::try_new(
+                agent_info.agent_latest_pubkey,
+                LinkTypes::AgentToUnderstanding,
+            )?
+            .build(),
         )?;
 
         for link in links {
@@ -422,6 +470,10 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
                 content: understanding.content.clone(),
                 context: understanding.context.clone(),
                 triple: understanding.triple.clone(),
+                is_decision: understanding.is_decision,
+                coherence_score: understanding.coherence_score,
+                committee_validation: understanding.committee_validation.clone(),
+                patterns: understanding.patterns.clone(),
                 created_at: sys_time()?,
                 agent: my_agent.clone(),
                 content_hash: understanding.content_hash.clone(),
@@ -434,12 +486,7 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
             let hash = create_entry(EntryTypes::Understanding(new_understanding))?;
 
             // Create link from current agent to understanding
-            create_link(
-                my_agent.clone(),
-                hash,
-                LinkTypes::AgentToUnderstanding,
-                ()
-            )?;
+            create_link(my_agent.clone(), hash, LinkTypes::AgentToUnderstanding, ())?;
 
             new_count += 1;
         }
@@ -459,7 +506,10 @@ pub fn compose_memories(other_agent: AgentPubKey) -> ExternResult<MemoryComposit
 
     create_entry(EntryTypes::MemoryComposition(composition.clone()))?;
 
-    debug!("Composed memories: {} new, {} duplicates skipped", new_count, dup_count);
+    debug!(
+        "Composed memories: {} new, {} duplicates skipped",
+        new_count, dup_count
+    );
 
     Ok(composition)
 }
@@ -542,8 +592,9 @@ pub fn query_by_perspective(perspective_hash: String) -> ExternResult<Vec<Unders
     let links = get_links(
         GetLinksInputBuilder::try_new(
             perspective_anchor.path_entry_hash()?,
-            LinkTypes::PerspectiveToUnderstanding
-        )?.build()
+            LinkTypes::PerspectiveToUnderstanding,
+        )?
+        .build(),
     )?;
 
     let mut understandings = Vec::new();
@@ -575,8 +626,9 @@ pub fn query_by_semantic_context(schema: String) -> ExternResult<Vec<Understandi
     let links = get_links(
         GetLinksInputBuilder::try_new(
             context_anchor.path_entry_hash()?,
-            LinkTypes::SemanticContextToUnderstanding
-        )?.build()
+            LinkTypes::SemanticContextToUnderstanding,
+        )?
+        .build(),
     )?;
 
     let mut understandings = Vec::new();
@@ -636,6 +688,10 @@ pub fn publish_with_perspective(input: PublishWithPerspectiveInput) -> ExternRes
     let understanding_input = UnderstandingInput {
         content: input.content,
         context: input.context,
+        is_decision: None,
+        coherence_score: None,
+        committee_validation: None,
+        patterns: None,
         perspectives: Some(vec![input.perspective]),
         semantic_context: input.semantic_context,
         language_address: input.language_address,
@@ -673,7 +729,11 @@ fn get_understanding(hash: ActionHash) -> ExternResult<Option<Understanding>> {
 fn matches_query(understanding: &Understanding, query: &RecallQuery) -> bool {
     // Filter by content
     if let Some(ref contains) = query.content_contains {
-        if !understanding.content.to_lowercase().contains(&contains.to_lowercase()) {
+        if !understanding
+            .content
+            .to_lowercase()
+            .contains(&contains.to_lowercase())
+        {
             return false;
         }
     }
@@ -732,11 +792,11 @@ fn extract_triple(content: &str) -> ExternResult<KnowledgeTriple> {
         });
     }
 
-    // Default: treat as statement
-    // Subject = agent, predicate = stated, object = content hash
+    // Default: relate the authoring agent to a stable content-hash object.
+    // Use a registered base predicate so ontology validation still succeeds.
     Ok(KnowledgeTriple {
         subject: format!("agent_{}", &agent_key.to_string()[..8]),
-        predicate: "stated".to_string(),
+        predicate: "related_to".to_string(),
         object: format!("content_{}", hash_content(content)),
         confidence: 1.0,
         source: agent_key,
@@ -779,7 +839,8 @@ fn extract_improves_pattern(content: &str) -> Option<(String, String)> {
             };
 
             if obj_idx < words.len() {
-                let object = words[obj_idx].trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+                let object =
+                    words[obj_idx].trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
                 if !subject.is_empty() && !object.is_empty() {
                     return Some((subject.to_string(), object.to_string()));
                 }
@@ -795,7 +856,11 @@ fn extract_capable_pattern(content: &str) -> Option<(String, String)> {
     let words: Vec<&str> = content.split_whitespace().collect();
 
     for i in 0..words.len().saturating_sub(3) {
-        if words[i + 1] == "is" && words[i + 2] == "capable" && i + 3 < words.len() && words[i + 3] == "of" {
+        if words[i + 1] == "is"
+            && words[i + 2] == "capable"
+            && i + 3 < words.len()
+            && words[i + 3] == "of"
+        {
             let subject = words[i].trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
 
             if i + 4 < words.len() {

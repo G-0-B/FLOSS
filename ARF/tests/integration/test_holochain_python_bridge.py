@@ -19,19 +19,18 @@ import asyncio
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 import sys
-import json
 
 # Add ARF to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from conversation_memory import ConversationMemory
 
-
 # ============================================================================
 # Mock Holochain Client
 # ============================================================================
+
 
 class MockHolochainClient:
     """
@@ -45,21 +44,22 @@ class MockHolochainClient:
         self.entries = []  # Simulated DHT entries
         self.call_count = 0
 
-    async def call_zome(self, zome: str, function: str, payload: Dict) -> Dict[str, Any]:
+    async def call_zome(
+        self, zome: str, function: str, payload: Dict
+    ) -> Dict[str, Any]:
         """Mock zome function call"""
         self.call_count += 1
 
         if zome == "memory_coordinator":
             if function == "transmit_understanding":
                 return self._mock_transmit(payload)
-            elif function == "recall_understandings":
+            if function == "recall_understandings":
                 return self._mock_recall(payload)
-            elif function == "get_all_understandings":
+            if function == "get_all_understandings":
                 return self._mock_get_all()
 
-        elif zome == "ontology_integrity":
-            if function == "validate_triple":
-                return self._mock_validate_triple(payload)
+        if zome == "ontology_integrity" and function == "validate_triple":
+            return self._mock_validate_triple(payload)
 
         return {"error": f"Unknown zome function: {zome}.{function}"}
 
@@ -70,7 +70,7 @@ class MockHolochainClient:
             "content": payload.get("content", ""),
             "agent_id": payload.get("agent_id", "unknown"),
             "timestamp": payload.get("timestamp", "2025-11-14T00:00:00Z"),
-            "metadata": payload.get("metadata", {})
+            "metadata": payload.get("metadata", {}),
         }
         self.entries.append(entry)
         return {"status": "success", "hash": entry["hash"]}
@@ -82,21 +82,14 @@ class MockHolochainClient:
 
         # Simple keyword matching
         matches = [
-            entry for entry in self.entries
-            if query in entry.get("content", "").lower()
+            entry for entry in self.entries if query in entry.get("content", "").lower()
         ]
 
-        return {
-            "status": "success",
-            "results": matches[:top_k]
-        }
+        return {"status": "success", "results": matches[:top_k]}
 
     def _mock_get_all(self) -> Dict:
         """Mock get_all_understandings"""
-        return {
-            "status": "success",
-            "results": self.entries
-        }
+        return {"status": "success", "results": self.entries}
 
     def _mock_validate_triple(self, payload: Dict) -> Dict:
         """Mock validate_triple from ontology zome"""
@@ -105,23 +98,26 @@ class MockHolochainClient:
 
         # Known valid predicates
         valid_predicates = {
-            'is_a', 'part_of', 'related_to', 'has_property',
-            'improves_upon', 'capable_of', 'trained_on',
-            'evaluated_on', 'stated'
+            "is_a",
+            "part_of",
+            "related_to",
+            "has_property",
+            "improves_upon",
+            "capable_of",
+            "trained_on",
+            "evaluated_on",
+            "stated",
         }
 
         is_valid = predicate in valid_predicates
 
-        return {
-            "status": "success",
-            "is_valid": is_valid,
-            "predicate": predicate
-        }
+        return {"status": "success", "is_valid": is_valid, "predicate": predicate}
 
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def event_loop():
@@ -153,20 +149,18 @@ def temp_dir():
 # Basic Holochain Bridge Tests
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_mock_holochain_transmit(mock_holochain):
     """Test basic transmit to mock Holochain"""
     result = await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Test understanding",
-            "agent_id": "test_agent"
-        }
+        payload={"content": "Test understanding", "agent_id": "test_agent"},
     )
 
-    assert result['status'] == 'success'
-    assert 'hash' in result
+    assert result["status"] == "success"
+    assert "hash" in result
 
 
 @pytest.mark.asyncio
@@ -176,25 +170,19 @@ async def test_mock_holochain_recall(mock_holochain):
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "GPT-4 is a language model",
-            "agent_id": "test_agent"
-        }
+        payload={"content": "GPT-4 is a language model", "agent_id": "test_agent"},
     )
 
     # Then recall
     result = await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="recall_understandings",
-        payload={
-            "query": "GPT-4",
-            "top_k": 5
-        }
+        payload={"query": "GPT-4", "top_k": 5},
     )
 
-    assert result['status'] == 'success'
-    assert len(result['results']) >= 1
-    assert 'GPT-4' in result['results'][0]['content']
+    assert result["status"] == "success"
+    assert len(result["results"]) >= 1
+    assert "GPT-4" in result["results"][0]["content"]
 
 
 @pytest.mark.asyncio
@@ -204,38 +192,29 @@ async def test_mock_ontology_validation(mock_holochain):
     result = await mock_holochain.call_zome(
         zome="ontology_integrity",
         function="validate_triple",
-        payload={
-            "triple": {
-                "subject": "GPT-4",
-                "predicate": "is_a",
-                "object": "LLM"
-            }
-        }
+        payload={"triple": {"subject": "GPT-4", "predicate": "is_a", "object": "LLM"}},
     )
 
-    assert result['status'] == 'success'
-    assert result['is_valid'] is True
+    assert result["status"] == "success"
+    assert result["is_valid"] is True
 
     # Invalid predicate
     result = await mock_holochain.call_zome(
         zome="ontology_integrity",
         function="validate_triple",
         payload={
-            "triple": {
-                "subject": "GPT-4",
-                "predicate": "ate",
-                "object": "sandwich"
-            }
-        }
+            "triple": {"subject": "GPT-4", "predicate": "ate", "object": "sandwich"}
+        },
     )
 
-    assert result['status'] == 'success'
-    assert result['is_valid'] is False
+    assert result["status"] == "success"
+    assert result["is_valid"] is False
 
 
 # ============================================================================
 # ConversationMemory with Holochain Backend Tests
 # ============================================================================
+
 
 def test_memory_holochain_backend_initialization(temp_dir):
     """
@@ -251,7 +230,7 @@ def test_memory_holochain_backend_initialization(temp_dir):
     memory = ConversationMemory(
         agent_id="holochain_agent",
         storage_path=str(storage_path),
-        backend="holochain"  # Will use file backend if conductor unavailable
+        backend="holochain",  # Will use file backend if conductor unavailable
     )
 
     assert memory is not None
@@ -259,22 +238,17 @@ def test_memory_holochain_backend_initialization(temp_dir):
 
 
 def test_memory_with_holochain_transmit_fallback(temp_dir):
-    """
-    Test that memory gracefully falls back when Holochain unavailable.
-    """
+    """Test that memory gracefully falls back when Holochain unavailable."""
     storage_path = temp_dir / "fallback_memory"
 
     memory = ConversationMemory(
-        agent_id="fallback_agent",
-        storage_path=str(storage_path),
-        backend="holochain"
+        agent_id="fallback_agent", storage_path=str(storage_path), backend="holochain"
     )
 
     # Should still work with file backend fallback
-    ref = memory.transmit({
-        "content": "Test with Holochain backend intent",
-        "coherence": 0.9
-    })
+    ref = memory.transmit(
+        {"content": "Test with Holochain backend intent", "coherence": 0.9}
+    )
 
     assert ref is not None
 
@@ -287,121 +261,97 @@ def test_memory_with_holochain_transmit_fallback(temp_dir):
 # Multi-Agent DHT Coordination Tests
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_dht_multi_agent_coordination(mock_holochain):
-    """
-    Test multiple agents coordinating via DHT.
-    """
+    """Test multiple agents coordinating via DHT."""
     # Agent A transmits
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Agent A: System initialized",
-            "agent_id": "agent_a"
-        }
+        payload={"content": "Agent A: System initialized", "agent_id": "agent_a"},
     )
 
     # Agent B transmits
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Agent B: Ready for coordination",
-            "agent_id": "agent_b"
-        }
+        payload={"content": "Agent B: Ready for coordination", "agent_id": "agent_b"},
     )
 
     # Agent C queries DHT
     result = await mock_holochain.call_zome(
-        zome="memory_coordinator",
-        function="get_all_understandings",
-        payload={}
+        zome="memory_coordinator", function="get_all_understandings", payload={}
     )
 
-    assert result['status'] == 'success'
-    assert len(result['results']) >= 2
+    assert result["status"] == "success"
+    assert len(result["results"]) >= 2
 
     # Verify both agents' data is present
-    agents = [entry['agent_id'] for entry in result['results']]
-    assert 'agent_a' in agents
-    assert 'agent_b' in agents
+    agents = [entry["agent_id"] for entry in result["results"]]
+    assert "agent_a" in agents
+    assert "agent_b" in agents
 
 
 @pytest.mark.asyncio
 async def test_dht_query_filtering(mock_holochain):
-    """
-    Test querying DHT with filters.
-    """
+    """Test querying DHT with filters."""
     # Add multiple entries
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Entry about GPT-4",
-            "agent_id": "agent_1"
-        }
+        payload={"content": "Entry about GPT-4", "agent_id": "agent_1"},
     )
 
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Entry about Claude",
-            "agent_id": "agent_2"
-        }
+        payload={"content": "Entry about Claude", "agent_id": "agent_2"},
     )
 
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={
-            "content": "Another entry about GPT-4",
-            "agent_id": "agent_3"
-        }
+        payload={"content": "Another entry about GPT-4", "agent_id": "agent_3"},
     )
 
     # Query for GPT-4
     result = await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="recall_understandings",
-        payload={
-            "query": "GPT-4",
-            "top_k": 10
-        }
+        payload={"query": "GPT-4", "top_k": 10},
     )
 
-    assert len(result['results']) == 2  # Should find 2 GPT-4 entries
+    assert len(result["results"]) == 2  # Should find 2 GPT-4 entries
 
 
 # ============================================================================
 # DHT Performance Tests
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_dht_operation_count(mock_holochain):
-    """
-    Test tracking of DHT operations.
-    """
+    """Test tracking of DHT operations."""
     initial_count = mock_holochain.call_count
 
     # Perform several operations
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={"content": "Test 1", "agent_id": "test"}
+        payload={"content": "Test 1", "agent_id": "test"},
     )
 
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="transmit_understanding",
-        payload={"content": "Test 2", "agent_id": "test"}
+        payload={"content": "Test 2", "agent_id": "test"},
     )
 
     await mock_holochain.call_zome(
         zome="memory_coordinator",
         function="recall_understandings",
-        payload={"query": "Test", "top_k": 5}
+        payload={"query": "Test", "top_k": 5},
     )
 
     final_count = mock_holochain.call_count
@@ -412,19 +362,14 @@ async def test_dht_operation_count(mock_holochain):
 
 @pytest.mark.asyncio
 async def test_dht_batch_operations(mock_holochain):
-    """
-    Test batch operations on DHT.
-    """
+    """Test batch operations on DHT."""
     # Batch transmit
     tasks = []
     for i in range(10):
         task = mock_holochain.call_zome(
             zome="memory_coordinator",
             function="transmit_understanding",
-            payload={
-                "content": f"Batch entry {i}",
-                "agent_id": "batch_agent"
-            }
+            payload={"content": f"Batch entry {i}", "agent_id": "batch_agent"},
         )
         tasks.append(task)
 
@@ -432,55 +377,47 @@ async def test_dht_batch_operations(mock_holochain):
 
     # All should succeed
     assert len(results) == 10
-    assert all(r['status'] == 'success' for r in results)
+    assert all(r["status"] == "success" for r in results)
 
     # Verify all stored
     all_entries = await mock_holochain.call_zome(
-        zome="memory_coordinator",
-        function="get_all_understandings",
-        payload={}
+        zome="memory_coordinator", function="get_all_understandings", payload={}
     )
 
-    assert len(all_entries['results']) >= 10
+    assert len(all_entries["results"]) >= 10
 
 
 # ============================================================================
 # Error Handling Tests
 # ============================================================================
 
+
 @pytest.mark.asyncio
 async def test_holochain_unknown_zome(mock_holochain):
-    """
-    Test handling of unknown zome calls.
-    """
+    """Test handling of unknown zome calls."""
     result = await mock_holochain.call_zome(
-        zome="unknown_zome",
-        function="unknown_function",
-        payload={}
+        zome="unknown_zome", function="unknown_function", payload={}
     )
 
-    assert 'error' in result
+    assert "error" in result
 
 
 @pytest.mark.asyncio
 async def test_holochain_missing_payload(mock_holochain):
-    """
-    Test handling of missing required payload fields.
-    """
+    """Test handling of missing required payload fields."""
     # Transmit without content
     result = await mock_holochain.call_zome(
-        zome="memory_coordinator",
-        function="transmit_understanding",
-        payload={}
+        zome="memory_coordinator", function="transmit_understanding", payload={}
     )
 
     # Should handle gracefully (may succeed with empty content or fail)
-    assert 'status' in result or 'error' in result
+    assert "status" in result or "error" in result
 
 
 # ============================================================================
 # Future Integration Tests (Full Holochain)
 # ============================================================================
+
 
 @pytest.mark.skip(reason="Requires full Holochain conductor setup")
 @pytest.mark.asyncio
@@ -493,7 +430,7 @@ async def test_real_holochain_conductor():
     2. Rose Forest DNA is deployed
     3. Python-Holochain bridge is complete
     """
-    pass
+    pytest.skip("Requires full Holochain conductor setup")
 
 
 @pytest.mark.skip(reason="Requires full Holochain conductor setup")
@@ -504,16 +441,14 @@ async def test_dht_gossip_protocol():
 
     Target: Entries propagate to all nodes within 500ms.
     """
-    pass
+    return None
 
 
 @pytest.mark.skip(reason="Requires full Holochain conductor setup")
 @pytest.mark.asyncio
 async def test_holochain_signature_verification():
-    """
-    Test cryptographic signature verification on DHT entries.
-    """
-    pass
+    """Test cryptographic signature verification on DHT entries."""
+    return None
 
 
 @pytest.mark.skip(reason="Requires full Holochain conductor setup")
@@ -524,12 +459,13 @@ async def test_holochain_ontology_inference():
 
     From Phase 7.1: Inference Engine Expansion
     """
-    pass
+    return None
 
 
 # ============================================================================
 # Integration with Other Components
 # ============================================================================
+
 
 @pytest.mark.asyncio
 async def test_holochain_with_pony_swarm_intent():
@@ -540,7 +476,7 @@ async def test_holochain_with_pony_swarm_intent():
     """
     # Future: Swarm results should be stored in Holochain DHT
     # Future: Multiple swarms coordinate via shared memory
-    pass
+    return None
 
 
 @pytest.mark.asyncio
@@ -552,7 +488,7 @@ async def test_holochain_with_infinity_bridge_intent():
     """
     # Future: Bridges register capabilities in DHT
     # Future: Orchestrator discovers bridges via DHT
-    pass
+    return None
 
 
 if __name__ == "__main__":

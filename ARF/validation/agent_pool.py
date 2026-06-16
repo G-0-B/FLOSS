@@ -1,22 +1,23 @@
-"""
-Agent Pool for Validation Committee.
-Manages a pool of LLM agents that can act as validators.
-"""
-from typing import List, Dict, Any, Optional
+"""Agent pool for the validation committee."""
+
+from typing import List
 from dataclasses import dataclass
 import random
-import asyncio
+
 
 @dataclass
 class ValidatorResponse:
     """Response from a single validator."""
+
     agent_id: str
     approved: bool
     confidence: float
     reasoning: str
 
+
 class Validator:
     """Abstract base class for a validator agent."""
+
     def __init__(self, agent_id: str, model: str):
         self.agent_id = agent_id
         self.model = model
@@ -25,29 +26,36 @@ class Validator:
         """Validates a triple against the context."""
         raise NotImplementedError
 
+
 class MockValidator(Validator):
     """A mock validator for testing purposes."""
+
     async def validate_triple(self, triple: tuple, context: str) -> ValidatorResponse:
         """Simulates validation with random or deterministic logic."""
         # Deterministic mock logic for testing
         subject, predicate, obj = triple
-        
+
         # Simulate rejection of "nonsense"
-        if "nonsense" in subject.lower() or "nonsense" in obj.lower() or "nonsense" in context.lower():
+        if (
+            "nonsense" in subject.lower()
+            or "nonsense" in obj.lower()
+            or "nonsense" in context.lower()
+        ):
             return ValidatorResponse(
                 agent_id=self.agent_id,
                 approved=False,
                 confidence=0.9,
-                reasoning="Detected nonsense content."
+                reasoning="Detected nonsense content.",
             )
-            
-        # Simulate rejection of unknown predicates (redundant with basic check but good for testing)
+
+        # Simulate rejection of unknown predicates.
+        # This is redundant with the basic check but useful for tests.
         if predicate == "unknown_predicate":
-             return ValidatorResponse(
+            return ValidatorResponse(
                 agent_id=self.agent_id,
                 approved=False,
                 confidence=0.95,
-                reasoning="Unknown predicate."
+                reasoning="Unknown predicate.",
             )
 
         # Default approval
@@ -55,16 +63,18 @@ class MockValidator(Validator):
             agent_id=self.agent_id,
             approved=True,
             confidence=0.8 + (random.random() * 0.15),
-            reasoning="Triple appears consistent with context."
+            reasoning="Triple appears consistent with context.",
         )
+
 
 class ValidatorPool:
     """Manages a pool of validators."""
+
     def __init__(self, use_mock: bool = True):
         self.validators: List[Validator] = []
         if use_mock:
             self._init_mock_pool()
-    
+
     def _init_mock_pool(self):
         """Initializes a diverse pool of mock validators."""
         self.validators = [
@@ -74,7 +84,7 @@ class ValidatorPool:
             MockValidator("validator-4", "mock-mistral"),
             MockValidator("validator-5", "mock-gemini"),
         ]
-    
+
     def get_committee(self, size: int = 3) -> List[Validator]:
         """Selects a random committee of validators."""
         if size > len(self.validators):

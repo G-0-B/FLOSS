@@ -6,3 +6,6 @@ typer[all]>=0.9.0
 rich>=13.0.0
 aiohttp>=3.13.0
 websockets>=10.0
+pynacl>=1.6.0
+blake3>=1.0.8
+jcs>=0.2.1

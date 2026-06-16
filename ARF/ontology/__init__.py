@@ -1,4 +1,3 @@
-"""
-Ontology package for ARF.
-"""
-from .predicates import *
+"""Ontology package for ARF."""
+
+from .predicates import *  # noqa: F403

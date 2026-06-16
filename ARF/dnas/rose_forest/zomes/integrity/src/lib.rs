@@ -70,7 +70,12 @@ pub struct BudgetEntry {
 }
 
 #[hdk_link_types]
-pub enum LinkTypes { AllNodes, Edge, TriplesBySubject, TriplesByPredicate }
+pub enum LinkTypes {
+    AllNodes,
+    Edge,
+    TriplesBySubject,
+    TriplesByPredicate,
+}
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
@@ -100,7 +105,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::RoseNode(node) => validate_rose_node(&node),
                     EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
                     EntryTypes::BudgetEntry(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::ThoughtCredential(credential) => validate_thought_credential(&credential),
+                    EntryTypes::ThoughtCredential(credential) => {
+                        validate_thought_credential(&credential)
+                    }
                     EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple),
                 }
             }
@@ -110,79 +117,137 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_thought_credential(credential: &ThoughtCredential) -> ExternResult<ValidateCallbackResult> {
+fn validate_thought_credential(
+    credential: &ThoughtCredential,
+) -> ExternResult<ValidateCallbackResult> {
     let dim = credential.content.len();
     if dim < 32 || dim > 4096 {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_THOUGHT_CONTENT_DIM: {} out of [32,4096]", dim)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_THOUGHT_CONTENT_DIM: {} out of [32,4096]",
+            dim
+        )));
     }
     if !(-1..=1).contains(&credential.connotation) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_CONNOTATION: {} out of [-1,1]", credential.connotation)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_CONNOTATION: {} out of [-1,1]",
+            credential.connotation
+        )));
     }
     if !(0.0..=1.0).contains(&credential.impact) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_IMPACT: {} out of [0,1]", credential.impact)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_IMPACT: {} out of [0,1]",
+            credential.impact
+        )));
     }
     // Further validation could include checking provenance signature or resonance thresholds
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_rose_node(node: &RoseNode) -> ExternResult<ValidateCallbackResult> {
-    const VALID_LICENSES: &[&str] = &["MIT","Apache-2.0","BSD-3-Clause","MPL-2.0","CC-BY-4.0"];
+    const VALID_LICENSES: &[&str] = &["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0", "CC-BY-4.0"];
     if !VALID_LICENSES.contains(&node.license.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_LICENSE: '{}' not allowed", node.license)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_LICENSE: '{}' not allowed",
+            node.license
+        )));
     }
     let dim = node.embedding.len();
     if dim < 32 || dim > 4096 {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_EMBED_DIM: {} out of [32,4096]", dim)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_EMBED_DIM: {} out of [32,4096]",
+            dim
+        )));
     }
-    match (node.metadata.get("model_id"), node.metadata.get("model_card_hash")) {
+    match (
+        node.metadata.get("model_id"),
+        node.metadata.get("model_card_hash"),
+    ) {
         (Some(_), Some(hash)) if hash.starts_with("sha256:") => Ok(ValidateCallbackResult::Valid),
-        _ => Ok(ValidateCallbackResult::Invalid("E_MODEL_CARD_MISSING".into())),
+        _ => Ok(ValidateCallbackResult::Invalid(
+            "E_MODEL_CARD_MISSING".into(),
+        )),
     }
 }
 
 fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateCallbackResult> {
     if triple.subject.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_SUBJECT: subject must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_SUBJECT: subject must not be empty".into(),
+        ));
     }
     if triple.predicate.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_PREDICATE: predicate must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_PREDICATE: predicate must not be empty".into(),
+        ));
     }
     if triple.object.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_OBJECT: object must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_OBJECT: object must not be empty".into(),
+        ));
     }
-    if !(0.0..=1.0).contains(&triple.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_TRIPLE_CONFIDENCE: {} out of [0,1]", triple.confidence)));
+    // Signed gradient: negative = movement away from truth, positive = toward truth.
+    // Aligns with ternary logic (-1/0/+1) and Yumeichan connotation framework.
+    if !(-1.0..=1.0).contains(&triple.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_TRIPLE_CONFIDENCE: {} out of [-1,1]",
+            triple.confidence
+        )));
     }
     // Predicate must be from a registered ontology namespace.
     // Base predicates + AI/ML predicates from the ontology_integrity module.
     const VALID_PREDICATES: &[&str] = &[
-        "is_a", "part_of", "related_to", "has_property",
-        "trained_on", "improves_upon", "capable_of", "evaluated_on",
+        "is_a",
+        "part_of",
+        "related_to",
+        "has_property",
+        "trained_on",
+        "improves_upon",
+        "capable_of",
+        "evaluated_on",
         // Knowledge graph relationship predicates (same as KnowledgeEdge)
-        "relates_to", "supports", "contradicts",
-        "heals", "releases", "neutralizes", "recalibrates",
+        "relates_to",
+        "supports",
+        "contradicts",
+        "heals",
+        "releases",
+        "neutralizes",
+        "recalibrates",
     ];
     if !VALID_PREDICATES.contains(&triple.predicate.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("E_TRIPLE_PREDICATE_UNKNOWN: '{}' not in registered ontology", triple.predicate)
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_TRIPLE_PREDICATE_UNKNOWN: '{}' not in registered ontology",
+            triple.predicate
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbackResult> {
-    if !(0.0..=1.0).contains(&edge.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_CONFIDENCE: {} out of [0,1]", edge.confidence)));
+    // Signed gradient: same range as KnowledgeTriple confidence.
+    if !(-1.0..=1.0).contains(&edge.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_CONFIDENCE: {} out of [-1,1]",
+            edge.confidence
+        )));
     }
     // New relationship types reflecting the manifesto
-    const VALID_RELATIONSHIPS: &[&str] = &["relates_to", "supports", "contradicts", "heals", "releases", "neutralizes", "recalibrates"];
+    const VALID_RELATIONSHIPS: &[&str] = &[
+        "relates_to",
+        "supports",
+        "contradicts",
+        "heals",
+        "releases",
+        "neutralizes",
+        "recalibrates",
+    ];
     if !VALID_RELATIONSHIPS.contains(&edge.relationship.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_RELATIONSHIP: '{}' not allowed", edge.relationship)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_RELATIONSHIP: '{}' not allowed",
+            edge.relationship
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
-
-
 
 /// A verifiable credential representing a moment of "thought" or insight.
 ///
@@ -196,9 +261,9 @@ fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbac
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ThoughtCredential {
-    pub content: Vec<f32>, // SemanticVector
-    pub connotation: i8, // TernaryScore: -1, 0, 1
-    pub provenance: AgentPubKey, // AgentSignature
+    pub content: Vec<f32>,           // SemanticVector
+    pub connotation: i8,             // TernaryScore: -1, 0, 1
+    pub provenance: AgentPubKey,     // AgentSignature
     pub resonance: Vec<AgentPubKey>, // AgentEndorsement
-    pub impact: f32, // WisdomMetric
+    pub impact: f32,                 // WisdomMetric
 }

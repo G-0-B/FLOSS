@@ -12,8 +12,8 @@ A biomimetic distributed intelligence platform for all beings — synthetic, art
 | Question | Answer |
 |----------|--------|
 | What is this? | A decentralized knowledge commons on Holochain with semantic search, provenance, and multi-agent coordination |
-| What stage is it at? | Foundation docs consolidated. Phase 0 (substrate viability) is next. |
-| Where do I start reading? | `docs/ARCHITECTURE.md` for the full picture |
+| What stage is it at? | MVP Phase 0 substrate viability is complete; Phase 1 KnowledgeTriple + orchestration substrate-bridge validation are next. |
+| Where do I start reading? | `CLAUDE.md`, `MVP_PLAN.md`, and `docs/architecture/HOLISTIC_ARCHITECTURE.md` |
 | Where's the code? | `ARF/dnas/rose_forest/` (Holochain DNA), `ARF/conversation_memory.py` (Python memory substrate) |
 | What's the governance? | `docs/governance/LOADING_ORDER.md` |
 
@@ -54,22 +54,24 @@ code/                      -- Reference documentation and knowledge bases
 
 ---
 
-## Current Phase: Foundation Complete, Phase 0 Next
+## Current Phase: MVP Phase 0 Complete
 
-**Blocking items:**
-1. Rose Forest DNA has never been compiled (missing build infrastructure)
-2. ConversationMemory has an API mismatch with MultiScaleEmbedding
-3. ADR-0 Test #4 (Human Coherence) has not been run
+**Status correction (2026-05-18):**
+1. Rose Forest MVP Phase 0 is complete: DNA compiles to WASM and Tryorama integration tests pass per `MVP_PLAN.md`.
+2. ADR-0 Test #4 (Human Coherence) passed 2026-03-20.
+3. ConversationMemory still has an API mismatch with MultiScaleEmbedding.
+4. The remaining "Phase 0" work is a separate orchestration substrate-bridge validation (`docs/specs/phase0-substrate-bridge.spec.md`), not the old Tryorama gate.
 
-**Phase sequence:** Foundation (docs) -> Phase 0 (substrate viability) -> Phase 1 (MVC) -> Phase 2+ (LATER)
+**Phase sequence:** Foundation (docs) -> MVP Phase 0 (substrate viability) -> Phase 1 (KnowledgeTriple / MVC) + orchestration substrate bridge -> Phase 2+ (LATER)
 
-See `docs/ARCHITECTURE.md` for full gating logic and phase details.
+See `MVP_PLAN.md`, `docs/specs/phase0-substrate-bridge.spec.md`, and `docs/architecture/HOLISTIC_ARCHITECTURE.md` for gating logic and phase details.
 
 ---
 
 ## Key Documents
 
-- **Architecture:** `docs/ARCHITECTURE.md`
+- **Architecture:** `docs/architecture/HOLISTIC_ARCHITECTURE.md`
+- **MVP Plan / phase status:** `MVP_PLAN.md`
 - **ADR Index:** `docs/adr/INDEX.md`
 - **Governance Loading Order:** `docs/governance/LOADING_ORDER.md`
 - **Entry Type Specs:** `docs/specs/`

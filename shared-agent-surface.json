@@ -1,0 +1,181 @@
+{
+  "manifest_version": "0.1.4",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "mcp_source": ".mcp.json",
+  "mcp_mirrors": [
+    "FLOSS/.mcp.json"
+  ],
+  "context_pack_path": ".agent-surface/CONTEXT_POINTERS.md",
+  "context_pointers": [
+    "INDEX.md",
+    "FLOSS/docs/architecture/OPERATOR_PRIMER.md",
+    "FLOSS/CLAUDE.md",
+    "FLOSS/README.md",
+    "FLOSS/MVP_PLAN.md",
+    "FLOSS/SDD-Master-Spec-0.22.md",
+    "FLOSS/INSTRUCTIONS_FOR_CODE.md",
+    "AGENTMEMORY.md",
+    ".agent-surface/STARTUP_CONTRACT.md",
+    "FLOSS/pprevious_working_task.md",
+    "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+    "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
+    "FLOSS/docs/architecture/RUNTIME_SURFACES.md",
+    "FLOSS/docs/specs/phase0-substrate-bridge.spec.md",
+    "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md",
+    ".agent-surface/VIBE_STARTUP.md",
+    ".agent-surface/context/CONTEXT_L0.md",
+    ".agent-surface/context/CONTEXT_L1.md",
+    "FLOSS/shared-context-surface.json",
+    "FLOSS/shared-hook-surface.json",
+    "FLOSS/shared-skill-surface.json",
+    "FLOSS/shared-agent-memory-surface.json",
+    "FLOSS/shared-ai-roster-surface.json",
+    "FLOSS/docs/agent-memory/MEMORY.md",
+    "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+    ".agent-surface/memory/AGENT_MEMORY.md",
+    "FLOSS/skill-corpus",
+    "FLOSS/scripts/context_router.py",
+    "FLOSS/scripts/watch_intake.py",
+    "FLOSS/scripts/process_intake_events.py",
+    "FLOSS/docs/specs/intake-event.spec.md",
+    "FLOSS/docs/specs/intake-event.schema.json",
+    "FLOSS/docs/superpowers/plans/2026-04-19-filewatch-metaharness.md",
+    "FLOSS/.serena/project.yml",
+    "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+    "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+    "FLOSS/docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md",
+    "FLOSS/docs/superpowers/plans/2026-04-16-external-adoption-and-shared-surface.md",
+    ".agent-surface/harness/AI_ROSTER.md",
+    ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
+    ".agent-surface/harness/ai-roster.json"
+  ],
+  "targets": {
+    "gemini": {
+      "settings_path": ".gemini/settings.json"
+    },
+    "opencode": {
+      "settings_path": "opworkers/opencode.jsonc",
+      "default_agent": "openwork",
+      "agent_instruction_path": "opworkers/.opencode/agents/openwork.md",
+      "agent_description": "OpenWork default FLOSSI0ULLK worker generated from the shared surface.",
+      "startup_context_pointers": [
+        ".agent-surface/STARTUP_CONTRACT.md",
+        ".agent-surface/context/CONTEXT_L0.md",
+        ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
+        ".agent-surface/harness/AI_ROSTER.md",
+        ".agent-surface/memory/AGENT_MEMORY.md",
+        "AGENTMEMORY.md",
+        "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+        "FLOSS/docs/specs/provenance-packet.spec.md"
+      ]
+    },
+    "vibe": {
+      "config_path": ".vibe/config.toml",
+      "agents_dir": ".vibe/agents",
+      "launcher_path": "vibe-floss.ps1",
+      "startup_prompt_path": ".agent-surface/VIBE_STARTUP.md",
+      "env_path": "FLOSS/.env",
+      "python_exe": "C:/Python313/python.exe",
+      "active_model": "devstral-small",
+      "default_agent": "flossi0ullk-align",
+      "include_project_context": true,
+      "context_warnings": true,
+      "enable_auto_update": true,
+      "agent_paths": [
+        ".vibe/agents"
+      ],
+      "enabled_agents": [
+        "flossi0ullk-align",
+        "flossi0ullk-explore"
+      ],
+      "skill_paths": [
+        "FLOSS/skill-corpus"
+      ],
+      "enabled_skills": [
+        "flossi0ullk-*"
+      ],
+      "mcp_servers": [
+        "serena",
+        "flossiullk-consensus",
+        "flossiullk-reasoning-ensemble",
+        "agentmemory"
+      ],
+      "server_overrides": {
+        "serena": {
+          "args": [
+            "--from",
+            "git+https://github.com/oraios/serena",
+            "serena",
+            "start-mcp-server",
+            "--project",
+            "${repo_root}",
+            "--enable-web-dashboard=false",
+            "--open-web-dashboard=false"
+          ],
+          "startup_timeout_sec": 20,
+          "tool_timeout_sec": 120
+        },
+        "flossiullk-consensus": {
+          "startup_timeout_sec": 20,
+          "tool_timeout_sec": 120,
+          "sampling_enabled": false
+        },
+        "flossiullk-reasoning-ensemble": {
+          "startup_timeout_sec": 120,
+          "tool_timeout_sec": 240,
+          "sampling_enabled": false
+        },
+        "agentmemory": {
+          "startup_timeout_sec": 30,
+          "tool_timeout_sec": 120,
+          "sampling_enabled": false
+        }
+      },
+      "agents": [
+        {
+          "name": "flossi0ullk-align",
+          "display_name": "FLOSSI0ULLK Align",
+          "description": "Default Mistral Vibe agent for FLOSSI0ULLK. Start from shared context, current phase status, shared memory, runtime budget, and SDD discipline before proposing work.",
+          "safety": "safe",
+          "auto_approve": false,
+          "active_model": "devstral-small",
+          "system_prompt_id": "cli",
+          "enabled_tools": [
+            "grep",
+            "read_file",
+            "ask_user_question",
+            "skill"
+          ]
+        },
+        {
+          "name": "flossi0ullk-explore",
+          "display_name": "FLOSSI0ULLK Explore",
+          "description": "Read-only FLOSSI0ULLK explorer using AGENTS.md, shared skills, grep, and read_file.",
+          "safety": "safe",
+          "auto_approve": true,
+          "active_model": "devstral-small",
+          "system_prompt_id": "explore",
+          "enabled_tools": [
+            "grep",
+            "read_file",
+            "ask_user_question"
+          ]
+        }
+      ],
+      "startup_context_pointers": [
+        ".agent-surface/context/CONTEXT_L0.md",
+        ".agent-surface/context/RESUMPTION.md",
+        ".agent-surface/memory/AGENT_MEMORY.md",
+        "AGENTMEMORY.md",
+        ".agent-surface/CONTEXT_POINTERS.md",
+        "FLOSS/docs/architecture/OPERATOR_PRIMER.md",
+        "FLOSS/docs/architecture/RUNTIME_SURFACES.md",
+        "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md",
+        "FLOSS/docs/specs/phase0-substrate-bridge.spec.md",
+        "FLOSS/docs/research/2026-05-15-working-todo-list.md"
+      ]
+    }
+  }
+}

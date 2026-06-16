@@ -13,10 +13,8 @@ Requires: websockets, msgpack
 """
 
 import asyncio
-import struct
-import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 try:
@@ -36,6 +34,7 @@ logger = logging.getLogger("holochain_connector")
 @dataclass
 class RoseNodeInput:
     """Input for add_knowledge zome call."""
+
     content: str
     embedding: list[float]
     license: str = "MIT"
@@ -45,6 +44,7 @@ class RoseNodeInput:
 @dataclass
 class SearchInput:
     """Input for vector_search zome call."""
+
     query_embedding: list[float]
     k: int = 5
 
@@ -52,6 +52,7 @@ class SearchInput:
 @dataclass
 class SearchResult:
     """Result from vector_search zome call."""
+
     hash: bytes
     score: float
     content: str
@@ -59,6 +60,7 @@ class SearchResult:
 
 class HolochainError(Exception):
     """Error from Holochain conductor."""
+
     pass
 
 
@@ -86,7 +88,9 @@ class HolochainConnector:
         self._cell_id: Optional[list] = None
         self._zome_name = "rose_forest"
 
-    async def connect(self, installed_app_id: str = "rose_forest", token: Optional[bytes] = None):
+    async def connect(
+        self, installed_app_id: str = "rose_forest", token: Optional[bytes] = None
+    ):
         """Connect to the conductor app WebSocket and resolve the cell ID.
 
         Args:
@@ -105,10 +109,12 @@ class HolochainConnector:
         # The token is issued via the admin interface's `issue_app_auth_token`.
         # Wire format: msgpack({type: "authenticate", data: msgpack({token: <bytes>})})
         if token is not None:
-            auth_msg = msgpack.packb({
-                "type": "authenticate",
-                "data": msgpack.packb({"token": token}),
-            })
+            auth_msg = msgpack.packb(
+                {
+                    "type": "authenticate",
+                    "data": msgpack.packb({"token": token}),
+                }
+            )
             await self._ws.send(auth_msg)
             auth_response = await self._ws.recv()
             auth_result = msgpack.unpackb(auth_response, raw=False)
@@ -119,13 +125,9 @@ class HolochainConnector:
                 auth_type = auth_result.get("type", "")
                 if auth_type == "error" or auth_type != "authenticated":
                     error_data = auth_result.get("data", "unknown error")
-                    raise HolochainError(
-                        "Authentication failed: %s" % error_data
-                    )
+                    raise HolochainError("Authentication failed: %s" % error_data)
             else:
-                raise HolochainError(
-                    "Unexpected authentication response format"
-                )
+                raise HolochainError("Unexpected authentication response format")
 
         # Get app info to resolve cell_id
         app_info = await self._app_request("app_info", None)
@@ -141,9 +143,7 @@ class HolochainConnector:
                     logger.info("Resolved cell_id for role '%s'", role_name)
                     return
 
-        raise HolochainError(
-            "No provisioned cell found in app '%s'" % installed_app_id
-        )
+        raise HolochainError("No provisioned cell found in app '%s'" % installed_app_id)
 
     async def close(self):
         """Close the WebSocket connection."""
@@ -197,7 +197,9 @@ class HolochainConnector:
         if self._cell_id is None:
             raise HolochainError("Not connected — call connect() first")
 
-        zome_call_payload = msgpack.packb(payload) if payload is not None else msgpack.packb(None)
+        zome_call_payload = (
+            msgpack.packb(payload) if payload is not None else msgpack.packb(None)
+        )
 
         request = {
             "type": "call_zome",
@@ -227,14 +229,18 @@ class HolochainConnector:
         request_id = self._call_id
 
         # Build the request envelope
-        request_msg = msgpack.packb({
-            "id": request_id,
-            "type": "request",
-            "data": msgpack.packb({
-                "type": method,
-                "data": msgpack.packb(params) if params is not None else None,
-            }),
-        })
+        request_msg = msgpack.packb(
+            {
+                "id": request_id,
+                "type": "request",
+                "data": msgpack.packb(
+                    {
+                        "type": method,
+                        "data": msgpack.packb(params) if params is not None else None,
+                    }
+                ),
+            }
+        )
 
         await self._ws.send(request_msg)
         response_raw = await self._ws.recv()
@@ -258,13 +264,11 @@ class HolochainConnector:
                     return msgpack.unpackb(inner, raw=False)
                 return inner
             return data
-        else:
-            raise HolochainError(
-                "Unexpected response type: %s" % response.get("type")
-            )
+        raise HolochainError("Unexpected response type: %s" % response.get("type"))
 
 
 # ── Convenience Functions ────────────────────────────
+
 
 def understanding_to_rose_node(
     understanding: dict,
@@ -309,8 +313,8 @@ def understanding_to_rose_node(
 
 
 async def round_trip_demo(app_ws_url: str = "ws://localhost:8888"):
-    """
-    Demonstrate a full round-trip:
+    """Demonstrate a full round-trip.
+
     1. Create a mock Understanding (as from ConversationMemory)
     2. Convert to RoseNode and write to Holochain
     3. Retrieve via vector_search
@@ -323,7 +327,7 @@ async def round_trip_demo(app_ws_url: str = "ws://localhost:8888"):
     # Mock understanding from ConversationMemory
     understanding = {
         "content": "The walking skeleton is the conversation itself — "
-                   "a carrier signal bridging human meaning and machine state.",
+        "a carrier signal bridging human meaning and machine state.",
         "source": "conversation_memory",
         "agent_id": "claude-demo",
         "level": "level_0",

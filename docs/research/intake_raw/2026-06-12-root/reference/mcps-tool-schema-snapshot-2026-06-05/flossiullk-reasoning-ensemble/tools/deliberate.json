@@ -1,0 +1,29 @@
+{
+  "name": "deliberate",
+  "description": "Full reasoning-ensemble deliberation: route + (if ensemble) synthesize.\n\nFor mode=ensemble: dispatches parallel calls to ≥3 diverse voter models,\nembeds responses via mxbai-embed-large, builds similarity matrix,\nruns cluster-based Tier-1/2/4 classification per the v0.2 §12.3 cluster-\nbased Tier classification logic, applies the coherence-threshold guard\nfor dissent surfacing (Upgrade D §12.5), writes a synthesis draft to\n`.agent-surface/reasoning/ensemble/<ts>_<hash>_synthesis.json`.\n\nFor mode=pass_through or single_strong: the prompt is returned with\nrouting metadata. The caller (Claude session, agent) is responsible\nfor invoking the chosen mode against its own model surface — this MCP\nonly handles ensemble synthesis. Pass-through and single-strong work\nthrough the caller's normal channels.\n\nReturns JSON with:\n  mode: the routing decision\n  tier (if mode=ensemble): tier1 | tier2 | tier4\n  synthesis_path (if mode=ensemble): durable draft location\n  final_synthesis (if mode=ensemble): readable digest\n  router_decision: full RouterDecision JSON\n\n---\nFLOSSI0ULLK Reasoning Ensemble — reasoning aid, not authority.\n\nInvariants you MUST honor when using these tools:\n- Router output is a routing hint: pass_through, single_strong, or ensemble.\n- Synthesizer output is Plane A draft reasoning. It never promotes canon.\n- Decision-grade claims still go through the separate flossiullk-consensus MCP.\n- Prefer this MCP for architectural, multi-file, ADR-class, or rollback-costly\n  reasoning where preserved disagreement has value.\n- Do not use this as a heartbeat health pulse. It is on-demand.\n- If the MCP is unavailable, fall back to normal single-strong reasoning and\n  record that the ensemble surface was unavailable if the decision mattered.",
+  "inputSchema": {
+    "properties": {
+      "prompt": {
+        "title": "Prompt",
+        "type": "string"
+      },
+      "force_mode": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Force Mode"
+      }
+    },
+    "required": [
+      "prompt"
+    ],
+    "title": "deliberateArguments",
+    "type": "object"
+  }
+}

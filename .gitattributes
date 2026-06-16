@@ -1,0 +1,36 @@
+# FLOSSI0ULLK / FLOSS line-ending normalization
+# Root-cause fix for cross-tool CRLF<->LF churn (Codex / Antigravity / editors on Windows).
+# Without this, re-saving any file makes git see the whole file changed, burying real diffs.
+
+# Default: normalize text to LF in repo and working tree.
+* text=auto eol=lf
+
+# Windows-native scripts keep CRLF.
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Source code: explicit text (LF).
+*.rs    text eol=lf
+*.py    text eol=lf
+*.toml  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+
+# Binary — never apply line-ending transforms.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+*.wasm  binary
+*.dna   binary
+*.happ  binary
+*.key   binary
+
+# Cryptographic identity / source-chain material — binary regardless of name.
+**/identity/** binary
+*.chain.json binary

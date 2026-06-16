@@ -29,9 +29,9 @@
     },
     "confidence": {
       "type": "number",
-      "minimum": 0.0,
+      "minimum": -1.0,
       "maximum": 1.0,
-      "description": "Certainty score in [0,1]"
+      "description": "Signed gradient in [-1,+1]: negative = away from truth, 0 = neutral, positive = toward truth"
     },
     "source": {
       "type": "string",
