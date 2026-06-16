@@ -15,6 +15,8 @@ Permanent numbers assigned in v2.0:
 - `ADR-MCP-ORCHESTRATOR` → **ADR-10** (file kept under historical name to avoid breaking inbound links; cross-reference both).
 - `ADR-N` (IPFS) → **ADR-11** (file kept under historical name pending a rename pass; cross-reference both).
 
+**Namespace separation — FLOSSI U curriculum ADRs:** the FLOSSI U Founding Kit defines a *separate* curriculum-ADR series using the zero-padded `001`–`019` namespace (containing-scope / curriculum layer). These do **not** share numbering with the repo's integer `ADR-0 … ADR-N` engineering ADRs indexed below; the two series are intentionally distinct and must not be cross-numbered.
+
 ---
 
 ## Active ADRs
@@ -35,6 +37,9 @@ Permanent numbers assigned in v2.0:
 | **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-MCP-ORCHESTRATOR.md` |
 | **ADR-11** | IPFS Large File Integration for VVS-Compliant Git | Accepted | Specified | Medium | 2025-11-11 | `ADR-N-IPFS-Integration-VVS.md` |
 | **ADR-12** | Consent Gate Protocol | Draft (implementation-backed) | Specified (substrate verified locally; action-time gating + DID hardening + cross-frame validation pending) | High (OVERRIDE FORBIDDEN; APPROVE ≥ 0.85) | 2026-05-19 | `ADR-12-consent-gate-protocol.md` |
+| **ADR-13** | Yumeichan Watch Architecture (Affective Edge Node) | Accepted | Specified | High | 2026-06-13 | `ADR-13-yumeichan-watch-architecture.md` |
+| **ADR-14** | ObjectGraph Projection over Corpus | Accepted | Specified → Verified on landing | Low | 2026-06-13 | `ADR-14-objectgraph-projection.md` |
+| **ADR-15** | Enforce Author–Provenance Binding in Integrity Zome | Accepted (impl P1) | Specified | High (security / core invariant) | 2026-06-13 | `ADR-15-provenance-validation-enforcement.md` |
 
 ---
 

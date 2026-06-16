@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Yumeichan Watch Capabilities Schema",
+  "description": "OCapN-compliant capability tokens for the Yumeichan Watch Interface, regulating affective disclosure, haptic engagement, and biometric telemetry on a continuous analog scale.",
+  "type": "object",
+  "properties": {
+    "capability_id": {
+      "type": "string",
+      "description": "Unique identifier for the capability grant (must map to a Holochain ActionHash)."
+    },
+    "grantor_pubkey": {
+      "type": "string",
+      "description": "Ed25519 public key of the human user granting the capability."
+    },
+    "grantee_pubkey": {
+      "type": "string",
+      "description": "Ed25519 public key of the Local Agent Node (Layer 4.5) receiving the capability."
+    },
+    "capability_type": {
+      "type": "string",
+      "enum": [
+        "AFFECTIVE_MEMORY_READ",
+        "PROACTIVE_HAPTIC_ENGAGEMENT",
+        "BIOMETRIC_TELEMETRY_STREAM"
+      ],
+      "description": "The specific class of intimacy or sensory access granted."
+    },
+    "analog_threshold_bounds": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -1.0,
+        "maximum": 1.0
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "The [min, max] analog resonance bounds within which this capability is active."
+    },
+    "ttl_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7200,
+      "description": "Time-To-Live in seconds. Maximum of 2 hours (7200s) to prevent resonance flooding and unbounded intimacy."
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locale_context": {
+      "type": "string",
+      "description": "Cultural-locale context string dictating the baseline communication posture (e.g., 'direct-analytical', 'warm-prosocial')."
+    }
+  },
+  "required": [
+    "capability_id",
+    "grantor_pubkey",
+    "grantee_pubkey",
+    "capability_type",
+    "analog_threshold_bounds",
+    "ttl_seconds",
+    "issued_at"
+  ]
+}
