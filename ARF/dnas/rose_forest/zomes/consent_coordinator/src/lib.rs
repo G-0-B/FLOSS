@@ -126,6 +126,26 @@ pub fn create_consent_decision(input: CreateConsentDecisionInput) -> ExternResul
     })?;
     ensure_scope_subset(&input.scope_granted, &payload.consent_scope)?;
 
+    // BoundedAccept must NARROW the requested scope. If every requested scope
+    // was granted, that is a full Accept, not a bounded one — granting the full
+    // set under a "bounded" outcome defeats the narrowing semantics (ADR-12 §4)
+    // and would mislead the action-time gate. (Intra-entry outcome↔scope rules —
+    // Rejected=empty, TouristObserve=ReadOnly-only — are enforced in the
+    // integrity zome; this cross-entry narrowing check needs the payload's
+    // requested scope, which only the coordinator has resolved here.)
+    if matches!(input.outcome, Outcome::BoundedAccept)
+        && payload
+            .consent_scope
+            .iter()
+            .all(|s| input.scope_granted.contains(s))
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "E_BOUNDED_NOT_NARROWED: outcome=BoundedAccept MUST grant fewer scopes than \
+             requested; use Accepted to grant the full requested scope"
+                .into()
+        )));
+    }
+
     let payload_action_hash = input.payload_action_hash.clone();
     let decision = ConsentDecision {
         decision_id: input.decision_id,

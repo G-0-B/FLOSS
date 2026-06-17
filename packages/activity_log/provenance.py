@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -393,8 +394,23 @@ def _has_non_packet_evidence(packet: dict[str, Any]) -> bool:
 # here so a governed claim cannot pass the System/Substrate hard block with a
 # packet whose `a[]` entry omits the required v1.4 fields while still carrying a
 # consent_ref and a non-packet evidence root.
-_ENTRY_REQUIRED_STR_FIELDS = ("claim_type", "truth_status", "created_at", "next_action")
-_ENTRY_REQUIRED_LIST_FIELDS = ("source_systems", "risks", "benefits")
+# Full v1.4 entry contract per docs/specs/provenance-packet.schema.json.
+_ENTRY_REQUIRED_STR_FIELDS = (
+    "claim_type",
+    "truth_status",
+    "created_at",
+    "human_collision_node",
+    "next_action",
+)
+_ENTRY_REQUIRED_LIST_FIELDS = (
+    "source_systems",
+    "artifact_refs",
+    "evidence_refs",
+    "risks",
+    "benefits",
+)
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+_EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
 
 
 def _payload_entry_errors(entries: list[Any]) -> list[str]:
@@ -410,6 +426,31 @@ def _payload_entry_errors(entries: list[Any]) -> list[str]:
         for field_name in _ENTRY_REQUIRED_LIST_FIELDS:
             if not isinstance(entry.get(field_name), list):
                 errors.append(f"E_PROVENANCE_ENTRY_FIELD_MISSING:{field_name}")
+        # artifactRef shape: {path: non-empty str, sha256: 64-hex}
+        for ref in entry.get("artifact_refs") or []:
+            if (
+                not isinstance(ref, dict)
+                or not isinstance(ref.get("path"), str)
+                or not ref["path"].strip()
+                or not isinstance(ref.get("sha256"), str)
+                or not _SHA256_RE.match(ref["sha256"])
+            ):
+                errors.append("E_PROVENANCE_ARTIFACT_REF_INVALID")
+        # evidenceRef shape: {type ∈ enum, ref: non-empty str, sha256?: 64-hex}
+        for ref in entry.get("evidence_refs") or []:
+            if (
+                not isinstance(ref, dict)
+                or ref.get("type") not in _EVIDENCE_REF_TYPES
+                or not isinstance(ref.get("ref"), str)
+                or not ref["ref"].strip()
+            ):
+                errors.append("E_PROVENANCE_EVIDENCE_REF_INVALID")
+            else:
+                sha = ref.get("sha256")
+                if sha is not None and not (
+                    isinstance(sha, str) and _SHA256_RE.match(sha)
+                ):
+                    errors.append("E_PROVENANCE_EVIDENCE_REF_INVALID")
     return errors
 
 

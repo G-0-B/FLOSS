@@ -115,4 +115,39 @@ describe("Consent Gate", () => {
       }
     });
   });
+
+  test("rejects a tourist_observe decision that grants more than ReadOnly scope", async () => {
+    await runScenario(async (scenario: Scenario) => {
+      const alice = await scenario.addPlayerWithApp({ path: hAppPath });
+      const call = getZomeCaller(alice.cells[0], ZOME);
+
+      // Payload that legitimately offers Bind, so the subset check passes and
+      // the outcome↔scope rule (integrity) is what must reject the decision.
+      const payloadHash = await call<ActionHash>("create_consent_payload", {
+        ...validConsentPayload(),
+        payload_id: "018f6d7a-7f2c-7aa1-a2b1-7b3a3f0e0201",
+        consent_scope: ["read_only", "bind"],
+      });
+
+      try {
+        await call<ActionHash>("create_consent_decision", {
+          decision_id: "018f6d7a-7f2c-7aa1-a2b1-7b3a3f0e0202",
+          payload_action_hash: payloadHash,
+          decider_did: "did:floss:bob",
+          outcome: "tourist_observe",
+          scope_granted: ["bind"],
+          rationale: "Attempting to smuggle bind under a tourist-observe refusal.",
+          counter_frame_ref: null,
+          expires_at: null,
+          decided_at: null,
+        });
+        assert.fail("tourist_observe granting Bind should be rejected");
+      } catch (e: any) {
+        assert.ok(
+          String(e).includes("E_TOURIST_SCOPE_EXCEEDED"),
+          `Error should mention E_TOURIST_SCOPE_EXCEEDED, got: ${e}`
+        );
+      }
+    });
+  });
 });

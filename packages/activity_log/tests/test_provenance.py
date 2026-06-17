@@ -306,6 +306,9 @@ def test_dag_root_satisfied_by_valid_child_packet(tmp_path, monkeypatch):
             "truth_status": "specified",
             "source_systems": ["unit-test"],
             "created_at": "2026-06-13T00:00:00Z",
+            "human_collision_node": "unit-test",
+            "artifact_refs": [],
+            "evidence_refs": [],
             "risks": [],
             "benefits": [],
             "next_action": "noop",
@@ -426,3 +429,36 @@ def test_payload_entry_missing_required_field_is_invalid(tmp_path, monkeypatch):
     )
     assert result.ok is False
     assert any(e.startswith("E_PROVENANCE_ENTRY_FIELD_MISSING") for e in result.errors)
+
+
+def test_payload_entry_malformed_artifact_ref_is_invalid(tmp_path, monkeypatch):
+    """An entry with all required fields present but a malformed artifact_ref is invalid."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    _p, path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-06-13T00:00:00Z",
+                "human_collision_node": "unit-test",
+                # Bad sha256 (not 64-hex) — must be rejected.
+                "artifact_refs": [{"path": "FLOSS/x.md", "sha256": "deadbeef"}],
+                "evidence_refs": [{"type": "test", "ref": "x"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "noop",
+            }
+        ],
+        identity_dir=tmp_path / "id",
+        output_root=out,
+        prior_digest=None,
+    )
+    result = provenance.validate_packet(
+        path, workspace_root=tmp_path, provenance_root=out
+    )
+    assert result.ok is False
+    assert "E_PROVENANCE_ARTIFACT_REF_INVALID" in result.errors

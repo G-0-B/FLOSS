@@ -435,6 +435,27 @@ fn validate_consent_decision(decision: &ConsentDecision) -> ExternResult<Validat
         ));
     }
 
+    // Rule 6b: outcome=TouristObserve ⟹ scope_granted may contain ONLY ReadOnly.
+    // tourist_observe is a read-only inspection refusal (ADR-12 §4 / CFIS
+    // [auth:tourist]). The subset check against the payload's requested scope
+    // (coordinator) is not enough on its own: if the payload requested Bind, a
+    // tourist-observe decision granting [Bind] would still be a subset, yet the
+    // action-time gate (keys off outcome != rejected + scope_granted) would then
+    // treat a refusal as a Bind authorization. Enforce read-only here, where it
+    // cannot be bypassed.
+    if matches!(decision.outcome, Outcome::TouristObserve)
+        && decision
+            .scope_granted
+            .iter()
+            .any(|s| !matches!(s, ConsentScope::ReadOnly))
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TOURIST_SCOPE_EXCEEDED: outcome=TouristObserve may only grant ReadOnly scope \
+             (tourist_observe is read-only inspection; ADR-12 §4)"
+                .into(),
+        ));
+    }
+
     // Rule 5 (contradiction-free side): outcome != Rejected ⟹ scope_granted
     // MUST be non-empty. Full subset-check against the referenced payload's
     // consent_scope happens in the coordinator zome (would require DHT read).
