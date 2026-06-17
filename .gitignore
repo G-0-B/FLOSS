@@ -105,3 +105,9 @@ ARF/workdir/*.happ
 
 # Tryorama local sandbox state
 ARF/tests/tryorama/.hc/
+
+# Machine-local MCP launch config (absolute interpreter/lens paths, JanuScope
+# wrapper) — not portable across checkouts, so it is intentionally untracked.
+# The working file stays in place locally; it is just not committed. See PR #36
+# review thread 3407820580.
+/.mcp.json
