@@ -99,17 +99,17 @@ pub enum EntryTypes {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
+        // ADR-15 R1: bind every identity-bearing entry to the action's author.
+        // `action.author` (hdi 0.7.1) is the author-of-record; an entry whose own
+        // identity field disagrees with it must be rejected. Create and Update carry
+        // distinct action types (Create / Update), so each arm extracts the author
+        // from its own action field rather than sharing one binding.
         FlatOp::StoreEntry(store) => match store {
-            OpEntry::CreateEntry { app_entry, .. } | OpEntry::UpdateEntry { app_entry, .. } => {
-                match app_entry {
-                    EntryTypes::RoseNode(node) => validate_rose_node(&node),
-                    EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
-                    EntryTypes::BudgetEntry(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::ThoughtCredential(credential) => {
-                        validate_thought_credential(&credential)
-                    }
-                    EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple),
-                }
+            OpEntry::CreateEntry { app_entry, action } => {
+                validate_app_entry(app_entry, &action.author)
+            }
+            OpEntry::UpdateEntry { app_entry, action, .. } => {
+                validate_app_entry(app_entry, &action.author)
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -117,9 +117,33 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
+/// ADR-15: dispatch an entry to its per-type validator, passing the action author
+/// so identity-bearing entries can be bound to their author-of-record.
+fn validate_app_entry(
+    app_entry: EntryTypes,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    match app_entry {
+        EntryTypes::RoseNode(node) => validate_rose_node(&node),
+        EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
+        EntryTypes::BudgetEntry(budget) => validate_budget_entry(&budget, author),
+        EntryTypes::ThoughtCredential(credential) => {
+            validate_thought_credential(&credential, author)
+        }
+        EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple, author),
+    }
+}
+
 fn validate_thought_credential(
     credential: &ThoughtCredential,
+    author: &AgentPubKey,
 ) -> ExternResult<ValidateCallbackResult> {
+    // ADR-15 R3: provenance is the verifiable author-of-record, not a free-form claim.
+    if &credential.provenance != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_THOUGHT_PROVENANCE: provenance must equal the action author".into(),
+        ));
+    }
     let dim = credential.content.len();
     if dim < 32 || dim > 4096 {
         return Ok(ValidateCallbackResult::Invalid(format!(
@@ -139,7 +163,9 @@ fn validate_thought_credential(
             credential.impact
         )));
     }
-    // Further validation could include checking provenance signature or resonance thresholds
+    // NOTE (ADR-15 R5, deferred to PR-B): `connotation` remains integer ternary (i8, -1..=1)
+    // here. Migration to the analog f32 [-1.0, +1.0] model (ADR-10 v2.0 / ADR-13) is a breaking
+    // data-model change with migration impact on existing data + ontology tests, handled separately.
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -169,7 +195,16 @@ fn validate_rose_node(node: &RoseNode) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateCallbackResult> {
+fn validate_knowledge_triple(
+    triple: &KnowledgeTriple,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    // ADR-15 R4: the triple's `source` is provenance and must equal the action author.
+    if &triple.source != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_SOURCE: source must equal the action author".into(),
+        ));
+    }
     if triple.subject.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "E_TRIPLE_SUBJECT: subject must not be empty".into(),
@@ -249,6 +284,26 @@ fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbac
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// ADR-15 R2: `BudgetEntry` was previously accepted unconditionally (`Ok(Valid)`), letting any
+/// agent mint a budget naming any other agent. Bind it to the author and reject negative balances.
+fn validate_budget_entry(
+    budget: &BudgetEntry,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    if &budget.agent != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_AUTHOR: agent must equal the action author".into(),
+        ));
+    }
+    if budget.remaining_ru < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_BUDGET_RU: {} must be >= 0.0",
+            budget.remaining_ru
+        )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 /// A verifiable credential representing a moment of "thought" or insight.
 ///
 /// This struct is a more abstract and fine-grained representation of knowledge
@@ -266,4 +321,112 @@ pub struct ThoughtCredential {
     pub provenance: AgentPubKey,     // AgentSignature
     pub resonance: Vec<AgentPubKey>, // AgentEndorsement
     pub impact: f32,                 // WisdomMetric
+}
+
+#[cfg(test)]
+mod tests {
+    //! ADR-15 R1–R4 author/provenance-binding tests (unit level).
+    //!
+    //! These exercise the pure validator helpers directly (no `Op` construction needed).
+    //! Cross-agent rejection at the conductor level is covered by the Tryorama test
+    //! `ARF/tests/tryorama/provenance_validation.test.ts`.
+    use super::*;
+
+    /// Two distinct, deterministic agent keys. Pattern mirrors `consent_integrity` tests.
+    fn agent(seed: u8) -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![seed; 36])
+    }
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(1_000_000)
+    }
+
+    #[test]
+    fn budget_rejects_author_mismatch() {
+        let b = BudgetEntry { agent: agent(1), remaining_ru: 10.0, window_start: ts() };
+        assert!(matches!(
+            validate_budget_entry(&b, &agent(2)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn budget_accepts_self_authored() {
+        let b = BudgetEntry { agent: agent(1), remaining_ru: 10.0, window_start: ts() };
+        assert_eq!(
+            validate_budget_entry(&b, &agent(1)).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_rejects_negative_balance() {
+        let b = BudgetEntry { agent: agent(1), remaining_ru: -1.0, window_start: ts() };
+        assert!(matches!(
+            validate_budget_entry(&b, &agent(1)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn thought_rejects_provenance_mismatch() {
+        let c = ThoughtCredential {
+            content: vec![0.0; 64],
+            connotation: 0,
+            provenance: agent(1),
+            resonance: vec![],
+            impact: 0.5,
+        };
+        assert!(matches!(
+            validate_thought_credential(&c, &agent(2)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn thought_accepts_self_authored() {
+        let c = ThoughtCredential {
+            content: vec![0.0; 64],
+            connotation: 0,
+            provenance: agent(1),
+            resonance: vec![],
+            impact: 0.5,
+        };
+        assert_eq!(
+            validate_thought_credential(&c, &agent(1)).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn triple_rejects_source_mismatch() {
+        let t = KnowledgeTriple {
+            subject: "a".into(),
+            predicate: "is_a".into(),
+            object: "b".into(),
+            confidence: 0.5,
+            source: agent(1),
+            created_at: ts(),
+        };
+        assert!(matches!(
+            validate_knowledge_triple(&t, &agent(2)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn triple_accepts_self_authored() {
+        let t = KnowledgeTriple {
+            subject: "a".into(),
+            predicate: "is_a".into(),
+            object: "b".into(),
+            confidence: 0.5,
+            source: agent(1),
+            created_at: ts(),
+        };
+        assert_eq!(
+            validate_knowledge_triple(&t, &agent(1)).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
 }
