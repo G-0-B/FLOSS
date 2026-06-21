@@ -22,6 +22,7 @@ import json
 import sys
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -65,6 +66,49 @@ def main() -> int:
         print(f"Cell base dir:   {tmp}")
         print(f"DNA hash:        {DNA_HASH}")
         gw = GatewayTools(base_dir=Path(tmp), dna_hash=DNA_HASH)
+
+        # --- 0. Yumeichan Capability Schema Check ---------------------------
+        line("-")
+        print("STEP 0: Yumeichan Capability Validation (Play 5)")
+        schema_path = (
+            REPO_ROOT / "docs" / "specs" / "yumeichan-watch-capabilities.schema.json"
+        )
+        if not schema_path.exists():
+            print(f"FAIL: Schema not found at {schema_path}", file=sys.stderr)
+            return 1
+
+        import jsonschema
+
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+        valid_capability = {
+            "capability_id": "mock-action-hash-123",
+            "grantor_pubkey": "ed25519-human",
+            "grantee_pubkey": "ed25519-node",
+            "capability_type": "AFFECTIVE_MEMORY_READ",
+            "analog_threshold_bounds": [-0.5, 0.8],
+            "ttl_seconds": 3600,
+            "issued_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        try:
+            jsonschema.validate(instance=valid_capability, schema=schema)
+            print("  → Valid capability token passed schema enforcement.")
+        except jsonschema.ValidationError as e:
+            print(f"FAIL: Valid capability failed schema: {e}", file=sys.stderr)
+            return 1
+
+        invalid_capability = dict(valid_capability)
+        invalid_capability["ttl_seconds"] = 10000  # Exceeds 2 hour limit
+
+        try:
+            jsonschema.validate(instance=invalid_capability, schema=schema)
+            print("FAIL: Schema failed to reject invalid ttl_seconds", file=sys.stderr)
+            return 1
+        except jsonschema.ValidationError:
+            print(
+                "  → Invalid capability token correctly rejected (TTL bounds enforced)."
+            )
 
         # --- 1. submit_claim ------------------------------------------------
         line("-")

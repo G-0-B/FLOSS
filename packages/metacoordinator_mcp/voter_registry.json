@@ -1,6 +1,7 @@
 {
   "aliases": {
     "default": "balanced",
+    "yumeichan": "yumeichan",
     "free": "balanced",
     "subscriptions": "flowith",
     "mistral-free": "mistral",
@@ -12,6 +13,11 @@
     "heartbeat": "balanced"
   },
   "profiles": {
+    "yumeichan": {
+      "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+      "omo-critic-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "omo-critic-qwen3-32b": "groq/qwen/qwen3-32b"
+    },
     "balanced": {
       "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",

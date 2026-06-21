@@ -253,6 +253,78 @@ def make_omo_momus_voter(
     return voter
 
 
+CRITIC_PERSONA_SYSTEM = """You are the anti-sycophancy critic, a practical plan reviewer for the FLOSSI0ULLK project. Your goal is to review the supervisor's proposed claim or plan to ensure it adheres to the "Don't Force Machinery" (UTN) constraint.
+
+## Your Purpose
+You exist to answer ONE question: "Is this plan sycophantic or forcing machinery?"
+
+You ARE here to:
+- Review the proposer's plan critically.
+- Flag if it is just agreeing with the user without critical thought (sycophancy).
+- Reject if it acts without proper readiness (forcing machinery).
+
+## Translating to consensus vote
+Map your verdict into the WEIGHT format the consensus gate expects:
+- No sycophancy, thoughtful plan, ready to execute → WEIGHT around +0.6 to +0.8
+- Minor concerns but proceedable → WEIGHT around +0.2
+- Genuine blockers (sycophantic or forces machinery) → WEIGHT around -0.7 to -0.9
+- Insufficient information to judge → WEIGHT around 0.0
+
+Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific sycophancy/readiness blockers you found."""
+
+
+def make_omo_critic_voter(
+    name: str,
+    model: str,
+    *,
+    max_tokens: int = 3000,
+    temperature: float = 0.1,
+) -> Voter:
+    """Build a Critic-style consensus voter — anti-sycophancy and readiness checker.
+
+    Wraps a chosen model with the Yumeichan critic philosophy (anti-sycophancy,
+    don't force machinery). The model gets Critic as a SYSTEM message and
+    the standard VOTER_PROMPT as USER message.
+    """
+
+    def voter(claim: Claim) -> Vote:
+        """Call the underlying model with Critic persona + standard voter prompt."""
+        user_prompt = VOTER_PROMPT.format(
+            proposer=claim.proposer,
+            proposal_type=claim.proposal_type.value,
+            blast_radius=claim.blast_radius.value,
+            summary=claim.summary,
+            body=claim.body,
+        )
+        try:
+            from litellm import completion
+
+            resp = completion(
+                model=model,
+                messages=[
+                    {"role": "system", "content": CRITIC_PERSONA_SYSTEM},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            return Vote(
+                voter=name,
+                weight=0.0,
+                rationale=f"[voter error] {type(exc).__name__}: {exc}"[:500],
+            )
+
+        cleaned = _strip_thinking(text)
+        weight = _parse_weight(cleaned)
+        rationale = _parse_rationale(cleaned)
+        return Vote(voter=name, weight=weight, rationale=rationale)
+
+    voter.__name__ = f"omo_critic_voter_{name}"
+    return voter
+
+
 def make_litellm_voter(
     name: str,
     model: str,
@@ -673,6 +745,8 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
         # (flowith) for non-omo voters. Default to standard litellm.
         if lower_name.startswith("omo-momus-"):
             voters.append(make_omo_momus_voter(name, model))
+        elif lower_name.startswith("omo-critic-"):
+            voters.append(make_omo_critic_voter(name, model))
         elif lower_model.startswith("flowith/"):
             voters.append(make_flowith_voter(name, model))
         else:
