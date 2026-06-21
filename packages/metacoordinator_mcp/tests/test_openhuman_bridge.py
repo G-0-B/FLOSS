@@ -6,7 +6,6 @@ from packages.orchestrator.claim_schema import (
     Vote,
     ProposalType,
     BlastRadius,
-    TruthStatus,
     Outcome,
     Decision,
 )
