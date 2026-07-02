@@ -56,8 +56,17 @@ In `validate()`, the `OpEntry::CreateEntry { app_entry, action }` /
 via its `.author()` accessor and thread it into each `validate_*` helper:
 
 ```rust
-OpEntry::CreateEntry { app_entry, action } | OpEntry::UpdateEntry { app_entry, action } => {
-    let author = action.author().clone();
+OpEntry::CreateEntry { app_entry, action } => {
+    let author = action.author;
+    match app_entry {
+        EntryTypes::BudgetEntry(b)        => validate_budget_entry(&b, &author),
+        EntryTypes::ThoughtCredential(c)  => validate_thought_credential(&c, &author),
+        EntryTypes::KnowledgeTriple(t)    => validate_knowledge_triple(&t, &author),
+        // ...
+    }
+}
+OpEntry::UpdateEntry { app_entry, action, .. } => {
+    let author = action.author;
     match app_entry {
         EntryTypes::BudgetEntry(b)        => validate_budget_entry(&b, &author),
         EntryTypes::ThoughtCredential(c)  => validate_thought_credential(&c, &author),
