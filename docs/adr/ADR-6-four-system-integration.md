@@ -1,6 +1,6 @@
 # ADR-6: Four-System Meta-Orchestration Integration
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-04
 **Truth Status:** Specified (integration seams identified, not yet implemented)
 **Friction Tier:** Medium (adds integration layer, does not modify core substrate)
@@ -79,6 +79,8 @@ Each layer is replaceable. Each seam is independently reversible. No layer is tr
 5. Decision recorded as ADR with provenance; substrate-affecting claims require unanimous +1/+1/+1 and cannot be overridden by a human voter
 
 **Why first:** Establishes the MCP communication channel that Seams 2-5 also depend on. Smallest blast radius. Fastest validation loop.
+
+> **Vote-model note (supersession):** the `+1/+1/+1` and "ternary consensus" language throughout this ADR predates **ADR-10 v2.0**, which formally superseded the ternary framing with an **analog vote model (float in `[-1.0, +1.0]`)**. Read each `+1` as the positive extreme of that range and "unanimous +1/+1/+1" as "all voters at/above the APPROVE threshold" (cf. ADR-12 APPROVE ≥ 0.85). The substrate-affecting / override-forbidden semantics are unchanged; only the vote representation moved from ternary to analog.
 
 ## Implementation Strategy
 
