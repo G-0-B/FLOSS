@@ -20,14 +20,20 @@ When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load docum
 **Purpose:** Invariants, truth labels, upgrade mechanics, enforcement expectations.
 **Key content:** Canonical source precedence, prime directive, upgrade-everything policy, claim truth model (labels), two-plane architecture, voluntary convergence, provenance packets, substrate-first gating, agent orchestration.
 
-## 4. Relevant ADRs (Decisions)
+## 4. Canonical Build Spine v0.2 (Current Execution Synthesis)
+
+**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.2.md`
+**Purpose:** Current build order and contradiction-resolving execution spine. This document does not override the Kernel, Spine, or SDD spec; it translates them into the present repo state.
+**Key content:** Source register, evidence classes, current reality check, contradiction log, phase gates, NOW/LATER/NEVER backlog, issue backlog draft.
+
+## 5. Relevant ADRs (Decisions)
 
 **Directory:** `../adr/`
 **Index:** `../adr/INDEX.md`
 **Purpose:** Specific architectural decisions with rationale and supersession chains.
 **Load order within ADRs:** Start with ADR-0 (Recognition Protocol), then ADR-1 (Carrier Equivalence), then task-relevant ADRs.
 
-## 5. Seed Packet v1.0.0 (Bootstrapping)
+## 6. Seed Packet v1.0.0 (Bootstrapping)
 
 **File:** `seed-packet-v1.0.0.md`
 **Purpose:** Complete system genesis kit. How to bootstrap a new instance.
@@ -43,8 +49,9 @@ When artifacts disagree, resolve in this order:
 3. SDD Master Spec (architecture)
 4. UpgradableArtifact schema + lints
 5. Governance protocols
-6. ADRs / RFCs
-7. Contracts / Schemas
-8. Tests + signed results
-9. Code
-10. Synthesis / analysis docs
+6. Current Build Spine (execution synthesis; contradiction resolver)
+7. ADRs / RFCs
+8. Contracts / Schemas
+9. Tests + signed results
+10. Code
+11. Synthesis / analysis docs
