@@ -111,3 +111,9 @@ ARF/tests/tryorama/.hc/
 # The working file stays in place locally; it is just not committed. See PR #36
 # review thread 3407820580.
 /.mcp.json
+
+# Regenerable consolidation-sweep outputs (major_consolidation_sweep.py) — a 910KB
+# LLM auto-synthesis + its processed-file log. Not canon; regenerate from the tool.
+# Do not commit the overgrowth; distill load-bearing parts into a small doc if needed.
+docs/research/Holistic_Vision.md
+docs/research/consolidation_processed.txt
