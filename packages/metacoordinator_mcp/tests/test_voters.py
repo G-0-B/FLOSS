@@ -163,7 +163,7 @@ def test_heartbeat_alias_uses_budget_safe_balanced_profile():
     ):
         resolved = resolve_default_voter_specs(profile="heartbeat")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
     }
@@ -191,7 +191,7 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
     ):
         resolved = resolve_default_voter_specs(profile="roi")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
         "mistral-devstral-small": "mistral/devstral-small-2507",
@@ -212,7 +212,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
     ):
         resolved = resolve_default_voter_specs(profile="roi-plus")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
         "mistral-devstral-small": "mistral/devstral-small-2507",
