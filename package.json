@@ -1,4 +1,14 @@
 {
+  "scripts": {
+    "cf:commons-gateway:build": "npm --prefix workers/commons-gateway run build",
+    "cf:commons-gateway:deploy": "npm --prefix workers/commons-gateway run deploy",
+    "cf:commons-gateway:dev": "npm --prefix workers/commons-gateway run dev",
+    "cf:commons-gateway:test": "npm --prefix workers/commons-gateway test",
+    "cf:commons-gateway:typecheck": "npm --prefix workers/commons-gateway run typecheck",
+    "cf:commons-gateway:typegen": "npm --prefix workers/commons-gateway run cf:typegen",
+    "cf:commons-gateway:versions-upload": "npm --prefix workers/commons-gateway run versions:upload",
+    "deploy": "npm --prefix workers/commons-gateway run deploy"
+  },
   "dependencies": {
     "@holochain/tryorama": "^0.19.0-dev.2"
   }

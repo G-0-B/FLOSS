@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-06-12 (root-intake digestion + N-queue closure + NLnet unblock)
+**Last refreshed:** 2026-07-03 (Fable 5 sprint WS0 repo-state verification)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -9,6 +9,34 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 ---
 
 ## Section A — Immediate threads (this session or next)
+
+### A.000 Fable 5 sprint WS0 — repo-state verification (2026-07-03)
+
+**Status:** ✅ SPRINT COMPLETE 2026-07-04 — all five workstreams landed (WS0 stop condition acked by Anthony same-day; WS1→WS5 executed in order WS0→WS1→WS4→WS2→WS5→WS3). Generator: `claude-fable-5`. Sprint packet: `FLOSS/docs/superpowers/plans/2026-07-03-fable5-sprint-handoff.md`.
+
+**Sprint deliverables (all working-tree, uncommitted — human gate):**
+- **WS1:** `FLOSS/evals/` — 3 modules × (20 dev + 10 heldout) + rubric.json each + README (doc 1/6). 90 items machine-validated, 2 derived-from-repo claims included. ≥80% rubric spot-check still pending.
+- **WS4:** `2026-07-fable5-adversarial-review.md` (doc 2/6) — 9 findings (F1 SDD-precedence, F2 dual packet contracts, F3 M14-vs-Sweettest, F4 truth-label misquote, F5-F9), zero new architecture.
+- **WS2:** VOTER_PROMPT v2 + `render_voter_prompt()` in `voters.py` — A/B on nemo: **20% → 65%** bucket accuracy (temp 0, cv dev). 147/147 green. Delta doc (3/6). Chain audit: 12,869 votes, 3 dead voters, error-votes-count-toward-quorum flagged.
+- **WS5:** `post-window` voter profile (4 surfaces/5 families, omo-critic verifier on cerebras/gpt-oss-120b) + dead-id remediation in all 7 profiles + live smoke round (6/6 votes, 0 errors, 0 Fable calls, APPROVED +0.642). Policy doc (4/6) — **`FABLE5_WEEKLY_CREDIT_BUDGET` awaits Anthony.**
+- **WS3:** 52-item `pioneer_seed.jsonl` (train split, zero eval contamination) + annotation guidelines/Pioneer contract doc (5/6). Pro tier + per-call learn-flag confirmed by Anthony 2026-07-04; adaptive-inference hold lifted conditionally on flag discipline.
+- **Doc budget: 5/6.** Ops directive recorded: Tryorama→Sweettest (agent-memory patched; M14 Gate 5 revision = WS4 F3).
+
+**WS0 verification table (2026-07-03, preserved below):**
+
+| # | Packet claim | Verdict | Evidence |
+|---|---|---|---|
+| 1 | PR #25 open/merged + contents (ADR-5/6, consensus gate) | ✅ **Verified** (repo pointer corrected) | **G-0-B/FLOSS #25** MERGED 2026-06-16 (`lappytop`→`main`), 227 files incl. `docs/adr/ADR-5`, `ADR-6`, `ADR-7/8/9`, `ADR-MCP-ORCHESTRATOR`, `INDEX` + Seam 1 consensus-gate code (`ARF/metacoordinator/consensus.py`). Packet's `kalisam/FLOSS` pointer is the fork (0 PRs); `kalisam/Amazon_Rose_Forest_01` #25 is an unrelated 2025 Cargo bump. |
+| 2 | Phase 0: DNA→WASM + Tryorama passing on default branch | ⚠️ **Partially verified / partially refuted** | WASM: ✅ live re-run this session — `cargo check --target wasm32-unknown-unknown --workspace` exit 0 (4.82s); DNA sources byte-identical `main`↔HEAD (both direction diffs empty). Native zome tests: ✅ live 25/25 (10 `consent_integrity` + 8 `rose_forest` + 7 `rose_forest_integrity`). Tryorama e2e: ❌ **BLOCKED** on hc 0.6.1 tooling gap — no tryorama release pairs with the 0.6 conductor (agent-memory `project-tryorama-tooling-gap-2026-05-26`; MVP_PLAN already corrected in `f4a70cf`+`5969d09`). "Tryorama passing" is PR #21-era history (MERGED 2026-03-21, `7d656e2`), not currently re-runnable. **Unblock path updated by operator directive 2026-07-03: JS Tryorama is replaced by Rust Sweettest as the e2e framework** (in-process conductor; sidesteps the hc-sandbox pairing gap). Repo state: Sweettest named as scaffolding target in `consent_integrity/src/lib.rs` §6 only — no `sweettest` dep in any Cargo.toml yet; `ARF/tests/tryorama/*.test.ts` remain on disk as deprecated scenarios pending port. |
+| 3 | Consensus gateway 32/32 tests | ✅ **Verified, claim stale-low** | Live run: `python -m pytest packages -q` → **147 passed, 0 failed** (6.18s). Suite grew ~4.6× since the 32/32 snapshot. |
+| 4 | ADR numbering conflict Kernel vs `docs/adr/` | ✅ **Enumerated** | Largely pre-reconciled by `docs/adr/INDEX.md` v2.0.0 (ADR-003→ADR-3 mapping; ADR-10/11 permanent numbers on historical filenames; FLOSSI_U `001–019` namespace separation). **Live drift remaining:** (a) Kernel v1.3.1 still cites `ADR-003` ×3 (cosmetic; index maps it); (b) `ADR-16-omnigent-execution-surface.md` (Proposed 2026-06-17) **missing from INDEX table** (stops at ADR-15); (c) ADR-10/11 file renames still pending. |
+| 5 | Holochain pin 0.6.1 baseline | ✅ **Verified** | `ARF/Cargo.toml`: `hdi==0.7.1`, `hdk==0.6.1`, `holochain_serialized_bytes==0.0.57` (0.6 line, bumped 2026-05-19). 0.7 migration planned (A.10/M14). |
+
+**Branch context at verification time:** local checkout `working/2026-06-16-adr-cleanup-reconverge` (ahead 8, behind 1 of origin); `main` head `ec195d7` (merge of PR #33, CodeQL workflow).
+
+**CURRENT_STATE resolution:** no repo file named `CURRENT_STATE` exists; the in-repo role is served by this Working Todo (single "what are we tracking" surface), with the claude.ai project-knowledge doc at upload-tier. WS0 block landed here per packet rule "update, do not create a parallel one."
+
+**Follow-ups surfaced (not executed):** INDEX.md ADR-16 row; kernel ADR-003 label refresh at next kernel rev; ADR-10/11 renames; CONTEXT_L0 regeneration (stale >14d at probe time); `.agent-surface/events/` queue depth 8.
 
 ### A.00 Root-intake digestion + N-queue closure + NLnet unblock (2026-06-12)
 
