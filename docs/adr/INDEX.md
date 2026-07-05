@@ -1,9 +1,9 @@
 # ADR Index — FLOSSI0ULLK / ARF Ecosystem
 
-**Version:** 2.0.0
-**Updated:** 2026-05-25
+**Version:** 2.1.0
+**Updated:** 2026-07-04
 **Truth Status:** Specified
-**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12).
+**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12..17).
 
 ---
 
@@ -40,6 +40,8 @@ Permanent numbers assigned in v2.0:
 | **ADR-13** | Yumeichan Watch Architecture (Affective Edge Node) | Accepted | Specified | High | 2026-06-13 | `ADR-13-yumeichan-watch-architecture.md` |
 | **ADR-14** | ObjectGraph Projection over Corpus | Accepted | Specified → Verified on landing | Low | 2026-06-13 | `ADR-14-objectgraph-projection.md` |
 | **ADR-15** | Enforce Author–Provenance Binding in Integrity Zome | Accepted (impl P1) | Specified | High (security / core invariant) | 2026-06-13 | `ADR-15-provenance-validation-enforcement.md` |
+| **ADR-16** | Omnigent as Execution/Governance Surface; Gateway + Holochain as Validation Substrate | Proposed | Specified (upstream capability + fork state Verified; integration seam Specified; validation fit Blocked) | High (execution/governance seam) | 2026-06-17 | `ADR-16-omnigent-execution-surface.md` |
+| **ADR-17** | KnowledgeTriple Contract Reconciliation (signed-gradient confidence; enum-now/URI-later predicates) | Proposed | Specified (divergence Verified; D1/D2 pending gate acceptance) | High (Phase 1 primary-deliverable contract) | 2026-07-04 | `ADR-17-knowledge-triple-contract-reconciliation.md` |
 
 ---
 
