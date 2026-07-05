@@ -2,13 +2,31 @@
 id: project-fable5-cowork-metaplanner-window
 type: project
 created: '2026-06-12'
-status: superseded-by-events
+status: active
 applies_to:
 - any-agent
-title: Fable-5 metaplanner window CLOSED early (US-gov pullback 2026-06-13); Cowork+Opus is the surviving pattern
+title: Fable-5 access restored (2026-07-03); sprint executed; post-window escalation policy now governs
 ---
 
-## UPDATE 2026-06-13 — window closed early by external event
+## UPDATE 2026-07-04 — access RESTORED; second window executed and closed cleanly
+
+**Fable 5 access returned:** `claude-fable-5` was directly invocable in Claude
+Code on 2026-07-03/04 and executed the full **Fable 5 sprint** (packet
+`docs/superpowers/plans/2026-07-03-fable5-sprint-handoff.md`): WS0 repo
+verification, 90 eval items + 52 Pioneer seed, VOTER_PROMPT v2 (measured
+20%→65%), 10-finding adversarial review, post-window voter profile, ADR-17.
+Subscription access ends **~2026-07-09**, then pay-per-credit.
+
+**Post-window is no longer improvised — it is policy:** successor
+adversarial/verification role = `omo-critic` on `cerebras/gpt-oss-120b`
+(`post-window` profile, live-validated 2026-07-04 with zero Fable calls);
+Fable 5 credits spend only on escalation triggers E1–E5 per
+`docs/superpowers/plans/2026-07-fable5-sprint-ws5-successor-policy.md`
+(weekly budget number pending Anthony). This window was used exactly as the
+durable principle below prescribes: compile-time artifact extraction on the
+capable surface, execution structured for cheaper ones.
+
+## UPDATE 2026-06-13 — window closed early by external event (superseded 2026-07-04)
 
 **US government action caused Anthropic to pull back public Fable 5 access; it is
 on hold "for now" (Anthony, 2026-06-13).** The "until 2026-06-22" Fable window
