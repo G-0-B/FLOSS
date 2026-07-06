@@ -34,7 +34,7 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 - `project-critique-exchange-landed`: Multi-lens critique exchange landed as canon + Wave-3 backlog prioritized
 - `project-cross-harness-ai-roster`: Cross-harness AI roster and update packet are generated shared surfaces — FLOSSI0ULLK now has a central AI/harness roster surface:
 - `project-doc-explosion-acknowledged`: Doc-explosion pattern acknowledged + aggressive cull approved — User explicitly acknowledged on 2026-05-10 that the doc-explosion pattern is bigger than they realized and approved aggressive culling. Direct quote: "yea might need a bit more aggressive culling of this even more insane overgrowth than i realized. I saw it and knew it was there but just ignored it and kept reepeating it."
-- `project-fable5-cowork-metaplanner-window`: Fable-5 metaplanner window CLOSED early (US-gov pullback 2026-06-13); Cowork+Opus is the surviving pattern
+- `project-fable5-cowork-metaplanner-window`: Fable-5 access restored (2026-07-03); sprint executed; post-window escalation policy now governs
 - `project-filewatch-intake-skeleton`: Filewatch metaharness intake skeleton landed — A minimal filewatch + consolidation skeleton has landed under `FLOSS/scripts/`:
 - `project-floss-subprojects`: FLOSS subprojects — FLOSSI U and YumeiCHAN — The FLOSSI0ULLK family contains **multiple sibling projects**, not a monolithic codebase. Distinguishing them is critical for the cull triage and for future architecture decisions.
 - `project-heartbeat-running`: Heartbeat loop is budget-gated; diverse-max is no longer routine

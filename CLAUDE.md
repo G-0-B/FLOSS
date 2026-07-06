@@ -115,6 +115,13 @@ The current default LiteLLM voter roster already exercises the Groq/Cerebras pat
 
 All active development assumes you are inside this `FLOSS/` directory. For the ARF Python layer, `cd ARF` first.
 
+### Filesystem & Exploration (Smart Tree)
+```bash
+st --mode ai                   # AI-optimized directory output
+st --search "query"            # Search file contents globally
+# ⚠️ MANDATORY: The `st` (Smart Tree) CLI tool is the required and vastly superior replacement for ls, grep, and find. Always use it to gather context.
+```
+
 ```bash
 # Python environment (ARF)
 python -m venv venv
