@@ -46,7 +46,7 @@ Use this as the default phase correction:
 | MVP Phase 0 substrate viability | Verified complete | DNA/WASM/Tryorama and ontology integrity passed per `FLOSS/MVP_PLAN.md`; do not restart this as the current gate. |
 | Orchestration substrate bridge | Specified | Current proof gate: publish, provenance, independent verify, query, fork-visible conflict, no privileged verifier. |
 | Local consensus gateway | Verified at module level | ADR-10 / `ADR-MCP-ORCHESTRATOR`; analog votes, source-chain append, passive router. |
-| Heartbeat automation | Stopped intentionally | `C:\~shit\.agent-surface\heartbeat\STOP` is present after the 2026-05-19 Groq token-budget fix. |
+| Heartbeat automation | Resumed 2026-05-26 (budget-reconciled) | STOP file removed after spec↔code reconciliation (5/5 defaults verified, `test_heartbeat_budget.py` 7/7). Runs as a user-session process (`MSI\kalis`), NOT LocalSystem — LocalSystem lacks user-site packages, `.env`, and `~/.floss_agent` access (verified again 2026-07-07). Check posture: STOP file presence + `daily_state.json` date + `ticks.log` tail. Service runner still pending; see working-todo §A.1 Servy recipe. |
 | Reasoning ensemble | Specified prototype | Router, Synthesizer, and MCP wrapper exist; specs were retrofitted after code and now bind future changes. |
 | Consent gate | Implementation-backed draft | ADR-12 stub, JSON schema, Holochain entry types, consent coordinator, DNA wiring, Rust unit tests, static wiring tests, release WASMs, hApp packing, and consent Tryorama scenarios exist; action-time gating remains pending before Substrate-class ratification. |
 
@@ -148,7 +148,9 @@ not repeat the code-first sequence unless explicitly marked as emergency work.
 ## What Not To Do
 
 - Do not restart old MVP Phase 0 Tryorama work as if it is the active gate.
-- Do not remove the heartbeat STOP file just to see what happens.
+- Do not toggle the heartbeat STOP file without checking the current budget posture (`daily_state.json`, staging queue depth) — STOP/resume decisions are intentional, not exploratory.
+- Do not run the heartbeat as LocalSystem or any non-`kalis` account; it silently loses litellm, `.env`, and `~/.floss_agent` (2026-05-16 Servy incident, re-verified 2026-07-07).
+- Do not run two heartbeat loop instances concurrently.
 - Do not run `diverse-max` repeatedly from heartbeat without a changed slate.
 - Do not edit generated projections when a canonical manifest can be changed.
 - Do not treat model agreement as truth without schema, substrate, or provenance.

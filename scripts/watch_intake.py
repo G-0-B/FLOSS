@@ -57,6 +57,10 @@ ROOT_INTAKE_EXCLUDE_PREFIXES = {
 }
 LOCK_POLL_SECONDS = 0.1
 DEFAULT_DEBOUNCE_SECONDS = 1.5
+# Backpressure guard: if the incoming queue is deeper than this, the watcher
+# stops emitting until process_intake_events.py drains it. Prevents unbounded
+# feedback storms (2026-06-16/17 incident: 1.23M events accumulated).
+MAX_INCOMING_QUEUE_DEPTH = 5000
 RESERVED_AGENT_SURFACE_SUBTREES = {
     ".agent-surface",
     ".agent-surface/events",
@@ -308,6 +312,25 @@ def scan_once(
     incoming_dir = event_root / "incoming"
     now_ns = time.time_ns()
 
+    # Backpressure guard (2026-07-07): never let the queue grow unboundedly.
+    # Count with an early-exit scan so a flooded dir doesn't stall us.
+    queue_depth = 0
+    try:
+        with os.scandir(incoming_dir) as entries:
+            for _entry in entries:
+                queue_depth += 1
+                if queue_depth > MAX_INCOMING_QUEUE_DEPTH:
+                    break
+    except OSError:
+        queue_depth = 0
+    if queue_depth > MAX_INCOMING_QUEUE_DEPTH:
+        print(
+            f"[watch_intake] BACKPRESSURE: incoming queue > "
+            f"{MAX_INCOMING_QUEUE_DEPTH} events; skipping emit this scan "
+            f"(drain with process_intake_events.py)"
+        )
+        return 0
+
     for spec in default_watch_specs(workspace_root):
         for path in iter_domain_files(spec):
             if not should_include(path, workspace_root):
@@ -317,6 +340,14 @@ def scan_once(
             except OSError:
                 continue
             key = info["abs_path"]
+            # Overlapping-spec dedup (2026-07-07): the canon spec (FLOSS/docs)
+            # and the broad shared-surface spec (FLOSS/) both visit the same
+            # files. The fingerprint embeds watch_domain, so without this
+            # first-spec-wins guard every overlapped file oscillates between
+            # two fingerprints and emits a spurious "modified" event on every
+            # scan — the root cause of the 2026-06-16/17 1.23M-event storm.
+            if key in current:
+                continue
             prior = previous.get(key)
             mtime_ns = int(info.get("mtime_ns") or 0)
             if debounce_seconds > 0 and (now_ns - mtime_ns) < int(
