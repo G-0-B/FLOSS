@@ -10,6 +10,10 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 
 ## Section A — Immediate threads (this session or next)
 
+### A.0000 Holo-RBI synthesis delta follow-ups (2026-07-07)
+
+**Status:** ⚠️ OPEN — delta doc landed at `FLOSS/docs/research/2026-07-07-holo-rbi-synthesis-delta.md` (comparison only, no adoption). Follow-ups: (a) **ADR-17 review item** — consider `valid_context` / `known_failures` / `expiry_or_retest_date` fields for the KnowledgeTriple contract before Phase 1 hardens (memory decay + scheduled retest is a real gap); (b) proposing-coordinator ADR question (dormant — trigger is anyone actually wanting adaptive orchestration; adoption shape constrained by ADR-10 router-not-controller and the 2026-05-18 Conductor digestion); (c) optional governance paragraph for the staged economic-agency ladder. Trading/RBI vertical explicitly out of scope.
+
 ### A.000 Fable 5 sprint WS0 — repo-state verification (2026-07-03)
 
 **Status:** ✅ SPRINT COMPLETE 2026-07-04 — all five workstreams landed (WS0 stop condition acked by Anthony same-day; WS1→WS5 executed in order WS0→WS1→WS4→WS2→WS5→WS3). Generator: `claude-fable-5`. Sprint packet: `FLOSS/docs/superpowers/plans/2026-07-03-fable5-sprint-handoff.md`.
