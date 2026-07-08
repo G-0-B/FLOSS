@@ -709,6 +709,10 @@ def run_one_tick() -> TickResult:
 
     daily_state = load_daily_state()
     daily_state["ticks_today"] = int(daily_state.get("ticks_today", 0)) + 1
+    # Persist immediately so a mid-tick kill (SIGKILL/OOM/crash) doesn't
+    # lose the tick count. load_daily_state() already reset the date/rounds
+    # on rollover, so this is safe to write now. (2026-07-08 persistence gap fix)
+    save_daily_state(daily_state)
 
     rotation = get_work_rotation(daily_state)
     rounds_dispatched_this_tick = 0
@@ -737,6 +741,10 @@ def run_one_tick() -> TickResult:
         daily_state["rounds_today"] = (
             int(daily_state.get("rounds_today", 0)) + rounds_used
         )
+        # Persist rounds accumulation after each item so partial-tick
+        # progress survives a hard kill before the end-of-tick save.
+        # (2026-07-08 persistence gap fix)
+        save_daily_state(daily_state)
 
         if result.get("returncode") == 0:
             tick.completed.append(result)
