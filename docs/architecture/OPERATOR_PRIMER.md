@@ -2,10 +2,10 @@
 
 ```yaml
 id: "flossi0ullk-operator-primer"
-version: "0.1.0"
+version: "0.2.0"
 kind: "operator_primer"
 status: "Active"
-updated: "2026-05-19"
+updated: "2026-07-08"
 truth_status: "Specified with verified runtime anchors"
 evidence_sources:
   - "INDEX.md"
@@ -43,12 +43,12 @@ Use this as the default phase correction:
 
 | Area | Status | Meaning |
 |---|---|---|
-| MVP Phase 0 substrate viability | Verified complete | DNA/WASM/Tryorama and ontology integrity passed per `FLOSS/MVP_PLAN.md`; do not restart this as the current gate. |
-| Orchestration substrate bridge | Specified | Current proof gate: publish, provenance, independent verify, query, fork-visible conflict, no privileged verifier. |
+| MVP Phase 0 substrate viability | Verified complete | DNA/WASM + integration tests and ontology integrity passed per `FLOSS/MVP_PLAN.md`; do not restart this as the current gate. (JS Tryorama deprecated → **Rust Sweettest** per operator directive 2026-07-03 on hc 0.6.1 tooling gap.) |
+| Orchestration substrate bridge | Specified | Proof gate: publish, provenance, independent verify, query, fork-visible conflict, no privileged verifier. Active focus has shifted to ADR-17 (KnowledgeTriple contract reconciliation) as the Phase 1 primary deliverable; substrate-bridge validation remains a standing gate. |
 | Local consensus gateway | Verified at module level | ADR-10 / `ADR-MCP-ORCHESTRATOR`; analog votes, source-chain append, passive router. |
 | Heartbeat automation | Resumed 2026-05-26 (budget-reconciled) | STOP file removed after spec↔code reconciliation (5/5 defaults verified, `test_heartbeat_budget.py` 7/7). Runs as a user-session process (`MSI\kalis`), NOT LocalSystem — LocalSystem lacks user-site packages, `.env`, and `~/.floss_agent` access (verified again 2026-07-07). Check posture: STOP file presence + `daily_state.json` date + `ticks.log` tail. Service runner still pending; see working-todo §A.1 Servy recipe. |
 | Reasoning ensemble | Specified prototype | Router, Synthesizer, and MCP wrapper exist; specs were retrofitted after code and now bind future changes. |
-| Consent gate | Implementation-backed draft | ADR-12 stub, JSON schema, Holochain entry types, consent coordinator, DNA wiring, Rust unit tests, static wiring tests, release WASMs, hApp packing, and consent Tryorama scenarios exist; action-time gating remains pending before Substrate-class ratification. |
+| Consent gate | Implementation-backed draft | ADR-12 stub, JSON schema, Holochain entry types, consent coordinator, DNA wiring, Rust unit tests, static wiring tests, release WASMs, hApp packing, and consent scenarios exist; action-time gating remains pending before Substrate-class ratification. (e2e via **Rust Sweettest** per directive 2026-07-03; JS Tryorama deprecated.) |
 
 If another file says "Phase 0 Tryorama is still the blocker," treat it as
 evidence drift unless it explicitly distinguishes the separate orchestration
@@ -94,7 +94,7 @@ Use the cheapest surface that can do the job:
 | Human-readable runtime map | `FLOSS/docs/architecture/RUNTIME_SURFACES.md` |
 | Project architecture | `FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md` |
 | Operating model | `FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md` |
-| Decision history | `FLOSS/docs/adr/INDEX.md`, ADR-Suite v2.0 |
+| Decision history | `FLOSS/docs/adr/INDEX.md` (v2.1.0, 2026-07-04 — supersedes the v2.0 suite for ADR-13..17) |
 | Shared memory | `FLOSS/docs/agent-memory/MEMORY.md` |
 | Agent-native projections | generated from shared manifests, not edited directly |
 | Consensus decisions | `flossiullk-consensus` MCP / source-chain files |
@@ -159,13 +159,13 @@ not repeat the code-first sequence unless explicitly marked as emergency work.
 
 ## Current Best Next Moves
 
-As of 2026-05-19, high-leverage work is:
+As of 2026-07-08, high-leverage work is:
 
-1. Implement ADR-12 action-time governed-pattern enforcement, then harden DID/header binding.
-2. Run the orchestration substrate-bridge validation from `phase0-substrate-bridge.spec.md`.
-3. Register and pilot the reasoning ensemble MCP under real agent use.
-4. Reconcile ADR-2 evidence drift against the verified MVP Phase 0 state.
-5. Keep heartbeat budgeted until staged synthesis drafts and daily round state are under control.
+1. **ADR-17 KnowledgeTriple contract reconciliation** — the Phase 1 primary deliverable. Land D1/D2 gates (signed-gradient confidence, enum-now/URI-later predicates); review `valid_context`/`known_failures`/`expiry_or_retest_date` fields before hardening (working-todo §A.0000).
+2. **ADR-12 action-time governed-pattern enforcement**, then harden DID/header binding; gate Substrate-class ratification on Sweettest e2e + cross-frame validation.
+3. **spec_gate adoption** (`FLOSS/scripts/spec_gate.py` + `docs/specs/spec-registry.json`) — the D7 "−1 layer" spec-gate is built; wire it into routine change discipline so artifacts are spec'd before they're built.
+4. **Sweettest migration** — port deprecated `ARF/tests/tryorama/*.test.ts` scenarios to Rust Sweettest (in-process conductor; sidesteps hc 0.6.1 pairing gap).
+5. **Synthesis budget decision** — the `autonomous_synthesis` 900s timeout (pathologically large files like `Holistic_Vision.md` = 932 KB → ~78 chunks) needs a policy call: raise timeout, cap chunks-per-file, or disable until the 17 staged drafts are triaged.
 
 When in doubt, slow down at the canon boundary. Fast iteration belongs in Plane A;
 promotion belongs behind specs, tests, provenance, and consent.
