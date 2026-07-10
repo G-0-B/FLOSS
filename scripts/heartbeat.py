@@ -490,7 +490,7 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
                 "richer summaries for the same wall-clock budget. "
                 f"Budget gate: {synthesis_reason}."
             ),
-            timeout_seconds=900,  # 3 files × 5 min budget per file
+            timeout_seconds=1800,  # 3 files × 10 min budget per file (raised 2026-07-08 from 900s — pathologically large files like Holistic_Vision.md need ~78 chunks)
         ))
     else:
         log_tick_line(f"[skip] autonomous_synthesis — {synthesis_reason}")
