@@ -36,6 +36,11 @@ LOG_DIR = REPO_ROOT / "docs" / "knowledge_log"
 STAGING_DIR = LOG_DIR / "staging"
 LOG_FILE = LOG_DIR / "APPEND_ONLY_KNOWLEDGE_LOG.md"
 
+# Max chunks per file in extract_semantics(). Files exceeding this are deferred
+# to prevent pathologically large files from monopolizing the tick budget.
+# (Consensus-approved 2026-07-10, claim 019f4a9f, mean +0.617)
+MAX_CHUNKS_PER_FILE = 20
+
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -84,6 +89,16 @@ def extract_semantics(file_path: Path, model: str) -> str:
     chunks = [content[i:i + chunk_size] for i in range(0, len(content), chunk_size)]
     if not chunks:
         return "No content found."
+
+    # Cap chunks per file to prevent pathologically large files from monopolizing
+    # the tick budget. Files exceeding the cap are deferred, not lost — the caller
+    # logs them and they can be processed via a separate offline batch.
+    # (Consensus-approved 2026-07-10, claim 019f4a9f, mean +0.617)
+    if len(chunks) > MAX_CHUNKS_PER_FILE:
+        return (
+            f"SKIPPED: file has {len(chunks)} chunks (cap={MAX_CHUNKS_PER_FILE}); "
+            f"size={len(content)} bytes. Defer to offline batch or use --force-full."
+        )
 
     all_insights = []
 
