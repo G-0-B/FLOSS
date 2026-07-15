@@ -47,6 +47,49 @@ def initialized_repo(tmp_path: Path) -> Path:
     return repo
 
 
+def initialized_repo_with_object_format(
+    tmp_path: Path,
+    object_format: str,
+    *,
+    name: str = "repo",
+) -> Path:
+    probe = tmp_path / f"object-format-probe-{object_format}"
+    capability = git(
+        tmp_path,
+        "init",
+        "--bare",
+        f"--object-format={object_format}",
+        str(probe),
+        check=False,
+    )
+    if capability.returncode != 0:
+        message = capability.stderr.decode("utf-8", errors="replace").strip()
+        if object_format == "sha256":
+            pytest.skip(f"installed Git lacks SHA-256 repository support: {message}")
+        pytest.fail(f"Git lacks required {object_format} repository support: {message}")
+    repo = tmp_path / name
+    git(
+        tmp_path,
+        "init",
+        f"--object-format={object_format}",
+        str(repo),
+    )
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "Test")
+    (repo / "a.txt").write_text("one\n", encoding="utf-8")
+    git(repo, "add", "a.txt")
+    git(repo, "commit", "-m", "seed")
+    return repo
+
+
+def artifact_tree(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def test_capture_rejects_destination_inside_source(tmp_path: Path) -> None:
     repo = initialized_repo(tmp_path)
 
@@ -405,6 +448,146 @@ def test_unreferenced_ancestor_remote_bundles_restore_exact_requested_heads(
         != 0
     )
     assert (restored_roots[PlaneId.LOCAL_HISTORY] / "local-only.txt").is_file()
+    assert index_path.read_bytes() == index_before
+    assert_unchanged(before, snapshot_subject(repo))
+
+
+@pytest.mark.parametrize("object_format", ["sha1", "sha256"])
+def test_exact_ancestor_capture_preserves_source_object_format_deterministically(
+    tmp_path: Path,
+    object_format: str,
+) -> None:
+    repo = initialized_repo_with_object_format(tmp_path, object_format)
+    remote_main_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    (repo / "pr-only.txt").write_text("pr\n", encoding="utf-8")
+    git(repo, "add", "pr-only.txt")
+    git(repo, "commit", "-m", "pr generation")
+    remote_pr_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    (repo / "local-only.txt").write_text("local\n", encoding="utf-8")
+    git(repo, "add", "local-only.txt")
+    git(repo, "commit", "-m", "local generation")
+    local_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    refs_before = git(repo, "show-ref", "--head").stdout
+    ref_oids = {
+        line.split(b" ", 1)[0].decode("ascii") for line in refs_before.splitlines()
+    }
+    assert remote_main_sha not in ref_oids
+    assert remote_pr_sha not in ref_oids
+    before = snapshot_subject(repo)
+    index_path = Path(
+        git(repo, "rev-parse", "--path-format=absolute", "--git-path", "index")
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+
+    first_destination = tmp_path / "capsule-one"
+    first = capture_planes(
+        repo,
+        remote_main_sha,
+        remote_pr_sha,
+        first_destination,
+        SecretPolicy.default(),
+    )
+    second_destination = tmp_path / "capsule-two"
+    second = capture_planes(
+        repo,
+        remote_main_sha,
+        remote_pr_sha,
+        second_destination,
+        SecretPolicy.default(),
+    )
+
+    assert first == second
+    assert artifact_tree(first_destination) == artifact_tree(second_destination)
+    expected = {
+        PlaneId.REMOTE_MAIN: remote_main_sha,
+        PlaneId.REMOTE_PR: remote_pr_sha,
+        PlaneId.LOCAL_HISTORY: local_sha,
+    }
+    for plane_id, expected_sha in expected.items():
+        plane_root = first_destination / plane_id.value
+        assert git(
+            plane_root / "source.git",
+            "rev-parse",
+            "--show-object-format=storage",
+        ).stdout.strip() == object_format.encode("ascii")
+        identity = json.loads(
+            (plane_root / "identity.json").read_text(encoding="utf-8")
+        )
+        assert identity["object_format"] == object_format
+        bundle = plane_root / "repository.bundle"
+        heads = git(repo, "bundle", "list-heads", str(bundle)).stdout.splitlines()
+        assert len(heads) == 1
+        assert heads[0].startswith(expected_sha.encode("ascii") + b" ")
+        restored = tmp_path / f"restored-{object_format}-{plane_id.value}"
+        git(tmp_path, "clone", str(bundle), str(restored))
+        assert git(restored, "rev-parse", "HEAD").stdout.strip() == expected_sha.encode(
+            "ascii"
+        )
+
+    assert (
+        git(
+            tmp_path / f"restored-{object_format}-remote-main",
+            "cat-file",
+            "-e",
+            f"{remote_pr_sha}^{{commit}}",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (
+        git(
+            tmp_path / f"restored-{object_format}-remote-pr38",
+            "cat-file",
+            "-e",
+            f"{local_sha}^{{commit}}",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert git(repo, "show-ref", "--head").stdout == refs_before
+    assert index_path.read_bytes() == index_before
+    assert_unchanged(before, snapshot_subject(repo))
+
+
+def test_sha256_partial_capture_remains_without_source_mutation(tmp_path: Path) -> None:
+    repo = initialized_repo_with_object_format(tmp_path, "sha256")
+    before = snapshot_subject(repo)
+    refs_before = git(repo, "show-ref", "--head").stdout
+    index_path = Path(
+        git(repo, "rev-parse", "--path-format=absolute", "--git-path", "index")
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+    destination = tmp_path / "partial-capsule"
+
+    def stop_after_first_plane(plane_id: PlaneId) -> None:
+        raise RuntimeError(f"injected stop after {plane_id.value}")
+
+    with pytest.raises(RuntimeError, match="injected stop after remote-main"):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            destination,
+            SecretPolicy.default(),
+            _between_planes=stop_after_first_plane,
+        )
+
+    partial = destination / "remote-main"
+    assert (partial / "repository.bundle").is_file()
+    assert (
+        git(
+            partial / "source.git",
+            "rev-parse",
+            "--show-object-format=storage",
+        ).stdout.strip()
+        == b"sha256"
+    )
+    assert not (destination / "remote-pr38").exists()
+    assert git(repo, "show-ref", "--head").stdout == refs_before
     assert index_path.read_bytes() == index_before
     assert_unchanged(before, snapshot_subject(repo))
 

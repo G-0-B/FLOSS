@@ -56,6 +56,29 @@
       "$ref": "#/$defs/resultStatus"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {"const": "PASS"}
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "planes": {
+            "items": {
+              "properties": {
+                "eligibility": {"const": "eligible"},
+                "status": {"const": "PASS"}
+              },
+              "required": ["eligibility", "status"]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "resultStatus": {
       "enum": ["PASS", "FAIL", "BLOCKED", "SKIPPED"]
@@ -63,7 +86,15 @@
     "planeRecord": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["plane_id", "subject_id", "digest"],
+      "required": [
+        "plane_id",
+        "subject_id",
+        "digest",
+        "sensitivity",
+        "eligibility",
+        "verification",
+        "status"
+      ],
       "properties": {
         "plane_id": {
           "enum": [
@@ -82,8 +113,69 @@
         "digest": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "sensitivity": {
+          "enum": ["ordinary", "opaque-sensitive", "redacted"]
+        },
+        "eligibility": {
+          "enum": ["eligible", "ineligible"]
+        },
+        "verification": {
+          "enum": [
+            "byte-equality",
+            "opaque-preserved",
+            "unverifiable-redacted"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/resultStatus"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "plane_id": {
+                "enum": [
+                  "remote-main",
+                  "remote-pr38",
+                  "local-history",
+                  "local-index"
+                ]
+              }
+            },
+            "required": ["plane_id"]
+          },
+          "then": {
+            "properties": {
+              "sensitivity": {"const": "opaque-sensitive"},
+              "eligibility": {"const": "ineligible"},
+              "verification": {"const": "opaque-preserved"},
+              "status": {"const": "BLOCKED"}
+            }
+          },
+          "else": {
+            "oneOf": [
+              {
+                "properties": {
+                  "sensitivity": {"const": "ordinary"},
+                  "eligibility": {"const": "eligible"},
+                  "verification": {"const": "byte-equality"},
+                  "status": {"const": "PASS"}
+                }
+              },
+              {
+                "properties": {
+                  "sensitivity": {"const": "redacted"},
+                  "eligibility": {"const": "ineligible"},
+                  "verification": {"const": "unverifiable-redacted"},
+                  "status": {"const": "BLOCKED"}
+                }
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

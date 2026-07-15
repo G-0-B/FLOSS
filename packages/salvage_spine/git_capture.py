@@ -536,11 +536,22 @@ def _resolved_commit(repo: Path, revision: str) -> str:
     )
 
 
+def _storage_object_format(repo: Path) -> str:
+    """Return the source repository's object storage format without mutation."""
+
+    return (
+        run_git(repo, "rev-parse", "--show-object-format=storage")
+        .strip()
+        .decode("ascii")
+    )
+
+
 def _write_history_plane(
     repo: Path,
     plane_root: Path,
     plane_id: PlaneId,
     subject_id: str,
+    object_format: str,
     disposition: _PlaneDisposition,
 ) -> None:
     plane_root.mkdir()
@@ -551,6 +562,7 @@ def _write_history_plane(
             "git",
             "init",
             "--bare",
+            f"--object-format={object_format}",
             "--initial-branch=master",
             "--template=",
             str(bundle_source),
@@ -602,6 +614,7 @@ def _write_history_plane(
             **disposition.metadata(),
             "bundle_ref": captured_ref,
             "bundle_scope": "destination-owned-exact-ref",
+            "object_format": object_format,
             "plane_id": plane_id.value,
             "schema_version": "1",
             "subject_id": subject_id,
@@ -654,6 +667,7 @@ def capture_planes(
     remote_main_id = _resolved_commit(repo, remote_main_sha)
     remote_pr_id = _resolved_commit(repo, pr_head_sha)
     local_history_id = _resolved_commit(repo, "HEAD")
+    object_format = _storage_object_format(repo)
     index_bytes = _index_path(repo).read_bytes()
     tracked_manifest = _tracked_manifest(repo, tracked_paths, secret_policy)
 
@@ -692,6 +706,7 @@ def capture_planes(
                 plane_root,
                 plane_id,
                 subjects[plane_id],
+                object_format,
                 dispositions[plane_id],
             )
         elif plane_id is PlaneId.LOCAL_INDEX:
