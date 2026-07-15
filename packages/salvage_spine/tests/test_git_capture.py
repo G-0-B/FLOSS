@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -110,3 +111,42 @@ def test_snapshot_resolves_linked_worktree_index(tmp_path: Path) -> None:
 
     assert len(snapshot.index_sha256) == 64
     assert snapshot.status == b""
+
+
+@pytest.mark.parametrize("linked_worktree", [False, True])
+def test_snapshot_preserves_index_when_stat_cache_is_stale(
+    tmp_path: Path,
+    linked_worktree: bool,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    subject = repo
+    if linked_worktree:
+        subject = tmp_path / "linked"
+        git(repo, "worktree", "add", "-b", "linked-stale-stat", str(subject))
+
+    index_path = Path(
+        git(
+            subject,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "index",
+        )
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+    tracked_path = subject / "a.txt"
+    tracked_stat = tracked_path.stat()
+    os.utime(
+        tracked_path,
+        ns=(tracked_stat.st_atime_ns, tracked_stat.st_mtime_ns + 2_000_000_000),
+    )
+
+    first = snapshot_subject(subject)
+    index_after_first = index_path.read_bytes()
+    second = snapshot_subject(subject)
+
+    assert index_after_first == index_before
+    assert index_path.read_bytes() == index_before
+    assert_unchanged(first, second)
