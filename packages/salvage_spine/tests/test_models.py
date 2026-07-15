@@ -23,6 +23,13 @@ OPAQUE_PLANE_IDS = (
     PlaneId.LOCAL_INDEX,
 )
 LOCAL_MUTABLE_PLANE_IDS = (PlaneId.LOCAL_TRACKED, PlaneId.LOCAL_UNTRACKED)
+DISPOSITION_FAMILIES = ("opaque", "ordinary", "redacted")
+DISPOSITION_FIELD_TYPES = (
+    ("sensitivity", PlaneSensitivity),
+    ("eligibility", PlaneEligibility),
+    ("verification", PlaneVerification),
+    ("status", ResultStatus),
+)
 
 
 def opaque_plane(plane_id: PlaneId, index: int = 0) -> PlaneRecord:
@@ -59,6 +66,16 @@ def redacted_local_plane(plane_id: PlaneId, index: int = 4) -> PlaneRecord:
         verification=PlaneVerification.UNVERIFIABLE_REDACTED,
         status=ResultStatus.BLOCKED,
     )
+
+
+def disposition_family_record(family: str) -> PlaneRecord:
+    if family == "opaque":
+        return opaque_plane(PlaneId.LOCAL_HISTORY)
+    if family == "ordinary":
+        return ordinary_local_plane(PlaneId.LOCAL_TRACKED)
+    if family == "redacted":
+        return redacted_local_plane(PlaneId.LOCAL_UNTRACKED)
+    raise AssertionError(f"unknown test disposition family: {family}")
 
 
 def valid_planes() -> tuple[PlaneRecord, ...]:
@@ -192,6 +209,43 @@ def test_plane_record_rejects_raw_string_plane_id_bypass() -> None:
         )
 
 
+@pytest.mark.parametrize("family", DISPOSITION_FAMILIES)
+@pytest.mark.parametrize("field_name,expected_type", DISPOSITION_FIELD_TYPES)
+def test_plane_record_rejects_each_raw_string_disposition_field(
+    family: str,
+    field_name: str,
+    expected_type: type,
+) -> None:
+    record = disposition_family_record(family)
+    arguments = {
+        "plane_id": record.plane_id,
+        "subject_id": record.subject_id,
+        "digest": record.digest,
+        "sensitivity": record.sensitivity,
+        "eligibility": record.eligibility,
+        "verification": record.verification,
+        "status": record.status,
+    }
+    arguments[field_name] = arguments[field_name].value
+
+    with pytest.raises(
+        ValueError,
+        match=rf"{field_name} must be a {expected_type.__name__}",
+    ):
+        PlaneRecord(**arguments)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("family", DISPOSITION_FAMILIES)
+def test_plane_record_rejects_json_derived_raw_string_disposition(
+    family: str,
+) -> None:
+    serialized = json.loads(canonical_json_bytes(disposition_family_record(family)))
+    serialized["plane_id"] = PlaneId(serialized["plane_id"])
+
+    with pytest.raises(ValueError, match="sensitivity must be a PlaneSensitivity"):
+        PlaneRecord(**serialized)
+
+
 @pytest.mark.parametrize("plane_id", OPAQUE_PLANE_IDS)
 def test_inherently_opaque_plane_rejects_ordinary_pass(plane_id: PlaneId) -> None:
     with pytest.raises(ValueError, match="inherently opaque"):
@@ -259,6 +313,22 @@ def test_capsule_record_rejects_raw_string_status_bypass() -> None:
             planes=valid_planes(),
             exclusions=(),
             status="PASS",  # type: ignore[arg-type]
+        )
+
+
+def test_capsule_record_rejects_nested_malformed_plane_record() -> None:
+    planes = list(valid_planes())
+    object.__setattr__(planes[4], "status", "PASS")
+
+    with pytest.raises(ValueError, match="status must be a ResultStatus"):
+        CapsuleRecord(
+            schema_version="1.0.0",
+            state_id="nested-raw-pass",
+            repository="C:/repo",
+            captured_at="2026-07-14T00:00:00Z",
+            planes=tuple(planes),
+            exclusions=(),
+            status=ResultStatus.BLOCKED,
         )
 
 

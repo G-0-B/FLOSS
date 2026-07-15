@@ -68,6 +68,15 @@ class PlaneRecord:
 
         if not isinstance(self.plane_id, PlaneId):
             raise ValueError("plane_id must be a PlaneId")
+        disposition_types = (
+            ("sensitivity", self.sensitivity, PlaneSensitivity),
+            ("eligibility", self.eligibility, PlaneEligibility),
+            ("verification", self.verification, PlaneVerification),
+            ("status", self.status, ResultStatus),
+        )
+        for field_name, value, expected_type in disposition_types:
+            if not isinstance(value, expected_type):
+                raise ValueError(f"{field_name} must be a {expected_type.__name__}")
         disposition = (
             self.sensitivity,
             self.eligibility,
@@ -128,13 +137,14 @@ class CapsuleRecord:
 
         if not isinstance(self.status, ResultStatus):
             raise ValueError("status must be a ResultStatus")
+        if any(not isinstance(record, PlaneRecord) for record in self.planes):
+            raise ValueError("planes must contain exactly one record for every PlaneId")
+        for record in self.planes:
+            PlaneRecord.__post_init__(record)
         expected = set(PlaneId)
-        actual = [
-            record.plane_id for record in self.planes if isinstance(record, PlaneRecord)
-        ]
+        actual = [record.plane_id for record in self.planes]
         if (
             len(self.planes) != len(expected)
-            or len(actual) != len(self.planes)
             or any(not isinstance(plane_id, PlaneId) for plane_id in actual)
             or len(set(actual)) != len(actual)
             or set(actual) != expected
