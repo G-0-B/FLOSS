@@ -166,6 +166,87 @@ def _capsule_root(root: Path) -> Path:
     return resolved
 
 
+def _validated_directory_state(path: Path) -> os.stat_result:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise CapsuleVerificationError("directory is unavailable") from exc
+    if stat.S_ISLNK(metadata.st_mode) or _is_reparse(metadata):
+        raise CapsuleVerificationError("directory alias is not supported")
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise CapsuleVerificationError("directory entry is not a directory")
+    return metadata
+
+
+@contextmanager
+def _locked_directory(path: Path) -> Iterator[Path]:
+    """Retain directory identity; Windows additionally blocks path replacement."""
+
+    directory = Path(path)
+    before = _validated_directory_state(directory)
+    if os.name == "nt":
+        from ctypes import wintypes
+
+        create_file = ctypes.windll.kernel32.CreateFileW
+        create_file.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        )
+        create_file.restype = wintypes.HANDLE
+        close_handle = ctypes.windll.kernel32.CloseHandle
+        close_handle.argtypes = (wintypes.HANDLE,)
+        close_handle.restype = wintypes.BOOL
+        handle = create_file(
+            str(directory),
+            0x80000000,  # GENERIC_READ; READ_ATTRIBUTES alone permits rename here
+            0x00000001 | 0x00000002,  # deliberately omit FILE_SHARE_DELETE
+            None,
+            3,  # OPEN_EXISTING
+            0x00200000 | 0x02000000,  # OPEN_REPARSE_POINT | BACKUP_SEMANTICS
+            None,
+        )
+        invalid_handle = ctypes.c_void_p(-1).value
+        if handle == invalid_handle:
+            raise CapsuleVerificationError(
+                "directory cannot be retained safely"
+            ) from ctypes.WinError()
+        try:
+            after = _validated_directory_state(directory)
+            if _node_identity(before) != _node_identity(after):
+                raise CapsuleVerificationError(
+                    "directory changed while acquiring containment"
+                )
+            yield directory
+        finally:
+            close_handle(handle)
+        return
+
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | os.O_NOFOLLOW
+    )
+    try:
+        descriptor = os.open(directory, flags)
+    except OSError as exc:
+        raise CapsuleVerificationError("directory cannot be retained safely") from exc
+    try:
+        handle_state = os.fstat(descriptor)
+        if _node_identity(before) != _node_identity(handle_state):
+            raise CapsuleVerificationError(
+                "directory changed while acquiring containment"
+            )
+        yield directory
+    finally:
+        os.close(descriptor)
+
+
 def _walk_regular_files(
     root: Path, *, excluded_root_names: frozenset[str] = _SEAL_ARTIFACTS
 ) -> Iterator[Path]:
@@ -244,48 +325,51 @@ def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
     """Atomically replace a validated fixed output; failed pending files remain."""
 
     capsule = _capsule_root(root)
-    root_before = capsule.lstat()
-    existing = _validate_fixed_output(capsule, name)
-    pending = capsule / f".{name}.pending-{secrets.token_hex(16)}"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
-    try:
-        descriptor = os.open(pending, flags, 0o600)
-    except OSError as exc:
-        raise CapsuleVerificationError(
-            "fixed output pending file cannot be created"
-        ) from exc
-    with os.fdopen(descriptor, "wb", closefd=True) as stream:
-        stream.write(content)
-        stream.flush()
-        os.fsync(stream.fileno())
-        pending_handle = os.fstat(stream.fileno())
-    _assert_regular_metadata(pending_handle)
-    pending_path = _validated_file_state(pending)
-    if _file_identity(pending_handle) != _file_identity(pending_path):
-        raise CapsuleVerificationError("fixed output pending file changed")
-    root_now = _capsule_root(capsule).lstat()
-    if _node_identity(root_before) != _node_identity(root_now):
-        raise CapsuleVerificationError("capsule root changed during output write")
-    current = _validate_fixed_output(capsule, name)
-    if (existing is None) != (current is None) or (
-        existing is not None
-        and current is not None
-        and _file_identity(existing) != _file_identity(current)
-    ):
-        raise CapsuleVerificationError("fixed output changed before replacement")
-    try:
-        os.replace(pending, capsule / name)
-    except OSError as exc:
-        raise CapsuleVerificationError(
-            "fixed output atomic replacement failed"
-        ) from exc
-    written = _validated_file_state(capsule / name)
-    if _node_identity(written) != _node_identity(pending_handle):
-        raise CapsuleVerificationError(
-            "fixed output identity changed after replacement"
-        )
-    if _node_identity(_capsule_root(capsule).lstat()) != _node_identity(root_before):
-        raise CapsuleVerificationError("capsule root changed after output write")
+    with _locked_directory(capsule) as retained_capsule:
+        root_before = capsule.lstat()
+        existing = _validate_fixed_output(retained_capsule, name)
+        pending = retained_capsule / f".{name}.pending-{secrets.token_hex(16)}"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+        try:
+            descriptor = os.open(pending, flags, 0o600)
+        except OSError as exc:
+            raise CapsuleVerificationError(
+                "fixed output pending file cannot be created"
+            ) from exc
+        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+            pending_handle = os.fstat(stream.fileno())
+        _assert_regular_metadata(pending_handle)
+        pending_path = _validated_file_state(pending)
+        if _file_identity(pending_handle) != _file_identity(pending_path):
+            raise CapsuleVerificationError("fixed output pending file changed")
+        root_now = _capsule_root(capsule).lstat()
+        if _node_identity(root_before) != _node_identity(root_now):
+            raise CapsuleVerificationError("capsule root changed during output write")
+        current = _validate_fixed_output(retained_capsule, name)
+        if (existing is None) != (current is None) or (
+            existing is not None
+            and current is not None
+            and _file_identity(existing) != _file_identity(current)
+        ):
+            raise CapsuleVerificationError("fixed output changed before replacement")
+        try:
+            os.replace(pending, retained_capsule / name)
+        except OSError as exc:
+            raise CapsuleVerificationError(
+                "fixed output atomic replacement failed"
+            ) from exc
+        written = _validated_file_state(retained_capsule / name)
+        if _node_identity(written) != _node_identity(pending_handle):
+            raise CapsuleVerificationError(
+                "fixed output identity changed after replacement"
+            )
+        if _node_identity(_capsule_root(capsule).lstat()) != _node_identity(
+            root_before
+        ):
+            raise CapsuleVerificationError("capsule root changed after output write")
 
 
 def _checksum_entries(root: Path) -> list[dict[str, str]]:
@@ -315,19 +399,20 @@ def seal_capsule(root: Path) -> str:
     """Write an idempotent local-unanchored seal and return its root digest."""
 
     capsule = _capsule_root(root)
-    for name in _SEAL_ARTIFACTS:
-        _validate_fixed_output(capsule, name)
-    entries = _checksum_entries(capsule)
-    listing = _listing_bytes(entries)
-    provenance_root = hashlib.sha256(listing).hexdigest()
-    _atomic_write_fixed(capsule, "checksums.sha256", listing)
-    _atomic_write_fixed(
-        capsule,
-        "provenance-root.json",
-        canonical_json_bytes(_provenance_record(provenance_root)),
-    )
-    verify_checksums(capsule)
-    return provenance_root
+    with _locked_directory(capsule) as retained_capsule:
+        for name in _SEAL_ARTIFACTS:
+            _validate_fixed_output(retained_capsule, name)
+        entries = _checksum_entries(retained_capsule)
+        listing = _listing_bytes(entries)
+        provenance_root = hashlib.sha256(listing).hexdigest()
+        _atomic_write_fixed(capsule, "checksums.sha256", listing)
+        _atomic_write_fixed(
+            capsule,
+            "provenance-root.json",
+            canonical_json_bytes(_provenance_record(provenance_root)),
+        )
+        verify_checksums(capsule)
+        return provenance_root
 
 
 def _safe_listed_path(value: object) -> str:
