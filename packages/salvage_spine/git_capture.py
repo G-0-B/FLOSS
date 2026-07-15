@@ -79,7 +79,7 @@ def snapshot_subject(repo: Path) -> SubjectSnapshot:
         index_sha256=index_digest,
         status=run_git(repo, "status", "--porcelain=v2", "-z", "--ignored"),
         staged_diff=run_git(repo, "diff", "--binary", "--cached"),
-        unstaged_diff=run_git(repo, "diff", "--binary"),
+        unstaged_diff=run_git(repo, "diff-files", "--binary"),
         tracked_flags=run_git(repo, "ls-files", "-v", "-z"),
     )
 
