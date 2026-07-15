@@ -9,13 +9,21 @@ import pytest
 
 from packages.salvage_spine.git_capture import (
     CaptureDrift,
+    CaptureEvidenceError,
+    CaptureUnverifiable,
     SecretPolicy,
     assert_unchanged,
     capture_planes,
     run_git,
     snapshot_subject,
 )
-from packages.salvage_spine.models import PlaneId
+from packages.salvage_spine.models import (
+    PlaneEligibility,
+    PlaneId,
+    PlaneSensitivity,
+    PlaneVerification,
+    ResultStatus,
+)
 
 
 def git(
@@ -56,7 +64,7 @@ def test_secret_named_file_is_redacted_not_copied(tmp_path: Path) -> None:
     secret.write_text("TOKEN=do-not-copy\n", encoding="utf-8")
     destination = tmp_path / "capsule"
 
-    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+    records = capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
 
     assert not any(path.name == ".env" for path in destination.rglob("*"))
     manifest = json.loads(
@@ -69,6 +77,137 @@ def test_secret_named_file_is_redacted_not_copied(tmp_path: Path) -> None:
     assert entry["reason"] == "secret-name"
     assert entry["size"] is None
     assert entry["sha256"] is None
+    record = next(item for item in records if item.plane_id is PlaneId.LOCAL_UNTRACKED)
+    assert record.sensitivity is PlaneSensitivity.REDACTED
+    assert record.eligibility is PlaneEligibility.INELIGIBLE
+    assert record.verification is PlaneVerification.UNVERIFIABLE_REDACTED
+    assert record.status is ResultStatus.BLOCKED
+    assert len(records) == len(PlaneId)
+    assert any(item.status is ResultStatus.PASS for item in records)
+    metadata = json.loads(
+        (destination / "local-untracked-ignored" / "metadata.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert metadata["sensitivity"] == "redacted"
+    assert metadata["eligibility"] == "ineligible"
+    assert metadata["verification"] == "unverifiable-redacted"
+    assert metadata["status"] == "BLOCKED"
+
+
+def test_history_preserves_historical_env_only_as_blocked_opaque_payload(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    historical_secret = b"TOKEN=historical-secret\x00bytes\n"
+    (repo / ".env").write_bytes(historical_secret)
+    git(repo, "add", ".env")
+    git(repo, "commit", "-m", "historical environment")
+    historical_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    git(repo, "update-index", "--force-remove", ".env")
+    git(repo, "commit", "-m", "remove environment from current tree")
+    destination = tmp_path / "capsule"
+
+    records = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        destination,
+        SecretPolicy.default(),
+    )
+
+    history = next(
+        record for record in records if record.plane_id is PlaneId.LOCAL_HISTORY
+    )
+    assert history.sensitivity is PlaneSensitivity.OPAQUE_SENSITIVE
+    assert history.eligibility is PlaneEligibility.INELIGIBLE
+    assert history.verification is PlaneVerification.OPAQUE_PRESERVED
+    assert history.status is ResultStatus.BLOCKED
+    metadata = json.loads(
+        (destination / "local-history" / "identity.json").read_text(encoding="utf-8")
+    )
+    assert metadata["sensitivity"] == "opaque-sensitive"
+    assert metadata["eligibility"] == "ineligible"
+    assert metadata["verification"] == "opaque-preserved"
+    assert metadata["status"] == "BLOCKED"
+    restored = tmp_path / "restored-history"
+    git(
+        tmp_path,
+        "clone",
+        str(destination / "local-history" / "repository.bundle"),
+        str(restored),
+    )
+    assert git(restored, "show", f"{historical_sha}:.env").stdout == historical_secret
+
+
+def test_index_preserves_staged_secret_path_and_oid_only_as_blocked_opaque_payload(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    staged_secret = b"TOKEN=staged-secret\x00bytes\n"
+    (repo / ".env").write_bytes(staged_secret)
+    git(repo, "add", ".env")
+    stage_line = git(repo, "ls-files", "--stage", "--", ".env").stdout
+    staged_oid = stage_line.split()[1].decode("ascii")
+    index_path = Path(
+        git(repo, "rev-parse", "--path-format=absolute", "--git-path", "index")
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+    destination = tmp_path / "capsule"
+
+    records = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        destination,
+        SecretPolicy.default(),
+    )
+
+    index_record = next(
+        record for record in records if record.plane_id is PlaneId.LOCAL_INDEX
+    )
+    assert index_record.sensitivity is PlaneSensitivity.OPAQUE_SENSITIVE
+    assert index_record.eligibility is PlaneEligibility.INELIGIBLE
+    assert index_record.verification is PlaneVerification.OPAQUE_PRESERVED
+    assert index_record.status is ResultStatus.BLOCKED
+    index_payload = destination / "local-index" / "index.raw"
+    assert index_payload.read_bytes() == index_before
+    assert b".env" in index_payload.read_bytes()
+    assert bytes.fromhex(staged_oid) in index_payload.read_bytes()
+    assert (
+        staged_secret not in (destination / "local-index" / "staged.diff").read_bytes()
+    )
+    metadata = json.loads(
+        (destination / "local-index" / "metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["sensitivity"] == "opaque-sensitive"
+    assert metadata["eligibility"] == "ineligible"
+    assert metadata["verification"] == "opaque-preserved"
+    assert metadata["status"] == "BLOCKED"
+    restored = tmp_path / "restored-index"
+    git(
+        tmp_path,
+        "clone",
+        str(destination / "local-history" / "repository.bundle"),
+        str(restored),
+    )
+    restored_index = Path(
+        git(
+            restored,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "index",
+        )
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    restored_index.write_bytes(index_payload.read_bytes())
+    restored_stage = git(restored, "ls-files", "--stage", "--", ".env").stdout
+    assert restored_stage.split()[1].decode("ascii") == staged_oid
+    assert restored_stage.rstrip(b"\r\n").endswith(b"\t.env")
 
 
 def test_capture_writes_six_exact_source_planes(tmp_path: Path) -> None:
@@ -185,6 +324,91 @@ def test_history_bundles_do_not_expose_unrelated_divergent_refs(tmp_path: Path) 
     assert history_heads[0].startswith(main_sha.encode("ascii") + b" ")
 
 
+def test_unreferenced_ancestor_remote_bundles_restore_exact_requested_heads(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    remote_main_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    (repo / "pr-only.txt").write_text("pr\n", encoding="utf-8")
+    git(repo, "add", "pr-only.txt")
+    git(repo, "commit", "-m", "pr generation")
+    remote_pr_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    (repo / "local-only.txt").write_text("local\n", encoding="utf-8")
+    git(repo, "add", "local-only.txt")
+    git(repo, "commit", "-m", "local generation")
+    local_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    ref_oids = {
+        line.split(b" ", 1)[0].decode("ascii")
+        for line in git(repo, "show-ref").stdout.splitlines()
+    }
+    assert remote_main_sha not in ref_oids
+    assert remote_pr_sha not in ref_oids
+    before = snapshot_subject(repo)
+    index_path = Path(
+        git(repo, "rev-parse", "--path-format=absolute", "--git-path", "index")
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+    destination = tmp_path / "capsule"
+
+    records = capture_planes(
+        repo,
+        remote_main_sha,
+        remote_pr_sha,
+        destination,
+        SecretPolicy.default(),
+    )
+
+    expected = {
+        PlaneId.REMOTE_MAIN: remote_main_sha,
+        PlaneId.REMOTE_PR: remote_pr_sha,
+        PlaneId.LOCAL_HISTORY: local_sha,
+    }
+    restored_roots: dict[PlaneId, Path] = {}
+    for plane_id, expected_sha in expected.items():
+        bundle = destination / plane_id.value / "repository.bundle"
+        heads = git(repo, "bundle", "list-heads", str(bundle)).stdout.splitlines()
+        assert len(heads) == 1
+        assert heads[0].startswith(expected_sha.encode("ascii") + b" ")
+        record = next(record for record in records if record.plane_id is plane_id)
+        assert record.subject_id == expected_sha
+        restored = tmp_path / f"restored-{plane_id.value}"
+        git(tmp_path, "clone", str(bundle), str(restored))
+        assert git(restored, "rev-parse", "HEAD").stdout.strip() == expected_sha.encode(
+            "ascii"
+        )
+        restored_roots[plane_id] = restored
+
+    assert not (restored_roots[PlaneId.REMOTE_MAIN] / "pr-only.txt").exists()
+    assert not (restored_roots[PlaneId.REMOTE_MAIN] / "local-only.txt").exists()
+    assert (
+        git(
+            restored_roots[PlaneId.REMOTE_MAIN],
+            "cat-file",
+            "-e",
+            f"{remote_pr_sha}^{{commit}}",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (restored_roots[PlaneId.REMOTE_PR] / "pr-only.txt").is_file()
+    assert not (restored_roots[PlaneId.REMOTE_PR] / "local-only.txt").exists()
+    assert (
+        git(
+            restored_roots[PlaneId.REMOTE_PR],
+            "cat-file",
+            "-e",
+            f"{local_sha}^{{commit}}",
+            check=False,
+        ).returncode
+        != 0
+    )
+    assert (restored_roots[PlaneId.LOCAL_HISTORY] / "local-only.txt").is_file()
+    assert index_path.read_bytes() == index_before
+    assert_unchanged(before, snapshot_subject(repo))
+
+
 def test_default_secret_patterns_are_case_insensitive(tmp_path: Path) -> None:
     repo = initialized_repo(tmp_path)
     secret_paths = (
@@ -235,7 +459,7 @@ def test_tracked_secret_diff_with_pathspec_metacharacters_is_excluded(
     secret.write_bytes(unstaged_secret)
     destination = tmp_path / "capsule"
 
-    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+    records = capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
 
     artifact_bytes = [
         path.read_bytes() for path in destination.rglob("*") if path.is_file()
@@ -249,6 +473,108 @@ def test_tracked_secret_diff_with_pathspec_metacharacters_is_excluded(
     assert entry["inclusion"] == "redacted"
     assert entry["size"] is None
     assert entry["sha256"] is None
+    record = next(item for item in records if item.plane_id is PlaneId.LOCAL_TRACKED)
+    assert record.sensitivity is PlaneSensitivity.REDACTED
+    assert record.eligibility is PlaneEligibility.INELIGIBLE
+    assert record.verification is PlaneVerification.UNVERIFIABLE_REDACTED
+    assert record.status is ResultStatus.BLOCKED
+    metadata = json.loads(
+        (destination / "local-tracked" / "metadata.json").read_text(encoding="utf-8")
+    )
+    assert metadata["sensitivity"] == "redacted"
+    assert metadata["eligibility"] == "ineligible"
+    assert metadata["verification"] == "unverifiable-redacted"
+    assert metadata["status"] == "BLOCKED"
+
+
+def test_missing_tracked_secret_path_is_redacted_and_blocked(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    secret = repo / ".env"
+    secret.write_bytes(b"committed secret\n")
+    git(repo, "add", ".env")
+    git(repo, "commit", "-m", "track secret-shaped path")
+    secret.replace(tmp_path / "held-secret")
+
+    records = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        tmp_path / "capsule",
+        SecretPolicy.default(),
+    )
+
+    tracked = next(
+        record for record in records if record.plane_id is PlaneId.LOCAL_TRACKED
+    )
+    assert tracked.sensitivity is PlaneSensitivity.REDACTED
+    assert tracked.status is ResultStatus.BLOCKED
+
+
+def test_required_byte_equality_fails_closed_for_redacted_mutable_path(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    (repo / ".env").write_bytes(b"same-length-secret-a\n")
+
+    with pytest.raises(
+        CaptureUnverifiable,
+        match="redacted mutable paths prevent byte-equality verification",
+    ):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            tmp_path / "capsule",
+            SecretPolicy.default(),
+            require_byte_equality=True,
+        )
+
+    assert (tmp_path / "capsule" / "local-untracked-ignored").is_dir()
+
+
+def test_same_size_restored_mtime_secret_mutation_cannot_pass_byte_equality(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    secret = repo / ".env"
+    original = b"same-length-secret-a\n"
+    replacement = b"same-length-secret-b\n"
+    assert len(original) == len(replacement)
+    secret.write_bytes(original)
+    original_stat = secret.stat()
+    mutated = False
+
+    def mutate_and_restore_mtime(_plane_id: PlaneId) -> None:
+        nonlocal mutated
+        if mutated:
+            return
+        secret.write_bytes(replacement)
+        os.utime(
+            secret,
+            ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+        )
+        mutated = True
+
+    with pytest.raises(CaptureEvidenceError):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            tmp_path / "capsule",
+            SecretPolicy.default(),
+            require_byte_equality=True,
+            _between_planes=mutate_and_restore_mtime,
+        )
+
+    assert secret.read_bytes() == replacement
+    assert secret.stat().st_size == original_stat.st_size
+    assert secret.stat().st_mtime_ns == original_stat.st_mtime_ns
+    artifact_bytes = [
+        path.read_bytes()
+        for path in (tmp_path / "capsule").rglob("*")
+        if path.is_file()
+    ]
+    assert all(replacement not in content for content in artifact_bytes)
 
 
 def test_capture_does_not_follow_untracked_symlink(tmp_path: Path) -> None:
