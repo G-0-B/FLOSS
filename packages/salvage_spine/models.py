@@ -58,31 +58,57 @@ class PlaneRecord:
     plane_id: PlaneId
     subject_id: str
     digest: str
-    sensitivity: PlaneSensitivity = PlaneSensitivity.ORDINARY
-    eligibility: PlaneEligibility = PlaneEligibility.ELIGIBLE
-    verification: PlaneVerification = PlaneVerification.BYTE_EQUALITY
-    status: ResultStatus = ResultStatus.PASS
+    sensitivity: PlaneSensitivity
+    eligibility: PlaneEligibility
+    verification: PlaneVerification
+    status: ResultStatus
 
     def __post_init__(self) -> None:
         """Prevent sensitive or unverifiable preservation from claiming success."""
 
-        expected_verification = {
-            PlaneSensitivity.ORDINARY: PlaneVerification.BYTE_EQUALITY,
-            PlaneSensitivity.OPAQUE_SENSITIVE: PlaneVerification.OPAQUE_PRESERVED,
-            PlaneSensitivity.REDACTED: PlaneVerification.UNVERIFIABLE_REDACTED,
-        }[self.sensitivity]
-        if self.verification is not expected_verification:
-            raise ValueError("plane sensitivity and verification must agree")
-        if self.sensitivity is not PlaneSensitivity.ORDINARY and (
-            self.eligibility is not PlaneEligibility.INELIGIBLE
-            or self.status is not ResultStatus.BLOCKED
-        ):
-            raise ValueError("sensitive planes must be blocked and ineligible")
-        if self.sensitivity is PlaneSensitivity.ORDINARY and (
-            self.eligibility is not PlaneEligibility.ELIGIBLE
-            or self.status is not ResultStatus.PASS
-        ):
-            raise ValueError("ordinary planes must be passing and eligible")
+        if not isinstance(self.plane_id, PlaneId):
+            raise ValueError("plane_id must be a PlaneId")
+        disposition = (
+            self.sensitivity,
+            self.eligibility,
+            self.verification,
+            self.status,
+        )
+        opaque_disposition = (
+            PlaneSensitivity.OPAQUE_SENSITIVE,
+            PlaneEligibility.INELIGIBLE,
+            PlaneVerification.OPAQUE_PRESERVED,
+            ResultStatus.BLOCKED,
+        )
+        ordinary_disposition = (
+            PlaneSensitivity.ORDINARY,
+            PlaneEligibility.ELIGIBLE,
+            PlaneVerification.BYTE_EQUALITY,
+            ResultStatus.PASS,
+        )
+        redacted_disposition = (
+            PlaneSensitivity.REDACTED,
+            PlaneEligibility.INELIGIBLE,
+            PlaneVerification.UNVERIFIABLE_REDACTED,
+            ResultStatus.BLOCKED,
+        )
+        opaque_planes = {
+            PlaneId.REMOTE_MAIN,
+            PlaneId.REMOTE_PR,
+            PlaneId.LOCAL_HISTORY,
+            PlaneId.LOCAL_INDEX,
+        }
+        if self.plane_id in opaque_planes:
+            if disposition != opaque_disposition:
+                raise ValueError(
+                    "inherently opaque planes require opaque, ineligible, "
+                    "preserved, BLOCKED disposition"
+                )
+        elif disposition not in {ordinary_disposition, redacted_disposition}:
+            raise ValueError(
+                "local mutable planes require ordinary byte-equality PASS or "
+                "redacted unverifiable BLOCKED disposition"
+            )
 
 
 @dataclass(frozen=True)
@@ -100,6 +126,8 @@ class CapsuleRecord:
     def __post_init__(self) -> None:
         """Reject incomplete or ambiguous six-plane capsule metadata."""
 
+        if not isinstance(self.status, ResultStatus):
+            raise ValueError("status must be a ResultStatus")
         expected = set(PlaneId)
         actual = [
             record.plane_id for record in self.planes if isinstance(record, PlaneRecord)
@@ -112,6 +140,14 @@ class CapsuleRecord:
             or set(actual) != expected
         ):
             raise ValueError("planes must contain exactly one record for every PlaneId")
+        if self.status is ResultStatus.PASS and any(
+            plane.status is not ResultStatus.PASS
+            or plane.eligibility is not PlaneEligibility.ELIGIBLE
+            for plane in self.planes
+        ):
+            raise ValueError(
+                "capsule PASS requires every plane to PASS and be eligible"
+            )
 
 
 def canonical_json_bytes(value: object) -> bytes:
