@@ -7,6 +7,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from pathlib import PurePosixPath
+from pathlib import PureWindowsPath
 from typing import Callable
 
 from packages.salvage_spine.models import (
@@ -232,16 +233,37 @@ def _validate_destination(source_root: Path, destination: Path) -> None:
 
 
 def _decode_paths(raw_paths: bytes) -> tuple[str, ...]:
-    return tuple(
-        raw.decode("utf-8", errors="surrogateescape")
-        for raw in raw_paths.split(b"\0")
-        if raw
-    )
+    decoded_paths: list[str] = []
+    seen_paths: set[str] = set()
+    for raw_path in raw_paths.split(b"\0"):
+        if not raw_path:
+            continue
+        relative_path = raw_path.decode("utf-8", errors="surrogateescape")
+        if relative_path.endswith("/"):
+            relative_path = relative_path[:-1]
+        canonical_path = _safe_relative_path(relative_path).as_posix()
+        if canonical_path in seen_paths:
+            raise ValueError(
+                f"duplicate repository path after canonicalization: {canonical_path!r}"
+            )
+        seen_paths.add(canonical_path)
+        decoded_paths.append(canonical_path)
+    return tuple(decoded_paths)
 
 
 def _safe_relative_path(relative_path: str) -> PurePosixPath:
     relative = PurePosixPath(relative_path)
-    if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+    windows_relative = PureWindowsPath(relative_path)
+    if (
+        not relative_path
+        or "\\" in relative_path
+        or relative.is_absolute()
+        or not relative.parts
+        or ".." in relative.parts
+        or relative_path != relative.as_posix()
+        or windows_relative.is_absolute()
+        or bool(windows_relative.drive)
+    ):
         raise ValueError(f"unsafe repository-relative path: {relative_path!r}")
     return relative
 
