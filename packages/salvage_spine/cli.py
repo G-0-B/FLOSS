@@ -39,6 +39,7 @@ _SAFE_STATE_CHARS = frozenset(
 _RENDER_PHASES = {"projection-rendered"}
 _INVENTORY_PHASES = {"inventory-complete", *_RENDER_PHASES}
 _VERIFY_PHASES = {"verification-complete", *_INVENTORY_PHASES}
+_STATUS_COMMAND = "python scripts/pr38_salvage.py status --capsule STATE_DIR"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -133,7 +134,10 @@ def _handle_capture(args: argparse.Namespace) -> int:
         capsule_root,
         SecretPolicy.default(),
     )
-    state_id = _validated_state_id(state_dir.name)
+    _validated_state_id(state_dir.name)
+    capsule_root_hash = seal_capsule(capsule_root)
+    precomputed_manifest = inventory_change_universe(capsule_root)
+    state_id = _validated_state_id(str(precomputed_manifest["state_id"]))
     _write_bytes(
         state_dir / _CAPSULE_RECORD,
         canonical_json_bytes(
@@ -148,8 +152,6 @@ def _handle_capture(args: argparse.Namespace) -> int:
             )
         ),
     )
-    capsule_root_hash = seal_capsule(capsule_root)
-    precomputed_manifest = inventory_change_universe(capsule_root)
     checkpoint = Checkpoint(
         schema_version="1.0.0",
         sequence=0,
@@ -167,10 +169,10 @@ def _handle_capture(args: argparse.Namespace) -> int:
         blockers=("verification-pending",),
         human_decisions=("preserve-read-only-first",),
         next_safe_command=(
-            "python scripts/pr38_salvage.py verify --capsule <state-dir> "
-            "--restore <clean-room-dir> --forbid-root <source-root>"
+            "python scripts/pr38_salvage.py verify --capsule STATE_DIR "
+            "--restore CLEAN_ROOM_DIR --forbid-root SOURCE_ROOT"
         ),
-        recovery_command="python scripts/pr38_salvage.py status --capsule <state-dir>",
+        recovery_command=_STATUS_COMMAND,
         digest=None,
     )
     append_checkpoint(state_dir / _CHECKPOINT_FILE, checkpoint)
@@ -223,10 +225,10 @@ def _handle_verify(args: argparse.Namespace) -> int:
     verification_digest = hashlib.sha256(canonical_json_bytes(result)).hexdigest()
     inventory_eligible = _verification_inventory_eligible(result)
     if inventory_eligible:
-        next_safe = "python scripts/pr38_salvage.py inventory --capsule <state-dir>"
+        next_safe = "python scripts/pr38_salvage.py inventory --capsule STATE_DIR"
         blockers: tuple[str, ...] = ()
     else:
-        next_safe = "python scripts/pr38_salvage.py status --capsule <state-dir>"
+        next_safe = _STATUS_COMMAND
         blockers = result.blockers
     checkpoint = Checkpoint(
         schema_version="1.0.0",
@@ -245,7 +247,7 @@ def _handle_verify(args: argparse.Namespace) -> int:
         blockers=blockers,
         human_decisions=tuple(latest.human_decisions),
         next_safe_command=next_safe,
-        recovery_command="python scripts/pr38_salvage.py status --capsule <state-dir>",
+        recovery_command=_STATUS_COMMAND,
         digest=None,
     )
     append_checkpoint(checkpoint_path, checkpoint)
@@ -308,10 +310,10 @@ def _handle_inventory(args: argparse.Namespace) -> int:
         blockers=(),
         human_decisions=tuple(latest.human_decisions),
         next_safe_command=(
-            "python scripts/pr38_salvage.py render-github --capsule <state-dir> "
-            "--output <render-dir>"
+            "python scripts/pr38_salvage.py render-github --capsule STATE_DIR "
+            "--output RENDER_DIR"
         ),
-        recovery_command="python scripts/pr38_salvage.py status --capsule <state-dir>",
+        recovery_command=_STATUS_COMMAND,
         digest=None,
     )
     append_checkpoint(state_dir / _CHECKPOINT_FILE, checkpoint)
@@ -338,16 +340,6 @@ def _handle_render_github(args: argparse.Namespace) -> int:
             "render-github requires an inventory-eligible verification record"
         )
 
-    output_dir = _new_directory_target(Path(args.output))
-    artifacts_dir = output_dir / _ARTIFACTS_DIR
-    artifacts_dir.mkdir(parents=True, exist_ok=False)
-    _copy_exact(
-        state_dir / _CAPSULE_DIRNAME / _VERIFICATION_FILE,
-        artifacts_dir / _VERIFICATION_FILE,
-    )
-    _copy_exact(state_dir / _MANIFEST_FILE, artifacts_dir / _MANIFEST_FILE)
-    _copy_exact(state_dir / _CHECKPOINT_FILE, artifacts_dir / _CHECKPOINT_FILE)
-
     evidence = Evidence(
         verification=verification,
         checkpoint=latest,
@@ -362,6 +354,18 @@ def _handle_render_github(args: argparse.Namespace) -> int:
     )
     summary = render_check_summary(evidence)
     comment = render_stop_merge_comment(evidence)
+
+    output_dir = _new_directory_target(Path(args.output))
+    if _paths_overlap(output_dir, state_dir):
+        raise ValueError("render output overlaps the capsule state")
+    artifacts_dir = output_dir / _ARTIFACTS_DIR
+    artifacts_dir.mkdir(parents=True, exist_ok=False)
+    _copy_exact(
+        state_dir / _CAPSULE_DIRNAME / _VERIFICATION_FILE,
+        artifacts_dir / _VERIFICATION_FILE,
+    )
+    _copy_exact(state_dir / _MANIFEST_FILE, artifacts_dir / _MANIFEST_FILE)
+    _copy_exact(state_dir / _CHECKPOINT_FILE, artifacts_dir / _CHECKPOINT_FILE)
     _write_bytes(output_dir / _CHECK_SUMMARY_FILE, canonical_json_bytes(summary))
     _write_bytes(
         output_dir / _STOP_MERGE_FILE,
@@ -387,8 +391,8 @@ def _handle_render_github(args: argparse.Namespace) -> int:
         ),
         blockers=tuple(latest.blockers),
         human_decisions=tuple(latest.human_decisions),
-        next_safe_command="python scripts/pr38_salvage.py status --capsule <state-dir>",
-        recovery_command="python scripts/pr38_salvage.py status --capsule <state-dir>",
+        next_safe_command=_STATUS_COMMAND,
+        recovery_command=_STATUS_COMMAND,
         digest=None,
     )
     append_checkpoint(state_dir / _CHECKPOINT_FILE, checkpoint)
@@ -412,14 +416,27 @@ def _handle_status(args: argparse.Namespace) -> int:
             blockers.append("verification-record-missing")
         elif _verification_digest(verification_path) != latest.verification_digest:
             blockers.append("verification-digest-mismatch")
+        else:
+            verification = _load_verification(state_dir)
+            if verification.provenance_root != latest.capsule_root:
+                blockers.append("verification-capsule-root-mismatch")
+            if (
+                latest.phase in _INVENTORY_PHASES
+                and not _verification_inventory_eligible(verification)
+            ):
+                blockers.append("verification-not-inventory-eligible")
     if latest.phase in _INVENTORY_PHASES and latest.manifest_digest is not None:
         manifest_path = state_dir / _MANIFEST_FILE
         if not manifest_path.is_file():
             blockers.append("manifest-missing")
-        elif (
-            manifest_digest(_load_json_object(manifest_path)) != latest.manifest_digest
-        ):
-            blockers.append("manifest-digest-mismatch")
+        else:
+            manifest = _load_json_object(manifest_path)
+            if manifest_digest(manifest) != latest.manifest_digest:
+                blockers.append("manifest-digest-mismatch")
+            if manifest.get("state_id") != latest.state_id:
+                blockers.append("manifest-state-id-mismatch")
+            if manifest.get("capsule_root") != latest.capsule_root:
+                blockers.append("manifest-capsule-root-mismatch")
     if provenance_root(state_dir / _CAPSULE_DIRNAME) != latest.capsule_root:
         blockers.append("capsule-root-mismatch")
 
