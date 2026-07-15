@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/superpowers/pr38-salvage-manifest.schema.json",
+  "title": "PR 38 Salvage Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "state_id", "capsule_root", "atoms", "items"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "state_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capsule_root": {
+      "$ref": "#/$defs/digest"
+    },
+    "atoms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/atom"
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullablePath": {
+      "type": ["string", "null"]
+    },
+    "nullableOid": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40,64}$"
+    },
+    "nullableMode": {
+      "type": ["string", "null"],
+      "pattern": "^[0-7]{6}$"
+    },
+    "atom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atom_id",
+        "source_plane",
+        "source_commit",
+        "path_before",
+        "path_after",
+        "blob_before",
+        "blob_after",
+        "mode_before",
+        "mode_after",
+        "exact_diff_digest"
+      ],
+      "properties": {
+        "atom_id": {"type": "string", "minLength": 1},
+        "source_plane": {
+          "enum": [
+            "remote-main",
+            "remote-pr38",
+            "local-history",
+            "local-index",
+            "local-tracked",
+            "local-untracked-ignored"
+          ]
+        },
+        "source_commit": {"$ref": "#/$defs/nullableOid"},
+        "path_before": {"$ref": "#/$defs/nullablePath"},
+        "path_after": {"$ref": "#/$defs/nullablePath"},
+        "blob_before": {"$ref": "#/$defs/nullableOid"},
+        "blob_after": {"$ref": "#/$defs/nullableOid"},
+        "mode_before": {"$ref": "#/$defs/nullableMode"},
+        "mode_after": {"$ref": "#/$defs/nullableMode"},
+        "exact_diff_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "item"],
+      "properties": {
+        "type": {
+          "enum": ["requires", "generated_by", "conflicts_with", "supersedes"]
+        },
+        "item": {"type": "string", "minLength": 1}
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "revision_id",
+        "atom_ids",
+        "primary_lane",
+        "classification_state",
+        "disposition",
+        "required_gate_ids",
+        "dependencies",
+        "blockers",
+        "required_profiles",
+        "replacement_item_id",
+        "notes"
+      ],
+      "properties": {
+        "item_id": {"type": "string", "minLength": 1},
+        "revision_id": {"type": "string", "minLength": 1},
+        "atom_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "primary_lane": {"type": "string", "minLength": 1},
+        "classification_state": {"enum": ["captured", "classified"]},
+        "disposition": {
+          "type": ["string", "null"],
+          "enum": [null, "salvage", "revise", "park", "reject"]
+        },
+        "required_gate_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/dependency"}
+        },
+        "blockers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_profiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "replacement_item_id": {"type": ["string", "null"]},
+        "notes": {"type": "string"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"classification_state": {"const": "captured"}},
+            "required": ["classification_state"]
+          },
+          "then": {
+            "properties": {"disposition": {"type": "null"}}
+          }
+        },
+        {
+          "if": {
+            "properties": {"classification_state": {"const": "classified"}},
+            "required": ["classification_state"]
+          },
+          "then": {
+            "properties": {
+              "disposition": {"enum": ["salvage", "revise", "park", "reject"]}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"disposition": {"const": "revise"}},
+            "required": ["disposition"]
+          },
+          "then": {
+            "properties": {"replacement_item_id": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    }
+  }
+}
