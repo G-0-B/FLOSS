@@ -43,6 +43,36 @@ def _file_identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
+def _path_handle_mode_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    if os.name != "nt":
+        return (metadata.st_mode,)
+    # Windows lstat() synthesizes executable permission bits from a .exe suffix,
+    # while fstat() on the same handle reports 0o666. File type, attributes, and
+    # reparse tag are stable across both stat surfaces and retain the safety state.
+    return (
+        stat.S_IFMT(metadata.st_mode),
+        getattr(metadata, "st_file_attributes", 0),
+        getattr(metadata, "st_reparse_tag", 0),
+    )
+
+
+def _path_handle_node_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        *_path_handle_mode_identity(metadata),
+    )
+
+
+def _path_handle_file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        *_path_handle_node_identity(metadata),
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+    )
+
+
 def _assert_regular_metadata(metadata: os.stat_result) -> None:
     if stat.S_ISLNK(metadata.st_mode):
         raise CapsuleVerificationError("capsule symlink is not supported")
@@ -123,7 +153,9 @@ def _consume_regular_file(path: Path, *, return_bytes: bool) -> bytes | str:
     with _open_regular_nofollow(path) as stream:
         handle_before = os.fstat(stream.fileno())
         _assert_regular_metadata(handle_before)
-        if _node_identity(path_before) != _node_identity(handle_before):
+        if _path_handle_node_identity(path_before) != _path_handle_node_identity(
+            handle_before
+        ):
             raise CapsuleVerificationError("capsule payload changed before hashing")
         while chunk := stream.read(1024 * 1024):
             digest.update(chunk)
@@ -132,9 +164,11 @@ def _consume_regular_file(path: Path, *, return_bytes: bool) -> bytes | str:
         handle_after = os.fstat(stream.fileno())
     path_after = _validated_file_state(path)
     if (
-        _file_identity(path_before) != _file_identity(handle_before)
+        _path_handle_file_identity(path_before)
+        != _path_handle_file_identity(handle_before)
         or _file_identity(handle_before) != _file_identity(handle_after)
-        or _file_identity(handle_after) != _file_identity(path_after)
+        or _path_handle_file_identity(handle_after)
+        != _path_handle_file_identity(path_after)
     ):
         raise CapsuleVerificationError("capsule payload changed while hashing")
     return bytes(content) if content is not None else digest.hexdigest()
@@ -343,7 +377,9 @@ def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
             pending_handle = os.fstat(stream.fileno())
         _assert_regular_metadata(pending_handle)
         pending_path = _validated_file_state(pending)
-        if _file_identity(pending_handle) != _file_identity(pending_path):
+        if _path_handle_file_identity(pending_handle) != _path_handle_file_identity(
+            pending_path
+        ):
             raise CapsuleVerificationError("fixed output pending file changed")
         root_now = _capsule_root(capsule).lstat()
         if _node_identity(root_before) != _node_identity(root_now):
@@ -362,7 +398,9 @@ def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
                 "fixed output atomic replacement failed"
             ) from exc
         written = _validated_file_state(retained_capsule / name)
-        if _node_identity(written) != _node_identity(pending_handle):
+        if _path_handle_node_identity(written) != _path_handle_node_identity(
+            pending_handle
+        ):
             raise CapsuleVerificationError(
                 "fixed output identity changed after replacement"
             )

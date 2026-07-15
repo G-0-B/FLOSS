@@ -5,6 +5,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 
 import pytest
@@ -184,6 +185,66 @@ def test_seal_is_deterministic_idempotent_and_local_unanchored(tmp_path: Path) -
         "schema_version": "1",
     }
     verify_checksums(capsule)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path/handle mode regression")
+def test_windows_executable_hash_read_and_seal_use_stable_identity(
+    tmp_path: Path,
+) -> None:
+    capsule = tmp_path / "capsule-executable"
+    capsule.mkdir()
+    payload = capsule / "build-script.exe"
+    content = b"disposable executable evidence\n"
+    payload.write_bytes(content)
+    seal_module = importlib.import_module("packages.salvage_spine.seal")
+
+    path_state = payload.lstat()
+    with seal_module._open_regular_nofollow(payload) as stream:
+        handle_state = os.fstat(stream.fileno())
+
+    assert stat.S_IFMT(path_state.st_mode) == stat.S_IFREG
+    assert stat.S_IFMT(handle_state.st_mode) == stat.S_IFREG
+    assert stat.S_IMODE(path_state.st_mode) == 0o777
+    assert stat.S_IMODE(handle_state.st_mode) == 0o666
+    assert (
+        path_state.st_dev,
+        path_state.st_ino,
+        path_state.st_nlink,
+        path_state.st_size,
+        path_state.st_mtime_ns,
+        path_state.st_file_attributes,
+        path_state.st_reparse_tag,
+    ) == (
+        handle_state.st_dev,
+        handle_state.st_ino,
+        handle_state.st_nlink,
+        handle_state.st_size,
+        handle_state.st_mtime_ns,
+        handle_state.st_file_attributes,
+        handle_state.st_reparse_tag,
+    )
+
+    assert (
+        seal_module._hash_regular_file(payload) == hashlib.sha256(content).hexdigest()
+    )
+    assert seal_module._read_regular_bytes(payload) == content
+    seal_capsule(capsule)
+    verify_checksums(capsule)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX full-mode identity contract")
+def test_posix_identity_retains_permission_bits(tmp_path: Path) -> None:
+    payload = tmp_path / "payload"
+    payload.write_bytes(b"mode identity\n")
+    before = payload.lstat()
+    payload.chmod(stat.S_IMODE(before.st_mode) ^ stat.S_IXUSR)
+    after = payload.lstat()
+    seal_module = importlib.import_module("packages.salvage_spine.seal")
+
+    assert stat.S_IFMT(before.st_mode) == stat.S_IFMT(after.st_mode)
+    assert before.st_mode != after.st_mode
+    assert seal_module._node_identity(before) != seal_module._node_identity(after)
+    assert seal_module._file_identity(before) != seal_module._file_identity(after)
 
 
 @pytest.mark.parametrize("mutation", ["bytes", "extra", "missing"])
