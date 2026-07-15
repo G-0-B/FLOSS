@@ -298,6 +298,9 @@
     "FLOSS/scripts/poll_high_roi_actions.py": {
       "spec": "Durable high-ROI action poll through the consensus gateway (default profile: diverse)"
     },
+    "FLOSS/scripts/pr38_salvage.py": {
+      "spec": "Local-only preserve-first capture, verification, inventory, and evidence rendering for PR #38 salvage."
+    },
     "FLOSS/scripts/process_intake_events.py": {
       "spec": "Intake event consolidator over the claim-by-rename queue",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
