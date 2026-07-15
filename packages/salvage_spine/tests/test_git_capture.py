@@ -12,6 +12,7 @@ from packages.salvage_spine.git_capture import (
     CaptureEvidenceError,
     CaptureUnverifiable,
     SecretPolicy,
+    _decode_paths,
     assert_unchanged,
     capture_planes,
     run_git,
@@ -88,6 +89,111 @@ def artifact_tree(root: Path) -> dict[str, bytes]:
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
+
+
+def test_decode_paths_canonicalizes_only_terminal_directory_markers() -> None:
+    raw_paths = b"tracked.txt\0untracked/nested.txt\0ignored-directory/\0"
+
+    assert _decode_paths(raw_paths) == (
+        "tracked.txt",
+        "untracked/nested.txt",
+        "ignored-directory",
+    )
+
+
+@pytest.mark.parametrize(
+    "raw_paths",
+    (
+        b"/\0",
+        b"./\0",
+        b"../escape/\0",
+        b"nested/../../escape/\0",
+        b"/absolute\0",
+        b"C:/absolute\0",
+        b"nested//file.txt\0",
+        b"nested\\file.txt\0",
+    ),
+)
+def test_decode_paths_rejects_unsafe_or_empty_paths(raw_paths: bytes) -> None:
+    with pytest.raises(ValueError, match="unsafe repository-relative path"):
+        _decode_paths(raw_paths)
+
+
+@pytest.mark.parametrize(
+    "raw_paths",
+    (
+        b"ignored-directory/\0ignored-directory\0",
+        b"ignored-directory\0ignored-directory/\0",
+        b"ordinary.txt\0ordinary.txt\0",
+    ),
+)
+def test_decode_paths_rejects_duplicate_canonical_forms(raw_paths: bytes) -> None:
+    with pytest.raises(ValueError, match="duplicate repository path"):
+        _decode_paths(raw_paths)
+
+
+def test_capture_canonicalizes_ignored_directory_marker(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    (repo / ".gitignore").write_text("ignored-directory/\n", encoding="utf-8")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-m", "ignore directory")
+    (repo / "ignored-directory").mkdir()
+    git(repo / "ignored-directory", "init")
+    raw_ignored = run_git(
+        repo,
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "-z",
+    )
+    assert raw_ignored == b"ignored-directory/\0"
+
+    first_records = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        tmp_path / "capsule-one",
+        SecretPolicy.default(),
+    )
+    second_records = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        tmp_path / "capsule-two",
+        SecretPolicy.default(),
+    )
+
+    first_manifest = json.loads(
+        (
+            tmp_path / "capsule-one" / "local-untracked-ignored" / "manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    second_manifest = json.loads(
+        (
+            tmp_path / "capsule-two" / "local-untracked-ignored" / "manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    matching = [
+        entry for entry in first_manifest if entry["path"] == "ignored-directory"
+    ]
+    assert first_records == second_records
+    assert first_manifest == second_manifest
+    assert len(matching) == 1
+    assert matching[0]["kind"] == "directory"
+    assert matching[0]["inclusion"] == "excluded"
+    assert matching[0]["reason"] == "special-file-not-copied"
+    assert matching[0]["size"] is None
+    assert matching[0]["sha256"] is None
+    assert isinstance(matching[0]["mode"], int)
+    assert all(entry["path"] != "ignored-directory/" for entry in first_manifest)
+    assert not (
+        tmp_path
+        / "capsule-one"
+        / "local-untracked-ignored"
+        / "payload"
+        / "ignored-directory"
+    ).exists()
 
 
 def test_capture_rejects_destination_inside_source(tmp_path: Path) -> None:
