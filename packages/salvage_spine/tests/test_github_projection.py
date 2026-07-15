@@ -16,15 +16,34 @@ from packages.salvage_spine.github_projection import (
 )
 
 
+def _subject_for_plane(
+    plane_id: PlaneId,
+    *,
+    remote_main_sha: str = "1" * 40,
+    pr_head_sha: str = "2" * 40,
+    local_history_sha: str = "3" * 40,
+) -> str:
+    subject_ids = {
+        PlaneId.REMOTE_MAIN: remote_main_sha,
+        PlaneId.REMOTE_PR: pr_head_sha,
+        PlaneId.LOCAL_HISTORY: local_history_sha,
+        PlaneId.LOCAL_INDEX: "4" * 64,
+        PlaneId.LOCAL_TRACKED: "5" * 64,
+        PlaneId.LOCAL_UNTRACKED: "6" * 64,
+    }
+    return subject_ids[plane_id]
+
+
 def _plane(
     plane_id: PlaneId,
     *,
+    subject_id: str | None = None,
     status: ResultStatus = ResultStatus.PASS,
     blockers: tuple[str, ...] = (),
 ) -> PlaneRestoreResult:
     return PlaneRestoreResult(
         plane_id=plane_id,
-        subject_id=(plane_id.value.replace("-", ""))[:12].ljust(40, "a"),
+        subject_id=subject_id or _subject_for_plane(plane_id),
         status=status,
         commit_match=True,
         tree_match=True,
@@ -94,6 +113,9 @@ def _verification(
     commit_match: bool = True,
     tree_match: bool = True,
     artifact_match: bool = True,
+    remote_main_sha: str = "1" * 40,
+    pr_head_sha: str = "2" * 40,
+    local_history_sha: str = "3" * 40,
 ) -> VerificationRecord:
     return VerificationRecord(
         schema_version="1",
@@ -101,7 +123,19 @@ def _verification(
         provenance_root="a" * 64,
         status=status,
         checksum_status=ResultStatus.PASS,
-        planes=planes or tuple(_plane(plane_id) for plane_id in PlaneId),
+        planes=planes
+        or tuple(
+            _plane(
+                plane_id,
+                subject_id=_subject_for_plane(
+                    plane_id,
+                    remote_main_sha=remote_main_sha,
+                    pr_head_sha=pr_head_sha,
+                    local_history_sha=local_history_sha,
+                ),
+            )
+            for plane_id in PlaneId
+        ),
         commit_match=commit_match,
         tree_match=tree_match,
         artifact_match=artifact_match,
@@ -116,6 +150,8 @@ def _checkpoint(
     verification_digest: str | None = None,
     next_safe_command: str = "python -m pytest packages/salvage_spine/tests -q",
     blockers: tuple[str, ...] = (),
+    remote_main_sha: str = "1" * 40,
+    pr_head_sha: str = "2" * 40,
 ) -> Checkpoint:
     return Checkpoint(
         schema_version="1.0.0",
@@ -124,8 +160,8 @@ def _checkpoint(
         state_id="capsule-state-1",
         phase="projection-ready",
         input_shas={
-            "remote_main": "1" * 40,
-            "pr_head": "2" * 40,
+            "remote_main": remote_main_sha,
+            "pr_head": pr_head_sha,
         },
         capsule_root=verification.provenance_root,
         manifest_digest=manifest_digest(manifest),
@@ -160,6 +196,9 @@ def _evidence(
     tree_match: bool = True,
     artifact_match: bool = True,
     manifest: dict[str, object] | None = None,
+    remote_main_sha: str = "1" * 40,
+    pr_head_sha: str = "2" * 40,
+    local_history_sha: str = "3" * 40,
 ) -> Evidence:
     verification = _verification(
         status=verification_status,
@@ -168,6 +207,9 @@ def _evidence(
         commit_match=commit_match,
         tree_match=tree_match,
         artifact_match=artifact_match,
+        remote_main_sha=remote_main_sha,
+        pr_head_sha=pr_head_sha,
+        local_history_sha=local_history_sha,
     )
     manifest = manifest or _manifest(
         classification_state=classification_state,
@@ -183,6 +225,8 @@ def _evidence(
         verification_digest=bound_digest,
         next_safe_command=next_safe_command,
         blockers=checkpoint_blockers,
+        remote_main_sha=remote_main_sha,
+        pr_head_sha=pr_head_sha,
     )
     return Evidence(
         verification=verification,
@@ -326,6 +370,159 @@ def test_unknown_plane_value_fails_closed() -> None:
     )
     with pytest.raises(ValueError, match="plane|verification"):
         render_check_summary(_evidence(planes=(forged,)))
+
+
+def test_raw_string_plane_id_lookalike_fails_closed() -> None:
+    forged = PlaneRestoreResult(
+        plane_id="remote-main",  # type: ignore[arg-type]
+        subject_id="1" * 40,
+        status=ResultStatus.PASS,
+        commit_match=True,
+        tree_match=True,
+        parent_match=True,
+        mode_path_match=True,
+        object_reachability=True,
+        tree_id="b" * 40,
+        parents_digest="c" * 64,
+        mode_path_digest="d" * 64,
+        evidence_digest="e" * 64,
+        artifact_digests=(("artifact.json", "f" * 64),),
+        artifact_match=True,
+        payload_digest="1" * 64,
+        payload_count=1,
+        blockers=(),
+    )
+    with pytest.raises(ValueError, match="plane|verification"):
+        render_check_summary(_evidence(planes=(forged,)))
+
+
+@pytest.mark.parametrize(
+    ("plane_id", "subject_id"),
+    [
+        (PlaneId.REMOTE_MAIN, "a" * 40),
+        (PlaneId.REMOTE_PR, "b" * 40),
+    ],
+)
+def test_history_plane_subject_binding_mismatch_fails_closed(
+    plane_id: PlaneId,
+    subject_id: str,
+) -> None:
+    planes = tuple(
+        _plane(
+            current,
+            subject_id=(
+                subject_id if current is plane_id else _subject_for_plane(current)
+            ),
+        )
+        for current in PlaneId
+    )
+    with pytest.raises(ValueError, match="subject|checkpoint|sha|verification"):
+        render_check_summary(_evidence(planes=planes))
+
+
+def test_swapped_remote_history_subjects_fail_closed() -> None:
+    planes = tuple(
+        _plane(
+            plane_id,
+            subject_id={
+                PlaneId.REMOTE_MAIN: "2" * 40,
+                PlaneId.REMOTE_PR: "1" * 40,
+            }.get(plane_id, _subject_for_plane(plane_id)),
+        )
+        for plane_id in PlaneId
+    )
+    with pytest.raises(ValueError, match="subject|checkpoint|sha|verification"):
+        render_check_summary(_evidence(planes=planes))
+
+
+@pytest.mark.parametrize(
+    ("remote_main_sha", "pr_head_sha", "remote_main_subject", "remote_pr_subject"),
+    [
+        ("1" * 40, "2" * 40, "A" * 40, "2" * 40),
+        ("1" * 40, "2" * 40, "1" * 64, "2" * 40),
+        ("1" * 64, "2" * 64, "1" * 64, "2" * 40),
+    ],
+)
+def test_history_plane_hash_case_and_length_mismatches_fail_closed(
+    remote_main_sha: str,
+    pr_head_sha: str,
+    remote_main_subject: str,
+    remote_pr_subject: str,
+) -> None:
+    planes = tuple(
+        _plane(
+            plane_id,
+            subject_id={
+                PlaneId.REMOTE_MAIN: remote_main_subject,
+                PlaneId.REMOTE_PR: remote_pr_subject,
+            }.get(
+                plane_id,
+                _subject_for_plane(
+                    plane_id,
+                    remote_main_sha=remote_main_sha,
+                    pr_head_sha=pr_head_sha,
+                    local_history_sha="3" * len(remote_main_sha),
+                ),
+            ),
+        )
+        for plane_id in PlaneId
+    )
+    with pytest.raises(ValueError, match="subject|checkpoint|sha|verification"):
+        render_check_summary(
+            _evidence(
+                planes=planes,
+                remote_main_sha=remote_main_sha,
+                pr_head_sha=pr_head_sha,
+                local_history_sha="3" * len(remote_main_sha),
+            )
+        )
+
+
+def test_duplicate_history_plane_identity_fails_closed() -> None:
+    planes = (
+        _plane(PlaneId.REMOTE_MAIN),
+        _plane(PlaneId.REMOTE_MAIN),
+        _plane(PlaneId.LOCAL_HISTORY),
+        _plane(PlaneId.LOCAL_INDEX),
+        _plane(PlaneId.LOCAL_TRACKED),
+        _plane(PlaneId.LOCAL_UNTRACKED),
+    )
+    with pytest.raises(ValueError, match="plane|verification"):
+        render_check_summary(_evidence(planes=planes))
+
+
+def test_display_correct_remote_plane_with_forged_subject_binding_fails_closed() -> (
+    None
+):
+    planes = tuple(
+        _plane(
+            plane_id,
+            subject_id=(
+                "f" * 40
+                if plane_id is PlaneId.REMOTE_MAIN
+                else _subject_for_plane(plane_id)
+            ),
+        )
+        for plane_id in PlaneId
+    )
+    with pytest.raises(ValueError, match="subject|checkpoint|sha|verification"):
+        render_check_summary(_evidence(planes=planes))
+
+
+def test_valid_sha1_history_plane_bindings_still_pass() -> None:
+    summary = render_check_summary(_evidence())
+    assert summary["preservation"]["status"] == ResultStatus.PASS.value
+
+
+def test_valid_sha256_history_plane_bindings_still_pass() -> None:
+    summary = render_check_summary(
+        _evidence(
+            remote_main_sha="1" * 64,
+            pr_head_sha="2" * 64,
+            local_history_sha="3" * 64,
+        )
+    )
+    assert summary["preservation"]["status"] == ResultStatus.PASS.value
 
 
 @pytest.mark.parametrize("status", [ResultStatus.FAIL, ResultStatus.BLOCKED])
