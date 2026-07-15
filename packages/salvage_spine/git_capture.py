@@ -392,11 +392,18 @@ def _inventory_state(repo: Path, secret_policy: SecretPolicy) -> _InventoryState
             "-z",
         )
     )
-    categories = {
-        **{path: "tracked" for path in tracked_paths},
-        **{path: "untracked" for path in untracked_paths},
-        **{path: "ignored" for path in ignored_paths},
-    }
+    categories: dict[str, str] = {}
+    for category, paths in (
+        ("tracked", tracked_paths),
+        ("untracked", untracked_paths),
+        ("ignored", ignored_paths),
+    ):
+        for path in paths:
+            if path in categories:
+                raise ValueError(
+                    "duplicate repository path across inventory categories"
+                )
+            categories[path] = category
     fingerprints: list[dict[str, object]] = []
     for relative_path in sorted(categories):
         path = _worktree_path(repo, relative_path)
