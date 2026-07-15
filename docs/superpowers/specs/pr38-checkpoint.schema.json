@@ -35,7 +35,10 @@
     "phase": {"type": "string", "minLength": 1},
     "input_shas": {
       "type": "object",
-      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+      }
     },
     "capsule_root": {"$ref": "#/$defs/digest"},
     "manifest_digest": {
