@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -8,13 +9,18 @@ import pytest
 
 from packages.salvage_spine.git_capture import (
     CaptureDrift,
+    SecretPolicy,
     assert_unchanged,
+    capture_planes,
     run_git,
     snapshot_subject,
 )
+from packages.salvage_spine.models import PlaneId
 
 
-def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
+def git(
+    repo: Path, *args: str, check: bool = True
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
         check=check,
@@ -31,6 +37,336 @@ def initialized_repo(tmp_path: Path) -> Path:
     git(repo, "add", "a.txt")
     git(repo, "commit", "-m", "seed")
     return repo
+
+
+def test_capture_rejects_destination_inside_source(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+
+    with pytest.raises(
+        ValueError, match="destination must be outside the source worktree"
+    ):
+        capture_planes(repo, "HEAD", "HEAD", repo / "capsule", SecretPolicy.default())
+
+    assert not (repo / "capsule").exists()
+
+
+def test_secret_named_file_is_redacted_not_copied(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    secret = repo / ".env"
+    secret.write_text("TOKEN=do-not-copy\n", encoding="utf-8")
+    destination = tmp_path / "capsule"
+
+    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+
+    assert not any(path.name == ".env" for path in destination.rglob("*"))
+    manifest = json.loads(
+        (destination / "local-untracked-ignored" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    entry = next(item for item in manifest if item["path"] == ".env")
+    assert entry["inclusion"] == "redacted"
+    assert entry["reason"] == "secret-name"
+    assert entry["size"] is None
+    assert entry["sha256"] is None
+
+
+def test_capture_writes_six_exact_source_planes(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    (repo / ".gitignore").write_text("*.log\n", encoding="utf-8")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-m", "ignore logs")
+    (repo / "a.txt").write_bytes(b"staged\x00bytes\n")
+    git(repo, "add", "a.txt")
+    (repo / "a.txt").write_bytes(b"unstaged\x00bytes\n")
+    (repo / "notes.txt").write_bytes(b"ordinary untracked\n")
+    (repo / "ignored.log").write_bytes(b"ordinary ignored\n")
+    before = snapshot_subject(repo)
+    index_path = Path(
+        git(repo, "rev-parse", "--path-format=absolute", "--git-path", "index")
+        .stdout.rstrip(b"\r\n")
+        .decode("utf-8", errors="surrogateescape")
+    )
+    index_before = index_path.read_bytes()
+    destination = tmp_path / "capsule"
+
+    records = capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+
+    assert tuple(record.plane_id for record in records) == tuple(PlaneId)
+    assert len({record.digest for record in records}) == len(PlaneId)
+    for record in records:
+        assert (destination / record.plane_id.value).is_dir()
+        assert len(record.digest) == 64
+    assert (destination / "remote-main" / "repository.bundle").is_file()
+    assert (destination / "remote-pr38" / "repository.bundle").is_file()
+    assert (destination / "local-history" / "repository.bundle").is_file()
+    assert (destination / "local-index" / "index.raw").read_bytes() == index_before
+    assert (
+        destination / "local-index" / "staged.diff"
+    ).read_bytes() == before.staged_diff
+    assert (
+        destination / "local-tracked" / "unstaged.diff"
+    ).read_bytes() == before.unstaged_diff
+    assert (
+        destination / "local-untracked-ignored" / "payload" / "notes.txt"
+    ).read_bytes() == b"ordinary untracked\n"
+    assert (
+        destination / "local-untracked-ignored" / "payload" / "ignored.log"
+    ).read_bytes() == b"ordinary ignored\n"
+    assert index_path.read_bytes() == index_before
+    assert_unchanged(before, snapshot_subject(repo))
+    source_path_bytes = str(repo.resolve()).encode("utf-8")
+    assert all(
+        source_path_bytes not in artifact.read_bytes()
+        for artifact in destination.rglob("*")
+        if artifact.is_file()
+    )
+
+
+def test_capture_records_are_deterministic(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    (repo / "ordinary.txt").write_bytes(b"same bytes\n")
+
+    first = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        tmp_path / "capsule-one",
+        SecretPolicy.default(),
+    )
+    second = capture_planes(
+        repo,
+        "HEAD",
+        "HEAD",
+        tmp_path / "capsule-two",
+        SecretPolicy.default(),
+    )
+
+    assert first == second
+
+
+def test_history_bundles_do_not_expose_unrelated_divergent_refs(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    main_branch = git(repo, "branch", "--show-current").stdout.strip().decode("ascii")
+    main_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    git(repo, "checkout", "-b", "feature")
+    (repo / "feature.txt").write_text("feature\n", encoding="utf-8")
+    git(repo, "add", "feature.txt")
+    git(repo, "commit", "-m", "feature")
+    feature_sha = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    git(repo, "checkout", main_branch)
+    destination = tmp_path / "capsule"
+
+    capture_planes(repo, main_sha, feature_sha, destination, SecretPolicy.default())
+
+    main_heads = git(
+        repo,
+        "bundle",
+        "list-heads",
+        str(destination / "remote-main" / "repository.bundle"),
+    ).stdout.splitlines()
+    pr_heads = git(
+        repo,
+        "bundle",
+        "list-heads",
+        str(destination / "remote-pr38" / "repository.bundle"),
+    ).stdout.splitlines()
+    history_heads = git(
+        repo,
+        "bundle",
+        "list-heads",
+        str(destination / "local-history" / "repository.bundle"),
+    ).stdout.splitlines()
+    assert len(main_heads) == 1
+    assert main_heads[0].startswith(main_sha.encode("ascii") + b" ")
+    assert len(pr_heads) == 1
+    assert pr_heads[0].startswith(feature_sha.encode("ascii") + b" ")
+    assert len(history_heads) == 1
+    assert history_heads[0].startswith(main_sha.encode("ascii") + b" ")
+
+
+def test_default_secret_patterns_are_case_insensitive(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    secret_paths = (
+        ".ENV.local",
+        "myTOKEN.txt",
+        "Credentials.json",
+        "API_KEY.txt",
+        "private.KEY",
+        "wallet-recovery.txt",
+        "seed-phrase.txt",
+        "MNEMONIC.md",
+    )
+    for relative in secret_paths:
+        (repo / relative).write_bytes(b"must never enter capsule\n")
+    destination = tmp_path / "capsule"
+
+    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+
+    manifest = json.loads(
+        (destination / "local-untracked-ignored" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    entries = {item["path"]: item for item in manifest}
+    assert set(secret_paths) <= entries.keys()
+    for relative in secret_paths:
+        assert entries[relative]["inclusion"] == "redacted"
+        assert entries[relative]["size"] is None
+        assert entries[relative]["sha256"] is None
+        assert not (
+            destination / "local-untracked-ignored" / "payload" / relative
+        ).exists()
+
+
+def test_tracked_secret_diff_with_pathspec_metacharacters_is_excluded(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    relative = ".ENV[prod].local"
+    secret = repo / relative
+    secret.write_bytes(b"non-secret committed baseline\n")
+    git(repo, "add", relative)
+    git(repo, "commit", "-m", "tracked secret-shaped path")
+    staged_secret = b"STAGED-SECRET-MUST-NOT-LEAK\n"
+    unstaged_secret = b"UNSTAGED-SECRET-MUST-NOT-LEAK\n"
+    secret.write_bytes(staged_secret)
+    git(repo, "add", relative)
+    secret.write_bytes(unstaged_secret)
+    destination = tmp_path / "capsule"
+
+    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+
+    artifact_bytes = [
+        path.read_bytes() for path in destination.rglob("*") if path.is_file()
+    ]
+    assert all(staged_secret.strip() not in content for content in artifact_bytes)
+    assert all(unstaged_secret.strip() not in content for content in artifact_bytes)
+    manifest = json.loads(
+        (destination / "local-tracked" / "manifest.json").read_text(encoding="utf-8")
+    )
+    entry = next(item for item in manifest if item["path"] == relative)
+    assert entry["inclusion"] == "redacted"
+    assert entry["size"] is None
+    assert entry["sha256"] is None
+
+
+def test_capture_does_not_follow_untracked_symlink(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside secret\n")
+    link = repo / "ordinary-link"
+    try:
+        link.symlink_to(outside)
+    except OSError as error:
+        pytest.skip(f"symlinks unavailable: {error}")
+    destination = tmp_path / "capsule"
+
+    capture_planes(repo, "HEAD", "HEAD", destination, SecretPolicy.default())
+
+    manifest = json.loads(
+        (destination / "local-untracked-ignored" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    entry = next(item for item in manifest if item["path"] == "ordinary-link")
+    assert entry["kind"] == "symlink"
+    assert entry["inclusion"] == "excluded"
+    assert entry["reason"] == "symlink-not-followed"
+    assert not (
+        destination / "local-untracked-ignored" / "payload" / "ordinary-link"
+    ).exists()
+    assert (
+        b"outside secret"
+        not in (destination / "local-untracked-ignored" / "manifest.json").read_bytes()
+    )
+
+
+def test_capture_detects_source_drift_between_planes(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    mutated = False
+
+    def mutate_after_first_plane(plane_id: PlaneId) -> None:
+        nonlocal mutated
+        if not mutated:
+            (repo / "a.txt").write_text(
+                f"mutated after {plane_id.value}\n", encoding="utf-8"
+            )
+            mutated = True
+
+    with pytest.raises(CaptureDrift, match="source state changed during capture"):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            tmp_path / "capsule",
+            SecretPolicy.default(),
+            _between_planes=mutate_after_first_plane,
+        )
+
+
+def test_capture_detects_untracked_content_drift_at_same_path(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    untracked = repo / "ordinary.txt"
+    untracked.write_bytes(b"before-content\n")
+    mutated = False
+
+    def mutate_untracked_after_first_plane(plane_id: PlaneId) -> None:
+        nonlocal mutated
+        if not mutated:
+            untracked.write_bytes(b"after-content!\n")
+            mutated = True
+
+    with pytest.raises(CaptureDrift, match="source state changed during capture"):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            tmp_path / "capsule",
+            SecretPolicy.default(),
+            _between_planes=mutate_untracked_after_first_plane,
+        )
+
+
+def test_capture_rejects_symlink_alias_into_source(tmp_path: Path) -> None:
+    repo = initialized_repo(tmp_path)
+    alias = tmp_path / "repo-alias"
+    try:
+        alias.symlink_to(repo, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"directory symlinks unavailable: {error}")
+
+    with pytest.raises(
+        ValueError, match="destination must be outside the source worktree"
+    ):
+        capture_planes(
+            repo,
+            "HEAD",
+            "HEAD",
+            alias / "capsule",
+            SecretPolicy.default(),
+        )
+
+
+def test_capture_from_subdirectory_still_rejects_worktree_destination(
+    tmp_path: Path,
+) -> None:
+    repo = initialized_repo(tmp_path)
+    nested = repo / "nested"
+    nested.mkdir()
+
+    with pytest.raises(
+        ValueError, match="destination must be outside the source worktree"
+    ):
+        capture_planes(
+            nested,
+            "HEAD",
+            "HEAD",
+            repo / "sibling-capsule",
+            SecretPolicy.default(),
+        )
+
+    assert not (repo / "sibling-capsule").exists()
 
 
 def test_snapshot_detects_ref_and_worktree_drift(tmp_path: Path) -> None:
