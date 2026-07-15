@@ -8,11 +8,12 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import unicodedata
 from typing import Mapping
+from urllib.parse import unquote
 
 from .checkpoint import Checkpoint
 from .manifest import _PROTECTED_LANES, manifest_digest, validate_manifest
-from .models import ResultStatus, canonical_json_bytes
-from .restore import VerificationRecord
+from .models import PlaneId, ResultStatus, canonical_json_bytes
+from .restore import PlaneRestoreResult, VerificationRecord
 
 PRESERVATION_CHECK_NAME = "Preservation capsule — restore-tested evidence"
 CORE_CHECK_NAME = "Core engineering checks — scoped evidence only"
@@ -69,6 +70,13 @@ _SAFE_COMMAND_RE = re.compile(r"[A-Za-z0-9._/\- =]+\Z")
 _HEX_RE = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 _SCHEME_RE = re.compile(r"(?i)^[a-z][a-z0-9+.-]*://")
 _LABEL_RE = re.compile(r"[a-z0-9][a-z0-9_-]*\Z")
+_URL_RE = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://\S+")
+_AUTOLINK_RE = re.compile(r"<[^>\n]+>")
+_MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\([^\)\n]*\)")
+_PRIVATE_KEY_RE = re.compile(r"(?i)-{2,}\s*begin [a-z0-9 _-]*private key\s*-{2,}")
+_SAFE_LOCATION_SEGMENT_RE = re.compile(r"[a-z0-9][a-z0-9._-]*\Z")
+_SAFE_LOCATION_EXTENSIONS = frozenset({"json", "jsonl", "log", "md", "sha256", "txt"})
+_EXPECTED_PLANE_IDS = tuple(PlaneId)
 
 
 @dataclass(frozen=True)
@@ -102,6 +110,10 @@ class _PreparedEvidence:
     blockers: tuple[str, ...]
     next_safe_command: str
     evidence_locations: tuple[tuple[str, str], ...]
+
+
+class ProjectionValidationError(ValueError):
+    """Projection evidence is malformed, contradictory, or unsafe to render."""
 
 
 def render_check_summary(evidence: Evidence) -> dict:
@@ -205,36 +217,51 @@ def _prepare_evidence(evidence: Evidence) -> _PreparedEvidence:
     if not isinstance(evidence, Evidence):
         raise TypeError("evidence must be an Evidence")
     if not isinstance(evidence.verification, VerificationRecord):
-        raise ValueError("verification must be a VerificationRecord")
+        raise ProjectionValidationError("verification must be a VerificationRecord")
     if not isinstance(evidence.checkpoint, Checkpoint):
-        raise ValueError("checkpoint must be a Checkpoint")
+        raise ProjectionValidationError("checkpoint must be a Checkpoint")
     for field_name, value in (
         ("absolute_core_status", evidence.absolute_core_status),
         ("regression_core_status", evidence.regression_core_status),
         ("verification.status", evidence.verification.status),
     ):
         if not isinstance(value, ResultStatus):
-            raise ValueError(f"{field_name} must be a ResultStatus")
+            raise ProjectionValidationError(f"{field_name} must be a ResultStatus")
     if not isinstance(evidence.manifest, dict):
-        raise ValueError("manifest must be an object")
+        raise ProjectionValidationError("manifest must be an object")
 
     manifest_errors = validate_manifest(evidence.manifest)
     if manifest_errors:
-        raise ValueError("manifest evidence is invalid")
+        raise ProjectionValidationError("manifest evidence is invalid")
     computed_manifest_digest = manifest_digest(evidence.manifest)
     if evidence.checkpoint.manifest_digest != computed_manifest_digest:
-        raise ValueError("manifest digest does not match checkpoint binding")
+        raise ProjectionValidationError(
+            "manifest digest does not match checkpoint binding"
+        )
+    manifest_state_id = evidence.manifest.get("state_id")
+    if evidence.checkpoint.state_id != manifest_state_id:
+        raise ProjectionValidationError("manifest state_id does not match checkpoint")
+    manifest_capsule_root = evidence.manifest.get("capsule_root")
+    if evidence.checkpoint.capsule_root != manifest_capsule_root:
+        raise ProjectionValidationError(
+            "manifest capsule_root does not match checkpoint"
+        )
 
     computed_verification_digest = hashlib.sha256(
         canonical_json_bytes(evidence.verification)
     ).hexdigest()
     if evidence.checkpoint.capsule_root != evidence.verification.provenance_root:
-        raise ValueError("capsule root does not match verification provenance root")
+        raise ProjectionValidationError(
+            "capsule root does not match verification provenance root"
+        )
     if evidence.checkpoint.verification_digest not in {
         None,
         computed_verification_digest,
     }:
-        raise ValueError("verification digest does not match verification payload")
+        raise ProjectionValidationError(
+            "verification digest does not match verification payload"
+        )
+    _validate_verification_record(evidence.verification)
 
     remote_main_sha = _require_sha(
         evidence.checkpoint.input_shas.get("remote_main"),
@@ -293,6 +320,10 @@ def _preservation_status(
     evidence: Evidence,
     computed_verification_digest: str,
 ) -> ResultStatus:
+    if evidence.checkpoint.blockers or evidence.verification.blockers:
+        return ResultStatus.BLOCKED
+    if _unclassified_count(evidence.manifest) or _hard_stop_count(evidence.manifest):
+        return ResultStatus.BLOCKED
     if evidence.verification.status is ResultStatus.FAIL:
         return ResultStatus.FAIL
     if evidence.verification.status in {ResultStatus.BLOCKED, ResultStatus.SKIPPED}:
@@ -305,6 +336,13 @@ def _preservation_status(
         and evidence.verification.artifact_match
     ):
         return ResultStatus.FAIL
+    plane_statuses = {plane.status for plane in evidence.verification.planes}
+    if ResultStatus.FAIL in plane_statuses:
+        return ResultStatus.FAIL
+    if plane_statuses != {ResultStatus.PASS}:
+        return ResultStatus.BLOCKED
+    if any(plane.blockers for plane in evidence.verification.planes):
+        return ResultStatus.BLOCKED
     if evidence.checkpoint.verification_digest != computed_verification_digest:
         return ResultStatus.BLOCKED
     return ResultStatus.PASS
@@ -349,8 +387,10 @@ def _combined_blockers(evidence: Evidence) -> set[str]:
 
 def _sanitize_text(value: object) -> str:
     if not isinstance(value, str):
-        raise ValueError("rendered text inputs must be strings")
-    normalized = unicodedata.normalize("NFC", value)
+        raise ProjectionValidationError("rendered text inputs must be strings")
+    normalized = _normalize_unsafe_scalar(value)
+    if _contains_unsafe_text(normalized):
+        return "[redacted-unsafe-text]"
     normalized = _CONTROL_RE.sub(" ", normalized)
     normalized = "".join(
         (
@@ -363,59 +403,109 @@ def _sanitize_text(value: object) -> str:
     )
     normalized = _TOKEN_RE.sub("[redacted-secret]", normalized)
     normalized = _PATH_RE.sub("[redacted-path]", normalized)
+    normalized = re.sub(
+        r"(?i)\b(?:gh|curl|invoke-webrequest)\b.*", "[redacted-unsafe-text]", normalized
+    )
+    normalized = normalized.replace("://", " ")
     normalized = " ".join(normalized.split())
-    return normalized.strip()
+    return normalized.strip() or "[redacted-unsafe-text]"
 
 
 def _sanitize_command(value: object) -> str:
     if not isinstance(value, str):
-        raise ValueError("next_safe_command must be a string")
-    if _SCHEME_RE.match(value) or _PATH_RE.search(value):
-        raise ValueError("next_safe_command must not contain remote or absolute paths")
+        raise ProjectionValidationError("next_safe_command must be a string")
+    normalized = _normalize_unsafe_scalar(value)
+    if (
+        _contains_unsafe_text(normalized)
+        or _SCHEME_RE.match(normalized)
+        or _PATH_RE.search(normalized)
+        or "?" in normalized
+        or "#" in normalized
+        or "%" in normalized
+    ):
+        raise ProjectionValidationError(
+            "next_safe_command must not contain remote or absolute paths"
+        )
     if _UNSAFE_COMMAND_RE.search(value):
-        raise ValueError("next_safe_command contains an unsafe or mutating command")
-    if not _SAFE_COMMAND_RE.fullmatch(value):
-        raise ValueError("next_safe_command contains unsupported characters")
-    return _sanitize_text(value)
+        raise ProjectionValidationError(
+            "next_safe_command contains an unsafe or mutating command"
+        )
+    if not _SAFE_COMMAND_RE.fullmatch(normalized):
+        raise ProjectionValidationError(
+            "next_safe_command contains unsupported characters"
+        )
+    return _sanitize_text(normalized)
 
 
 def _normalize_locations(locations: Mapping[str, str]) -> tuple[tuple[str, str], ...]:
     normalized: list[tuple[str, str]] = []
     for label, location in sorted(locations.items(), key=lambda item: item[0]):
         if not isinstance(label, str) or not _LABEL_RE.fullmatch(label):
-            raise ValueError("evidence location label is invalid")
+            raise ProjectionValidationError("evidence location label is invalid")
         normalized.append((label, _sanitize_location(location)))
     if not normalized:
-        raise ValueError("at least one evidence location is required")
+        raise ProjectionValidationError("at least one evidence location is required")
     return tuple(normalized)
 
 
 def _sanitize_location(location: object) -> str:
     if not isinstance(location, str):
-        raise ValueError("evidence location must be a string")
-    if _SCHEME_RE.match(location):
-        raise ValueError("evidence location scheme is unsafe")
-    if "\\\\" in location or _PATH_RE.search(location):
-        raise ValueError("evidence location must be relative and non-private")
-    path = PurePosixPath(location)
-    windows_path = PureWindowsPath(location)
+        raise ProjectionValidationError("evidence location must be a string")
+    normalized = _normalize_unsafe_scalar(location)
+    if _contains_unsafe_text(normalized):
+        raise ProjectionValidationError("evidence location scheme is unsafe")
+    if any(
+        token in normalized
+        for token in (
+            "#",
+            "?",
+            "@",
+            "://",
+            "`",
+            "<",
+            ">",
+            "[",
+            "]",
+            "(",
+            ")",
+            "!",
+            "'",
+            '"',
+        )
+    ):
+        raise ProjectionValidationError("evidence location path is unsafe")
+    if "\\" in normalized or "\\\\" in normalized or _PATH_RE.search(normalized):
+        raise ProjectionValidationError(
+            "evidence location must be relative and non-private"
+        )
+    if ":" in normalized:
+        raise ProjectionValidationError("evidence location path is unsafe")
+    if "%" in normalized:
+        raise ProjectionValidationError("evidence location path is unsafe")
+    path = PurePosixPath(normalized)
+    windows_path = PureWindowsPath(normalized)
     if (
         path.is_absolute()
         or windows_path.is_absolute()
         or windows_path.drive
-        or ".." in path.parts
-        or "\\" in location
-        or not location
-        or location != path.as_posix()
+        or any(part in {".", ".."} for part in path.parts)
+        or not normalized
+        or normalized != path.as_posix()
     ):
-        raise ValueError("evidence location path is unsafe")
-    _sanitize_text(location)
-    return location
+        raise ProjectionValidationError("evidence location path is unsafe")
+    if any(not _SAFE_LOCATION_SEGMENT_RE.fullmatch(part) for part in path.parts):
+        raise ProjectionValidationError("evidence location path is unsafe")
+    suffix = path.suffix.lower().lstrip(".")
+    if suffix not in _SAFE_LOCATION_EXTENSIONS:
+        raise ProjectionValidationError("evidence location extension is unsafe")
+    return normalized
 
 
 def _require_sha(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not _HEX_RE.fullmatch(value):
-        raise ValueError(f"{field_name} must be a locked lowercase digest")
+        raise ProjectionValidationError(
+            f"{field_name} must be a locked lowercase digest"
+        )
     return value
 
 
@@ -423,10 +513,12 @@ def _read_template() -> str:
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
     placeholders = set(re.findall(r"\{\{([a-z0-9_]+)\}\}", template))
     if placeholders != _TEMPLATE_KEYS:
-        raise ValueError("template placeholders do not match renderer contract")
+        raise ProjectionValidationError(
+            "template placeholders do not match renderer contract"
+        )
     lowered = template.lower()
     if "gh pr" in lowered or "curl " in lowered or "invoke-webrequest" in lowered:
-        raise ValueError("template contains remote API commands")
+        raise ProjectionValidationError("template contains remote API commands")
     return template
 
 
@@ -461,6 +553,67 @@ def _render_links(locations: tuple[tuple[str, str], ...]) -> str:
         f"- {label.replace('_', ' ').title()}: [{location}]({location})"
         for label, location in locations
     )
+
+
+def _normalize_unsafe_scalar(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value)
+    for _ in range(4):
+        decoded = unquote(normalized)
+        decoded = unicodedata.normalize("NFKC", decoded)
+        if decoded == normalized:
+            break
+        normalized = decoded
+    return normalized
+
+
+def _contains_unsafe_text(value: str) -> bool:
+    return bool(
+        _URL_RE.search(value)
+        or _AUTOLINK_RE.search(value)
+        or _MARKDOWN_LINK_RE.search(value)
+        or _PRIVATE_KEY_RE.search(value)
+        or _CONTROL_RE.search(value)
+        or _SCHEME_RE.match(value)
+    )
+
+
+def _validate_verification_record(verification: VerificationRecord) -> None:
+    if not isinstance(verification.checksum_status, ResultStatus):
+        raise ProjectionValidationError(
+            "verification.checksum_status must be a ResultStatus"
+        )
+    _require_exact_bool(verification.commit_match, "verification.commit_match")
+    _require_exact_bool(verification.tree_match, "verification.tree_match")
+    _require_exact_bool(verification.artifact_match, "verification.artifact_match")
+    if not isinstance(verification.planes, tuple):
+        raise ProjectionValidationError("verification planes must be a tuple")
+
+    seen: set[PlaneId] = set()
+    for plane in verification.planes:
+        if not isinstance(plane, PlaneRestoreResult):
+            raise ProjectionValidationError(
+                "verification plane must be a PlaneRestoreResult"
+            )
+        if not isinstance(plane.plane_id, PlaneId):
+            raise ProjectionValidationError("verification plane_id is invalid")
+        if plane.plane_id in seen:
+            raise ProjectionValidationError("verification plane_id is duplicated")
+        seen.add(plane.plane_id)
+        if not isinstance(plane.status, ResultStatus):
+            raise ProjectionValidationError("verification plane status is invalid")
+        if not isinstance(plane.blockers, tuple):
+            raise ProjectionValidationError("verification plane blockers are invalid")
+        if any(not isinstance(blocker, str) for blocker in plane.blockers):
+            raise ProjectionValidationError("verification plane blockers are invalid")
+    if tuple(sorted(seen, key=lambda plane_id: plane_id.value)) != tuple(
+        sorted(_EXPECTED_PLANE_IDS, key=lambda plane_id: plane_id.value)
+    ):
+        raise ProjectionValidationError("verification plane set is incomplete")
+
+
+def _require_exact_bool(value: object, field_name: str) -> None:
+    if not isinstance(value, bool):
+        raise ProjectionValidationError(f"{field_name} must be a bool")
 
 
 __all__ = [
