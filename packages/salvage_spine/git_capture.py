@@ -10,14 +10,26 @@ from pathlib import PurePosixPath
 from typing import Callable
 
 from packages.salvage_spine.models import (
+    PlaneEligibility,
     PlaneId,
     PlaneRecord,
+    PlaneSensitivity,
+    PlaneVerification,
+    ResultStatus,
     canonical_json_bytes,
 )
 
 
-class CaptureDrift(RuntimeError):
+class CaptureEvidenceError(RuntimeError):
+    """Base class for failed source-state equality evidence."""
+
+
+class CaptureDrift(CaptureEvidenceError):
     """Raised when the source repository changes during a capture."""
+
+
+class CaptureUnverifiable(CaptureEvidenceError):
+    """Raised when redaction makes requested byte equality unprovable."""
 
 
 @dataclass(frozen=True)
@@ -76,6 +88,42 @@ class _InventoryState:
     untracked_paths: tuple[str, ...]
     ignored_paths: tuple[str, ...]
     digest: str
+
+
+@dataclass(frozen=True)
+class _PlaneDisposition:
+    sensitivity: PlaneSensitivity
+    eligibility: PlaneEligibility
+    verification: PlaneVerification
+    status: ResultStatus
+
+    def metadata(self) -> dict[str, str]:
+        return {
+            "eligibility": self.eligibility.value,
+            "sensitivity": self.sensitivity.value,
+            "status": self.status.value,
+            "verification": self.verification.value,
+        }
+
+
+_ORDINARY_DISPOSITION = _PlaneDisposition(
+    sensitivity=PlaneSensitivity.ORDINARY,
+    eligibility=PlaneEligibility.ELIGIBLE,
+    verification=PlaneVerification.BYTE_EQUALITY,
+    status=ResultStatus.PASS,
+)
+_OPAQUE_DISPOSITION = _PlaneDisposition(
+    sensitivity=PlaneSensitivity.OPAQUE_SENSITIVE,
+    eligibility=PlaneEligibility.INELIGIBLE,
+    verification=PlaneVerification.OPAQUE_PRESERVED,
+    status=ResultStatus.BLOCKED,
+)
+_REDACTED_DISPOSITION = _PlaneDisposition(
+    sensitivity=PlaneSensitivity.REDACTED,
+    eligibility=PlaneEligibility.INELIGIBLE,
+    verification=PlaneVerification.UNVERIFIABLE_REDACTED,
+    status=ResultStatus.BLOCKED,
+)
 
 
 def _git_environment() -> dict[str, str]:
@@ -285,7 +333,16 @@ def _read_regular_file(
 
     content = path.read_bytes()
     after = path.lstat()
-    stable_fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns")
+    stable_fields = [
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    ]
+    if hasattr(before, "st_birthtime_ns") and hasattr(after, "st_birthtime_ns"):
+        stable_fields.append("st_birthtime_ns")
     if any(getattr(before, field) != getattr(after, field) for field in stable_fields):
         raise CaptureDrift("source state changed during capture")
     return content, {
@@ -336,7 +393,9 @@ def _inventory_state(repo: Path, secret_policy: SecretPolicy) -> _InventoryState
             else:
                 fingerprints.append(
                     {
+                        "birth_ns": getattr(metadata, "st_birthtime_ns", None),
                         "category": categories[relative_path],
+                        "changed_ns": metadata.st_ctime_ns,
                         "classification": "redacted",
                         "device": metadata.st_dev,
                         "inode": metadata.st_ino,
@@ -357,6 +416,10 @@ def _inventory_state(repo: Path, secret_policy: SecretPolicy) -> _InventoryState
         fingerprints.append(
             {
                 "category": categories[relative_path],
+                "birth_ns": (
+                    getattr(path_stat, "st_birthtime_ns", None) if path_stat else None
+                ),
+                "changed_ns": path_stat.st_ctime_ns if path_stat else None,
                 "classification": "permitted",
                 "device": path_stat.st_dev if path_stat else None,
                 "inode": path_stat.st_ino if path_stat else None,
@@ -473,56 +536,57 @@ def _resolved_commit(repo: Path, revision: str) -> str:
     )
 
 
-def _select_bundle_revision(
-    repo: Path,
-    subject_id: str,
-    *,
-    prefer_head: bool = False,
-) -> str:
-    exact_refs: list[str] = []
-    for line in run_git(repo, "show-ref", "--head").splitlines():
-        raw_oid, raw_ref = line.split(b" ", 1)
-        if raw_oid.decode("ascii") == subject_id:
-            exact_refs.append(raw_ref.decode("utf-8", errors="surrogateescape"))
-    if prefer_head and "HEAD" in exact_refs:
-        return "HEAD"
-    named_exact_refs = sorted(ref for ref in exact_refs if ref != "HEAD")
-    if named_exact_refs:
-        return named_exact_refs[0]
-
-    containing_refs = sorted(
-        line.decode("utf-8", errors="surrogateescape")
-        for line in run_git(
-            repo,
-            "for-each-ref",
-            "--contains",
-            subject_id,
-            "--format=%(refname)",
-        ).splitlines()
-        if line
-    )
-    if containing_refs:
-        return containing_refs[0]
-    raise ValueError(f"commit {subject_id} is not reachable from a source ref")
-
-
 def _write_history_plane(
     repo: Path,
     plane_root: Path,
     plane_id: PlaneId,
     subject_id: str,
-    bundle_revision: str,
+    disposition: _PlaneDisposition,
 ) -> None:
     plane_root.mkdir()
+    bundle_source = plane_root / "source.git"
+    captured_ref = "refs/heads/master"
+    subprocess.run(
+        [
+            "git",
+            "init",
+            "--bare",
+            "--initial-branch=master",
+            "--template=",
+            str(bundle_source),
+        ],
+        check=True,
+        capture_output=True,
+        shell=False,
+        env=_git_environment(),
+    )
     subprocess.run(
         [
             "git",
             "-C",
+            str(bundle_source),
+            "-c",
+            "protocol.file.allow=always",
+            "fetch",
+            "--no-write-fetch-head",
+            "--no-tags",
             str(repo),
+            f"{subject_id}:{captured_ref}",
+        ],
+        check=True,
+        capture_output=True,
+        shell=False,
+        env=_git_environment(),
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(bundle_source),
             "bundle",
             "create",
             str(plane_root / "repository.bundle"),
-            bundle_revision,
+            captured_ref,
         ],
         check=True,
         capture_output=True,
@@ -530,13 +594,14 @@ def _write_history_plane(
         env=_git_environment(),
     )
     (plane_root / "refs.txt").write_bytes(
-        f"{subject_id} {bundle_revision}\n".encode("utf-8")
+        f"{subject_id} {captured_ref}\n".encode("utf-8")
     )
     _write_json(
         plane_root / "identity.json",
         {
-            "bundle_ref": bundle_revision,
-            "bundle_scope": "selected-source-ref",
+            **disposition.metadata(),
+            "bundle_ref": captured_ref,
+            "bundle_scope": "destination-owned-exact-ref",
             "plane_id": plane_id.value,
             "schema_version": "1",
             "subject_id": subject_id,
@@ -566,9 +631,10 @@ def capture_planes(
     destination: Path,
     secret_policy: SecretPolicy,
     *,
+    require_byte_equality: bool = False,
     _between_planes: Callable[[PlaneId], None] | None = None,
 ) -> tuple[PlaneRecord, ...]:
-    """Capture six independently identified source-state planes."""
+    """Capture six planes; blocked records still preserve but cannot release."""
 
     repo = _repository_root(repo)
     _validate_destination(repo, destination)
@@ -579,19 +645,15 @@ def capture_planes(
     secret_tracked_paths = tuple(
         path for path in tracked_paths if secret_policy.is_secret(path)
     )
+    secret_untracked_paths = tuple(
+        path
+        for path in (*untracked_paths, *ignored_paths)
+        if secret_policy.is_secret(path)
+    )
     before = snapshot_subject(repo, exclude_paths=secret_tracked_paths)
     remote_main_id = _resolved_commit(repo, remote_main_sha)
     remote_pr_id = _resolved_commit(repo, pr_head_sha)
     local_history_id = _resolved_commit(repo, "HEAD")
-    bundle_revisions = {
-        PlaneId.REMOTE_MAIN: _select_bundle_revision(repo, remote_main_id),
-        PlaneId.REMOTE_PR: _select_bundle_revision(repo, remote_pr_id),
-        PlaneId.LOCAL_HISTORY: _select_bundle_revision(
-            repo,
-            local_history_id,
-            prefer_head=True,
-        ),
-    }
     index_bytes = _index_path(repo).read_bytes()
     tracked_manifest = _tracked_manifest(repo, tracked_paths, secret_policy)
 
@@ -603,6 +665,18 @@ def capture_planes(
         PlaneId.LOCAL_INDEX: before.index_sha256,
         PlaneId.LOCAL_TRACKED: hashlib.sha256(before.unstaged_diff).hexdigest(),
         PlaneId.LOCAL_UNTRACKED: "pending-manifest",
+    }
+    dispositions = {
+        PlaneId.REMOTE_MAIN: _OPAQUE_DISPOSITION,
+        PlaneId.REMOTE_PR: _OPAQUE_DISPOSITION,
+        PlaneId.LOCAL_HISTORY: _OPAQUE_DISPOSITION,
+        PlaneId.LOCAL_INDEX: _OPAQUE_DISPOSITION,
+        PlaneId.LOCAL_TRACKED: (
+            _REDACTED_DISPOSITION if secret_tracked_paths else _ORDINARY_DISPOSITION
+        ),
+        PlaneId.LOCAL_UNTRACKED: (
+            _REDACTED_DISPOSITION if secret_untracked_paths else _ORDINARY_DISPOSITION
+        ),
     }
     records: list[PlaneRecord] = []
 
@@ -618,7 +692,7 @@ def capture_planes(
                 plane_root,
                 plane_id,
                 subjects[plane_id],
-                bundle_revisions[plane_id],
+                dispositions[plane_id],
             )
         elif plane_id is PlaneId.LOCAL_INDEX:
             plane_root.mkdir()
@@ -627,6 +701,7 @@ def capture_planes(
             _write_json(
                 plane_root / "metadata.json",
                 {
+                    **dispositions[plane_id].metadata(),
                     "index_sha256": before.index_sha256,
                     "secret_path_exclusions": list(secret_tracked_paths),
                 },
@@ -635,6 +710,13 @@ def capture_planes(
             plane_root.mkdir()
             (plane_root / "unstaged.diff").write_bytes(before.unstaged_diff)
             _write_json(plane_root / "manifest.json", tracked_manifest)
+            _write_json(
+                plane_root / "metadata.json",
+                {
+                    **dispositions[plane_id].metadata(),
+                    "secret_path_exclusions": list(secret_tracked_paths),
+                },
+            )
         else:
             plane_root.mkdir()
             manifest = _untracked_manifest_and_payload(
@@ -645,15 +727,27 @@ def capture_planes(
                 secret_policy,
             )
             _write_json(plane_root / "manifest.json", manifest)
+            _write_json(
+                plane_root / "metadata.json",
+                {
+                    **dispositions[plane_id].metadata(),
+                    "secret_path_exclusions": list(secret_untracked_paths),
+                },
+            )
             subjects[plane_id] = hashlib.sha256(
                 canonical_json_bytes(manifest)
             ).hexdigest()
 
+        disposition = dispositions[plane_id]
         records.append(
             PlaneRecord(
                 plane_id=plane_id,
                 subject_id=subjects[plane_id],
                 digest=_directory_digest(plane_root),
+                sensitivity=disposition.sensitivity,
+                eligibility=disposition.eligibility,
+                verification=disposition.verification,
+                status=disposition.status,
             )
         )
         if _between_planes is not None:
@@ -664,4 +758,8 @@ def capture_planes(
     assert_unchanged(before, after)
     if inventory_before != inventory_after:
         raise CaptureDrift("source state changed during capture")
+    if require_byte_equality and (secret_tracked_paths or secret_untracked_paths):
+        raise CaptureUnverifiable(
+            "redacted mutable paths prevent byte-equality verification"
+        )
     return tuple(records)
