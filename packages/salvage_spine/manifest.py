@@ -10,6 +10,7 @@ from collections import Counter, defaultdict
 import hashlib
 import json
 import re
+import unicodedata
 from pathlib import Path
 from pathlib import PurePosixPath
 from pathlib import PureWindowsPath
@@ -30,6 +31,50 @@ _DISPOSITIONS = {"salvage", "revise", "park", "reject"}
 _DEPENDENCY_TYPES = {"requires", "generated_by", "conflicts_with", "supersedes"}
 _ACYCLIC_DEPENDENCIES = {"requires", "generated_by"}
 _PROTECTED_LANES = {"holochain-integrity", "consensus-gateway"}
+_OPAQUE_DISPOSITION = (
+    "opaque-sensitive",
+    "ineligible",
+    "opaque-preserved",
+    "BLOCKED",
+)
+_ORDINARY_DISPOSITION = ("ordinary", "eligible", "byte-equality", "PASS")
+_REDACTED_DISPOSITION = (
+    "redacted",
+    "ineligible",
+    "unverifiable-redacted",
+    "BLOCKED",
+)
+_MANIFEST_ENTRY_FIELDS = {
+    "inclusion",
+    "kind",
+    "mode",
+    "path",
+    "reason",
+    "sha256",
+    "size",
+}
+_EXCLUDED_KINDS = {
+    "gitlink-not-followed": frozenset({"gitlink"}),
+    "missing-from-worktree": frozenset({"missing"}),
+    "outside-source-not-followed": frozenset({"file"}),
+    "special-file-not-copied": frozenset({"directory", "special"}),
+    "symlink-not-followed": frozenset({"symlink"}),
+    "symlink-parent-not-followed": frozenset({"file"}),
+}
+_AMBIGUOUS_PATH_CHARACTERS = frozenset(
+    {
+        "\u2024",  # one dot leader
+        "\u2044",  # fraction slash
+        "\u2215",  # division slash
+        "\u29f5",  # reverse solidus operator
+        "\u29f8",  # big solidus
+        "\ufe52",  # small full stop
+        "\ufe68",  # small reverse solidus
+        "\uff0e",  # fullwidth full stop
+        "\uff0f",  # fullwidth solidus
+        "\uff3c",  # fullwidth reverse solidus
+    }
+)
 _ATOM_FIELDS = {
     "atom_id",
     "source_plane",
@@ -396,7 +441,15 @@ def _read_json(reader: _VerifiedCapsuleReader, path: Path) -> Any:
 
 
 def _is_safe_manifest_path(value: str) -> bool:
-    if not value or "\x00" in value or "\\" in value:
+    """Require portable, printable, single-line NFC repository paths."""
+
+    if (
+        not value
+        or "\\" in value
+        or not value.isprintable()
+        or unicodedata.normalize("NFC", value) != value
+        or any(character in _AMBIGUOUS_PATH_CHARACTERS for character in value)
+    ):
         return False
     try:
         value.encode("utf-8")
@@ -404,6 +457,8 @@ def _is_safe_manifest_path(value: str) -> bool:
         return False
     pure = PurePosixPath(value)
     windows = PureWindowsPath(value)
+    if any(part.endswith((".", " ")) for part in pure.parts):
+        return False
     return not (
         pure.is_absolute()
         or ".." in pure.parts
@@ -681,10 +736,28 @@ def _history_atom(
     subject = identity.get("subject_id")
     object_format = identity.get("object_format")
     bundle_ref = identity.get("bundle_ref")
-    if identity.get("plane_id") != plane.value:
-        raise CapsuleVerificationError("history identity has the wrong source plane")
-    if object_format not in {"sha1", "sha256"}:
-        raise CapsuleVerificationError("history object format is unsupported")
+    expected_fields = {
+        "bundle_ref",
+        "bundle_scope",
+        "eligibility",
+        "object_format",
+        "plane_id",
+        "schema_version",
+        "sensitivity",
+        "status",
+        "subject_id",
+        "verification",
+    }
+    if (
+        set(identity) != expected_fields
+        or identity.get("plane_id") != plane.value
+        or identity.get("bundle_scope") != "destination-owned-exact-ref"
+        or identity.get("schema_version") != "1"
+        or bundle_ref != "refs/heads/master"
+        or object_format not in {"sha1", "sha256"}
+    ):
+        raise CapsuleVerificationError("history identity is malformed")
+    _require_disposition(identity, _OPAQUE_DISPOSITION)
     expected_length = 40 if object_format == "sha1" else 64
     if (
         not isinstance(subject, str)
@@ -724,16 +797,144 @@ def _history_atom(
     )
 
 
+def _require_disposition(
+    metadata: dict[str, object],
+    expected: tuple[str, str, str, str],
+) -> None:
+    actual = (
+        metadata.get("sensitivity"),
+        metadata.get("eligibility"),
+        metadata.get("verification"),
+        metadata.get("status"),
+    )
+    if actual != expected:
+        raise CapsuleVerificationError("plane disposition metadata is inconsistent")
+
+
+def _secret_exclusions(metadata: dict[str, object]) -> tuple[str, ...]:
+    value = metadata.get("secret_path_exclusions")
+    if not isinstance(value, list):
+        raise CapsuleVerificationError("secret exclusion metadata is invalid")
+    exclusions = tuple(_safe_manifest_path(item) for item in value)
+    if len(set(exclusions)) != len(exclusions) or list(exclusions) != sorted(
+        exclusions, key=lambda item: item.encode("utf-8")
+    ):
+        raise CapsuleVerificationError("secret exclusion metadata is inconsistent")
+    return exclusions
+
+
+def _validate_manifest_entry(
+    entry: dict[str, object],
+    *,
+    plane: PlaneId,
+) -> tuple[str, str | None]:
+    if set(entry) != _MANIFEST_ENTRY_FIELDS:
+        raise CapsuleVerificationError("manifest entry is invalid")
+    path = _safe_manifest_path(entry.get("path"))
+    inclusion = entry.get("inclusion")
+    allowed = (
+        frozenset({"metadata-only", "redacted", "excluded"})
+        if plane is PlaneId.LOCAL_TRACKED
+        else frozenset({"copied", "redacted", "excluded"})
+    )
+    if not isinstance(inclusion, str) or inclusion not in allowed:
+        raise CapsuleVerificationError("manifest inclusion is not verifiable")
+    if inclusion == "redacted":
+        if (
+            entry.get("kind") != "redacted"
+            or entry.get("reason") != "secret-name"
+            or entry.get("mode") is not None
+            or entry.get("size") is not None
+            or entry.get("sha256") is not None
+        ):
+            raise CapsuleVerificationError("redacted manifest metadata is invalid")
+        return path, "redacted-evidence-ineligible"
+    if inclusion in {"copied", "metadata-only"}:
+        mode = entry.get("mode")
+        size = entry.get("size")
+        digest = entry.get("sha256")
+        if (
+            entry.get("kind") != "file"
+            or not isinstance(mode, int)
+            or isinstance(mode, bool)
+            or mode < 0
+            or mode > 0o7777
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or size < 0
+            or not isinstance(digest, str)
+            or not _HEX_64.fullmatch(digest)
+        ):
+            raise CapsuleVerificationError(f"{inclusion} manifest metadata is invalid")
+        if inclusion == "copied" and entry.get("reason") not in {
+            "untracked",
+            "ignored",
+        }:
+            raise CapsuleVerificationError("copied manifest reason is invalid")
+        if (
+            inclusion == "metadata-only"
+            and entry.get("reason") != "tracked-worktree-inventory"
+        ):
+            raise CapsuleVerificationError("metadata-only manifest metadata is invalid")
+        return path, None
+
+    reason = entry.get("reason")
+    kind = entry.get("kind")
+    mode = entry.get("mode")
+    requires_mode = isinstance(reason, str) and reason not in {
+        "gitlink-not-followed",
+        "missing-from-worktree",
+    }
+    if (
+        not isinstance(reason, str)
+        or reason not in _EXCLUDED_KINDS
+        or not isinstance(kind, str)
+        or kind not in _EXCLUDED_KINDS[reason]
+        or (reason == "gitlink-not-followed" and mode != 0o160000)
+        or (reason == "missing-from-worktree" and mode is not None)
+        or (requires_mode and not isinstance(mode, int))
+        or isinstance(mode, bool)
+        or (requires_mode and (mode < 0 or mode > 0o7777))
+        or entry.get("size") is not None
+        or entry.get("sha256") is not None
+    ):
+        raise CapsuleVerificationError("excluded manifest metadata is invalid")
+    return path, "excluded-evidence-ineligible"
+
+
 def _manifest_entries(
     reader: _VerifiedCapsuleReader,
     path: Path,
-) -> list[dict[str, object]]:
+    *,
+    plane: PlaneId,
+    metadata: dict[str, object],
+) -> tuple[list[dict[str, object]], dict[str, str]]:
     value = _read_json(reader, path)
     if not isinstance(value, list) or not all(
         isinstance(entry, dict) for entry in value
     ):
         raise CapsuleVerificationError("file manifest must be an array of objects")
-    return value
+    blockers: dict[str, str] = {}
+    redacted: set[str] = set()
+    seen: set[str] = set()
+    for entry in value:
+        entry_path, blocker = _validate_manifest_entry(entry, plane=plane)
+        if entry_path in seen:
+            raise CapsuleVerificationError("manifest contains duplicate paths")
+        seen.add(entry_path)
+        if entry.get("inclusion") == "redacted":
+            redacted.add(entry_path)
+        if blocker is not None:
+            blockers[entry_path] = blocker
+    if set(_secret_exclusions(metadata)) != redacted:
+        raise CapsuleVerificationError(
+            "manifest disposition exclusions are inconsistent"
+        )
+    _require_disposition(
+        metadata,
+        _REDACTED_DISPOSITION if redacted else _ORDINARY_DISPOSITION,
+    )
+    return value, blockers
 
 
 def _file_atom(
@@ -760,7 +961,10 @@ def _file_atom(
     )
 
 
-def _item_for_atom(atom: dict[str, object]) -> dict[str, object]:
+def _item_for_atom(
+    atom: dict[str, object],
+    blockers: tuple[str, ...] = (),
+) -> dict[str, object]:
     atom_id = str(atom["atom_id"])
     item_id = "item-" + _sha256(atom_id.encode("utf-8"))
     initial = {
@@ -780,7 +984,7 @@ def _item_for_atom(atom: dict[str, object]) -> dict[str, object]:
         "disposition": None,
         "required_gate_ids": [],
         "dependencies": [],
-        "blockers": [],
+        "blockers": list(blockers),
         "required_profiles": [],
         "replacement_item_id": None,
         "notes": "Locally inventoried capsule evidence; no salvage intent inferred.",
@@ -798,21 +1002,32 @@ def inventory_change_universe(capsule: Path) -> dict:
     root = reader.root
     capsule_digest = reader.provenance_root
     atoms: list[dict[str, object]] = []
+    atom_blockers: dict[str, set[str]] = defaultdict(set)
+
+    def add_atom(atom: dict[str, object], *blockers: str) -> None:
+        atoms.append(atom)
+        atom_blockers[str(atom["atom_id"])].update(blockers)
+
     for plane in (PlaneId.REMOTE_MAIN, PlaneId.REMOTE_PR, PlaneId.LOCAL_HISTORY):
-        atoms.append(_history_atom(reader, root / plane.value, plane))
+        add_atom(
+            _history_atom(reader, root / plane.value, plane),
+            "opaque-preservation-ineligible",
+        )
 
     index_root = root / PlaneId.LOCAL_INDEX.value
     index_bytes = reader.read(index_root / "index.raw")
     index_metadata = _read_json(reader, index_root / "metadata.json")
     if not isinstance(index_metadata, dict):
         raise CapsuleVerificationError("index metadata must be an object")
+    _secret_exclusions(index_metadata)
+    _require_disposition(index_metadata, _OPAQUE_DISPOSITION)
     index_digest = _sha256(index_bytes)
     if index_metadata.get("index_sha256") != index_digest:
         raise CapsuleVerificationError(
             "index metadata disagrees with exact index bytes"
         )
     staged_diff = reader.read(index_root / "staged.diff")
-    atoms.append(
+    add_atom(
         _new_atom(
             source_plane=PlaneId.LOCAL_INDEX,
             source_commit=index_digest,
@@ -823,28 +1038,47 @@ def inventory_change_universe(capsule: Path) -> dict:
             mode_before=None,
             mode_after=None,
             exact_diff_digest=_sha256(staged_diff),
-        )
+        ),
+        "opaque-preservation-ineligible",
     )
-    atoms.extend(_diff_atoms(staged_diff, PlaneId.LOCAL_INDEX, index_digest))
+    for atom in _diff_atoms(staged_diff, PlaneId.LOCAL_INDEX, index_digest):
+        add_atom(atom, "opaque-preservation-ineligible")
 
     tracked_root = root / PlaneId.LOCAL_TRACKED.value
     tracked_diff = reader.read(tracked_root / "unstaged.diff")
-    tracked_entries = _manifest_entries(reader, tracked_root / "manifest.json")
+    tracked_metadata = _read_json(reader, tracked_root / "metadata.json")
+    if not isinstance(tracked_metadata, dict):
+        raise CapsuleVerificationError("tracked metadata must be an object")
+    tracked_entries, tracked_blockers = _manifest_entries(
+        reader,
+        tracked_root / "manifest.json",
+        plane=PlaneId.LOCAL_TRACKED,
+        metadata=tracked_metadata,
+    )
     tracked_digest = _sha256(tracked_diff + canonical_json_bytes(tracked_entries))
-    atoms.extend(_diff_atoms(tracked_diff, PlaneId.LOCAL_TRACKED, tracked_digest))
+    for atom in _diff_atoms(tracked_diff, PlaneId.LOCAL_TRACKED, tracked_digest):
+        add_atom(atom)
     for entry in tracked_entries:
-        atoms.append(
-            _file_atom(
-                entry,
-                plane=PlaneId.LOCAL_TRACKED,
-                source_digest=tracked_digest,
-                before=True,
-                exact_digest=_sha256(tracked_diff),
-            )
+        atom = _file_atom(
+            entry,
+            plane=PlaneId.LOCAL_TRACKED,
+            source_digest=tracked_digest,
+            before=True,
+            exact_digest=_sha256(tracked_diff),
         )
+        blocker = tracked_blockers.get(str(entry["path"]))
+        add_atom(atom, *((blocker,) if blocker is not None else ()))
 
     untracked_root = root / PlaneId.LOCAL_UNTRACKED.value
-    untracked_entries = _manifest_entries(reader, untracked_root / "manifest.json")
+    untracked_metadata = _read_json(reader, untracked_root / "metadata.json")
+    if not isinstance(untracked_metadata, dict):
+        raise CapsuleVerificationError("untracked metadata must be an object")
+    untracked_entries, untracked_blockers = _manifest_entries(
+        reader,
+        untracked_root / "manifest.json",
+        plane=PlaneId.LOCAL_UNTRACKED,
+        metadata=untracked_metadata,
+    )
     untracked_digest = _sha256(canonical_json_bytes(untracked_entries))
     for entry in untracked_entries:
         atom = _file_atom(
@@ -864,7 +1098,8 @@ def inventory_change_universe(capsule: Path) -> dict:
                 raise CapsuleVerificationError(
                     "untracked payload disagrees with manifest metadata"
                 )
-        atoms.append(atom)
+        blocker = untracked_blockers.get(str(entry["path"]))
+        add_atom(atom, *((blocker,) if blocker is not None else ()))
 
     by_id: dict[str, dict[str, object]] = {}
     for atom in atoms:
@@ -874,7 +1109,13 @@ def inventory_change_universe(capsule: Path) -> dict:
         by_id[atom_id] = atom
     ordered_atoms = [by_id[atom_id] for atom_id in sorted(by_id)]
     items = sorted(
-        (_item_for_atom(atom) for atom in ordered_atoms),
+        (
+            _item_for_atom(
+                atom,
+                tuple(sorted(atom_blockers[str(atom["atom_id"])])),
+            )
+            for atom in ordered_atoms
+        ),
         key=lambda item: str(item["item_id"]),
     )
     data = {

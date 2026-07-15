@@ -13,7 +13,7 @@ from packages.salvage_spine.manifest import (
     manifest_digest,
     validate_manifest,
 )
-from packages.salvage_spine.models import PlaneId, canonical_json_bytes
+from packages.salvage_spine.models import PlaneId, ResultStatus, canonical_json_bytes
 from packages.salvage_spine.seal import CapsuleVerificationError, seal_capsule
 
 
@@ -171,6 +171,37 @@ def test_manifest_digest_is_canonical_and_content_sensitive() -> None:
     assert manifest_digest(data) != manifest_digest(changed)
 
 
+@pytest.mark.parametrize(
+    "unsafe_path",
+    [
+        "bad\nname.txt",
+        "bad\tname.txt",
+        "bad\rname.txt",
+        "bad\x1bname.txt",
+        "bad\x7fname.txt",
+        "bad\x85name.txt",
+        "bad\u202ename.txt",
+        "bad\u2066name.txt",
+        "bad\u200bname.txt",
+        "bad\u2215name.txt",
+        "A\u030a.txt",
+    ],
+)
+def test_validate_manifest_rejects_non_single_line_or_ambiguous_paths(
+    unsafe_path: str,
+) -> None:
+    data = _manifest()
+    data["atoms"][0]["path_after"] = unsafe_path
+    assert any("path_after is unsafe" in error for error in validate_manifest(data))
+
+
+def test_validate_manifest_accepts_normalized_printable_non_ascii_paths() -> None:
+    data = _manifest()
+    data["atoms"][0]["path_before"] = "Ångström/猫.txt"
+    data["atoms"][0]["path_after"] = "ångström/猫.txt"
+    assert validate_manifest(data) == []
+
+
 def _write_json(path: Path, value: object) -> None:
     path.write_bytes(canonical_json_bytes(value))
 
@@ -182,9 +213,11 @@ def _sealed_capsule(
     unstaged_diff: bytes = b"",
     tracked_manifest: list[dict[str, object]] | None = None,
     untracked_manifest: list[dict[str, object]] | None = None,
+    index_metadata_overrides: dict[str, object] | None = None,
+    history_identity_overrides: dict[str, object] | None = None,
 ) -> Path:
     capsule = tmp_path / "capsule"
-    capsule.mkdir()
+    capsule.mkdir(parents=True)
     for index, plane in enumerate(
         (PlaneId.REMOTE_MAIN, PlaneId.REMOTE_PR, PlaneId.LOCAL_HISTORY), start=1
     ):
@@ -200,40 +233,68 @@ def _sealed_capsule(
         (root / "refs.txt").write_text(
             f"{subject} {bundle_ref}\n", encoding="utf-8", newline="\n"
         )
-        _write_json(
-            root / "identity.json",
-            {
-                "bundle_ref": bundle_ref,
-                "bundle_scope": "destination-owned-exact-ref",
-                "object_format": "sha1",
-                "plane_id": plane.value,
-                "schema_version": "1",
-                "subject_id": subject,
-            },
-        )
+        identity = {
+            "bundle_ref": bundle_ref,
+            "bundle_scope": "destination-owned-exact-ref",
+            "eligibility": "ineligible",
+            "object_format": "sha1",
+            "plane_id": plane.value,
+            "schema_version": "1",
+            "sensitivity": "opaque-sensitive",
+            "status": "BLOCKED",
+            "subject_id": subject,
+            "verification": "opaque-preserved",
+        }
+        identity.update(history_identity_overrides or {})
+        _write_json(root / "identity.json", identity)
 
     index_root = capsule / PlaneId.LOCAL_INDEX.value
     index_root.mkdir()
     index_bytes = b"exact index bytes"
     (index_root / "index.raw").write_bytes(index_bytes)
     (index_root / "staged.diff").write_bytes(staged_diff)
-    _write_json(
-        index_root / "metadata.json",
-        {
-            "index_sha256": hashlib.sha256(index_bytes).hexdigest(),
+    index_metadata = {
+        "eligibility": "ineligible",
+        "index_sha256": hashlib.sha256(index_bytes).hexdigest(),
+        "secret_path_exclusions": [],
+        "sensitivity": "opaque-sensitive",
+        "status": "BLOCKED",
+        "verification": "opaque-preserved",
+    }
+    index_metadata.update(index_metadata_overrides or {})
+    _write_json(index_root / "metadata.json", index_metadata)
+
+    def disposition(entries: list[dict[str, object]]) -> dict[str, object]:
+        redacted = sorted(
+            str(entry["path"])
+            for entry in entries
+            if entry.get("inclusion") == "redacted"
+        )
+        if redacted:
+            return {
+                "eligibility": "ineligible",
+                "secret_path_exclusions": redacted,
+                "sensitivity": "redacted",
+                "status": "BLOCKED",
+                "verification": "unverifiable-redacted",
+            }
+        return {
+            "eligibility": "eligible",
             "secret_path_exclusions": [],
-        },
-    )
+            "sensitivity": "ordinary",
+            "status": "PASS",
+            "verification": "byte-equality",
+        }
 
     tracked_root = capsule / PlaneId.LOCAL_TRACKED.value
     tracked_root.mkdir()
     (tracked_root / "unstaged.diff").write_bytes(unstaged_diff)
-    _write_json(tracked_root / "manifest.json", tracked_manifest or [])
-    _write_json(tracked_root / "metadata.json", {"secret_path_exclusions": []})
+    stored_tracked = copy.deepcopy(tracked_manifest or [])
+    _write_json(tracked_root / "manifest.json", stored_tracked)
+    _write_json(tracked_root / "metadata.json", disposition(stored_tracked))
 
     untracked_root = capsule / PlaneId.LOCAL_UNTRACKED.value
     untracked_root.mkdir()
-    _write_json(untracked_root / "metadata.json", {"secret_path_exclusions": []})
     stored_untracked = copy.deepcopy(untracked_manifest or [])
     for entry in stored_untracked:
         if entry.get("inclusion") == "copied":
@@ -241,6 +302,7 @@ def _sealed_capsule(
             payload.parent.mkdir(parents=True, exist_ok=True)
             payload.write_bytes(bytes(entry["content"]))
             del entry["content"]
+    _write_json(untracked_root / "metadata.json", disposition(stored_untracked))
     _write_json(untracked_root / "manifest.json", stored_untracked)
     seal_capsule(capsule)
     return capsule
@@ -256,7 +318,7 @@ def test_inventory_is_deterministic_complete_and_defaults_to_captured(
             {
                 "path": "tracked.txt",
                 "kind": "file",
-                "mode": 0o100644,
+                "mode": 0o644,
                 "size": 4,
                 "sha256": hashlib.sha256(b"data").hexdigest(),
                 "inclusion": "metadata-only",
@@ -267,7 +329,7 @@ def test_inventory_is_deterministic_complete_and_defaults_to_captured(
             {
                 "path": "new.txt",
                 "kind": "file",
-                "mode": 0o100644,
+                "mode": 0o644,
                 "size": len(payload),
                 "sha256": hashlib.sha256(payload).hexdigest(),
                 "inclusion": "copied",
@@ -345,6 +407,36 @@ def test_inventory_decodes_git_octal_quoted_utf8_path(tmp_path: Path) -> None:
     assert atom["path_after"] == "å.txt"
 
 
+@pytest.mark.parametrize(
+    "quoted_path",
+    [
+        rb"bad\nname.txt",
+        rb"bad\tname.txt",
+        rb"bad\rname.txt",
+        rb"bad\033name.txt",
+        rb"bad\177name.txt",
+        rb"bad\302\205name.txt",
+        rb"bad\342\200\256name.txt",
+        rb"bad\342\201\246name.txt",
+    ],
+)
+def test_inventory_rejects_quoted_git_control_and_format_paths(
+    tmp_path: Path,
+    quoted_path: bytes,
+) -> None:
+    diff = (
+        b'diff --git "a/'
+        + quoted_path
+        + b'" "b/'
+        + quoted_path
+        + b'"\nnew file mode 100644\n--- /dev/null\n+++ "b/'
+        + quoted_path
+        + b'"\n@@ -0,0 +1 @@\n+x\n'
+    )
+    with pytest.raises(CapsuleVerificationError, match="unsafe"):
+        inventory_change_universe(_sealed_capsule(tmp_path, staged_diff=diff))
+
+
 def test_inventory_rejects_tamper_and_unsafe_manifest_path(tmp_path: Path) -> None:
     capsule = _sealed_capsule(tmp_path)
     (capsule / PlaneId.LOCAL_INDEX.value / "index.raw").write_bytes(b"tampered")
@@ -399,7 +491,7 @@ def test_inventory_rejects_sealed_payload_metadata_disagreement(tmp_path: Path) 
             {
                 "path": "payload.txt",
                 "kind": "file",
-                "mode": 0o100644,
+                "mode": 0o644,
                 "size": len(payload) + 1,
                 "sha256": hashlib.sha256(payload).hexdigest(),
                 "inclusion": "copied",
@@ -410,3 +502,221 @@ def test_inventory_rejects_sealed_payload_metadata_disagreement(tmp_path: Path) 
     )
     with pytest.raises(CapsuleVerificationError, match="payload disagrees"):
         inventory_change_universe(capsule)
+
+
+@pytest.mark.parametrize(
+    ("plane", "entry", "expected_blocker"),
+    [
+        (
+            PlaneId.LOCAL_TRACKED,
+            {
+                "path": "tracked.txt",
+                "kind": "file",
+                "mode": 0o644,
+                "size": 4,
+                "sha256": hashlib.sha256(b"data").hexdigest(),
+                "inclusion": "metadata-only",
+                "reason": "tracked-worktree-inventory",
+            },
+            None,
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": "copied.txt",
+                "kind": "file",
+                "mode": 0o644,
+                "size": 4,
+                "sha256": hashlib.sha256(b"data").hexdigest(),
+                "inclusion": "copied",
+                "reason": "untracked",
+                "content": b"data",
+            },
+            None,
+        ),
+        (
+            PlaneId.LOCAL_TRACKED,
+            {
+                "path": ".env",
+                "kind": "redacted",
+                "mode": None,
+                "size": None,
+                "sha256": None,
+                "inclusion": "redacted",
+                "reason": "secret-name",
+            },
+            "redacted-evidence-ineligible",
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": ".secret",
+                "kind": "redacted",
+                "mode": None,
+                "size": None,
+                "sha256": None,
+                "inclusion": "redacted",
+                "reason": "secret-name",
+            },
+            "redacted-evidence-ineligible",
+        ),
+        (
+            PlaneId.LOCAL_TRACKED,
+            {
+                "path": "missing.txt",
+                "kind": "missing",
+                "mode": None,
+                "size": None,
+                "sha256": None,
+                "inclusion": "excluded",
+                "reason": "missing-from-worktree",
+            },
+            "excluded-evidence-ineligible",
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": "special-dir",
+                "kind": "directory",
+                "mode": 0o755,
+                "size": None,
+                "sha256": None,
+                "inclusion": "excluded",
+                "reason": "special-file-not-copied",
+            },
+            "excluded-evidence-ineligible",
+        ),
+    ],
+)
+def test_inventory_and_task4_accept_the_same_inclusion_states(
+    tmp_path: Path,
+    plane: PlaneId,
+    entry: dict[str, object],
+    expected_blocker: str | None,
+) -> None:
+    from packages.salvage_spine.restore import _validate_artifact_plane
+
+    kwargs = (
+        {"tracked_manifest": [entry]}
+        if plane is PlaneId.LOCAL_TRACKED
+        else {"untracked_manifest": [entry]}
+    )
+    capsule = _sealed_capsule(tmp_path, **kwargs)
+    data = inventory_change_universe(capsule)
+    task4_result = _validate_artifact_plane(capsule, plane)
+    atom = next(
+        atom
+        for atom in data["atoms"]
+        if atom["source_plane"] == plane.value and atom["path_after"] == entry["path"]
+    )
+    item = next(item for item in data["items"] if atom["atom_id"] in item["atom_ids"])
+    if expected_blocker is None:
+        assert task4_result.status is ResultStatus.PASS
+        assert item["blockers"] == []
+    else:
+        assert task4_result.status is ResultStatus.BLOCKED
+        assert expected_blocker in task4_result.blockers
+        assert item["blockers"] == [expected_blocker]
+    assert item["classification_state"] == "captured"
+    assert item["disposition"] is None
+
+
+@pytest.mark.parametrize(
+    ("plane", "entry"),
+    [
+        (
+            PlaneId.LOCAL_TRACKED,
+            {
+                "path": "tracked.txt",
+                "kind": "file",
+                "mode": 0o644,
+                "size": 4,
+                "sha256": hashlib.sha256(b"data").hexdigest(),
+                "inclusion": "eligible",
+                "reason": "content-read",
+            },
+        ),
+        (
+            PlaneId.LOCAL_TRACKED,
+            {
+                "path": "tracked.txt",
+                "kind": "file",
+                "mode": 0o644,
+                "size": 4,
+                "sha256": hashlib.sha256(b"data").hexdigest(),
+                "inclusion": "metadata-only",
+                "reason": "reason-drift",
+            },
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": "copied.txt",
+                "kind": "file",
+                "mode": 0o644,
+                "size": 4,
+                "sha256": hashlib.sha256(b"data").hexdigest(),
+                "inclusion": "copied",
+                "reason": "reason-drift",
+                "content": b"data",
+            },
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": ".env",
+                "kind": "redacted",
+                "mode": None,
+                "size": None,
+                "sha256": None,
+                "inclusion": "redacted",
+                "reason": "reason-drift",
+            },
+        ),
+        (
+            PlaneId.LOCAL_UNTRACKED,
+            {
+                "path": "special-dir",
+                "kind": "file",
+                "mode": 0o755,
+                "size": None,
+                "sha256": None,
+                "inclusion": "excluded",
+                "reason": "special-file-not-copied",
+            },
+        ),
+    ],
+)
+def test_inventory_and_task4_both_reject_unsupported_inclusion_semantics(
+    tmp_path: Path,
+    plane: PlaneId,
+    entry: dict[str, object],
+) -> None:
+    from packages.salvage_spine.restore import _validate_artifact_plane
+
+    kwargs = (
+        {"tracked_manifest": [entry]}
+        if plane is PlaneId.LOCAL_TRACKED
+        else {"untracked_manifest": [entry]}
+    )
+    capsule = _sealed_capsule(tmp_path, **kwargs)
+    with pytest.raises(CapsuleVerificationError):
+        inventory_change_universe(capsule)
+    with pytest.raises(CapsuleVerificationError):
+        _validate_artifact_plane(capsule, plane)
+
+
+def test_inventory_rejects_index_and_history_disposition_drift(tmp_path: Path) -> None:
+    index_capsule = _sealed_capsule(
+        tmp_path / "index",
+        index_metadata_overrides={"eligibility": "eligible"},
+    )
+    with pytest.raises(CapsuleVerificationError):
+        inventory_change_universe(index_capsule)
+
+    history_capsule = _sealed_capsule(
+        tmp_path / "history",
+        history_identity_overrides={"status": "PASS"},
+    )
+    with pytest.raises(CapsuleVerificationError):
+        inventory_change_universe(history_capsule)
