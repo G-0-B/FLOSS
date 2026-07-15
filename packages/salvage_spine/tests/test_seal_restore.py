@@ -354,6 +354,37 @@ def test_seal_fails_closed_when_payload_path_is_substituted_before_hash(
     assert not (capsule / "checksums.sha256").exists()
 
 
+def test_seal_parent_swap_cannot_redirect_pending_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, _, _ = captured_capsule(tmp_path)
+    external = tmp_path / "seal-swap-external"
+    external.mkdir()
+    preserved = tmp_path / "seal-swap-preserved"
+    seal_module = importlib.import_module("packages.salvage_spine.seal")
+    original_open = seal_module.os.open
+    attempted = False
+
+    def swap_before_pending_open(path: object, *args: object, **kwargs: object) -> int:
+        nonlocal attempted
+        rendered = Path(path)  # type: ignore[arg-type]
+        if rendered.name.startswith(".checksums.sha256.pending-") and not attempted:
+            attempted = True
+            capsule.rename(preserved)
+            _make_junction(capsule, external)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(seal_module.os, "open", swap_before_pending_open)
+
+    with pytest.raises((CapsuleVerificationError, OSError)):
+        seal_capsule(capsule)
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == ((), {})
+
+
 @pytest.mark.parametrize("object_format", ["sha1", "sha256"])
 def test_clean_room_restore_is_exact_for_each_history_plane(
     tmp_path: Path, object_format: str
@@ -534,6 +565,176 @@ def test_restore_rejects_capsule_root_symlink_before_writes(tmp_path: Path) -> N
         restore_and_verify(alias, destination, forbidden_roots={repo})
 
     assert not destination.exists()
+
+
+def test_restore_root_swap_before_first_plane_mkdir_creates_no_external_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    restore_root = tmp_path / "restore-root-swap"
+    preserved = tmp_path / "restore-root-swap-preserved"
+    external = tmp_path / "restore-root-swap-external"
+    external.mkdir()
+    original_mkdir = Path.mkdir
+    attempted = False
+
+    def swap_before_mkdir(path: Path, *args: object, **kwargs: object) -> None:
+        nonlocal attempted
+        if path == restore_root / "remote-main" and not attempted:
+            attempted = True
+            restore_root.rename(preserved)
+            _make_junction(restore_root, external)
+        original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", swap_before_mkdir)
+
+    with pytest.raises((CapsuleVerificationError, OSError, ValueError)):
+        restore_and_verify(capsule, restore_root, forbidden_roots={repo})
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == ((), {})
+
+
+def test_restore_parent_swap_before_root_mkdir_creates_no_external_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    parent = tmp_path / "restore-parent-swap"
+    parent.mkdir()
+    restore_root = parent / "restore"
+    preserved = tmp_path / "restore-parent-swap-preserved"
+    external = tmp_path / "restore-parent-swap-external"
+    external.mkdir()
+    original_mkdir = Path.mkdir
+    attempted = False
+
+    def swap_before_mkdir(path: Path, *args: object, **kwargs: object) -> None:
+        nonlocal attempted
+        if path == restore_root and not attempted:
+            attempted = True
+            parent.rename(preserved)
+            _make_junction(parent, external)
+        original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", swap_before_mkdir)
+
+    with pytest.raises((CapsuleVerificationError, OSError, ValueError)):
+        restore_and_verify(capsule, restore_root, forbidden_roots={repo})
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == ((), {})
+
+
+def test_restore_plane_swap_after_mkdir_creates_no_external_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    restore_root = tmp_path / "restore-plane-swap"
+    plane_root = restore_root / "remote-main"
+    preserved = tmp_path / "restore-plane-swap-preserved"
+    external = tmp_path / "restore-plane-swap-external"
+    external.mkdir()
+    original_mkdir = Path.mkdir
+    attempted = False
+
+    def swap_after_mkdir(path: Path, *args: object, **kwargs: object) -> None:
+        nonlocal attempted
+        original_mkdir(path, *args, **kwargs)
+        if path == plane_root and not attempted:
+            attempted = True
+            plane_root.rename(preserved)
+            _make_junction(plane_root, external)
+
+    monkeypatch.setattr(Path, "mkdir", swap_after_mkdir)
+
+    with pytest.raises((CapsuleVerificationError, OSError, ValueError)):
+        restore_and_verify(capsule, restore_root, forbidden_roots={repo})
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == ((), {})
+
+
+def test_restore_repository_swap_before_git_init_creates_no_external_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    restore_root = tmp_path / "restore-repository-init-swap"
+    repository = restore_root / "remote-main" / "repository.git"
+    preserved = tmp_path / "restore-repository-init-swap-preserved"
+    external = tmp_path / "restore-repository-init-swap-external"
+    external.mkdir()
+    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    original_run = restore_module.subprocess.run
+    attempted = False
+
+    def swap_before_git_init(*args: object, **kwargs: object) -> object:
+        nonlocal attempted
+        command = args[0]
+        if (
+            isinstance(command, list)
+            and command[:2] == ["git", "init"]
+            and not attempted
+        ):
+            attempted = True
+            repository.mkdir(exist_ok=True)
+            repository.rename(preserved)
+            _make_junction(repository, external)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(restore_module.subprocess, "run", swap_before_git_init)
+
+    with pytest.raises((CapsuleVerificationError, OSError, ValueError)):
+        restore_and_verify(capsule, restore_root, forbidden_roots={repo})
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == ((), {})
+
+
+def test_restore_repository_swap_before_fetch_cannot_write_external_git_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction swap regression")
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    restore_root = tmp_path / "restore-repository-fetch-swap"
+    repository = restore_root / "remote-main" / "repository.git"
+    preserved = tmp_path / "restore-repository-fetch-swap-preserved"
+    external = tmp_path / "restore-repository-fetch-swap-external.git"
+    git(tmp_path, "init", "--bare", str(external))
+    before = filesystem_snapshot(external)
+    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    original_run = restore_module.subprocess.run
+    attempted = False
+
+    def swap_before_fetch(*args: object, **kwargs: object) -> object:
+        nonlocal attempted
+        command = args[0]
+        if isinstance(command, list) and "fetch" in command and not attempted:
+            attempted = True
+            repository.rename(preserved)
+            _make_junction(repository, external)
+        return original_run(*args, **kwargs)
+
+    monkeypatch.setattr(restore_module.subprocess, "run", swap_before_fetch)
+
+    with pytest.raises((CapsuleVerificationError, OSError, ValueError)):
+        restore_and_verify(capsule, restore_root, forbidden_roots={repo, external})
+
+    assert attempted is True
+    assert filesystem_snapshot(external) == before
 
 
 def test_restore_cross_checks_refs_and_identity_scope(tmp_path: Path) -> None:
@@ -810,6 +1011,120 @@ def test_gitlink_without_submodule_repository_returns_blocked(tmp_path: Path) ->
     assert result.status is ResultStatus.BLOCKED
     assert "submodule-repository-missing" in result.blockers
     assert not any("nested-module" in blocker for blocker in result.blockers)
+    tracked = next(
+        plane for plane in result.planes if plane.plane_id is PlaneId.LOCAL_TRACKED
+    )
+    assert tracked.status is ResultStatus.BLOCKED
+    assert tracked.artifact_match is True
+    assert tracked.blockers == ("excluded-evidence-ineligible",)
+
+
+def test_excluded_manifest_status_and_reason_must_agree(tmp_path: Path) -> None:
+    capsule, repo, _ = captured_capsule(tmp_path, gitlink=True)
+    manifest_path = capsule / "local-tracked" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    excluded = next(entry for entry in manifest if entry["inclusion"] == "excluded")
+    excluded["reason"] = "tracked-worktree-inventory"
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+    seal_capsule(capsule)
+
+    with pytest.raises(CapsuleVerificationError, match="excluded manifest metadata"):
+        restore_and_verify(
+            capsule,
+            tmp_path / "restore-excluded-reason-mismatch",
+            forbidden_roots={repo},
+        )
+
+
+@pytest.mark.parametrize("inclusion", ["eligible", "copied", "error", "failed"])
+def test_tracked_manifest_rejects_every_unsupported_inclusion_state(
+    tmp_path: Path, inclusion: str
+) -> None:
+    capsule, repo, _ = captured_capsule(tmp_path)
+    manifest_path = capsule / "local-tracked" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[0]["inclusion"] = inclusion
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+    seal_capsule(capsule)
+
+    with pytest.raises(CapsuleVerificationError, match="inclusion is not verifiable"):
+        restore_and_verify(
+            capsule,
+            tmp_path / f"restore-unsupported-{inclusion}",
+            forbidden_roots={repo},
+        )
+
+
+def test_tracked_metadata_only_is_the_only_eligible_manifest_state(
+    tmp_path: Path,
+) -> None:
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+
+    result = restore_and_verify(
+        capsule,
+        tmp_path / "restore-tracked-metadata-only",
+        forbidden_roots={repo},
+    )
+
+    tracked = next(
+        plane for plane in result.planes if plane.plane_id is PlaneId.LOCAL_TRACKED
+    )
+    assert tracked.status is ResultStatus.PASS
+    assert tracked.blockers == ()
+
+
+def test_tracked_redacted_manifest_state_is_explicitly_blocked(tmp_path: Path) -> None:
+    _, repo, _ = captured_capsule(tmp_path)
+    _write_and_commit(repo, ".env", b"TOKEN=committed\n", "tracked secret")
+    (repo / ".env").write_bytes(b"TOKEN=changed\n")
+    capsule = tmp_path / "capsule-tracked-redacted"
+    head = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    capture_planes(repo, head, head, capsule, SecretPolicy.default())
+    seal_capsule(capsule)
+
+    result = restore_and_verify(
+        capsule,
+        tmp_path / "restore-tracked-redacted",
+        forbidden_roots={repo},
+    )
+
+    tracked = next(
+        plane for plane in result.planes if plane.plane_id is PlaneId.LOCAL_TRACKED
+    )
+    assert tracked.status is ResultStatus.BLOCKED
+    assert tracked.blockers == ("redacted-evidence-ineligible",)
+
+
+def test_untracked_excluded_manifest_state_is_explicitly_blocked(
+    tmp_path: Path,
+) -> None:
+    _, repo, _ = captured_capsule(tmp_path)
+    outside = tmp_path / "untracked-link-target.txt"
+    outside.write_bytes(b"must-not-be-copied\n")
+    link = repo / "untracked-link"
+    try:
+        link.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink creation unavailable: {exc}")
+    capsule = tmp_path / "capsule-untracked-excluded"
+    head = git(repo, "rev-parse", "HEAD").stdout.strip().decode("ascii")
+    capture_planes(repo, head, head, capsule, SecretPolicy.default())
+    seal_capsule(capsule)
+
+    result = restore_and_verify(
+        capsule,
+        tmp_path / "restore-untracked-excluded",
+        forbidden_roots={repo},
+    )
+
+    untracked = next(
+        plane for plane in result.planes if plane.plane_id is PlaneId.LOCAL_UNTRACKED
+    )
+    assert untracked.status is ResultStatus.BLOCKED
+    assert untracked.artifact_match is True
+    assert untracked.payload_count == 1
+    assert untracked.blockers == ("excluded-evidence-ineligible",)
 
 
 def test_verification_json_is_deterministic_and_contains_no_absolute_paths(
