@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import secrets
 import stat
-from typing import Iterator
+from typing import BinaryIO, Iterator
 
 from .models import canonical_json_bytes
 
@@ -20,6 +23,130 @@ class CapsuleVerificationError(RuntimeError):
     """The capsule cannot be authenticated or violates the sealed contract."""
 
 
+def _is_reparse(metadata: os.stat_result) -> bool:
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def _node_identity(metadata: os.stat_result) -> tuple[int, int, int]:
+    return (metadata.st_dev, metadata.st_ino, metadata.st_mode)
+
+
+def _file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+    )
+
+
+def _assert_regular_metadata(metadata: os.stat_result) -> None:
+    if stat.S_ISLNK(metadata.st_mode):
+        raise CapsuleVerificationError("capsule symlink is not supported")
+    if _is_reparse(metadata):
+        raise CapsuleVerificationError("capsule reparse point is not supported")
+    if not stat.S_ISREG(metadata.st_mode):
+        raise CapsuleVerificationError("capsule entry is not a regular file")
+    if metadata.st_nlink != 1:
+        raise CapsuleVerificationError("capsule hardlink is not supported")
+
+
+@contextmanager
+def _open_regular_nofollow(path: Path) -> Iterator[BinaryIO]:
+    """Open only the named entry, never a final symlink or reparse target."""
+
+    if os.name != "nt":
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW
+        try:
+            descriptor = os.open(path, flags)
+        except OSError as exc:
+            raise CapsuleVerificationError(
+                "capsule payload cannot be opened safely"
+            ) from exc
+    else:
+        from ctypes import wintypes
+        import msvcrt
+
+        create_file = ctypes.windll.kernel32.CreateFileW
+        create_file.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        )
+        create_file.restype = wintypes.HANDLE
+        handle = create_file(
+            str(path),
+            0x80000000,
+            0x00000001 | 0x00000002 | 0x00000004,
+            None,
+            3,
+            0x00200000 | 0x08000000,
+            None,
+        )
+        invalid_handle = ctypes.c_void_p(-1).value
+        if handle == invalid_handle:
+            raise CapsuleVerificationError(
+                "capsule payload cannot be opened safely"
+            ) from ctypes.WinError()
+        try:
+            descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        except OSError:
+            ctypes.windll.kernel32.CloseHandle(handle)
+            raise
+    stream = os.fdopen(descriptor, "rb", closefd=True)
+    try:
+        yield stream
+    finally:
+        stream.close()
+
+
+def _validated_file_state(path: Path) -> os.stat_result:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise CapsuleVerificationError("capsule entry is unavailable") from exc
+    _assert_regular_metadata(metadata)
+    return metadata
+
+
+def _consume_regular_file(path: Path, *, return_bytes: bool) -> bytes | str:
+    path_before = _validated_file_state(path)
+    digest = hashlib.sha256()
+    content = bytearray() if return_bytes else None
+    with _open_regular_nofollow(path) as stream:
+        handle_before = os.fstat(stream.fileno())
+        _assert_regular_metadata(handle_before)
+        if _node_identity(path_before) != _node_identity(handle_before):
+            raise CapsuleVerificationError("capsule payload changed before hashing")
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+            if content is not None:
+                content.extend(chunk)
+        handle_after = os.fstat(stream.fileno())
+    path_after = _validated_file_state(path)
+    if (
+        _file_identity(path_before) != _file_identity(handle_before)
+        or _file_identity(handle_before) != _file_identity(handle_after)
+        or _file_identity(handle_after) != _file_identity(path_after)
+    ):
+        raise CapsuleVerificationError("capsule payload changed while hashing")
+    return bytes(content) if content is not None else digest.hexdigest()
+
+
+def _read_regular_bytes(path: Path) -> bytes:
+    result = _consume_regular_file(path, return_bytes=True)
+    if not isinstance(result, bytes):
+        raise AssertionError("regular byte reader returned a digest")
+    return result
+
+
 def _capsule_root(root: Path) -> Path:
     root = Path(root)
     try:
@@ -28,14 +155,29 @@ def _capsule_root(root: Path) -> Path:
         raise CapsuleVerificationError("capsule root is unavailable") from exc
     if stat.S_ISLNK(root_stat.st_mode):
         raise CapsuleVerificationError("capsule root must not be a symlink")
+    if _is_reparse(root_stat):
+        raise CapsuleVerificationError("capsule root must not be a reparse point")
     if not stat.S_ISDIR(root_stat.st_mode):
         raise CapsuleVerificationError("capsule root must be a directory")
-    return root.resolve(strict=True)
+    resolved = root.resolve(strict=True)
+    resolved_stat = resolved.lstat()
+    if _node_identity(root_stat) != _node_identity(resolved_stat):
+        raise CapsuleVerificationError("capsule root alias is not supported")
+    return resolved
 
 
-def _walk_regular_files(root: Path) -> Iterator[Path]:
+def _walk_regular_files(
+    root: Path, *, excluded_root_names: frozenset[str] = _SEAL_ARTIFACTS
+) -> Iterator[Path]:
     """Yield regular files without following symlinks or special entries."""
 
+    root_metadata = Path(root).lstat()
+    if stat.S_ISLNK(root_metadata.st_mode):
+        raise CapsuleVerificationError("capsule tree root is a symlink")
+    if _is_reparse(root_metadata):
+        raise CapsuleVerificationError("capsule tree root is a reparse point")
+    if not stat.S_ISDIR(root_metadata.st_mode):
+        raise CapsuleVerificationError("capsule tree root is not a directory")
     pending = [root]
     while pending:
         directory = pending.pop()
@@ -48,17 +190,21 @@ def _walk_regular_files(root: Path) -> Iterator[Path]:
         for entry in entries:
             path = Path(entry.path)
             try:
-                metadata = entry.stat(follow_symlinks=False)
+                metadata = path.lstat()
             except OSError as exc:
                 raise CapsuleVerificationError("capsule entry is unreadable") from exc
             mode = metadata.st_mode
             if stat.S_ISLNK(mode):
                 raise CapsuleVerificationError("capsule symlink is not supported")
+            if _is_reparse(metadata):
+                raise CapsuleVerificationError("capsule reparse point is not supported")
             if stat.S_ISDIR(mode):
                 child_directories.append(path)
             elif stat.S_ISREG(mode):
+                if metadata.st_nlink != 1:
+                    raise CapsuleVerificationError("capsule hardlink is not supported")
                 relative = path.relative_to(root).as_posix()
-                if relative not in _SEAL_ARTIFACTS:
+                if relative not in excluded_root_names:
                     yield path
             else:
                 raise CapsuleVerificationError(
@@ -76,36 +222,70 @@ def _relative_name(root: Path, path: Path) -> str:
 
 
 def _hash_regular_file(path: Path) -> str:
+    result = _consume_regular_file(path, return_bytes=False)
+    if not isinstance(result, str):
+        raise AssertionError("regular file hasher returned bytes")
+    return result
+
+
+def _validate_fixed_output(root: Path, name: str) -> os.stat_result | None:
+    path = root / name
     try:
-        before = path.stat(follow_symlinks=False)
-        if not stat.S_ISREG(before.st_mode):
-            raise CapsuleVerificationError("capsule payload changed type while hashing")
-        digest = hashlib.sha256()
-        with path.open("rb") as stream:
-            while chunk := stream.read(1024 * 1024):
-                digest.update(chunk)
-        after = path.stat(follow_symlinks=False)
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return None
     except OSError as exc:
-        raise CapsuleVerificationError("capsule payload is unreadable") from exc
-    identity_before = (
-        before.st_mode,
-        before.st_size,
-        before.st_mtime_ns,
-        getattr(before, "st_ctime_ns", None),
-        before.st_dev,
-        before.st_ino,
-    )
-    identity_after = (
-        after.st_mode,
-        after.st_size,
-        after.st_mtime_ns,
-        getattr(after, "st_ctime_ns", None),
-        after.st_dev,
-        after.st_ino,
-    )
-    if identity_before != identity_after:
-        raise CapsuleVerificationError("capsule payload changed while hashing")
-    return digest.hexdigest()
+        raise CapsuleVerificationError("fixed output is unavailable") from exc
+    _assert_regular_metadata(metadata)
+    return metadata
+
+
+def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
+    """Atomically replace a validated fixed output; failed pending files remain."""
+
+    capsule = _capsule_root(root)
+    root_before = capsule.lstat()
+    existing = _validate_fixed_output(capsule, name)
+    pending = capsule / f".{name}.pending-{secrets.token_hex(16)}"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    try:
+        descriptor = os.open(pending, flags, 0o600)
+    except OSError as exc:
+        raise CapsuleVerificationError(
+            "fixed output pending file cannot be created"
+        ) from exc
+    with os.fdopen(descriptor, "wb", closefd=True) as stream:
+        stream.write(content)
+        stream.flush()
+        os.fsync(stream.fileno())
+        pending_handle = os.fstat(stream.fileno())
+    _assert_regular_metadata(pending_handle)
+    pending_path = _validated_file_state(pending)
+    if _file_identity(pending_handle) != _file_identity(pending_path):
+        raise CapsuleVerificationError("fixed output pending file changed")
+    root_now = _capsule_root(capsule).lstat()
+    if _node_identity(root_before) != _node_identity(root_now):
+        raise CapsuleVerificationError("capsule root changed during output write")
+    current = _validate_fixed_output(capsule, name)
+    if (existing is None) != (current is None) or (
+        existing is not None
+        and current is not None
+        and _file_identity(existing) != _file_identity(current)
+    ):
+        raise CapsuleVerificationError("fixed output changed before replacement")
+    try:
+        os.replace(pending, capsule / name)
+    except OSError as exc:
+        raise CapsuleVerificationError(
+            "fixed output atomic replacement failed"
+        ) from exc
+    written = _validated_file_state(capsule / name)
+    if _node_identity(written) != _node_identity(pending_handle):
+        raise CapsuleVerificationError(
+            "fixed output identity changed after replacement"
+        )
+    if _node_identity(_capsule_root(capsule).lstat()) != _node_identity(root_before):
+        raise CapsuleVerificationError("capsule root changed after output write")
 
 
 def _checksum_entries(root: Path) -> list[dict[str, str]]:
@@ -135,12 +315,16 @@ def seal_capsule(root: Path) -> str:
     """Write an idempotent local-unanchored seal and return its root digest."""
 
     capsule = _capsule_root(root)
+    for name in _SEAL_ARTIFACTS:
+        _validate_fixed_output(capsule, name)
     entries = _checksum_entries(capsule)
     listing = _listing_bytes(entries)
     provenance_root = hashlib.sha256(listing).hexdigest()
-    (capsule / "checksums.sha256").write_bytes(listing)
-    (capsule / "provenance-root.json").write_bytes(
-        canonical_json_bytes(_provenance_record(provenance_root))
+    _atomic_write_fixed(capsule, "checksums.sha256", listing)
+    _atomic_write_fixed(
+        capsule,
+        "provenance-root.json",
+        canonical_json_bytes(_provenance_record(provenance_root)),
     )
     verify_checksums(capsule)
     return provenance_root
@@ -201,10 +385,12 @@ def verify_checksums(root: Path) -> None:
     """Verify provenance, exact file universe, and every sealed payload byte."""
 
     capsule = _capsule_root(root)
+    for name in _SEAL_ARTIFACTS:
+        _validate_fixed_output(capsule, name)
     try:
-        listing = (capsule / "checksums.sha256").read_bytes()
-        provenance_bytes = (capsule / "provenance-root.json").read_bytes()
-    except OSError as exc:
+        listing = _read_regular_bytes(capsule / "checksums.sha256")
+        provenance_bytes = _read_regular_bytes(capsule / "provenance-root.json")
+    except CapsuleVerificationError as exc:
         raise CapsuleVerificationError("capsule seal artifacts are missing") from exc
     entries = _parse_listing(listing)
     provenance_root = hashlib.sha256(listing).hexdigest()
@@ -233,5 +419,7 @@ def provenance_root(root: Path) -> str:
 
     verify_checksums(root)
     capsule = _capsule_root(root)
-    value = json.loads((capsule / "provenance-root.json").read_text(encoding="utf-8"))
+    value = json.loads(
+        _read_regular_bytes(capsule / "provenance-root.json").decode("utf-8")
+    )
     return str(value["provenance_root"])
