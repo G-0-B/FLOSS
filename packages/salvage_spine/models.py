@@ -49,6 +49,24 @@ class CapsuleRecord:
     exclusions: tuple[str, ...]
     status: ResultStatus
 
+    def __post_init__(self) -> None:
+        """Reject incomplete or ambiguous six-plane capsule metadata."""
+
+        expected = set(PlaneId)
+        actual = [
+            record.plane_id
+            for record in self.planes
+            if isinstance(record, PlaneRecord)
+        ]
+        if (
+            len(self.planes) != len(expected)
+            or len(actual) != len(self.planes)
+            or any(not isinstance(plane_id, PlaneId) for plane_id in actual)
+            or len(set(actual)) != len(actual)
+            or set(actual) != expected
+        ):
+            raise ValueError("planes must contain exactly one record for every PlaneId")
+
 
 def canonical_json_bytes(value: object) -> bytes:
     """Serialize *value* as stable compact UTF-8 JSON plus one newline."""
