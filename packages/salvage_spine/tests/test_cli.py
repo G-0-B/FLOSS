@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
@@ -7,9 +8,11 @@ import sys
 
 import pytest
 
+from packages.salvage_spine import cli as cli_module
 from packages.salvage_spine.cli import main
 from packages.salvage_spine.checkpoint import load_latest_checkpoint
-from packages.salvage_spine.models import ResultStatus
+from packages.salvage_spine.models import ResultStatus, canonical_json_bytes
+from packages.salvage_spine.tests.test_github_projection import _verification
 from packages.salvage_spine.tests.test_seal_restore import git
 
 
@@ -170,7 +173,7 @@ def test_cli_flow_capture_verify_stops_before_inventory_when_blocked(
     assert after_capture == before
     capture_stdout = json.loads(capsys.readouterr().out)
     assert capture_stdout["phase"] == "capture-complete"
-    assert capture_stdout["state_id"] == "capsule-state-1"
+    assert capture_stdout["state_id"].startswith("capsule-")
 
     checkpoint = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
     assert checkpoint.phase == "capture-complete"
@@ -300,6 +303,122 @@ def test_blocked_verification_is_repeatable_without_rewriting_evidence(
         state_dir / "capsule" / "verification.json"
     ).read_bytes() == verification_before
     assert (state_dir / "checkpoints.jsonl").read_bytes() == checkpoints_before
+
+
+def test_pass_flow_inventory_render_and_overlap_guards(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, main_sha, pr_sha = _build_repo(tmp_path)
+    state_dir = tmp_path / "pass-state"
+    assert (
+        main(
+            [
+                "capture",
+                "--repo",
+                str(repo),
+                "--remote-main-sha",
+                main_sha,
+                "--pr-head-sha",
+                pr_sha,
+                "--output",
+                str(state_dir),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    captured = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+
+    def pass_verification(capsule: Path, restore: Path, **_: object):
+        record = replace(
+            _verification(remote_main_sha=main_sha, pr_head_sha=pr_sha),
+            provenance_root=captured.capsule_root,
+        )
+        (capsule / "verification.json").write_bytes(canonical_json_bytes(record))
+        return record
+
+    monkeypatch.setattr(cli_module, "restore_and_verify", pass_verification)
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "pass-restore"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert main(["inventory", "--capsule", str(state_dir)]) == 0
+    capsys.readouterr()
+
+    checkpoint = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+    manifest = json.loads((state_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert checkpoint.state_id == manifest["state_id"]
+    assert "<" not in checkpoint.next_safe_command
+    assert main(["status", "--capsule", str(state_dir)]) == 0
+    assert json.loads(capsys.readouterr().out)["blockers"] == []
+
+    failed_output = tmp_path / "failed-render"
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            cli_module,
+            "render_check_summary",
+            lambda evidence: (_ for _ in ()).throw(ValueError("invalid evidence")),
+        )
+        assert (
+            main(
+                [
+                    "render-github",
+                    "--capsule",
+                    str(state_dir),
+                    "--output",
+                    str(failed_output),
+                ]
+            )
+            == 1
+        )
+    capsys.readouterr()
+    assert not failed_output.exists()
+
+    inside_capsule = state_dir / "capsule" / "render-inside"
+    assert (
+        main(
+            [
+                "render-github",
+                "--capsule",
+                str(state_dir),
+                "--output",
+                str(inside_capsule),
+            ]
+        )
+        == 1
+    )
+    assert "overlaps" in capsys.readouterr().err
+    assert not inside_capsule.exists()
+
+    output = tmp_path / "projection"
+    assert (
+        main(
+            [
+                "render-github",
+                "--capsule",
+                str(state_dir),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["phase"] == "projection-rendered"
+    assert (output / "check-summary.json").is_file()
+    assert (output / "stop-merge-comment.md").is_file()
 
 
 def test_script_help_matches_main_surface(tmp_path: Path) -> None:
