@@ -90,6 +90,10 @@ def _verification(
     *,
     status: ResultStatus = ResultStatus.PASS,
     blockers: tuple[str, ...] = (),
+    planes: tuple[PlaneRestoreResult, ...] | None = None,
+    commit_match: bool = True,
+    tree_match: bool = True,
+    artifact_match: bool = True,
 ) -> VerificationRecord:
     return VerificationRecord(
         schema_version="1",
@@ -97,10 +101,10 @@ def _verification(
         provenance_root="a" * 64,
         status=status,
         checksum_status=ResultStatus.PASS,
-        planes=tuple(_plane(plane_id) for plane_id in PlaneId),
-        commit_match=True,
-        tree_match=True,
-        artifact_match=True,
+        planes=planes or tuple(_plane(plane_id) for plane_id in PlaneId),
+        commit_match=commit_match,
+        tree_match=tree_match,
+        artifact_match=artifact_match,
         blockers=blockers,
     )
 
@@ -151,12 +155,21 @@ def _evidence(
     verification_blockers: tuple[str, ...] = (),
     next_safe_command: str = "python -m pytest packages/salvage_spine/tests -q",
     evidence_locations: dict[str, str] | None = None,
+    planes: tuple[PlaneRestoreResult, ...] | None = None,
+    commit_match: bool = True,
+    tree_match: bool = True,
+    artifact_match: bool = True,
+    manifest: dict[str, object] | None = None,
 ) -> Evidence:
     verification = _verification(
         status=verification_status,
         blockers=verification_blockers,
+        planes=planes,
+        commit_match=commit_match,
+        tree_match=tree_match,
+        artifact_match=artifact_match,
     )
-    manifest = _manifest(
+    manifest = manifest or _manifest(
         classification_state=classification_state,
         primary_lane=primary_lane,
         disposition=None if classification_state == "captured" else "park",
@@ -254,6 +267,144 @@ def test_projection_renders_unclassified_and_protected_lane_counts() -> None:
     assert "NOT READY FOR CONTAINMENT" in text
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"checkpoint_blockers": ("manual-review-pending",)},
+        {"verification_blockers": ("restore-output-incomplete",)},
+        {"classification_state": "captured"},
+        {"primary_lane": "consensus-gateway"},
+    ],
+)
+def test_preservation_never_passes_when_blocked_or_unclassified_work_exists(
+    overrides: dict[str, object],
+) -> None:
+    summary = render_check_summary(_evidence(**overrides))
+    assert summary["preservation"]["status"] == ResultStatus.BLOCKED.value
+    assert "NOT READY FOR CONTAINMENT" in render_stop_merge_comment(
+        _evidence(**overrides)
+    )
+
+
+@pytest.mark.parametrize(
+    "planes",
+    [
+        (_plane(PlaneId.REMOTE_MAIN, status=ResultStatus.BLOCKED),),
+        tuple(_plane(plane_id) for plane_id in tuple(PlaneId)[:-1]),
+        tuple(
+            list(_plane(plane_id) for plane_id in PlaneId)
+            + [_plane(PlaneId.REMOTE_MAIN)]
+        ),
+    ],
+)
+def test_contradictory_plane_sets_fail_closed(
+    planes: tuple[PlaneRestoreResult, ...],
+) -> None:
+    with pytest.raises(ValueError, match="plane|verification"):
+        render_check_summary(_evidence(planes=planes))
+
+
+def test_unknown_plane_value_fails_closed() -> None:
+    forged = PlaneRestoreResult(
+        plane_id="unexpected-plane",  # type: ignore[arg-type]
+        subject_id="a" * 40,
+        status=ResultStatus.PASS,
+        commit_match=True,
+        tree_match=True,
+        parent_match=True,
+        mode_path_match=True,
+        object_reachability=True,
+        tree_id="b" * 40,
+        parents_digest="c" * 64,
+        mode_path_digest="d" * 64,
+        evidence_digest="e" * 64,
+        artifact_digests=(("artifact.json", "f" * 64),),
+        artifact_match=True,
+        payload_digest="1" * 64,
+        payload_count=1,
+        blockers=(),
+    )
+    with pytest.raises(ValueError, match="plane|verification"):
+        render_check_summary(_evidence(planes=(forged,)))
+
+
+@pytest.mark.parametrize("status", [ResultStatus.FAIL, ResultStatus.BLOCKED])
+def test_any_non_pass_plane_blocks_preservation_even_when_aggregate_flags_are_green(
+    status: ResultStatus,
+) -> None:
+    planes = tuple(
+        _plane(
+            plane_id,
+            status=status if plane_id is PlaneId.LOCAL_TRACKED else ResultStatus.PASS,
+        )
+        for plane_id in PlaneId
+    )
+    summary = render_check_summary(
+        _evidence(
+            planes=planes,
+            verification_status=ResultStatus.PASS,
+            commit_match=True,
+            tree_match=True,
+            artifact_match=True,
+        )
+    )
+    assert summary["preservation"]["status"] != ResultStatus.PASS.value
+    assert "NOT READY FOR CONTAINMENT" in render_stop_merge_comment(
+        _evidence(
+            planes=planes,
+            verification_status=ResultStatus.PASS,
+            commit_match=True,
+            tree_match=True,
+            artifact_match=True,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("commit_match", "tree_match", "artifact_match"),
+    [
+        (False, True, True),
+        (True, False, True),
+        (True, True, False),
+    ],
+)
+def test_forged_aggregate_green_flags_cannot_elevate_preservation(
+    commit_match: bool,
+    tree_match: bool,
+    artifact_match: bool,
+) -> None:
+    summary = render_check_summary(
+        _evidence(
+            commit_match=commit_match,
+            tree_match=tree_match,
+            artifact_match=artifact_match,
+        )
+    )
+    assert summary["preservation"]["status"] != ResultStatus.PASS.value
+
+
+def test_manifest_graph_contradictions_fail_closed() -> None:
+    manifest = _manifest()
+    manifest["atoms"].append(dict(manifest["atoms"][0]))
+    manifest["items"].append(dict(manifest["items"][0]))
+    with pytest.raises(ValueError, match="manifest"):
+        render_check_summary(_evidence(manifest=manifest))
+
+
+def test_raw_string_cannot_masquerade_as_result_status() -> None:
+    evidence = _evidence()
+    forged = Evidence(
+        verification=evidence.verification,
+        checkpoint=evidence.checkpoint,
+        manifest=evidence.manifest,
+        absolute_core_status="PASS",  # type: ignore[arg-type]
+        regression_core_status=ResultStatus.PASS,
+        evidence_locations=evidence.evidence_locations,
+    )
+    with pytest.raises(ValueError, match="ResultStatus"):
+        render_check_summary(forged)
+
+
 def test_projection_is_deterministic_and_pure_for_pass_case(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -305,10 +456,21 @@ def test_projection_sanitizes_markdown_html_paths_and_secret_like_strings() -> N
     "unsafe_location",
     [
         "../private/verification.json",
+        "artifacts/verification.json#frag",
+        "artifacts/manifest.json?raw=1",
+        "artifacts/%2e%2e/secret.json",
         "file:///C:/secret.txt",
         r"C:\secret.txt",
         r"\\server\share\secret.txt",
         "https://example.invalid/projection",
+        "artifacts/%252e%252e/secret.json",
+        "artifacts/..%2fsecret.json",
+        "artifacts/%E2%88%95secret.json",
+        "artifacts\\secret.json",
+        "<https://example.invalid/projection>",
+        "![img](artifacts/x.png)",
+        "[x](artifacts/y.json)",
+        "<img src='artifacts/x.json'>",
     ],
 )
 def test_projection_rejects_traversal_and_url_scheme_locations(
@@ -324,6 +486,53 @@ def test_projection_rejects_traversal_and_url_scheme_locations(
                 }
             )
         )
+
+
+@pytest.mark.parametrize(
+    "hostile_text",
+    [
+        "<script>alert(1)</script>",
+        "![img](file:///secret)",
+        "[click](https://example.invalid)",
+        "<https://example.invalid>",
+        "<img src='x'>",
+        "Bearer abc.def",
+        "token=shhh",
+        "-----BEGIN PRIVATE KEY-----",
+        "gh pr comment 38 --body boom",
+        "curl -X POST https://example.invalid",
+    ],
+)
+def test_hostile_renderable_field_content_does_not_survive_output(
+    hostile_text: str,
+) -> None:
+    text = render_stop_merge_comment(
+        _evidence(
+            checkpoint_blockers=(hostile_text,),
+            verification_blockers=(hostile_text,),
+        )
+    )
+    assert hostile_text not in text
+    assert "file://" not in text
+    assert "https://example.invalid" not in text
+    assert "gh pr comment" not in text
+    assert "curl -X POST" not in text
+
+
+@pytest.mark.parametrize(
+    "unsafe_command",
+    [
+        "gh pr comment 38 --body nope",
+        "curl -X POST https://example.invalid",
+        r"C:\temp\run.ps1",
+        "python scripts/pr38_salvage.py status#frag",
+    ],
+)
+def test_mutating_or_unsafe_next_safe_commands_are_rejected(
+    unsafe_command: str,
+) -> None:
+    with pytest.raises(ValueError, match="unsafe|command|path"):
+        render_stop_merge_comment(_evidence(next_safe_command=unsafe_command))
 
 
 def test_template_is_proposed_noncanonical_and_has_no_remote_api_command() -> None:
