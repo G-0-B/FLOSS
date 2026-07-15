@@ -14,6 +14,7 @@
     "input_shas",
     "capsule_root",
     "manifest_digest",
+    "verification_digest",
     "completed_actions",
     "blockers",
     "human_decisions",
@@ -31,8 +32,14 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "digest": {"$ref": "#/$defs/digest"},
-    "state_id": {"type": "string", "minLength": 1},
-    "phase": {"type": "string", "minLength": 1},
+    "state_id": {
+      "type": "string",
+      "pattern": "^(?=.*\\S)[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "phase": {
+      "type": "string",
+      "pattern": "^(?=.*\\S)[^\\u0000-\\u001f\\u007f]+$"
+    },
     "input_shas": {
       "type": "object",
       "additionalProperties": {
@@ -42,6 +49,10 @@
     },
     "capsule_root": {"$ref": "#/$defs/digest"},
     "manifest_digest": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "verification_digest": {
       "type": ["string", "null"],
       "pattern": "^[0-9a-f]{64}$"
     },
@@ -57,8 +68,14 @@
       "type": "array",
       "items": {"type": "string"}
     },
-    "next_safe_command": {"type": "string", "minLength": 1},
-    "recovery_command": {"type": "string", "minLength": 1}
+    "next_safe_command": {
+      "type": "string",
+      "pattern": "^(?=.*\\S)[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "recovery_command": {
+      "type": "string",
+      "pattern": "^(?=.*\\S)[^\\u0000-\\u001f\\u007f]+$"
+    }
   },
   "allOf": [
     {

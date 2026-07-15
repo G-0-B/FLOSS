@@ -457,7 +457,54 @@ def test_contract_schemas_are_strict_and_encode_state_rules():
     }
     assert checkpoint["additionalProperties"] is False
     assert len(checkpoint["allOf"]) == 2
+    assert "verification_digest" in checkpoint["required"]
+    assert checkpoint["properties"]["verification_digest"]["type"] == ["string", "null"]
+    assert (
+        checkpoint["properties"]["verification_digest"]["pattern"] == "^[0-9a-f]{64}$"
+    )
     assert (
         checkpoint["properties"]["input_shas"]["additionalProperties"]["pattern"]
         == "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
     )
+
+
+def test_checkpoint_schema_requires_explicit_verification_digest_field() -> None:
+    spec_root = Path(__file__).resolve().parents[3] / "docs" / "superpowers" / "specs"
+    schema = json.loads(
+        (spec_root / "pr38-checkpoint.schema.json").read_text(encoding="utf-8")
+    )
+    validator = Draft202012Validator(schema)
+    valid = {
+        "schema_version": "1.0.0",
+        "sequence": 0,
+        "previous_digest": None,
+        "digest": "0" * 64,
+        "state_id": "capsule-state-1",
+        "phase": "capture-complete",
+        "input_shas": {"remote_main": "1" * 40},
+        "capsule_root": "2" * 64,
+        "manifest_digest": "3" * 64,
+        "verification_digest": None,
+        "completed_actions": ["captured-six-planes"],
+        "blockers": ["restore-pending"],
+        "human_decisions": ["preserve-read-only-first"],
+        "next_safe_command": "python -m pytest packages/salvage_spine/tests -q",
+        "recovery_command": "python scripts/rebuild_capsule.py --state capsule-state-1",
+    }
+
+    validator.validate(valid)
+
+    invalid = dict(valid)
+    del invalid["verification_digest"]
+    with pytest.raises(ValidationError):
+        validator.validate(invalid)
+
+    invalid = dict(valid)
+    invalid["verification_digest"] = "A" * 64
+    with pytest.raises(ValidationError):
+        validator.validate(invalid)
+
+    invalid = dict(valid)
+    invalid["verification_digest"] = "a" * 63
+    with pytest.raises(ValidationError):
+        validator.validate(invalid)
