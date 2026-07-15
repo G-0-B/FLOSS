@@ -4,7 +4,7 @@
 
 **Goal:** Build the first reversible slice of the PR #38 salvage spine: six-plane local capture, authenticated capsule verification, complete change-universe inventory, resumable checkpoints, and sanitized GitHub-facing evidence projections without mutating PR #38.
 
-**Architecture:** A small standard-library Python package under `packages/salvage_spine/` owns deterministic models, Git capture, sealing, restoration, manifest inventory, and rendering. A thin registered script exposes the CLI. Runtime capsules live beneath ignored `.agent-surface/salvage/pr38/`, keyed by a generated state ID; tracked schemas, tests, and a proposed stop-merge template define the contract. GitHub is a projection surface in this slice: no workflow, PR comment, Draft transition, branch rewrite, or required-check mutation occurs.
+**Architecture:** A small standard-library Python package under `packages/salvage_spine/` owns deterministic models, Git capture, sealing, restoration, manifest inventory, and rendering. A thin registered script exposes the CLI. Runtime capsules live outside the workspace beneath `C:\~shit\_pr38_salvage_capsules\pr38\`, keyed by a generated state ID; tracked schemas, tests, and a proposed stop-merge template define the contract. Only sanitized projections may be copied into `.agent-surface/`. GitHub is a projection surface in this slice: no workflow, PR comment, Draft transition, branch rewrite, or required-check mutation occurs.
 
 **Tech Stack:** Python 3.11+ standard library, Git CLI, pytest, JSON Schema draft 2020-12 documents, SHA-256, Git bundles, Markdown/JSON projections.
 
@@ -40,7 +40,7 @@
 - Create `docs/superpowers/specs/pr38-salvage-manifest.schema.json`: inventory and classification contract.
 - Create `docs/superpowers/specs/pr38-checkpoint.schema.json`: continuation contract.
 - Create `docs/superpowers/templates/pr38-stop-merge-comment.md`: proposed, non-canonical comment template.
-- Create `.agent-surface/salvage/pr38/` only at runtime; never commit capsule payloads.
+- Create `C:\~shit\_pr38_salvage_capsules\pr38\` only at runtime; never place capsule payloads inside a captured workspace or commit them.
 
 ---
 
@@ -567,7 +567,7 @@ git commit -m "test: prove PR38 preservation capsule flow"
 ### Task 10: Live Readiness Audit Without Containment
 
 **Files:**
-- Runtime only: `.agent-surface/salvage/pr38/` followed by the generated state ID
+- Runtime only: `C:\~shit\_pr38_salvage_capsules\pr38\` followed by the generated state ID
 - Modify only if evidence exposes a defect: the smallest owning package/test file.
 
 **Interfaces:**
@@ -586,7 +586,7 @@ Run in PowerShell after fetching PR #38 into `refs/salvage/pr38`:
 $main = git -c safe.directory=C:/~shit/FLOSS -C C:/~shit/FLOSS rev-parse origin/main
 $pr = git -c safe.directory=C:/~shit/FLOSS -C C:/~shit/FLOSS rev-parse refs/salvage/pr38
 $state = (Get-Date -Format 'yyyyMMddTHHmmss') + '-' + $main.Substring(0, 12) + '-' + $pr.Substring(0, 12)
-$output = "C:/~shit/FLOSS/.agent-surface/salvage/pr38/$state"
+$output = "C:/~shit/_pr38_salvage_capsules/pr38/$state"
 python scripts/pr38_salvage.py capture --repo C:/~shit/FLOSS --remote-main-sha $main --pr-head-sha $pr --output $output
 ```
 
@@ -616,7 +616,7 @@ Expected baseline: repository-wide FAIL on 10 pre-existing unregistered governed
 
 - [ ] **Step 6: Commit only code or test corrections**
 
-Never commit `.agent-surface/salvage/` payloads. If no defect was found, make no empty commit.
+Never copy capsule payloads into the workspace or commit them. If no defect was found, make no empty commit.
 
 ## Explicit Follow-On Plans
 
