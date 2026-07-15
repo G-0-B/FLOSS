@@ -77,6 +77,13 @@ _PRIVATE_KEY_RE = re.compile(r"(?i)-{2,}\s*begin [a-z0-9 _-]*private key\s*-{2,}
 _SAFE_LOCATION_SEGMENT_RE = re.compile(r"[a-z0-9][a-z0-9._-]*\Z")
 _SAFE_LOCATION_EXTENSIONS = frozenset({"json", "jsonl", "log", "md", "sha256", "txt"})
 _EXPECTED_PLANE_IDS = tuple(PlaneId)
+_HISTORY_PLANE_IDS = frozenset(
+    {
+        PlaneId.REMOTE_MAIN,
+        PlaneId.REMOTE_PR,
+        PlaneId.LOCAL_HISTORY,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -261,8 +268,6 @@ def _prepare_evidence(evidence: Evidence) -> _PreparedEvidence:
         raise ProjectionValidationError(
             "verification digest does not match verification payload"
         )
-    _validate_verification_record(evidence.verification)
-
     remote_main_sha = _require_sha(
         evidence.checkpoint.input_shas.get("remote_main"),
         "checkpoint.input_shas.remote_main",
@@ -270,6 +275,11 @@ def _prepare_evidence(evidence: Evidence) -> _PreparedEvidence:
     pr_head_sha = _require_sha(
         evidence.checkpoint.input_shas.get("pr_head"),
         "checkpoint.input_shas.pr_head",
+    )
+    _validate_verification_record(
+        evidence.verification,
+        remote_main_sha=remote_main_sha,
+        pr_head_sha=pr_head_sha,
     )
     next_safe_command = _sanitize_command(evidence.checkpoint.next_safe_command)
     evidence_locations = _normalize_locations(evidence.evidence_locations)
@@ -577,7 +587,12 @@ def _contains_unsafe_text(value: str) -> bool:
     )
 
 
-def _validate_verification_record(verification: VerificationRecord) -> None:
+def _validate_verification_record(
+    verification: VerificationRecord,
+    *,
+    remote_main_sha: str,
+    pr_head_sha: str,
+) -> None:
     if not isinstance(verification.checksum_status, ResultStatus):
         raise ProjectionValidationError(
             "verification.checksum_status must be a ResultStatus"
@@ -589,6 +604,10 @@ def _validate_verification_record(verification: VerificationRecord) -> None:
         raise ProjectionValidationError("verification planes must be a tuple")
 
     seen: set[PlaneId] = set()
+    checkpoint_subjects = {
+        PlaneId.REMOTE_MAIN: remote_main_sha,
+        PlaneId.REMOTE_PR: pr_head_sha,
+    }
     for plane in verification.planes:
         if not isinstance(plane, PlaneRestoreResult):
             raise ProjectionValidationError(
@@ -605,6 +624,17 @@ def _validate_verification_record(verification: VerificationRecord) -> None:
             raise ProjectionValidationError("verification plane blockers are invalid")
         if any(not isinstance(blocker, str) for blocker in plane.blockers):
             raise ProjectionValidationError("verification plane blockers are invalid")
+        if plane.plane_id in _HISTORY_PLANE_IDS:
+            subject_id = _require_sha(
+                plane.subject_id,
+                f"verification.planes.{plane.plane_id.value}.subject_id",
+            )
+            expected_subject = checkpoint_subjects.get(plane.plane_id)
+            if expected_subject is not None and subject_id != expected_subject:
+                raise ProjectionValidationError(
+                    f"verification.planes.{plane.plane_id.value}.subject_id does not "
+                    "match locked checkpoint sha"
+                )
     if tuple(sorted(seen, key=lambda plane_id: plane_id.value)) != tuple(
         sorted(_EXPECTED_PLANE_IDS, key=lambda plane_id: plane_id.value)
     ):
