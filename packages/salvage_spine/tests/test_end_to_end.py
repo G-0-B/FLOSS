@@ -36,15 +36,36 @@ class _Invocation:
 
 
 @dataclass(frozen=True)
+class _ExpectedLocalDeltas:
+    staged_diff: bytes
+    tracked_unstaged_diff: bytes
+
+
+@dataclass(frozen=True)
+class _DirectorySnapshot:
+    root_identity: tuple[int, int, int, int, bytes]
+    entries: tuple[tuple[str, tuple[int, int, int, int, bytes]], ...]
+
+
+@dataclass(frozen=True)
 class _SourceSnapshot:
     repository_identity: tuple[int, int, int, int, bytes]
-    git_directory_identity: tuple[int, int, int, int, bytes]
+    git_marker_identity: tuple[int, int, int, int, bytes]
+    git_directory: _DirectorySnapshot
+    git_common_directory: _DirectorySnapshot
     head_file: tuple[int, int, int, int, bytes]
     head_sha: bytes
     refs: bytes
     index: tuple[int, int, int, int, bytes]
     config: tuple[int, int, int, int, bytes]
     worktree: tuple[tuple[str, tuple[int, int, int, int, bytes]], ...]
+
+
+_STAGED_PATH = "staged.txt"
+_STAGED_CONTENT = b"staged content\n"
+_TRACKED_PATH = "local.txt"
+_TRACKED_INDEX_CONTENT = b"local committed content\n"
+_TRACKED_WORKTREE_CONTENT = b"tracked unstaged content\n"
 
 
 def _run(*command: str, cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
@@ -61,6 +82,29 @@ def _git(repo: Path, *args: str) -> bytes:
     return _run("git", "-C", str(repo), *args).stdout
 
 
+def _required_local_deltas(repo: Path) -> _ExpectedLocalDeltas:
+    staged_names = _git(repo, "diff", "--cached", "--name-only", "-z")
+    tracked_names = _git(repo, "diff-files", "--name-only", "-z")
+    assert staged_names == _STAGED_PATH.encode("utf-8") + b"\0"
+    assert tracked_names == _TRACKED_PATH.encode("utf-8") + b"\0"
+    assert (repo / _STAGED_PATH).read_bytes() == _STAGED_CONTENT
+    assert _git(repo, "show", f":{_STAGED_PATH}") == _STAGED_CONTENT
+    assert (repo / _TRACKED_PATH).read_bytes() == _TRACKED_WORKTREE_CONTENT
+    assert _git(repo, "show", f":{_TRACKED_PATH}") == _TRACKED_INDEX_CONTENT
+
+    staged_diff = _git(repo, "diff", "--binary", "--cached")
+    tracked_unstaged_diff = _git(repo, "diff-files", "--binary")
+    assert b"diff --git a/staged.txt b/staged.txt\n" in staged_diff
+    assert b"+staged content\n" in staged_diff
+    assert b"diff --git a/local.txt b/local.txt\n" in tracked_unstaged_diff
+    assert b"-local committed content\n" in tracked_unstaged_diff
+    assert b"+tracked unstaged content\n" in tracked_unstaged_diff
+    return _ExpectedLocalDeltas(
+        staged_diff=staged_diff,
+        tracked_unstaged_diff=tracked_unstaged_diff,
+    )
+
+
 def _commit_file(repo: Path, path: str, content: bytes, message: str) -> str:
     target = repo / path
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -70,9 +114,11 @@ def _commit_file(repo: Path, path: str, content: bytes, message: str) -> str:
     return _git(repo, "rev-parse", "HEAD").decode("ascii").strip()
 
 
-def _build_repository(tmp_path: Path) -> _RepositoryFixture:
+def _build_repository(
+    tmp_path: Path, *, linked_worktree: bool = False
+) -> _RepositoryFixture:
     origin = tmp_path / "origin.git"
-    repo = tmp_path / "source"
+    repo = tmp_path / ("primary" if linked_worktree else "source")
     _run("git", "init", "--bare", "--initial-branch=main", str(origin))
     _run("git", "init", "--initial-branch=main", str(repo))
     _git(repo, "config", "user.email", "task9@example.invalid")
@@ -105,9 +151,15 @@ def _build_repository(tmp_path: Path) -> _RepositoryFixture:
         b"local committed content\n",
         "local only change",
     )
-    (repo / "staged.txt").write_bytes(b"staged content\n")
-    _git(repo, "add", "--", "staged.txt")
-    (repo / "local.txt").write_bytes(b"tracked unstaged content\n")
+    if linked_worktree:
+        primary = repo
+        _git(primary, "checkout", "main")
+        repo = tmp_path / "source"
+        _git(primary, "worktree", "add", str(repo), "pr38")
+
+    (repo / _STAGED_PATH).write_bytes(_STAGED_CONTENT)
+    _git(repo, "add", "--", _STAGED_PATH)
+    (repo / _TRACKED_PATH).write_bytes(_TRACKED_WORKTREE_CONTENT)
     (repo / "ordinary.txt").write_bytes(b"ordinary untracked content\n")
     (repo / "ignored").mkdir()
     (repo / "ignored" / "cache.bin").write_bytes(b"ignored content\n")
@@ -168,16 +220,34 @@ def _tree_snapshot(
     return tuple(entries)
 
 
+def _resolved_git_path(repo: Path, *args: str) -> Path:
+    raw_path = _git(repo, "rev-parse", "--path-format=absolute", *args)
+    return Path(
+        raw_path.rstrip(b"\r\n").decode("utf-8", errors="surrogateescape")
+    ).resolve(strict=True)
+
+
+def _directory_snapshot(root: Path) -> _DirectorySnapshot:
+    return _DirectorySnapshot(
+        root_identity=_path_identity(root),
+        entries=_tree_snapshot(root),
+    )
+
+
 def _source_snapshot(repo: Path) -> _SourceSnapshot:
-    git_directory = repo / ".git"
+    git_marker = repo / ".git"
+    git_directory = _resolved_git_path(repo, "--git-dir")
+    git_common_directory = _resolved_git_path(repo, "--git-common-dir")
     return _SourceSnapshot(
         repository_identity=_path_identity(repo),
-        git_directory_identity=_path_identity(git_directory),
-        head_file=_path_identity(git_directory / "HEAD"),
+        git_marker_identity=_path_identity(git_marker),
+        git_directory=_directory_snapshot(git_directory),
+        git_common_directory=_directory_snapshot(git_common_directory),
+        head_file=_path_identity(_resolved_git_path(repo, "--git-path", "HEAD")),
         head_sha=_git(repo, "rev-parse", "HEAD"),
         refs=_git(repo, "show-ref", "--head"),
-        index=_path_identity(git_directory / "index"),
-        config=_path_identity(git_directory / "config"),
+        index=_path_identity(_resolved_git_path(repo, "--git-path", "index")),
+        config=_path_identity(_resolved_git_path(repo, "--git-path", "config")),
         worktree=_tree_snapshot(repo, excluded_roots=frozenset({".git"})),
     )
 
@@ -198,11 +268,15 @@ def _all_file_bytes(root: Path) -> bytes:
     )
 
 
+@pytest.mark.parametrize("linked_worktree", [False, True], ids=["normal", "linked"])
 def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    linked_worktree: bool,
 ) -> None:
-    fixture = _build_repository(tmp_path)
+    fixture = _build_repository(tmp_path, linked_worktree=linked_worktree)
+    assert (fixture.repo / ".git").is_file() is linked_worktree
+    expected_deltas = _required_local_deltas(fixture.repo)
     state_dir = tmp_path / "task9-state"
     restore_dir = tmp_path / "clean-room"
     projection_dir = tmp_path / "github-projection"
@@ -310,6 +384,15 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
         "verification": "unverifiable-redacted",
     }
 
+    captured_staged_diff = (
+        capsule / PlaneId.LOCAL_INDEX.value / "staged.diff"
+    ).read_bytes()
+    captured_tracked_unstaged_diff = (
+        capsule / PlaneId.LOCAL_TRACKED.value / "unstaged.diff"
+    ).read_bytes()
+    assert captured_staged_diff == expected_deltas.staged_diff
+    assert captured_tracked_unstaged_diff == expected_deltas.tracked_unstaged_diff
+
     local_manifest = json.loads(
         (capsule / PlaneId.LOCAL_UNTRACKED.value / "manifest.json").read_text("utf-8")
     )
@@ -356,6 +439,20 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
     assert restored_planes[PlaneId.LOCAL_UNTRACKED.value]["blockers"] == [
         "redacted-evidence-ineligible"
     ]
+    index_artifact_digests = dict(
+        restored_planes[PlaneId.LOCAL_INDEX.value]["artifact_digests"]
+    )
+    tracked_artifact_digests = dict(
+        restored_planes[PlaneId.LOCAL_TRACKED.value]["artifact_digests"]
+    )
+    assert (
+        index_artifact_digests["staged.diff"]
+        == hashlib.sha256(expected_deltas.staged_diff).hexdigest()
+    )
+    assert (
+        tracked_artifact_digests["unstaged.diff"]
+        == hashlib.sha256(expected_deltas.tracked_unstaged_diff).hexdigest()
+    )
 
     assert verify.returncode == 1
     assert verify.stderr == ""
@@ -433,3 +530,33 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
     assert _tree_snapshot(fixture.origin) == origin_before
     assert _git(fixture.repo, "remote", "get-url", "origin") == fixture.remote_url
     assert _git(fixture.origin, "show-ref") == origin_refs_before
+
+
+@pytest.mark.parametrize("linked_worktree", [False, True], ids=["normal", "linked"])
+def test_source_snapshot_detects_hidden_git_directory_mutation(
+    tmp_path: Path,
+    linked_worktree: bool,
+) -> None:
+    fixture = _build_repository(tmp_path, linked_worktree=linked_worktree)
+    before = _source_snapshot(fixture.repo)
+
+    mutation = _resolved_git_path(fixture.repo, "--git-dir")
+    (mutation / "TASK9_UNMONITORED_MUTATION").write_bytes(b"hidden mutation\n")
+
+    assert _source_snapshot(fixture.repo) != before
+
+
+@pytest.mark.parametrize("missing_state", ["staged", "tracked-unstaged"])
+def test_required_local_delta_probe_rejects_missing_state(
+    tmp_path: Path,
+    missing_state: str,
+) -> None:
+    fixture = _build_repository(tmp_path)
+    assert _required_local_deltas(fixture.repo)
+    if missing_state == "staged":
+        _git(fixture.repo, "reset", "--", _STAGED_PATH)
+    else:
+        (fixture.repo / _TRACKED_PATH).write_bytes(_TRACKED_INDEX_CONTENT)
+
+    with pytest.raises(AssertionError):
+        _required_local_deltas(fixture.repo)
