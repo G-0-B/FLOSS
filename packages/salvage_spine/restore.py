@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import stat
 import subprocess
@@ -18,13 +20,38 @@ from .models import (
     ResultStatus,
     canonical_json_bytes,
 )
-from .seal import CapsuleVerificationError, provenance_root, verify_checksums
+from .seal import (
+    CapsuleVerificationError,
+    _atomic_write_fixed,
+    _hash_regular_file,
+    _read_regular_bytes,
+    _walk_regular_files,
+    provenance_root,
+    verify_checksums,
+)
 
 _HISTORY_PLANES = (
     PlaneId.REMOTE_MAIN,
     PlaneId.REMOTE_PR,
     PlaneId.LOCAL_HISTORY,
 )
+
+
+def _git_environment() -> dict[str, str]:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
+    environment.update(
+        {
+            "GIT_CONFIG_COUNT": "0",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+    )
+    return environment
 
 
 @dataclass(frozen=True)
@@ -44,6 +71,9 @@ class PlaneRestoreResult:
     mode_path_digest: str | None
     evidence_digest: str
     artifact_digests: tuple[tuple[str, str], ...]
+    artifact_match: bool | None
+    payload_digest: str | None
+    payload_count: int | None
     blockers: tuple[str, ...]
 
 
@@ -69,6 +99,7 @@ def _run_git(repo: Path, *args: str) -> bytes:
             ["git", "-C", str(repo), *args],
             check=True,
             capture_output=True,
+            env=_git_environment(),
             shell=False,
         ).stdout
     except subprocess.CalledProcessError as exc:
@@ -81,6 +112,7 @@ def _run_git_all_output(repo: Path, *args: str) -> bytes:
             ["git", "-C", str(repo), *args],
             check=True,
             capture_output=True,
+            env=_git_environment(),
             shell=False,
         )
     except subprocess.CalledProcessError as exc:
@@ -102,6 +134,7 @@ def _initialize_bare(repo: Path, object_format: str) -> None:
             ],
             check=True,
             capture_output=True,
+            env=_git_environment(),
             shell=False,
         )
     except subprocess.CalledProcessError as exc:
@@ -110,9 +143,34 @@ def _initialize_bare(repo: Path, object_format: str) -> None:
         ) from exc
 
 
+def _verify_repository_layout(repository: Path) -> None:
+    repository_root = repository.resolve(strict=True)
+    queries = (
+        ("rev-parse", "--absolute-git-dir"),
+        ("rev-parse", "--git-common-dir"),
+        ("rev-parse", "--git-path", "objects"),
+    )
+    for query in queries:
+        try:
+            rendered = _run_git(repository, *query).strip().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise CapsuleVerificationError("effective Git path is not UTF-8") from exc
+        effective = Path(rendered)
+        if not effective.is_absolute():
+            effective = repository / effective
+        try:
+            resolved = effective.resolve(strict=True)
+        except OSError as exc:
+            raise CapsuleVerificationError("effective Git path is unavailable") from exc
+        if resolved != repository_root and not resolved.is_relative_to(repository_root):
+            raise CapsuleVerificationError(
+                "effective Git path escapes the plane destination"
+            )
+
+
 def _canonical_json(path: Path) -> dict[str, object] | list[object]:
     try:
-        content = path.read_bytes()
+        content = _read_regular_bytes(path)
         value = json.loads(content.decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CapsuleVerificationError("capsule metadata is malformed") from exc
@@ -159,12 +217,12 @@ def _disposition_record(
 def _plane_evidence_digest(plane_root: Path) -> str:
     digest = hashlib.sha256(b"salvage-restore-plane-evidence-v1\0")
     files = sorted(
-        (path for path in plane_root.rglob("*") if path.is_file()),
+        _walk_regular_files(plane_root, excluded_root_names=frozenset()),
         key=lambda path: path.relative_to(plane_root).as_posix().encode("utf-8"),
     )
     for path in files:
         relative = path.relative_to(plane_root).as_posix().encode("utf-8")
-        content = path.read_bytes()
+        content = _read_regular_bytes(path)
         digest.update(len(relative).to_bytes(8, "big"))
         digest.update(relative)
         digest.update(len(content).to_bytes(8, "big"))
@@ -178,6 +236,7 @@ def _list_bundle_heads(bundle: Path) -> tuple[tuple[str, str], ...]:
             ["git", "bundle", "list-heads", str(bundle)],
             check=True,
             capture_output=True,
+            env=_git_environment(),
             shell=False,
         ).stdout
     except subprocess.CalledProcessError as exc:
@@ -315,8 +374,8 @@ def _restore_history_plane(
     ):
         raise CapsuleVerificationError("history plane identity is malformed")
     try:
-        refs_bytes = (plane_root / "refs.txt").read_bytes()
-    except OSError as exc:
+        refs_bytes = _read_regular_bytes(plane_root / "refs.txt")
+    except CapsuleVerificationError as exc:
         raise CapsuleVerificationError("history refs metadata is missing") from exc
     if refs_bytes != f"{subject_id} {bundle_ref}\n".encode("ascii"):
         raise CapsuleVerificationError("history refs metadata does not match identity")
@@ -327,6 +386,7 @@ def _restore_history_plane(
     destination.mkdir()
     repository = destination / "repository.git"
     _initialize_bare(repository, object_format)
+    _verify_repository_layout(repository)
 
     heads = _list_bundle_heads(bundle)
     if heads != ((subject_id, bundle_ref),):
@@ -348,10 +408,12 @@ def _restore_history_plane(
             ],
             check=True,
             capture_output=True,
+            env=_git_environment(),
             shell=False,
         )
     except subprocess.CalledProcessError as exc:
         raise CapsuleVerificationError("history bundle restore failed") from exc
+    _verify_repository_layout(repository)
 
     restored_subject = _run_git(repository, "rev-parse", "refs/heads/master").strip()
     if restored_subject.decode("ascii") != subject_id:
@@ -395,6 +457,9 @@ def _restore_history_plane(
         mode_path_digest=mode_path_digest,
         evidence_digest=evidence_digest,
         artifact_digests=(),
+        artifact_match=None,
+        payload_digest=None,
+        payload_count=None,
         blockers=tuple(sorted(plane_blockers)),
     )
 
@@ -406,62 +471,153 @@ def _metadata_for_plane(plane_root: Path) -> dict[str, object]:
     return value
 
 
-def _validate_untracked_payload(plane_root: Path) -> str:
-    value = _canonical_json(plane_root / "manifest.json")
-    if not isinstance(value, list):
-        raise CapsuleVerificationError("untracked inventory is invalid")
-    seen: set[str] = set()
-    for raw_entry in value:
-        if not isinstance(raw_entry, dict):
-            raise CapsuleVerificationError("untracked inventory entry is invalid")
+def _manifest_facts(
+    manifest: list[object], *, allowed_inclusions: frozenset[str]
+) -> tuple[set[str], dict[str, dict[str, object]]]:
+    redacted_paths: set[str] = set()
+    entries: dict[str, dict[str, object]] = {}
+    required_fields = {"inclusion", "kind", "mode", "path", "reason", "sha256", "size"}
+    for raw_entry in manifest:
+        if not isinstance(raw_entry, dict) or set(raw_entry) != required_fields:
+            raise CapsuleVerificationError("manifest entry is invalid")
         relative = _safe_relative(raw_entry.get("path"))
         relative_name = relative.as_posix()
-        if relative_name in seen:
+        if relative_name in entries:
             raise CapsuleVerificationError(
                 "untracked inventory contains duplicate paths"
             )
-        seen.add(relative_name)
-        payload = plane_root.joinpath("payload", *relative.parts)
         inclusion = raw_entry.get("inclusion")
-        if inclusion == "copied":
-            try:
-                metadata = payload.stat(follow_symlinks=False)
-                content = payload.read_bytes()
-            except OSError as exc:
-                raise CapsuleVerificationError("copied payload is missing") from exc
-            if not stat.S_ISREG(metadata.st_mode):
-                raise CapsuleVerificationError("copied payload is not a regular file")
+        if not isinstance(inclusion, str) or inclusion not in allowed_inclusions:
+            raise CapsuleVerificationError("manifest inclusion is not verifiable")
+        if inclusion == "redacted":
             if (
-                raw_entry.get("size") != len(content)
-                or raw_entry.get("sha256") != hashlib.sha256(content).hexdigest()
+                raw_entry.get("kind") != "redacted"
+                or raw_entry.get("mode") is not None
+                or raw_entry.get("size") is not None
+                or raw_entry.get("sha256") is not None
             ):
-                raise CapsuleVerificationError("copied payload metadata does not match")
-        elif inclusion == "redacted":
-            if raw_entry.get("size") is not None or raw_entry.get("sha256") is not None:
-                raise CapsuleVerificationError(
-                    "redacted payload leaks content metadata"
-                )
-            if payload.exists() or payload.is_symlink():
-                raise CapsuleVerificationError("redacted payload bytes were persisted")
-        elif payload.exists() or payload.is_symlink():
-            raise CapsuleVerificationError(
-                "non-copied inventory entry has payload bytes"
-            )
-    return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+                raise CapsuleVerificationError("redacted manifest metadata is invalid")
+            redacted_paths.add(relative_name)
+        elif inclusion == "copied":
+            mode = raw_entry.get("mode")
+            size = raw_entry.get("size")
+            digest = raw_entry.get("sha256")
+            if (
+                raw_entry.get("kind") != "file"
+                or not isinstance(mode, int)
+                or isinstance(mode, bool)
+                or mode < 0
+                or mode > 0o7777
+                or not isinstance(size, int)
+                or isinstance(size, bool)
+                or size < 0
+                or not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+            ):
+                raise CapsuleVerificationError("copied manifest metadata is invalid")
+        entries[relative_name] = raw_entry
+    return redacted_paths, entries
+
+
+def _secret_exclusions(metadata: dict[str, object]) -> tuple[str, ...]:
+    value = metadata.get("secret_path_exclusions")
+    if not isinstance(value, list):
+        raise CapsuleVerificationError("secret exclusion metadata is invalid")
+    exclusions = tuple(_safe_relative(item).as_posix() for item in value)
+    if len(set(exclusions)) != len(exclusions) or list(exclusions) != sorted(
+        exclusions, key=lambda item: item.encode("utf-8")
+    ):
+        raise CapsuleVerificationError("secret exclusion metadata is inconsistent")
+    return exclusions
+
+
+def _require_manifest_disposition(
+    metadata: dict[str, object], redacted_paths: set[str]
+) -> None:
+    exclusions = set(_secret_exclusions(metadata))
+    if exclusions != redacted_paths:
+        raise CapsuleVerificationError(
+            "manifest disposition exclusions are inconsistent"
+        )
+    expected = (
+        ("redacted", "ineligible", "unverifiable-redacted", "BLOCKED")
+        if redacted_paths
+        else ("ordinary", "eligible", "byte-equality", "PASS")
+    )
+    actual = (
+        metadata.get("sensitivity"),
+        metadata.get("eligibility"),
+        metadata.get("verification"),
+        metadata.get("status"),
+    )
+    if actual != expected:
+        raise CapsuleVerificationError("manifest disposition metadata is inconsistent")
+
+
+def _validate_untracked_payload(
+    plane_root: Path, metadata: dict[str, object]
+) -> tuple[str, str, int]:
+    value = _canonical_json(plane_root / "manifest.json")
+    if not isinstance(value, list):
+        raise CapsuleVerificationError("untracked inventory is invalid")
+    redacted_paths, entries = _manifest_facts(
+        value, allowed_inclusions=frozenset({"copied", "redacted"})
+    )
+    _require_manifest_disposition(metadata, redacted_paths)
+    copied_paths = {
+        path for path, entry in entries.items() if entry["inclusion"] == "copied"
+    }
+    payload_root = plane_root / "payload"
+    try:
+        payload_root.lstat()
+    except FileNotFoundError:
+        payload_files: tuple[Path, ...] = ()
+    except OSError as exc:
+        raise CapsuleVerificationError("payload universe is unavailable") from exc
+    else:
+        payload_files = tuple(
+            _walk_regular_files(payload_root, excluded_root_names=frozenset())
+        )
+    actual_paths = {
+        path.relative_to(payload_root).as_posix(): path for path in payload_files
+    }
+    if set(actual_paths) != copied_paths:
+        raise CapsuleVerificationError(
+            "copied payload universe does not match manifest"
+        )
+    evidence: list[dict[str, str]] = []
+    for relative_name in sorted(copied_paths, key=lambda item: item.encode("utf-8")):
+        entry = entries[relative_name]
+        payload = actual_paths[relative_name]
+        digest = _hash_regular_file(payload)
+        try:
+            size = payload.lstat().st_size
+        except OSError as exc:
+            raise CapsuleVerificationError("copied payload is unavailable") from exc
+        if entry.get("size") != size or entry.get("sha256") != digest:
+            raise CapsuleVerificationError("copied payload metadata does not match")
+        evidence.append({"path": relative_name, "sha256": digest})
+    manifest_digest = hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+    payload_digest = hashlib.sha256(canonical_json_bytes(evidence)).hexdigest()
+    return manifest_digest, payload_digest, len(evidence)
 
 
 def _validate_artifact_plane(capsule: Path, plane_id: PlaneId) -> PlaneRestoreResult:
     plane_root = capsule / plane_id.value
     metadata = _metadata_for_plane(plane_root)
     evidence_digest = _plane_evidence_digest(plane_root)
+    payload_digest: str | None = None
+    payload_count: int | None = None
     if plane_id is PlaneId.LOCAL_INDEX:
         try:
-            index_bytes = (plane_root / "index.raw").read_bytes()
-            staged_diff = (plane_root / "staged.diff").read_bytes()
-        except OSError as exc:
+            index_bytes = _read_regular_bytes(plane_root / "index.raw")
+            staged_diff = _read_regular_bytes(plane_root / "staged.diff")
+        except CapsuleVerificationError as exc:
             raise CapsuleVerificationError(
                 "index preservation artifacts are missing"
             ) from exc
+        _secret_exclusions(metadata)
         index_digest = hashlib.sha256(index_bytes).hexdigest()
         if metadata.get("index_sha256") != index_digest:
             raise CapsuleVerificationError("preserved index identity does not match")
@@ -472,16 +628,17 @@ def _validate_artifact_plane(capsule: Path, plane_id: PlaneId) -> PlaneRestoreRe
         )
     elif plane_id is PlaneId.LOCAL_TRACKED:
         try:
-            diff = (plane_root / "unstaged.diff").read_bytes()
-        except OSError as exc:
+            diff = _read_regular_bytes(plane_root / "unstaged.diff")
+        except CapsuleVerificationError as exc:
             raise CapsuleVerificationError("tracked worktree diff is missing") from exc
         manifest = _canonical_json(plane_root / "manifest.json")
         if not isinstance(manifest, list):
             raise CapsuleVerificationError("tracked inventory is invalid")
-        for entry in manifest:
-            if not isinstance(entry, dict):
-                raise CapsuleVerificationError("tracked inventory entry is invalid")
-            _safe_relative(entry.get("path"))
+        redacted_paths, _ = _manifest_facts(
+            manifest,
+            allowed_inclusions=frozenset({"metadata-only", "redacted", "excluded"}),
+        )
+        _require_manifest_disposition(metadata, redacted_paths)
         subject_id = hashlib.sha256(diff).hexdigest()
         artifact_digests = (
             (
@@ -491,9 +648,25 @@ def _validate_artifact_plane(capsule: Path, plane_id: PlaneId) -> PlaneRestoreRe
             ("unstaged.diff", subject_id),
         )
     else:
-        subject_id = _validate_untracked_payload(plane_root)
+        subject_id, payload_digest, payload_count = _validate_untracked_payload(
+            plane_root, metadata
+        )
         artifact_digests = (("manifest.json", subject_id),)
     disposition = _disposition_record(plane_id, subject_id, evidence_digest, metadata)
+    artifact_match = bool(artifact_digests) and all(
+        len(digest) == 64
+        and all(character in "0123456789abcdef" for character in digest)
+        for _, digest in artifact_digests
+    )
+    if payload_count is not None:
+        artifact_match = (
+            artifact_match
+            and payload_digest is not None
+            and len(payload_digest) == 64
+            and payload_count >= 0
+        )
+    if not artifact_match:
+        raise CapsuleVerificationError("artifact verification evidence is incomplete")
     blockers: set[str] = set()
     if disposition.status is ResultStatus.BLOCKED:
         blockers.add(
@@ -515,33 +688,93 @@ def _validate_artifact_plane(capsule: Path, plane_id: PlaneId) -> PlaneRestoreRe
         mode_path_digest=None,
         evidence_digest=evidence_digest,
         artifact_digests=artifact_digests,
+        artifact_match=artifact_match,
+        payload_digest=payload_digest,
+        payload_count=payload_count,
         blockers=tuple(sorted(blockers)),
     )
 
 
-def _validate_restore_destination(capsule: Path, temp_root: Path) -> Path:
+def _assert_outside_roots(
+    destination: Path, capsule: Path, forbidden_roots: tuple[Path, ...]
+) -> None:
+    destination_resolved = destination.resolve(strict=False)
     capsule_resolved = capsule.resolve(strict=True)
-    destination = Path(temp_root).resolve(strict=False)
-    if destination == capsule_resolved or destination.is_relative_to(capsule_resolved):
+    if destination_resolved == capsule_resolved or destination_resolved.is_relative_to(
+        capsule_resolved
+    ):
         raise ValueError("restore destination must be outside the capsule")
+    for forbidden_root in forbidden_roots:
+        if (
+            destination_resolved == forbidden_root
+            or destination_resolved.is_relative_to(forbidden_root)
+        ):
+            raise ValueError("restore destination must be outside every forbidden root")
+
+
+def _assert_plain_restore_directory(destination: Path) -> None:
+    try:
+        metadata = destination.lstat()
+    except OSError as exc:
+        raise ValueError("restore destination is unavailable") from exc
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    if stat.S_ISLNK(metadata.st_mode) or bool(
+        attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    ):
+        raise ValueError("restore destination must not be an alias")
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise ValueError("restore destination must be a directory")
+
+
+def _validate_restore_destination(
+    capsule: Path,
+    temp_root: Path,
+    forbidden_roots: Iterable[Path],
+) -> tuple[Path, tuple[Path, ...]]:
+    destination = Path(temp_root).resolve(strict=False)
+    try:
+        resolved_forbidden = tuple(
+            Path(root).resolve(strict=True) for root in forbidden_roots
+        )
+    except OSError as exc:
+        raise ValueError("forbidden root is unavailable") from exc
+    if not resolved_forbidden:
+        raise ValueError("at least one forbidden root is required")
+    if any(not root.is_dir() for root in resolved_forbidden):
+        raise ValueError("forbidden root must be a directory")
+    _assert_outside_roots(destination, capsule, resolved_forbidden)
     if destination.exists() or destination.is_symlink():
         raise ValueError("restore destination must not already exist")
-    return destination
+    return destination, resolved_forbidden
 
 
-def restore_and_verify(root: Path, temp_root: Path) -> VerificationRecord:
+def restore_and_verify(
+    root: Path,
+    temp_root: Path,
+    *,
+    forbidden_roots: Iterable[Path],
+) -> VerificationRecord:
     """Restore sealed history independently and return scoped evidence."""
 
     capsule_path = Path(root)
     verify_checksums(capsule_path)
     capsule = capsule_path.resolve(strict=True)
-    destination = _validate_restore_destination(capsule, temp_root)
+    destination, resolved_forbidden = _validate_restore_destination(
+        capsule, temp_root, forbidden_roots
+    )
     local_root = provenance_root(capsule)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    destination, resolved_forbidden = _validate_restore_destination(
+        capsule, destination, resolved_forbidden
+    )
     destination.mkdir(exist_ok=False)
+    _assert_outside_roots(destination, capsule, resolved_forbidden)
+    _assert_plain_restore_directory(destination)
 
     results: list[PlaneRestoreResult] = []
     for plane_id in _HISTORY_PLANES:
+        _assert_outside_roots(destination, capsule, resolved_forbidden)
+        _assert_plain_restore_directory(destination)
         results.append(_restore_history_plane(capsule, destination, plane_id))
     for plane_id in (
         PlaneId.LOCAL_INDEX,
@@ -571,9 +804,11 @@ def restore_and_verify(root: Path, temp_root: Path) -> VerificationRecord:
         tree_match=all(
             result.tree_match is True for result in results[: len(_HISTORY_PLANES)]
         ),
-        artifact_match=True,
+        artifact_match=all(
+            result.artifact_match is True for result in results[len(_HISTORY_PLANES) :]
+        ),
         blockers=blockers,
     )
     verify_checksums(capsule)
-    (capsule / "verification.json").write_bytes(canonical_json_bytes(record))
+    _atomic_write_fixed(capsule, "verification.json", canonical_json_bytes(record))
     return record
