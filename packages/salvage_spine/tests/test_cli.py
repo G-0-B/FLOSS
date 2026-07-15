@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -358,7 +359,8 @@ def test_pass_flow_inventory_render_and_overlap_guards(
     assert main(["inventory", "--capsule", str(state_dir)]) == 0
     capsys.readouterr()
 
-    checkpoint = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+    checkpoint_path = state_dir / "checkpoints.jsonl"
+    checkpoint = load_latest_checkpoint(checkpoint_path)
     manifest = json.loads((state_dir / "manifest.json").read_text(encoding="utf-8"))
     assert checkpoint.state_id == manifest["state_id"]
     assert "<" not in checkpoint.next_safe_command
@@ -403,6 +405,15 @@ def test_pass_flow_inventory_render_and_overlap_guards(
     assert "overlaps" in capsys.readouterr().err
     assert not inside_capsule.exists()
 
+    source_artifacts = {
+        "verification.json": (state_dir / "capsule" / "verification.json").read_bytes(),
+        "manifest.json": (state_dir / "manifest.json").read_bytes(),
+        "checkpoints.jsonl": checkpoint_path.read_bytes(),
+    }
+    source_artifact_digests = {
+        name: hashlib.sha256(content).hexdigest()
+        for name, content in source_artifacts.items()
+    }
     output = tmp_path / "projection"
     assert (
         main(
@@ -416,9 +427,84 @@ def test_pass_flow_inventory_render_and_overlap_guards(
         )
         == 0
     )
-    assert json.loads(capsys.readouterr().out)["phase"] == "projection-rendered"
-    assert (output / "check-summary.json").is_file()
-    assert (output / "stop-merge-comment.md").is_file()
+    assert json.loads(capsys.readouterr().out) == {
+        "next_safe_command": "python scripts/pr38_salvage.py status --capsule STATE_DIR",
+        "phase": "projection-rendered",
+        "status": ResultStatus.BLOCKED.value,
+    }
+
+    projection_files = {
+        path.relative_to(output).as_posix()
+        for path in output.rglob("*")
+        if path.is_file()
+    }
+    assert projection_files == {
+        "artifacts/checkpoints.jsonl",
+        "artifacts/manifest.json",
+        "artifacts/verification.json",
+        "check-summary.json",
+        "stop-merge-comment.md",
+    }
+    for name, expected_bytes in source_artifacts.items():
+        rendered_bytes = (output / "artifacts" / name).read_bytes()
+        assert rendered_bytes == expected_bytes
+        assert (
+            hashlib.sha256(rendered_bytes).hexdigest() == source_artifact_digests[name]
+        )
+
+    artifact_checkpoint = load_latest_checkpoint(
+        output / "artifacts" / "checkpoints.jsonl"
+    )
+    assert artifact_checkpoint == checkpoint
+    summary_bytes = (output / "check-summary.json").read_bytes()
+    summary = json.loads(summary_bytes)
+    assert summary_bytes == canonical_json_bytes(summary)
+    assert summary["status"] == ResultStatus.BLOCKED.value
+    assert summary["preservation"]["status"] == ResultStatus.BLOCKED.value
+    assert summary["locked_shas"] == {
+        "pr_head": pr_sha,
+        "remote_main": main_sha,
+    }
+    assert summary["digests"] == {
+        "capsule_root": checkpoint.capsule_root,
+        "manifest": checkpoint.manifest_digest,
+        "verification": checkpoint.verification_digest,
+    }
+    assert summary["checkpoint"] == {
+        "digest": checkpoint.digest,
+        "sequence": checkpoint.sequence,
+    }
+    assert summary["evidence_locations"] == {
+        "checkpoint": "artifacts/checkpoints.jsonl",
+        "manifest": "artifacts/manifest.json",
+        "verification": "artifacts/verification.json",
+    }
+
+    comment = (output / "stop-merge-comment.md").read_text(encoding="utf-8")
+    assert comment.startswith(
+        "PROPOSED STOP-MERGE NOTICE — DO NOT POST BEFORE PRESERVATION PASSES\n"
+    )
+    for bound_value in (
+        main_sha,
+        pr_sha,
+        checkpoint.capsule_root,
+        checkpoint.manifest_digest,
+        checkpoint.verification_digest,
+    ):
+        assert bound_value in comment
+    assert "GitHub controls do not confer authority" in comment
+
+    projection_checkpoint = load_latest_checkpoint(checkpoint_path)
+    assert projection_checkpoint.sequence == checkpoint.sequence + 1
+    assert projection_checkpoint.previous_digest == checkpoint.digest
+    assert projection_checkpoint.phase == "projection-rendered"
+    assert projection_checkpoint.capsule_root == checkpoint.capsule_root
+    assert projection_checkpoint.manifest_digest == checkpoint.manifest_digest
+    assert projection_checkpoint.verification_digest == checkpoint.verification_digest
+    assert projection_checkpoint.blockers == checkpoint.blockers
+    assert projection_checkpoint.next_safe_command == (
+        "python scripts/pr38_salvage.py status --capsule STATE_DIR"
+    )
 
 
 def test_script_help_matches_main_surface(tmp_path: Path) -> None:
