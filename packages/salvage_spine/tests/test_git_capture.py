@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import packages.salvage_spine.git_capture as git_capture_module
 from packages.salvage_spine.git_capture import (
     CaptureDrift,
     CaptureEvidenceError,
@@ -130,6 +131,56 @@ def test_decode_paths_rejects_unsafe_or_empty_paths(raw_paths: bytes) -> None:
 def test_decode_paths_rejects_duplicate_canonical_forms(raw_paths: bytes) -> None:
     with pytest.raises(ValueError, match="duplicate repository path"):
         _decode_paths(raw_paths)
+
+
+@pytest.mark.parametrize(
+    ("first_category", "second_category"),
+    (
+        ("tracked", "untracked"),
+        ("tracked", "ignored"),
+        ("untracked", "ignored"),
+    ),
+)
+@pytest.mark.parametrize("relative_path", ("collision.txt", ".env"))
+@pytest.mark.parametrize(
+    ("first_suffix", "second_suffix"),
+    (("", ""), ("", "/"), ("/", "")),
+)
+def test_inventory_rejects_cross_stream_canonical_collisions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    first_category: str,
+    second_category: str,
+    relative_path: str,
+    first_suffix: str,
+    second_suffix: str,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / relative_path).write_text("collision\n", encoding="utf-8")
+    streams = {"tracked": b"", "untracked": b"", "ignored": b""}
+    streams[first_category] = f"{relative_path}{first_suffix}\0".encode()
+    streams[second_category] = f"{relative_path}{second_suffix}\0".encode()
+    categories_by_args = {
+        ("ls-files", "-z"): "tracked",
+        ("ls-files", "--others", "--exclude-standard", "-z"): "untracked",
+        (
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "-z",
+        ): "ignored",
+    }
+
+    def synthetic_run_git(repo_arg: Path, *args: str) -> bytes:
+        assert repo_arg == repo
+        return streams[categories_by_args[args]]
+
+    monkeypatch.setattr(git_capture_module, "run_git", synthetic_run_git)
+
+    with pytest.raises(ValueError, match="duplicate repository path"):
+        git_capture_module._inventory_state(repo, SecretPolicy.default())
 
 
 def test_capture_canonicalizes_ignored_directory_marker(tmp_path: Path) -> None:
