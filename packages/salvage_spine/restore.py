@@ -49,6 +49,7 @@ def _git_environment() -> dict[str, str]:
             "GIT_CONFIG_COUNT": "0",
             "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
             "GIT_TERMINAL_PROMPT": "0",
         }
     )
@@ -232,11 +233,13 @@ def _plane_evidence_digest(plane_root: Path) -> str:
 
 
 def _list_bundle_heads(bundle: Path) -> tuple[tuple[str, str], ...]:
+    bundle_path = bundle.resolve(strict=True)
     try:
         output = subprocess.run(
-            ["git", "bundle", "list-heads", str(bundle)],
+            ["git", "bundle", "list-heads", str(bundle_path)],
             check=True,
             capture_output=True,
+            cwd=bundle_path.parent,
             env=_git_environment(),
             shell=False,
         ).stdout
