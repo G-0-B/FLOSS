@@ -888,6 +888,43 @@ def test_restore_sanitizes_git_config_injection_environment(
     assert filesystem_snapshot(external) == before
 
 
+def test_bundle_head_inspection_isolated_from_callers_linked_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    capsule, repo, _ = captured_capsule(tmp_path)
+    bundle = capsule / "remote-main" / "repository.bundle"
+    caller = tmp_path / "caller-linked-worktree"
+    git(repo, "worktree", "add", "--detach", str(caller), "HEAD")
+    common_git = Path(
+        git(caller, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        .stdout.strip()
+        .decode("utf-8")
+    )
+    before = filesystem_snapshot(common_git)
+    before_mtime = common_git.stat().st_mtime_ns
+    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    original_run = restore_module.subprocess.run
+    invocation: dict[str, object] = {}
+
+    def observe_bundle_inspection(command: list[str], *args: object, **kwargs: object):
+        if command[:3] == ["git", "bundle", "list-heads"]:
+            invocation["cwd"] = kwargs.get("cwd")
+            invocation["optional_locks"] = kwargs["env"].get("GIT_OPTIONAL_LOCKS")
+        return original_run(command, *args, **kwargs)
+
+    monkeypatch.chdir(caller)
+    monkeypatch.setenv("GIT_OPTIONAL_LOCKS", "1")
+    monkeypatch.setattr(restore_module.subprocess, "run", observe_bundle_inspection)
+
+    heads = restore_module._list_bundle_heads(bundle)
+
+    assert heads
+    assert Path(invocation["cwd"]).resolve() == bundle.parent.resolve()
+    assert invocation["optional_locks"] == "0"
+    assert filesystem_snapshot(common_git) == before
+    assert common_git.stat().st_mtime_ns == before_mtime
+
+
 def test_opaque_secret_evidence_remains_blocked_and_metadata_is_sanitized(
     tmp_path: Path,
 ) -> None:
