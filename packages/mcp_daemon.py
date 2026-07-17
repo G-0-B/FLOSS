@@ -19,9 +19,30 @@ from pathlib import Path
 
 
 def _pid_alive(pid: int) -> bool:
-    """Return True if `pid` is a running process."""
+    """Return True if `pid` is a running process.
+
+    On Windows, ``os.kill(pid, 0)`` is unreliable (raises WinError 87 or
+    SystemError for various PID values). We use ``ctypes.OpenProcess`` with
+    a zero access mask — it succeeds if the process exists (even if owned by
+    another user) and fails with ERROR_INVALID_PARAMETER (87) if the PID
+    is not in use.
+    """
     if pid <= 0:
         return False
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        # PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if handle:
+            kernel32.CloseHandle(handle)
+            return True
+        # ERROR_INVALID_PARAMETER (87) = PID not in use
+        # ERROR_ACCESS_DENIED (5) = exists but owned by another user
+        err = kernel32.GetLastError()
+        return err == 5  # access denied means it exists
     try:
         os.kill(pid, 0)
         return True
@@ -31,10 +52,7 @@ def _pid_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True  # exists, owned by someone else
-    except OSError:
-        # Windows raises WinError 87 ("The parameter is incorrect") for
-        # impossibly high PIDs — treat as "not alive" so stale PID files
-        # with garbage values get overwritten.
+    except (OSError, SystemError):
         return False
 
 
@@ -90,8 +108,15 @@ def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
 
     Binds to 127.0.0.1 ONLY (native Windows; never expose to the network).
     If a daemon is already running for this slot, prints a message and exits 0.
+
+    Note: FastMCP's run() method does not accept host/port kwargs. The host and
+    port must be set on the FastMCP instance's settings before calling run().
+    This function patches ``mcp.settings.port`` in-place before serving.
     """
     if not claim_singleton(pid_filename):
         print(f"[FLOSS MCP] already running on :{port}; exiting.", file=sys.stderr)
         sys.exit(0)
-    mcp.run(transport="streamable-http", host="127.0.0.1", port=port)
+    # FastMCP stores host/port in settings; run() reads them from there.
+    mcp.settings.port = port
+    mcp.settings.host = "127.0.0.1"
+    mcp.run(transport="streamable-http")

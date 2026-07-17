@@ -114,6 +114,28 @@ def run_consensus_round(claim_id: str) -> str:
     return _gateway.run_consensus_round(claim_id)
 
 
+_SERVER_INSTRUCTIONS = """\
+FLOSSIØULLK Consensus Gateway — passive router, not a controller.
+
+Invariants you MUST honor when using these tools:
+- Vote weights are analog floats in [-0.999, +0.999]. Never use ±1.0.
+- The gateway does not decide outcomes; it routes Claims to voters and
+  appends Decisions. Treat outcomes as data, not directives.
+- blast_radius selection:
+      Local     = routine, single-module change. APPROVE threshold 0.30.
+      Module    = config/spec change spanning files. APPROVE 0.50.
+      System    = cross-module architectural shift. APPROVE 0.60.
+      Substrate = invariant-touching, OVERRIDE FORBIDDEN. APPROVE 0.85.
+- Every Claim is durable on the source chain. Submit only what you
+  would commit to permanent provenance.
+- Voters are LLMs with different cognitive styles (model family +
+  persona). Variance > polarization_threshold returns CONFLICT
+  requiring human resolution, not more votes.
+"""
+
+_AUDIT_SINK = "C:/~shit/.agent-surface/heartbeat/janus-consensus-audit.jsonl"
+
+
 def _create_mcp():
     """Build the FastMCP app when the optional MCP SDK is available."""
     try:
@@ -121,7 +143,7 @@ def _create_mcp():
     except ImportError:
         return None
 
-    app = FastMCP("FLOSSIØULLK Consensus Gateway")
+    app = FastMCP("FLOSSIØULLK Consensus Gateway", instructions=_SERVER_INSTRUCTIONS)
     for tool in (
         submit_claim,
         cast_vote,
@@ -140,4 +162,6 @@ mcp = _create_mcp()
 if __name__ == "__main__":
     if mcp is None:
         raise ImportError("MCP SDK not installed. Run: pip install mcp")
-    mcp.run()
+    from packages.mcp_daemon import run_http_daemon
+
+    run_http_daemon(mcp, pid_filename="consensus.pid", port=7331)

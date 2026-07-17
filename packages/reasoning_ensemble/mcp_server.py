@@ -49,7 +49,7 @@ SPECS, ADRS, AND RELATED RESEARCH
   `docs/research/2026-05-18-metaharness-unification.md` (single Action
   schema, single activity log, shared invocation convention)
 - Decision-grade peer:
-  `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 — consensus gateway is
+  `docs/adr/ADR-10-local-agent-node.md` (ADR-10 — consensus gateway is
   decision-grade routing; this is reasoning-grade routing)
 - Consent: `docs/adr/ADR-12-consent-gate-protocol.md` (the MCP tool
   surface is itself a governed pattern at the integrate level)
@@ -292,6 +292,23 @@ def get_ensemble_drafts(limit: int = 5) -> str:
 # ---------------------------------------------------------------------------
 
 
+_SERVER_INSTRUCTIONS = """\
+FLOSSI0ULLK Reasoning Ensemble — reasoning aid, not authority.
+
+Invariants you MUST honor when using these tools:
+- Router output is a routing hint: pass_through, single_strong, or ensemble.
+- Synthesizer output is Plane A draft reasoning. It never promotes canon.
+- Decision-grade claims still go through the separate flossiullk-consensus MCP.
+- Prefer this MCP for architectural, multi-file, ADR-class, or rollback-costly
+  reasoning where preserved disagreement has value.
+- Do not use this as a heartbeat health pulse. It is on-demand.
+- If the MCP is unavailable, fall back to normal single-strong reasoning and
+  record that the ensemble surface was unavailable if the decision mattered.
+"""
+
+_AUDIT_SINK = "C:/~shit/.agent-surface/heartbeat/janus-reasoning-ensemble-audit.jsonl"
+
+
 def _create_mcp():
     """Build the FastMCP app when the optional MCP SDK is available."""
     try:
@@ -299,7 +316,10 @@ def _create_mcp():
     except ImportError:
         return None
 
-    app = FastMCP("FLOSSI0ULLK Reasoning Ensemble (Inline CFIS Router + Synthesizer)")
+    app = FastMCP(
+        "FLOSSI0ULLK Reasoning Ensemble (Inline CFIS Router + Synthesizer)",
+        instructions=_SERVER_INSTRUCTIONS,
+    )
     for tool in (
         route_prompt,
         deliberate,
@@ -316,4 +336,6 @@ mcp = _create_mcp()
 if __name__ == "__main__":
     if mcp is None:
         raise ImportError("MCP SDK not installed. Run: pip install mcp")
-    mcp.run()
+    from packages.mcp_daemon import run_http_daemon
+
+    run_http_daemon(mcp, pid_filename="reasoning_ensemble.pid", port=7332)
