@@ -176,7 +176,7 @@ def test_mistral_profile_enables_when_api_key_is_present():
     assert resolved == {
         "mistral-open-nemo": "mistral/open-mistral-nemo",
         "mistral-ministral-8b": "mistral/ministral-8b-2410",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
     }
 
 
@@ -194,31 +194,31 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
         "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",
     }
 
 
-def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
-    """Add the optional OpenAI lane when the wider ROI roster can use it."""
+def test_diverse_plus_profile_adds_optional_openrouter_lane_when_available():
+    """Add the optional OpenRouter lane when the wider ROI roster can use it."""
     with patched_env(
         CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
         MISTRAL_API_KEY="test-mistral-key",
         FLOWITH_API_KEY="flo-test-key",
         FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
-        OPENAI_API_KEY="test-openai-key",
+        OPENROUTER_API_KEY="test-openrouter-key",
     ):
         resolved = resolve_default_voter_specs(profile="roi-plus")
     assert resolved == {
         "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",
-        "openai-gpt-4.1-mini": "openai/gpt-4.1-mini",
+        "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini",
     }
 
 
@@ -237,7 +237,7 @@ def _run_all() -> int:
         test_heartbeat_alias_uses_budget_safe_balanced_profile,
         test_mistral_profile_enables_when_api_key_is_present,
         test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist,
-        test_diverse_plus_profile_adds_optional_openai_lane_when_available,
+        test_diverse_plus_profile_adds_optional_openrouter_lane_when_available,
     ]
     passed = failed = 0
     for test in tests:
