@@ -19,12 +19,12 @@
   "profiles": {
     "yumeichan": {
       "omo-critic-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "omo-critic-qwen3-32b": "groq/qwen/qwen3-32b",
+      "omo-critic-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
     },
     "balanced": {
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
     },
     "fast": {
@@ -43,13 +43,13 @@
     },
     "amplified": {
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
     },
     "diverse": {
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat",
@@ -57,7 +57,7 @@
     },
     "diverse-plus": {
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat",
@@ -68,7 +68,7 @@
       "groq-llama-3.3-70b-versatile": "groq/llama-3.3-70b-versatile",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
       "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "groq-llama-4-scout": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "mistral-ministral-8b": "mistral/ministral-8b-2410",
@@ -82,7 +82,7 @@
     },
     "post-window": {
       "omo-critic-gpt-oss-120b": "cerebras/gpt-oss-120b",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "groq-llama-4-scout": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "mistral-open-mistral-nemo": "mistral/open-mistral-nemo",
@@ -93,7 +93,7 @@
     },
     "reuse-review": {
       "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat",
-      "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest"
     }
   }

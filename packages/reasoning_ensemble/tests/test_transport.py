@@ -23,7 +23,7 @@ def test_family_from_model():
     cases = {
         "groq/openai/gpt-oss-20b": "gpt-oss",
         "cerebras/gpt-oss-120b": "gpt-oss",
-        "groq/qwen/qwen3-32b": "qwen",
+        "groq/qwen/qwen3.6-27b": "qwen",
         "groq/llama-3.3-70b-versatile": "llama",
         "mistral/devstral-small-latest": "mistral",
         "mistral/open-mistral-nemo": "mistral",

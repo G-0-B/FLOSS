@@ -165,7 +165,7 @@ def test_heartbeat_alias_uses_budget_safe_balanced_profile():
     assert resolved == {
         "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
     }
 
 
@@ -193,7 +193,7 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
     assert resolved == {
         "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
         "mistral-devstral-small": "mistral/devstral-small-latest",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",
@@ -214,7 +214,7 @@ def test_diverse_plus_profile_adds_optional_openrouter_lane_when_available():
     assert resolved == {
         "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
         "mistral-devstral-small": "mistral/devstral-small-latest",
         "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
         "flowith-deepseek-chat": "flowith/deepseek-chat",

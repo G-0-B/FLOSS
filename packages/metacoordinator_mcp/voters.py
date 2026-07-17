@@ -257,6 +257,35 @@ Map your verdict into the WEIGHT format the consensus gate expects:
 Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific blocker(s) you found."""
 
 
+def _model_completion(
+    model: str,
+    messages: list[dict],
+    *,
+    max_tokens: int = 2000,
+    temperature: float = 0.1,
+) -> str:
+    """Call the configured model backend and return the response text.
+
+    Routes to OmniRoute (httpx) when FLOSS_MODEL_BACKEND=omniroute,
+    otherwise falls back to litellm. Keeps all parsing logic in the caller.
+    """
+    if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+        from packages.omniroute_client import completion as _omni
+
+        return _omni(
+            model, messages, max_tokens=max_tokens, temperature=temperature
+        )
+    from litellm import completion
+
+    resp = completion(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
 def make_omo_momus_voter(
     name: str,
     model: str,
@@ -281,18 +310,15 @@ def make_omo_momus_voter(
         """Call the underlying model with Momus persona + standard voter prompt."""
         user_prompt = render_voter_prompt(claim)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[
+            text = _model_completion(
+                model,
+                [
                     {"role": "system", "content": MOMUS_PERSONA_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             return Vote(
                 voter=name,
@@ -347,18 +373,15 @@ def make_omo_critic_voter(
         """Call the underlying model with Critic persona + standard voter prompt."""
         user_prompt = render_voter_prompt(claim)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[
+            text = _model_completion(
+                model,
+                [
                     {"role": "system", "content": CRITIC_PERSONA_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             return Vote(
                 voter=name,
@@ -575,8 +598,8 @@ def make_flowith_voter(
 #
 # - cerebras/llama3.1-8b        Cerebras WSE-3, Meta, production
 # - openai/gpt-oss-20b          Groq LPU, OpenAI open-weight, production (1000 t/s)
-# - qwen/qwen3-32b              Groq LPU, Alibaba Qwen 3, PREVIEW (may be dropped
-#                               at short notice; voter error path handles that)
+# - qwen/qwen3.6-27b            Groq LPU, Alibaba Qwen 3.6, production
+#                               (replaced qwen3-32b which was decommissioned 2026-07)
 #
 # Rate limits checked: 250K–300K TPM, 1K RPM on each — plenty of headroom for
 # consensus rounds. Upgrade to 70B / 120B / Llama 4 once we want heavier signal.
