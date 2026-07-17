@@ -64,7 +64,7 @@ SPECS, ADRS, AND RELATED RESEARCH
   semantics, 4-tier authority, LSM-Override)
 - Empirical validation: `docs/research/2026-05-16-mdash-cfis-
   architectural-transfer.md` (MDASH harness-over-model evidence)
-- Decision-grade peer: `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10
+- Decision-grade peer: `docs/adr/ADR-10-local-agent-node.md` (ADR-10
   consensus gateway — different stakes, different retention)
 - Voter diversity policy: ADR-Suite v2.0 §"Voter roster"
 - Consent: `docs/adr/ADR-12-consent-gate-protocol.md` (voter pool
@@ -93,9 +93,12 @@ module:
   7. Produces a synthesized response
   8. Emits one Action to the global activity log
 
-v0.1 voter pool: local Ollama models only (gemma3:12b-it-qat, phi4-mini,
-qwen2.5-coder-3b, llama3.1, llama3.2) for $0 cost and no rate limits. Cloud
-voters via LiteLLM are Later — same shape, different transport.
+Voter pool: **online-primary by default** (v0.2). Generation runs on the
+consensus-gateway provider roster via `transport.py`
+(FLOSS_ENSEMBLE_VOTER_MODE=online), because the local Ollama pool reliably
+degraded on VRAM-constrained hardware (see DEFAULT_VOTER_POOL note below).
+Local-only (=local) and mixed (=mixed) modes remain available. Embeddings use
+local mxbai when reachable, else a single cloud embedder — resolved once per run.
 
 Plane A: drafts go to `.agent-surface/reasoning/ensemble/<id>_synthesis.json`
 for review; never auto-promotes to canon.
@@ -132,6 +135,11 @@ except ImportError:
     from packages.activity_log import Action, append_action
     from packages.activity_log.schema import prompt_hash, utc_iso
 
+try:
+    from FLOSS.packages.reasoning_ensemble import transport
+except ImportError:
+    from packages.reasoning_ensemble import transport
+
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 ENSEMBLE_STAGING = WORKSPACE_ROOT / ".agent-surface" / "reasoning" / "ensemble"
 # Same file the Router appends its decision rows to and scans in
@@ -145,9 +153,13 @@ REASONING_ACTIVITY_LOG = (
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
 
-# v0.1 default voter pool. All local. ~$0 cost. Each is a distinct family,
-# satisfying the ≥3 providers / ≥4 model families diversity policy (where
-# "provider" is the model family lineage, not the inference host).
+# LEGACY (v0.1) local pool. As of v0.2 the live pools are resolved in
+# `transport.resolve_voter_pool()` (transport.LOCAL_VOTER_POOL mirrors this for
+# mode=local/mixed). Kept for reference / direct-call callers that pass an
+# explicit voter_pool. Edit transport.LOCAL_VOTER_POOL, not this, to change the
+# local roster.
+# All local. ~$0 cost. Each is a distinct family, satisfying the ≥3 providers /
+# ≥4 model families diversity policy (provider = model family lineage, not host).
 #
 # Note: per the reasoning-ensemble v0.2 §12.6 frame-cousin detection,
 # voters that always cluster together over time become flagged as "frame
@@ -302,11 +314,16 @@ def ollama_generate(
 # ---------------------------------------------------------------------------
 
 
-def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
-    """Call one voter. Wraps errors into the response. Never raises."""
+def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterResponse:
+    """Call one voter. Wraps errors into the response. Never raises.
+
+    Generation is routed by the voter's transport (ollama / litellm / flowith)
+    via transport.generate. `embed_fn` is the run's single resolved embedder
+    (local mxbai or a cloud fallback) so every voter shares one vector space.
+    """
     started = time.perf_counter()
     try:
-        text = ollama_generate(voter["model"], prompt)
+        text = transport.generate(voter, prompt, VOTER_TIMEOUT_SECONDS, ollama_generate)
         duration = time.perf_counter() - started
         if not text:
             return VoterResponse(
@@ -321,7 +338,7 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
             )
         # Embed in this voter's thread to keep things parallel-friendly
         try:
-            emb = ollama_embed(text)
+            emb = embed_fn(text)
         except Exception as e:  # noqa: BLE001
             emb = None
             embed_err = f"embed_failed: {e}"
@@ -356,19 +373,22 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
         )
 
 
-def dispatch_parallel(voter_pool: list[dict], prompt: str) -> list[VoterResponse]:
+def dispatch_parallel(
+    voter_pool: list[dict], prompt: str, embed_fn=ollama_embed
+) -> list[VoterResponse]:
     """Fan out to all voters in parallel via ThreadPoolExecutor.
 
-    Ollama serializes GPU access internally (single-model loading + queuing),
-    so true parallelism is partial. But submitting all calls simultaneously
-    lets Ollama overlap embed + generate for different models, which is
-    better than strict-serial.
+    For online voters (mode=online, the default) generation is network-bound and
+    genuinely parallel. For local Ollama voters (mode=local/mixed) GPU access is
+    serialized internally, so parallelism is partial — but submitting together
+    still lets Ollama overlap different models better than strict-serial.
     """
     voter_prompt = _build_voter_prompt(prompt)
     responses: list[VoterResponse] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(voter_pool)) as executor:
         futures = {
-            executor.submit(_dispatch_voter, v, voter_prompt): v for v in voter_pool
+            executor.submit(_dispatch_voter, v, voter_prompt, embed_fn): v
+            for v in voter_pool
         }
         for fut in concurrent.futures.as_completed(futures):
             responses.append(fut.result())
@@ -643,8 +663,17 @@ def write_synthesis(
 def synthesize(
     prompt: str, voter_pool: Optional[list[dict]] = None, stage_artifact: bool = True
 ) -> EnsembleSynthesis:
-    """Run the full ensemble: voters → embed → cluster → tier → synthesize."""
-    pool = voter_pool or DEFAULT_VOTER_POOL
+    """Run the full ensemble: voters → embed → cluster → tier → synthesize.
+
+    When `voter_pool` is None the pool is resolved from FLOSS_ENSEMBLE_VOTER_MODE
+    (online-primary by default), so a deliberation no longer depends on local GPU
+    headroom. The embedder is resolved once per run (local mxbai preferred, cloud
+    fallback) so all voter responses share one vector space.
+    """
+    if voter_pool is not None:
+        pool = voter_pool
+    else:
+        pool, _mode = transport.resolve_voter_pool()
     if len(pool) < MIN_VOTERS:
         raise ValueError(f"Voter pool too small: {len(pool)} < {MIN_VOTERS}")
 
@@ -652,8 +681,11 @@ def synthesize(
     started_perf = time.perf_counter()
     p_hash = prompt_hash(prompt)
 
+    # Resolve the single embedder for this run (shared vector space required).
+    _embed_name, embed_fn = transport.resolve_embedder(ollama_embed)
+
     # 1-3: dispatch + embed (embed is inside _dispatch_voter)
-    responses = dispatch_parallel(pool, prompt)
+    responses = dispatch_parallel(pool, prompt, embed_fn)
 
     # Filter to voters that produced an embedding (others can't be clustered)
     embedded = [r for r in responses if r.response_embedding is not None]
@@ -769,7 +801,7 @@ def _log_synthesis_action(
     llm_calls = [
         {
             "model": r.model,
-            "provider": "ollama-local",
+            "provider": (r.model.split("/", 1)[0] if "/" in r.model else "ollama-local"),
             "voter_id": r.voter_id,
             "family": r.family,
             "prompt_hash": p_hash,
