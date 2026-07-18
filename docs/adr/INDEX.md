@@ -1,9 +1,9 @@
 # ADR Index — FLOSSI0ULLK / ARF Ecosystem
 
-**Version:** 2.1.0
-**Updated:** 2026-07-04
+**Version:** 2.2.0
+**Updated:** 2026-07-16
 **Truth Status:** Specified
-**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12..17).
+**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12..18).
 
 ---
 
@@ -34,14 +34,16 @@ Permanent numbers assigned in v2.0:
 | **ADR-7** | Embracing AGPL-3.0 Copyleft Cascade | Accepted | Specified | Low | 2026-04-15 | `ADR-7-agpl-cascade.md` |
 | **ADR-8** | Radicle as Dev-Plane Code Substrate | Accepted | Specified (bridge unproven) | Medium | 2026-04-16 | `ADR-8-radicle-dev-substrate.md` |
 | **ADR-9** | Self-Perceptual Evolution (n+1) | Accepted | Specified | Medium | 2026-04-17 | `ADR-9-self-perceptual-evolution.md` |
-| **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-MCP-ORCHESTRATOR.md` |
-| **ADR-11** | IPFS Large File Integration for VVS-Compliant Git | Accepted | Specified | Medium | 2025-11-11 | `ADR-N-IPFS-Integration-VVS.md` |
+| **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-10-local-agent-node.md` |
+| **ADR-11** | IPFS Large File Integration for VVS-Compliant Git | Accepted | Specified | Medium | 2025-11-11 | `ADR-11-ipfs-large-file-integration.md` |
 | **ADR-12** | Consent Gate Protocol | Draft (implementation-backed) | Specified (substrate verified locally; action-time gating + DID hardening + cross-frame validation pending) | High (OVERRIDE FORBIDDEN; APPROVE ≥ 0.85) | 2026-05-19 | `ADR-12-consent-gate-protocol.md` |
 | **ADR-13** | Yumeichan Watch Architecture (Affective Edge Node) | Accepted | Specified | High | 2026-06-13 | `ADR-13-yumeichan-watch-architecture.md` |
 | **ADR-14** | ObjectGraph Projection over Corpus | Accepted | Specified → Verified on landing | Low | 2026-06-13 | `ADR-14-objectgraph-projection.md` |
 | **ADR-15** | Enforce Author–Provenance Binding in Integrity Zome | Accepted (impl P1) | Specified | High (security / core invariant) | 2026-06-13 | `ADR-15-provenance-validation-enforcement.md` |
 | **ADR-16** | Omnigent as Execution/Governance Surface; Gateway + Holochain as Validation Substrate | Proposed | Specified (upstream capability + fork state Verified; integration seam Specified; validation fit Blocked) | High (execution/governance seam) | 2026-06-17 | `ADR-16-omnigent-execution-surface.md` |
 | **ADR-17** | KnowledgeTriple Contract Reconciliation (signed-gradient confidence; enum-now/URI-later predicates) | Proposed | Specified (divergence Verified; D1/D2 pending gate acceptance) | High (Phase 1 primary-deliverable contract) | 2026-07-04 | `ADR-17-knowledge-triple-contract-reconciliation.md` |
+| **ADR-18** | Prior-Art & Reuse Gate (before_build_check enforced via spec_gate + reuse-review voters) | Accepted (operator 2026-07-16) | Specified (--check enforcement Verified on landing) | Low (T1) / Medium (T2 review) | 2026-07-16 | `ADR-18-prior-art-reuse-gate.md` |
+| **ADR-19** | OmniRoute Inference Plane + MCP Daemon Migration | Accepted (operator-consented 2026-07-17; consensus-pending) | Verified (Stages 0–3.4 implemented + 70/70 tests; Stage 3.5 equivalence run pending) | Medium (System blast radius; transport-plane change) | 2026-07-17 | `ADR-19-omniroute-inference-plane.md` |
 
 ---
 
@@ -57,8 +59,8 @@ Previous documents used inconsistent numbering. This index resolves conflicts:
 | `ADR-MCP-ORCHESTRATOR` | **ADR-10** | Promoted to permanent in v2.0 suite |
 
 Pending file renames (cosmetic, follow-up):
-- `ADR-MCP-ORCHESTRATOR.md` → `ADR-10-local-agent-node.md` (with inbound-link redirects)
-- `ADR-N-IPFS-Integration-VVS.md` → `ADR-11-ipfs-large-file-integration.md` (with inbound-link redirects)
+- `ADR-10-local-agent-node.md` → `ADR-10-local-agent-node.md` (with inbound-link redirects)
+- `ADR-11-ipfs-large-file-integration.md` → `ADR-11-ipfs-large-file-integration.md` (with inbound-link redirects)
 
 ---
 
