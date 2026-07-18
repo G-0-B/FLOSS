@@ -123,13 +123,19 @@ DOCUMENT CONTENT CHUNK:
 {chunk}
 """
         try:
-            response = litellm.completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-                max_tokens=1500,
-            )
-            all_insights.append(f"### Chunk {idx + 1}/{len(chunks)}\n{response.choices[0].message.content.strip()}")
+            if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+                from packages.omniroute_client import completion as _omni
+
+                text = _omni(model, [{"role": "user", "content": prompt}], max_tokens=1500, temperature=0.1)
+            else:
+                response = litellm.completion(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=1500,
+                )
+                text = response.choices[0].message.content.strip()
+            all_insights.append(f"### Chunk {idx + 1}/{len(chunks)}\n{text}")
         except Exception as e:
             all_insights.append(f"LLM Extraction Failed for chunk {idx + 1}: {e}")
 

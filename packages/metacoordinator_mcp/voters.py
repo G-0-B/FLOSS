@@ -419,18 +419,15 @@ def make_litellm_voter(
     """
 
     def voter(claim: Claim) -> Vote:
-        """Call LiteLLM for one claim and normalize the provider output into a Vote."""
+        """Call the model backend for one claim and normalize the output into a Vote."""
         prompt = render_voter_prompt(claim)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
+            text = _model_completion(
+                model,
+                [{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             # Voter failures return a 0.0 neutral vote with the error as rationale
             # so the consensus gate can still tally — one broken voter doesn't

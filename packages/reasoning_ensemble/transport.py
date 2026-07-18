@@ -147,6 +147,10 @@ def resolve_voter_pool(mode: str | None = None, online_profile: str | None = Non
 
 
 def _litellm_generate(model: str, prompt: str, timeout: int) -> str:
+    if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+        from packages.omniroute_client import completion as _omni
+
+        return _omni(model, [{"role": "user", "content": prompt}], max_tokens=600, temperature=0.4)
     from litellm import completion
 
     resp = completion(
@@ -211,6 +215,10 @@ def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
 
 def _cloud_embed_fn(model: str):
     def embed(text: str) -> list[float]:
+        if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+            from packages.omniroute_client import embedding as _omni_embed
+
+            return _omni_embed(model, text)
         from litellm import embedding
 
         resp = embedding(model=model, input=[text])
