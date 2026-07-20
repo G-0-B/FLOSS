@@ -13,7 +13,13 @@ Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.
 # Start reasoning ensemble daemon (port 7332)
 Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.reasoning_ensemble.mcp_server"
 
-# OmniRoute daemon (enabled in Stage 4 once configured):
-# Start-Process -WindowStyle Hidden "omniroute" "--no-open"
+# Start OmniRoute daemon (port 20128) — model routing + token compression
+$omni = Get-Process -Name 'node' -ErrorAction SilentlyContinue | Where-Object { $_.Path -match 'omniroute' }
+if (-not $omni) {
+    Start-Process -WindowStyle Hidden "omniroute" "--no-open"
+    Write-Host "[FLOSS MCP] OmniRoute started (:20128)"
+} else {
+    Write-Host "[FLOSS MCP] OmniRoute already running (PID $($omni.Id))"
+}
 
-Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332). PID guard prevents duplicates."
+Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."
