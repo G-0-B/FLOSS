@@ -45,6 +45,7 @@ def completion(
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "stream": False,
         },
         headers=_headers(),
         timeout=timeout,
