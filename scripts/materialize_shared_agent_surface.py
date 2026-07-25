@@ -27,6 +27,17 @@ Design rules:
   - one-way projection only
   - preserve unrelated agent-native settings
   - plain JSON output even when a target supports JSONC
+
+Exit codes (`main()`, non-`--doctor` path):
+  - A `REFUSED` result (currently only a Hermes target blocked by a live
+    gateway) always exits 1 -- on a plain run, under `--dry-run`, and under
+    `--check` alike. A refused write is a failure to converge, not routine
+    drift, and orchestrators such as `refresh_agent_surfaces.py` treat any
+    non-zero exit as a hard failure rather than parsing per-line output, so
+    this must not depend on which flags were passed. This check runs first,
+    before the `--check`/drift check below.
+  - Otherwise, `--check` exits 1 if any target drifted from canonical
+    source; a plain run or `--dry-run` (with no refusals) exits 0.
 """
 
 from __future__ import annotations
@@ -36,6 +47,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import textwrap
 from typing import Any
@@ -754,6 +766,16 @@ def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+# Matches a residual, unresolved environment-variable reference left behind
+# by `os.path.expandvars` -- either Windows `%VAR%` or POSIX `$VAR`/`${VAR}`.
+# `expandvars` silently leaves an undefined reference as a literal string
+# rather than raising, so this is the only signal available that expansion
+# didn't actually happen.
+_UNRESOLVED_ENV_VAR_RE = re.compile(
+    r"%[A-Za-z_][A-Za-z0-9_]*%|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?"
+)
+
+
 def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
     """Resolve a manifest-declared path against the workspace root.
 
@@ -762,8 +784,26 @@ def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
     `$HOME` on POSIX (e.g. `%LOCALAPPDATA%/hermes/config.yaml`). This is the
     single path resolver every target should route through -- do not
     hand-roll a second one for a new writer.
+
+    An undefined variable is a loud `SharedSurfaceError`, not a silent
+    pass-through: `os.path.expandvars` leaves an undefined `%VAR%`/`$VAR` as
+    a literal string instead of raising, which would otherwise resolve to a
+    bogus path nested inside the workspace tree (e.g.
+    `<workspace_root>/%LOCALAPPDATA%/hermes/config.yaml`). A caller checking
+    `.exists()` on that path sees the same "no config there" result as a
+    legitimately-absent config, which would make a stripped-environment run
+    (a scheduled task, a minimal CI shell, ...) silently skip a target
+    instead of failing loudly.
     """
-    path = Path(os.path.expandvars(raw_path)).expanduser()
+    expanded = os.path.expandvars(raw_path)
+    unresolved = _UNRESOLVED_ENV_VAR_RE.search(expanded)
+    if unresolved is not None:
+        raise SharedSurfaceError(
+            f"Manifest path {raw_path!r} references undefined environment "
+            f"variable {unresolved.group()!r} (expands to {expanded!r}); "
+            "set the variable or fix the manifest"
+        )
+    path = Path(expanded).expanduser()
     if path.is_absolute():
         return path
     return (workspace_root / path).resolve()
@@ -1358,8 +1398,20 @@ def target_in_scope(target_cfg: dict[str, Any], include_user_scope: bool) -> boo
     `%LOCALAPPDATA%/hermes/config.yaml`), which affects every project on the
     machine, not just this workspace -- so they only run when the caller
     explicitly opts in via `--include-user-scope`.
+
+    `scope` is required, not defaulted to `"repo"`. This function exists
+    specifically to gate writes outside the repo; defaulting an *absent*
+    scope to the affirmative ("repo", which always runs) would mean a
+    future manifest entry that forgets to set `scope` on a user-scope
+    target runs unconditionally, with this gate never actually consulted.
+    A garbage value already raised -- absence is equally strict.
     """
-    scope = str(target_cfg.get("scope", "repo")).strip().lower()
+    if "scope" not in target_cfg:
+        raise SharedSurfaceError(
+            "Target is missing required `scope` field (must be 'repo' or "
+            "'user'); this gate does not default absence to 'repo'"
+        )
+    scope = str(target_cfg["scope"]).strip().lower()
     if scope not in {"repo", "user"}:
         raise SharedSurfaceError(
             f"Target `scope` must be 'repo' or 'user', got {scope!r}"
@@ -1516,10 +1568,25 @@ def materialize(
             workspace_root, str(codex_cfg["config_path"])
         )
         tomlkit = require_module("tomlkit", codex_key)
-        existing_text = (
-            codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
-        )
-        doc = tomlkit.parse(existing_text)
+        # A malformed hand-edited config or a config_path that resolves to a
+        # directory (`.exists()` is True for both a file and a directory, so
+        # nothing upstream rules the latter out) must not raise a raw
+        # traceback here: `results` is only printed by main() after
+        # materialize() returns in full, so an unguarded crash mid-loop
+        # would discard every result computed before it and silently skip
+        # the five downstream sub-materializers (roster/memory/context/
+        # hook/skill) that run later in this function.
+        try:
+            existing_text = (
+                codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
+            )
+            doc = tomlkit.parse(existing_text)
+        except SharedSurfaceError:
+            raise
+        except Exception as exc:
+            raise SharedSurfaceError(
+                f"Could not read/parse Codex config at {codex_path}: {exc}"
+            ) from exc
         apply_codex_mcp(
             doc,
             shared_mcp,
@@ -1571,8 +1638,21 @@ def materialize(
         yaml_rt.preserve_quotes = True
         yaml_rt.indent(mapping=2, sequence=4, offset=2)
         yaml_rt.width = 4096
-        with hermes_path.open("r", encoding="utf-8") as handle:
-            data = yaml_rt.load(handle)
+        # Same guard as the Codex block above: a malformed hand-edited
+        # config, or `config_path` resolving to a directory (the `.exists()`
+        # check above is True for a directory too), must become one
+        # actionable SharedSurfaceError naming the path, not a raw
+        # traceback that discards every result gathered so far and skips
+        # the downstream sub-materializers.
+        try:
+            with hermes_path.open("r", encoding="utf-8") as handle:
+                data = yaml_rt.load(handle)
+        except SharedSurfaceError:
+            raise
+        except Exception as exc:
+            raise SharedSurfaceError(
+                f"Could not read/parse Hermes config at {hermes_path}: {exc}"
+            ) from exc
         apply_hermes_mcp(
             data,
             shared_mcp,
@@ -1707,6 +1787,15 @@ def main() -> int:
     )
     for line in results:
         print(line)
+    # A refused write (currently only a live-gateway-blocked Hermes target)
+    # is a failure to converge, not routine drift -- it must exit non-zero
+    # regardless of --check/--dry-run, since orchestrators such as
+    # refresh_agent_surfaces.py key their "ok"/"fail" summary off the
+    # process exit code, not per-line text. Checked before the --check
+    # drift branch below, and independent of it.
+    refused = [line for line in results if line.startswith("REFUSED")]
+    if refused:
+        return 1
     if args.check and drift_found:
         return 1
     return 0

@@ -820,8 +820,16 @@ def test_target_in_scope_user_requires_flag():
     assert mas.target_in_scope({"scope": "user"}, True) is True
 
 
-def test_target_in_scope_defaults_to_repo_when_absent():
-    assert mas.target_in_scope({}, False) is True
+def test_target_in_scope_requires_explicit_scope_field():
+    """Fix 4 (review of 79dd0d6): absence of `scope` must raise, not
+
+    default to "repo" (i.e. write unconditionally). This function exists to
+    gate writes outside the repo; defaulting absence to the affirmative
+    would let a future manifest entry that forgets `scope` on a user-scope
+    target skip the gate entirely.
+    """
+    with pytest.raises(mas.SharedSurfaceError, match="scope"):
+        mas.target_in_scope({}, False)
 
 
 def test_target_in_scope_rejects_invalid_scope_value():
@@ -837,3 +845,191 @@ def test_resolve_manifest_path_expands_env_vars(tmp_path, monkeypatch):
     monkeypatch.setenv("MAS_TEST_VAR", str(tmp_path / "expanded"))
     resolved = mas.resolve_manifest_path(tmp_path, "%MAS_TEST_VAR%/hermes/config.yaml")
     assert resolved == (tmp_path / "expanded" / "hermes" / "config.yaml").resolve()
+
+
+# ---------------------------------------------------------------------------
+# Review fixes on top of 79dd0d6 (risk/robustness issues found in quality
+# review; spec compliance passed cleanly).
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_manifest_path_raises_on_undefined_env_var(tmp_path, monkeypatch):
+    """Fix 3: an undefined `%VAR%`/`$VAR` must raise loudly, not silently
+
+    resolve to a bogus literal path nested inside the workspace tree.
+    `os.path.expandvars` leaves an undefined reference untouched instead of
+    raising, which -- left unchecked -- makes a stripped-environment run
+    (scheduled task, minimal CI shell, ...) silently treat a real config as
+    "not found" instead of failing.
+    """
+    monkeypatch.delenv("MAS_DEFINITELY_UNDEFINED_VAR", raising=False)
+    with pytest.raises(mas.SharedSurfaceError, match="MAS_DEFINITELY_UNDEFINED_VAR"):
+        mas.resolve_manifest_path(
+            tmp_path, "%MAS_DEFINITELY_UNDEFINED_VAR%/hermes/config.yaml"
+        )
+
+
+def test_materialize_exits_nonzero_on_refused_hermes_write_on_real_run(
+    tmp_path, monkeypatch
+):
+    """Fix 1 (CRITICAL): a REFUSED write must not report process success.
+
+    Calls the real `main()` entry point (via a monkeypatched `sys.argv`)
+    against a synthetic tmp_path manifest -- never the real workspace
+    config -- on a plain (non-`--check`) run, since the bug was specifically
+    that `main()`'s exit code only considered drift under `--check`. Before
+    this fix, `args.check and drift_found` was `False` on a non-`--check`
+    run, so a REFUSED Hermes write (which sets `drift_found = True` but
+    never writes) still exited 0 -- indistinguishable from success to a
+    caller like `refresh_agent_surfaces.py` that keys off exit code alone.
+    """
+    import os
+    import sys
+
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    hermes_config_path = hermes_dir / "config.yaml"
+    original_content = "mcp_servers:\n  existing:\n    command: foo\n"
+    hermes_config_path.write_text(original_content, encoding="utf-8")
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid(), "kind": "hermes-gateway"}), encoding="utf-8"
+    )
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "materialize_shared_agent_surface.py",
+            "--workspace-root",
+            str(tmp_path),
+            "--manifest",
+            str(manifest_path),
+        ],
+    )
+
+    exit_code = mas.main()
+
+    assert exit_code == 1
+    # The refused write must not have touched the file.
+    assert hermes_config_path.read_text(encoding="utf-8") == original_content
+
+
+def test_materialize_wraps_malformed_codex_toml_in_shared_surface_error(
+    tmp_path, monkeypatch
+):
+    """Fix 2: a malformed hand-edited Codex config must raise one actionable
+
+    SharedSurfaceError naming the path, not a raw tomlkit traceback that
+    (since `results` is only printed after materialize() returns in full)
+    would discard every result gathered before it and silently skip the
+    downstream sub-materializers that run later in the function.
+    """
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    codex_dir = tmp_path / "codex"
+    codex_dir.mkdir()
+    (codex_dir / "config.toml").write_text("not [valid toml", encoding="utf-8")
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": "codex/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError, match="Codex config"):
+        mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
+
+
+def test_materialize_wraps_malformed_hermes_yaml_in_shared_surface_error(
+    tmp_path, monkeypatch
+):
+    """Fix 2, Hermes side: same guard as the Codex test above."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    (hermes_dir / "config.yaml").write_text(
+        "mcp_servers:\n  existing:\n    command: foo\n  bad: [unterminated\n",
+        encoding="utf-8",
+    )
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError, match="Hermes config"):
+        mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
+
+
+def test_materialize_reports_clear_error_for_codex_config_path_that_is_a_directory(
+    tmp_path, monkeypatch
+):
+    """Fix 5: `.exists()` is True for a directory too, so a `config_path`
+
+    that names a directory must not fall through to a raw
+    IsADirectoryError/PermissionError from `read_text()`.
+    """
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    codex_dir = tmp_path / "codex"
+    codex_dir.mkdir()
+    (codex_dir / "config.toml").mkdir()  # config_path resolves to a directory
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": "codex/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError, match="Codex config"):
+        mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
+
+
+def test_materialize_reports_clear_error_for_hermes_config_path_that_is_a_directory(
+    tmp_path, monkeypatch
+):
+    """Fix 5, Hermes side: same guard as the Codex test above."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    (hermes_dir / "config.yaml").mkdir()  # config_path resolves to a directory
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError, match="Hermes config"):
+        mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
