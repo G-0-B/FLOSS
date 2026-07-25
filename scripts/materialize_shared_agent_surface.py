@@ -283,6 +283,11 @@ def classify_transport(name: str, server: dict[str, Any]) -> tuple[str, dict[str
     This is the single source of transport dispatch for every target. Do not
     reimplement it per target -- divergent copies are what broke the surface
     on 2026-07-17.
+
+    Precedence when a server entry defines both `command` and `url`: stdio
+    wins and `url` is silently ignored. This is intentional, existing
+    behavior -- documented here so downstream targets (OpenCode, Codex,
+    Hermes, ...) don't each reinvent a different tie-break.
     """
     if not isinstance(server, dict):
         raise SharedSurfaceError(f"Shared MCP server {name!r} must be a JSON object")
@@ -335,30 +340,23 @@ def classify_transport(name: str, server: dict[str, Any]) -> tuple[str, dict[str
 
 
 def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[str, Any]:
-    command = server.get("command")
-    args = server.get("args") or []
-    env = server.get("env")
-    if not isinstance(command, str) or not command.strip():
-        raise SharedSurfaceError(
-            f"Shared MCP server {name!r} cannot be projected to OpenCode without a `command` string"
-        )
-    if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
-        raise SharedSurfaceError(
-            f"Shared MCP server {name!r} has non-string args and cannot be projected to OpenCode"
-        )
+    """Project a shared MCP server into OpenCode's config shape.
+
+    OpenCode uses `{"type": "local", "command": [...]}` for stdio and
+    `{"type": "remote", "url": ...}` for HTTP (the shape its own
+    `openwork-browser`/`chrome` entries already use).
+    """
+    transport, spec = classify_transport(name, server)
+
+    if transport == "http":
+        return {"type": "remote", "url": spec["url"]}
+
     payload: dict[str, Any] = {
-        "command": [command, *args],
+        "command": [spec["command"], *spec["args"]],
         "type": "local",
     }
-    if env is not None:
-        if not isinstance(env, dict) or not all(
-            isinstance(key, str) and isinstance(value, str)
-            for key, value in env.items()
-        ):
-            raise SharedSurfaceError(
-                f"Shared MCP server {name!r} has non-string env values and cannot be projected to OpenCode"
-            )
-        payload["environment"] = env
+    if spec["env"]:
+        payload["environment"] = spec["env"]
     return payload
 
 
