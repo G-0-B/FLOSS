@@ -273,6 +273,67 @@ def build_gemini_payload(
     return payload
 
 
+def classify_transport(name: str, server: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Classify a shared MCP server entry as `stdio` or `http`.
+
+    Returns `(transport, spec)`. For stdio, `spec` has `command` (str),
+    `args` (list[str]) and `env` (dict[str, str] | None). For http, `spec`
+    has `url` (str) and `headers` (dict[str, str] | None).
+
+    This is the single source of transport dispatch for every target. Do not
+    reimplement it per target -- divergent copies are what broke the surface
+    on 2026-07-17.
+    """
+    if not isinstance(server, dict):
+        raise SharedSurfaceError(f"Shared MCP server {name!r} must be a JSON object")
+
+    command = server.get("command")
+    url = server.get("url")
+
+    if isinstance(command, str) and command.strip():
+        args = server.get("args") or []
+        if not isinstance(args, list) or not all(
+            isinstance(item, str) for item in args
+        ):
+            raise SharedSurfaceError(
+                f"Shared MCP server {name!r} stdio `args` must be a list of strings"
+            )
+        env = server.get("env")
+        if env is not None and (
+            not isinstance(env, dict)
+            or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in env.items()
+            )
+        ):
+            raise SharedSurfaceError(
+                f"Shared MCP server {name!r} stdio `env` must be a string map"
+            )
+        return "stdio", {
+            "command": command,
+            "args": list(args),
+            "env": dict(env) if env else None,
+        }
+
+    if isinstance(url, str) and url.strip():
+        headers = server.get("headers")
+        if headers is not None and (
+            not isinstance(headers, dict)
+            or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in headers.items()
+            )
+        ):
+            raise SharedSurfaceError(
+                f"Shared MCP server {name!r} HTTP `headers` must be a string map"
+            )
+        return "http", {"url": url, "headers": dict(headers) if headers else None}
+
+    raise SharedSurfaceError(
+        f"Shared MCP server {name!r} must define either `command` or `url`"
+    )
+
+
 def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[str, Any]:
     command = server.get("command")
     args = server.get("args") or []
