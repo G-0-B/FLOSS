@@ -828,7 +828,21 @@ git commit -m "surface: add Hermes YAML MCP writer with gateway liveness guard"
 > 2. **`check_or_write_text` CREATES missing files.** It delegates to `write_text`, which does `path.parent.mkdir(parents=True, exist_ok=True)`. There is no "update only if present" mode, and `changed` defaults to `True` for a nonexistent file — missing is indistinguishable from "content differs". The Hermes blocks must therefore guard existence *before* calling it, or they will fabricate a Hermes config where none exists.
 > 3. **There is no "REFUSED" vocabulary in this codebase.** The message set is `CHECK DRIFT/OK`, `PLAN WRITE/KEEP`, `WROTE`, `OK`. A refused Hermes write must append its own message to `results` and set `drift_found = True` manually. Note that `main()` only converts `drift_found` into exit 1 **when `--check` is passed** — in a normal writing run the message is the only signal.
 > 4. **`materialize()`'s per-target dispatch has ZERO test coverage today.** The only end-to-end test (`scripts/tests/test_shared_agent_surface.py::test_umbrella_materializer_refreshes_memory_before_context`) passes `"targets": {}`, so it never enters the per-target blocks. Every other test calls `build_*` helpers directly. **Task 7 must add `materialize()`-level tests with populated `targets`** covering: repo-scope target written, user-scope target skipped without the flag, user-scope target written with the flag, and Hermes refused when a gateway PID is live. Without these the four new blocks land unprotected.
-> 5. **Validate `name_map` collisions once, centrally.** Two shared servers mapping to one target name is silent data loss. Task 5's review added a guard inside the Codex writer; prefer hoisting the check so every target gets it rather than duplicating per-writer.
+> 5. **Validate `name_map` collisions once, centrally.** Two shared servers mapping to one target name is silent data loss. Task 5's review added a guard inside the Codex writer; prefer hoisting the check so every target gets it rather than duplicating per-writer. *(Done in Task 6 — `ensure_no_name_map_collisions`.)*
+>
+> **Further amendments from Task 6's code review — these are prerequisites for the Task 9 fidelity gate, not optional polish:**
+>
+> 6. **Use exactly this ruamel configuration** when opening a Hermes `config.yaml`. This is the single biggest lever on diff size:
+>    ```python
+>    yaml = YAML()
+>    yaml.preserve_quotes = True
+>    yaml.indent(mapping=2, sequence=4, offset=2)
+>    yaml.width = 4096
+>    ```
+>    Measured on a copy of the real `.toilet/hermes/config.yaml` (748 lines) with a no-op merge: bare `YAML()` produces a **398-line diff** (global block-sequence reflow — `args` lists shift from the file's native offset style to flush style, even on entries the writer never touched). Adding `indent(...)` alone but leaving the default width (~80) introduces a *new* bug: the `api_key` scalar sits at 81 chars and gets force-wrapped across two lines. With `indent(...)` **and** `width=4096` together the diff collapses to a **single hunk**.
+> 7. **The residual hunk is irreducible — do not chase it.** It is the `personalities:` block: 8 long strings that were wrapped by some other YAML emitter, at fold points ruamel's greedy wrapper does not reproduce at any width. Any width that avoids the `api_key` mis-wrap collapses them to single long lines instead. It is cosmetic, confined to pre-existing content the writer never touches, and vastly smaller than the unconfigured blast radius. **Task 9 must expect this diff on Hermes and not treat it as a fidelity failure.**
+> 8. **Fail closed at the call site on undeterminable liveness.** `hermes_gateway_alive` returning `None` means "no live gateway" for the *defined* states (no pidfile, corrupt pidfile, dead PID). Task 6's fix makes `_pid_alive` return `True` when it cannot determine liveness of a valid PID, so the refusal path triggers. Do not add call-site logic that reinterprets `None` as unconditionally safe.
+> 9. **Add a real-file-shape fidelity test.** The existing Hermes tests use a ~20-line fixture that is too tidy to catch either the width-driven `api_key` mis-wrap or the personalities reflow — both only appear against a file with long unwrapped scalars and pre-wrapped content. Build a secret-stripped fixture with that shape and assert a no-op round-trip produces a diff confined to a documented allowlist.
 
 **Files:**
 - Modify: `scripts/materialize_shared_agent_surface.py` (`materialize()` signature + dispatch, `main()` argparse)
@@ -1043,6 +1057,13 @@ git commit -m "surface: register Codex + Hermes MCP targets in the manifest"
 ### Task 9: Fidelity gate — the propagator must not revert the 2026-07-24 fixes
 
 This is the acceptance test for the whole effort.
+
+> **Expected-diff allowlist (from Task 6's review).** Two diffs are known-benign and must NOT be treated as gate failures:
+>
+> - **Hermes `personalities:` block reflow.** ruamel re-emits 8 long strings that another tool wrapped, at different fold points. Cosmetic, confined to content the writer never touches, unavoidable. See Task 7 amendment 7.
+> - **Gemini `settings.json` wholesale MCP rewrite.** `.gemini/settings.json` was never migrated — it still carries all four servers as `npx -y januscope@latest`, the full pre-migration state. The propagator correcting it to canonical is the *intended* outcome, not a regression. This surface was discovered during Task 4 and nobody had noticed it was stale.
+>
+> Everything else — any change to a server's transport, command, or URL in OpenCode, Codex, or Hermes — is a genuine failure of the gate.
 
 **Files:** none modified (verification only).
 
