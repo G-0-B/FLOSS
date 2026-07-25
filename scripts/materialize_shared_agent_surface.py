@@ -532,19 +532,40 @@ def apply_codex_mcp(
 
 
 def _pid_alive(pid: int) -> bool:
-    """Return True if `pid` is a live process."""
+    """Return True if `pid` is a live process, or if liveness cannot be
+    determined.
+
+    This is a liveness *guard*, not a liveness *report*: its only purpose is
+    to stop a config write while a Hermes gateway might still be running and
+    about to clobber the file on shutdown. So an inability to determine
+    liveness (`tasklist` missing or blocked by policy, an unexpected
+    non-zero exit, empty output) must fail CLOSED -- treated as "alive" so
+    the caller refuses to write -- rather than fail open into the exact
+    silent data loss this guard exists to prevent.
+    """
     if os.name == "nt":
-        completed = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return True  # could not even invoke tasklist -- fail closed
+        if completed.returncode != 0 or not completed.stdout.strip():
+            return True  # no usable output to judge liveness -- fail closed
+        # `tasklist /FI "PID eq N"` does exact PID filtering server-side, so
+        # this substring check is belt-and-suspenders, not the actual safety
+        # mechanism (verified: "PID eq 122" does not match a running pid
+        # 1220 -- tasklist's own filter already disambiguates that).
         return str(pid) in completed.stdout
     try:
         os.kill(pid, 0)
-    except OSError:
+    except ProcessLookupError:
         return False
+    except OSError:
+        return True  # e.g. PermissionError -- process exists, fail closed
     return True
 
 
@@ -581,11 +602,28 @@ def apply_hermes_mcp(
 
     Precedence matches `apply_codex_mcp`: managed transport fields, then
     whatever already existed on the entry, then manifest `overrides` last --
-    overrides beat everything.
+    overrides beat everything. `env` follows the same rule as Codex: the
+    shared entry's `env` replaces any existing `env` when it defines one;
+    otherwise a target-local `env` block survives untouched for a stdio
+    entry, and is dropped as stale if the entry is converted to http.
 
     Unlike the Codex writer this mutates the existing mapping in place. YAML
     mappings have no positional/header hazard, so there is no need to rebuild
     the node, and mutating in place is what lets ruamel preserve comments.
+
+    Only the fields belonging to the transport being *vacated* are cleared
+    before the managed fields are (re)assigned -- never every managed field
+    unconditionally. `CommentedMap.__setitem__` preserves an existing key's
+    position; it is `del` followed by re-add that moves a key to the end of
+    the mapping. Deleting unconditionally therefore reordered every touched
+    entry on every run, including a true no-op merge where nothing actually
+    changed -- which breaks Task 9's fidelity gate (regenerating must
+    produce no spurious diff against a verified-good config).
+
+    A `target_name` that exists but isn't a mapping (including a YAML null,
+    e.g. `serena:` with nothing after it) raises `SharedSurfaceError` rather
+    than being silently coerced or merged into -- consistent with the
+    non-mapping guard `apply_codex_mcp` applies to malformed TOML tables.
 
     Callers are responsible for checking `hermes_gateway_alive()` and
     importing `ruamel.yaml` (via `require_module`) before calling this --
@@ -602,26 +640,31 @@ def apply_hermes_mcp(
         target_name = name_map.get(shared_name, shared_name)
         transport, spec = classify_transport(shared_name, server)
 
-        existing = servers.get(target_name)
-        if existing is not None and not hasattr(existing, "items"):
-            raise SharedSurfaceError(
-                f"Hermes mcp_servers.{target_name!r} exists but is not a "
-                f"mapping (got {type(existing).__name__}); refusing to "
-                "merge into it"
-            )
-
-        if target_name not in servers:
+        # `.get()` can't distinguish "key absent" from "key present with a
+        # YAML null value" -- both come back None. Check membership
+        # explicitly so a present-but-null entry hits the malformed-entry
+        # guard instead of silently becoming `entry = None` and crashing
+        # later with a TypeError.
+        if target_name in servers:
+            existing = servers[target_name]
+            if not hasattr(existing, "items"):
+                raise SharedSurfaceError(
+                    f"Hermes mcp_servers.{target_name!r} exists but is not a "
+                    f"mapping (got {type(existing).__name__}); refusing to "
+                    "merge into it"
+                )
+        else:
             servers[target_name] = {}
         entry = servers[target_name]
 
-        for key in MANAGED_TRANSPORT_FIELDS:
-            if key in entry:
-                del entry[key]
-
         if transport == "http":
+            for key in ("command", "args", "env"):
+                entry.pop(key, None)
             entry["type"] = "http"
             entry["url"] = spec["url"]
         else:
+            for key in ("type", "url"):
+                entry.pop(key, None)
             entry["command"] = spec["command"]
             entry["args"] = spec["args"]
             if spec["env"] is not None:

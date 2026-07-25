@@ -450,3 +450,116 @@ def test_hermes_rejects_non_mapping_existing_entry():
             name_map={},
             overrides={},
         )
+
+
+def test_hermes_rejects_null_existing_entry():
+    """A present-but-null YAML value (`serena:` with nothing after it)
+
+    parses to None. `.get()` can't distinguish that from "key absent", so
+    an earlier revision let it slip past the malformed-entry guard and
+    crash later with `TypeError: argument of type 'NoneType' is not
+    iterable`. Membership must be checked explicitly instead.
+    """
+    text = "mcp_servers:\n  serena:\n"
+    yaml, data = _roundtrip(text)
+    assert data["mcp_servers"]["serena"] is None
+    with pytest.raises(mas.SharedSurfaceError, match="not a mapping"):
+        mas.apply_hermes_mcp(
+            data,
+            {"serena": {"command": "januscope", "args": []}},
+            name_map={},
+            overrides={},
+        )
+
+
+def test_hermes_noop_merge_preserves_key_order():
+    """Regression test for Fix 1: a merge that changes nothing must leave
+
+    key order byte-identical. `CommentedMap.__setitem__` preserves an
+    existing key's position; only `del` followed by re-add moves a key to
+    the end. An earlier revision deleted every managed field
+    unconditionally before reassigning, which reordered every touched
+    entry on every run -- including this no-op case -- and would break
+    Task 9's fidelity gate (regenerating must produce no spurious diff
+    against a verified-good config).
+    """
+    text = """\
+mcp_servers:
+  Agent Memory:
+    command: januscope
+    args:
+      - --config
+      - am.yaml
+    env:
+      AGENTMEMORY_TOOLS: all
+  flossiullk-consensus:
+    type: http
+    url: http://127.0.0.1:7331/mcp
+    enabled: true
+    timeout: 120
+"""
+    yaml, data = _roundtrip(text)
+    before_stdio_keys = list(data["mcp_servers"]["Agent Memory"].keys())
+    before_http_keys = list(data["mcp_servers"]["flossiullk-consensus"].keys())
+
+    mas.apply_hermes_mcp(
+        data,
+        {
+            "agentmemory": {
+                "command": "januscope",
+                "args": ["--config", "am.yaml"],
+                "env": {"AGENTMEMORY_TOOLS": "all"},
+            },
+            "flossiullk-consensus": {"url": "http://127.0.0.1:7331/mcp"},
+        },
+        name_map={"agentmemory": "Agent Memory"},
+        overrides={},
+    )
+
+    assert list(data["mcp_servers"]["Agent Memory"].keys()) == before_stdio_keys
+    assert list(data["mcp_servers"]["flossiullk-consensus"].keys()) == before_http_keys
+
+
+def test_hermes_stdio_to_http_clears_stale_fields():
+    text = """\
+mcp_servers:
+  switched:
+    command: old-cmd
+    args: [--old]
+    env:
+      OLD: value
+"""
+    yaml, data = _roundtrip(text)
+    mas.apply_hermes_mcp(
+        data,
+        {"switched": {"url": "http://127.0.0.1:9999/mcp"}},
+        name_map={},
+        overrides={},
+    )
+    entry = data["mcp_servers"]["switched"]
+    assert entry["type"] == "http"
+    assert entry["url"] == "http://127.0.0.1:9999/mcp"
+    assert "command" not in entry
+    assert "args" not in entry
+    assert "env" not in entry
+
+
+def test_hermes_http_to_stdio_clears_stale_fields():
+    text = """\
+mcp_servers:
+  switched:
+    type: http
+    url: http://127.0.0.1:9999/mcp
+"""
+    yaml, data = _roundtrip(text)
+    mas.apply_hermes_mcp(
+        data,
+        {"switched": {"command": "new-cmd", "args": ["--new"]}},
+        name_map={},
+        overrides={},
+    )
+    entry = data["mcp_servers"]["switched"]
+    assert entry["command"] == "new-cmd"
+    assert entry["args"] == ["--new"]
+    assert "type" not in entry
+    assert "url" not in entry
