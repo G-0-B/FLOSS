@@ -229,11 +229,35 @@ def toml_inline_table(mapping: dict[str, Any]) -> str:
     return "{ " + rendered + " }"
 
 
+# Every literal key `materialize()` dispatches on under manifest["targets"].
+# Kept in sync manually with the dispatch code below -- an unrecognized
+# target key (a typo, or a not-yet-wired 7th harness) must raise loudly here
+# rather than silently materializing nothing for it and reporting clean.
+KNOWN_TARGET_KEYS = frozenset(
+    {
+        "gemini",
+        "opencode",
+        "vibe",
+        "codex",
+        "codex_user",
+        "hermes_workspace",
+        "hermes_user",
+    }
+)
+
+
 def resolve_manifest(workspace_root: Path, manifest_path: Path) -> dict[str, Any]:
     manifest = load_json(manifest_path)
     if not isinstance(manifest.get("targets"), dict):
         raise SharedSurfaceError(
             f"{manifest_path} must contain an object-valued `targets` field"
+        )
+    unknown_target_keys = set(manifest["targets"]) - KNOWN_TARGET_KEYS
+    if unknown_target_keys:
+        raise SharedSurfaceError(
+            f"{manifest_path} `targets` has unrecognized key(s) "
+            f"{sorted(unknown_target_keys)!r}; known targets are "
+            f"{sorted(KNOWN_TARGET_KEYS)!r}"
         )
     if (
         not isinstance(manifest.get("mcp_source"), str)
@@ -454,7 +478,11 @@ def apply_codex_mcp(
     rejected with `url is not supported for stdio`.
 
     `env` is treated as managed only when the shared entry defines it, so a
-    target-local templated env block survives.
+    target-local templated env block survives -- but only for a target that
+    stays on stdio. A target whose transport switches to http never carries
+    its old `env` forward, even if the shared entry doesn't define one:
+    an env block (which may hold credentials) must not survive a transport
+    switch away from stdio.
 
     Precedence, low to high: managed transport fields, then whatever already
     existed on the target entry, then manifest `overrides` -- overrides beat
@@ -526,11 +554,15 @@ def apply_codex_mcp(
 
         # 3. tables, or TOML re-parents every later scalar into them (see
         #    docstring above -- defense-in-depth, not load-bearing today).
-        #    `env` is managed only when the shared entry defines one.
-        if transport == "stdio" and spec["env"] is not None:
-            entry["env"] = spec["env"]
-        elif preserved_env is not None:
-            entry["env"] = preserved_env
+        #    `env` is managed only when the shared entry defines one, and is
+        #    only ever carried over for a stdio target: a target converted
+        #    to http must not keep a stale (possibly credential-bearing)
+        #    `env` table from its previous stdio configuration.
+        if transport == "stdio":
+            if spec["env"] is not None:
+                entry["env"] = spec["env"]
+            elif preserved_env is not None:
+                entry["env"] = preserved_env
         for key, value in preserved_tables.items():
             entry[key] = value
 

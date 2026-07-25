@@ -222,6 +222,55 @@ def test_codex_env_preserved_when_shared_entry_has_no_env():
     )
 
 
+def test_codex_stdio_to_http_clears_stale_env():
+    """A stdio->http transport switch must not carry the old `env` forward.
+
+    Mirrors test_hermes_stdio_to_http_clears_stale_fields. Synthetic fixture
+    only -- never the real Codex config, never a real credential value.
+    """
+    doc = tomlkit.parse(
+        "[mcp_servers.switched]\n"
+        'type = "stdio"\n'
+        'command = "old-cmd"\n'
+        'args = ["--old"]\n\n'
+        "[mcp_servers.switched.env]\n"
+        'STALE_TOKEN = "leftover"\n'
+    )
+    mas.apply_codex_mcp(
+        doc,
+        {"switched": {"url": "http://127.0.0.1:9999/mcp"}},
+        name_map={},
+        overrides={},
+    )
+    reparsed = tomlkit.parse(tomlkit.dumps(doc))
+    entry = reparsed["mcp_servers"]["switched"]
+    assert entry["type"] == "streamable_http"
+    assert entry["url"] == "http://127.0.0.1:9999/mcp"
+    assert "command" not in entry
+    assert "env" not in entry
+
+
+def test_codex_http_to_stdio_clears_stale_url():
+    """An http->stdio transport switch must not carry the old `url` forward."""
+    doc = tomlkit.parse(
+        "[mcp_servers.switched]\n"
+        'type = "streamable_http"\n'
+        'url = "http://127.0.0.1:9999/mcp"\n'
+    )
+    mas.apply_codex_mcp(
+        doc,
+        {"switched": {"command": "new-cmd", "args": ["--new"]}},
+        name_map={},
+        overrides={},
+    )
+    reparsed = tomlkit.parse(tomlkit.dumps(doc))
+    entry = reparsed["mcp_servers"]["switched"]
+    assert entry["type"] == "stdio"
+    assert entry["command"] == "new-cmd"
+    assert entry["args"] == ["--new"]
+    assert "url" not in entry
+
+
 CODEX_EXISTING_WITH_TIMEOUT = """\
 model = "gpt-5.6-sol"
 
@@ -626,6 +675,36 @@ def _write_synthetic_manifest(workspace: Path, targets: dict) -> Path:
         encoding="utf-8",
     )
     return manifest_path
+
+
+def test_resolve_manifest_rejects_unknown_target_key(tmp_path):
+    """A typo'd or not-yet-wired target key under `targets` must raise
+    loudly. Before this check, materialize() dispatched by a fixed set of
+    literal keys with no validation that every manifest key was one of
+    them -- an unrecognized key (e.g. a typo, or a new 7th harness) was a
+    silent no-op: empty results, drift=False, exit 0, nothing written.
+    """
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_wrkspace_typo": {"config_path": "hermes.yaml"},
+            "windsurf": {"config_path": "windsurf.toml"},
+        },
+    )
+    with pytest.raises(mas.SharedSurfaceError, match="unrecognized key"):
+        mas.resolve_manifest(tmp_path, manifest_path)
+
+
+def test_resolve_manifest_accepts_all_known_target_keys(tmp_path):
+    """Every currently-dispatched target key must NOT raise -- this is the
+    inverse of test_resolve_manifest_rejects_unknown_target_key and guards
+    against KNOWN_TARGET_KEYS drifting out of sync with the real manifest.
+    """
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {key: {} for key in mas.KNOWN_TARGET_KEYS},
+    )
+    mas.resolve_manifest(tmp_path, manifest_path)
 
 
 def test_materialize_writes_repo_scope_codex_target(tmp_path, monkeypatch):
