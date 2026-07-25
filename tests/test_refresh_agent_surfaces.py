@@ -68,14 +68,20 @@ def test_dry_run_only_summary_says_planned_not_clean():
 
 
 def test_check_and_dry_run_together_uses_check_semantics():
-    """--check takes precedence over --dry-run when both are given: output
-    uses CHECK OK/DRIFT wording (not PLAN), and a real drift exits 1."""
+    """--check takes precedence over --dry-run when both are given.
+
+    Asserts only the wording contract (CHECK vocabulary, never PLAN). The
+    exit code is deliberately NOT asserted: it depends on whether the
+    workspace happens to be drifted at the moment the test runs, and an
+    earlier version of this test pinned exit 1 against ambient drift --
+    which broke the moment a real propagation run cleaned that drift up.
+    Exit-code semantics are covered by the `summarize` unit tests, which
+    are independent of workspace state.
+    """
     result = run("--only", "ai-roster", "--check", "--dry-run")
     assert "CHECK" in result.stdout
     assert "PLAN" not in result.stdout
-    # ai-roster currently has real, pre-existing drift in this workspace
-    # (verified live); under --check that must surface as exit 1.
-    assert result.returncode == 1
+    assert result.returncode in (0, 1)
 
 
 def test_build_command_includes_user_scope_for_agent_surface():
