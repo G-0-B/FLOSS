@@ -1101,16 +1101,6 @@ def materialize(
         results.append(message)
         drift_found = drift_found or changed
 
-    vibe_cfg = targets.get("vibe")
-    if isinstance(vibe_cfg, dict) and vibe_cfg.get("config_path"):
-        vibe_config_path = workspace_root / str(vibe_cfg["config_path"])
-        vibe_config = build_vibe_config(workspace_root, shared_mcp, vibe_cfg)
-        message, changed = check_or_write_text(
-            vibe_config_path, vibe_config, check=check, dry_run=dry_run
-        )
-        results.append(message)
-        drift_found = drift_found or changed
-
         agent_instruction_raw = opencode_cfg.get("agent_instruction_path")
         if agent_instruction_raw is not None:
             if (
@@ -1129,6 +1119,16 @@ def materialize(
             )
             results.append(message)
             drift_found = drift_found or changed
+
+    vibe_cfg = targets.get("vibe")
+    if isinstance(vibe_cfg, dict) and vibe_cfg.get("config_path"):
+        vibe_config_path = workspace_root / str(vibe_cfg["config_path"])
+        vibe_config = build_vibe_config(workspace_root, shared_mcp, vibe_cfg)
+        message, changed = check_or_write_text(
+            vibe_config_path, vibe_config, check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
 
         startup_prompt_raw = vibe_cfg.get("startup_prompt_path")
         if startup_prompt_raw is not None:
