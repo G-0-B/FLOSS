@@ -33,7 +33,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import subprocess
 import textwrap
 from typing import Any
 from urllib import error, request
@@ -404,6 +406,28 @@ def build_opencode_payload(
 MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url")
 
 
+def ensure_no_name_map_collisions(
+    shared_mcp: dict[str, Any], name_map: dict[str, str], target: str
+) -> None:
+    """Raise if two shared servers would collide on one target name.
+
+    Two shared servers silently colliding on one target name would
+    last-write-win and lose a server's config with no warning -- and this
+    comes from a manifest file, so that's silent data loss. Shared by every
+    writer (Codex, Hermes, ...) that accepts a `name_map`.
+    """
+    target_to_shared: dict[str, list[str]] = {}
+    for shared_name in shared_mcp:
+        target_name = name_map.get(shared_name, shared_name)
+        target_to_shared.setdefault(target_name, []).append(shared_name)
+    for target_name, shared_names in target_to_shared.items():
+        if len(shared_names) > 1:
+            raise SharedSurfaceError(
+                f"{target} name_map collision: shared servers {shared_names!r} "
+                f"all map to target name {target_name!r}"
+            )
+
+
 def apply_codex_mcp(
     doc: Any,
     shared_mcp: dict[str, Any],
@@ -437,20 +461,8 @@ def apply_codex_mcp(
     """
     tomlkit = require_module("tomlkit", "codex")
 
-    # Detect name_map collisions up front. Two shared servers silently
-    # colliding on one target name would otherwise last-write-win and lose
-    # a server's config with no warning -- and this comes from a manifest
-    # file, so that's silent data loss.
-    target_to_shared: dict[str, list[str]] = {}
-    for shared_name in shared_mcp:
-        target_name = name_map.get(shared_name, shared_name)
-        target_to_shared.setdefault(target_name, []).append(shared_name)
-    for target_name, shared_names in target_to_shared.items():
-        if len(shared_names) > 1:
-            raise SharedSurfaceError(
-                f"Codex name_map collision: shared servers {shared_names!r} "
-                f"all map to target name {target_name!r}"
-            )
+    # Detect name_map collisions up front (shared with the Hermes writer).
+    ensure_no_name_map_collisions(shared_mcp, name_map, "Codex")
 
     if "mcp_servers" not in doc:
         doc["mcp_servers"] = tomlkit.table(is_super_table=True)
@@ -517,6 +529,108 @@ def apply_codex_mcp(
         servers[target_name] = entry
 
     return doc
+
+
+def _pid_alive(pid: int) -> bool:
+    """Return True if `pid` is a live process."""
+    if os.name == "nt":
+        completed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return str(pid) in completed.stdout
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def hermes_gateway_alive(home: Path) -> int | None:
+    """Return the PID of a live Hermes gateway for `home`, else None.
+
+    A running gateway rewrites its own config.yaml on shutdown and would
+    clobber anything written underneath it, so writes must be refused while
+    it is alive.
+    """
+    pid_file = home / "gateway.pid"
+    if not pid_file.exists():
+        return None
+    try:
+        payload = json.loads(pid_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    pid = payload.get("pid")
+    if not isinstance(pid, int):
+        return None
+    return pid if _pid_alive(pid) else None
+
+
+def apply_hermes_mcp(
+    data: Any,
+    shared_mcp: dict[str, Any],
+    name_map: dict[str, str],
+    overrides: dict[str, Any],
+) -> Any:
+    """Merge shared MCP servers into a parsed Hermes config.yaml document.
+
+    Hermes supports Streamable HTTP natively via `type: http` + `url`, and
+    stdio via `command`/`args`/`env`.
+
+    Precedence matches `apply_codex_mcp`: managed transport fields, then
+    whatever already existed on the entry, then manifest `overrides` last --
+    overrides beat everything.
+
+    Unlike the Codex writer this mutates the existing mapping in place. YAML
+    mappings have no positional/header hazard, so there is no need to rebuild
+    the node, and mutating in place is what lets ruamel preserve comments.
+
+    Callers are responsible for checking `hermes_gateway_alive()` and
+    importing `ruamel.yaml` (via `require_module`) before calling this --
+    this function operates on an already-parsed document and needs neither.
+    """
+    ensure_no_name_map_collisions(shared_mcp, name_map, "Hermes")
+
+    servers = data.get("mcp_servers")
+    if servers is None:
+        data["mcp_servers"] = {}
+        servers = data["mcp_servers"]
+
+    for shared_name, server in shared_mcp.items():
+        target_name = name_map.get(shared_name, shared_name)
+        transport, spec = classify_transport(shared_name, server)
+
+        existing = servers.get(target_name)
+        if existing is not None and not hasattr(existing, "items"):
+            raise SharedSurfaceError(
+                f"Hermes mcp_servers.{target_name!r} exists but is not a "
+                f"mapping (got {type(existing).__name__}); refusing to "
+                "merge into it"
+            )
+
+        if target_name not in servers:
+            servers[target_name] = {}
+        entry = servers[target_name]
+
+        for key in MANAGED_TRANSPORT_FIELDS:
+            if key in entry:
+                del entry[key]
+
+        if transport == "http":
+            entry["type"] = "http"
+            entry["url"] = spec["url"]
+        else:
+            entry["command"] = spec["command"]
+            entry["args"] = spec["args"]
+            if spec["env"] is not None:
+                entry["env"] = spec["env"]
+
+        for key, value in (overrides.get(shared_name) or {}).items():
+            entry[key] = value
+
+    return data
 
 
 def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:

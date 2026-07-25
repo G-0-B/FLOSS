@@ -297,3 +297,156 @@ def test_codex_rejects_non_table_existing_entry():
             name_map={},
             overrides={},
         )
+
+
+import io
+import json
+
+from ruamel.yaml import YAML
+
+HERMES_EXISTING = """\
+model:
+  default: pioneer/auto_v1.1
+mcp_servers:
+  Agent Memory:
+    command: npx
+    args:
+      - -y
+      - '@agentmemory/mcp'
+    env:
+      AGENTMEMORY_TOOLS: all
+  docker:
+    command: docker
+    args: [mcp, gateway, run]
+    enabled: false
+
+# ── Fallback Model ──────────────────────────────
+# fallback_model:
+#   provider: openrouter
+"""
+
+
+def _roundtrip(text: str):
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    return yaml, yaml.load(io.StringIO(text))
+
+
+def test_hermes_http_transport():
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    mas.apply_hermes_mcp(
+        data,
+        {"flossiullk-consensus": {"url": "http://127.0.0.1:7331/mcp"}},
+        name_map={},
+        overrides={},
+    )
+    entry = data["mcp_servers"]["flossiullk-consensus"]
+    assert entry["type"] == "http"
+    assert entry["url"] == "http://127.0.0.1:7331/mcp"
+
+
+def test_hermes_name_map_updates_existing_server():
+    """`.mcp.json` calls it `agentmemory`; Hermes keys it `Agent Memory`."""
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    mas.apply_hermes_mcp(
+        data,
+        {"agentmemory": {"command": "januscope", "args": ["--config", "am.yaml"]}},
+        name_map={"agentmemory": "Agent Memory"},
+        overrides={},
+    )
+    assert "agentmemory" not in data["mcp_servers"]
+    assert data["mcp_servers"]["Agent Memory"]["command"] == "januscope"
+    assert data["mcp_servers"]["Agent Memory"]["env"]["AGENTMEMORY_TOOLS"] == "all"
+
+
+def test_hermes_preserves_comments_and_unmanaged_servers():
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    mas.apply_hermes_mcp(
+        data,
+        {"flossiullk-consensus": {"url": "http://127.0.0.1:7331/mcp"}},
+        name_map={},
+        overrides={},
+    )
+    buf = io.StringIO()
+    yaml.dump(data, buf)
+    rendered = buf.getvalue()
+    assert "Fallback Model" in rendered
+    assert "fallback_model" in rendered
+    assert data["mcp_servers"]["docker"]["enabled"] is False
+
+
+def test_hermes_overrides_applied():
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    mas.apply_hermes_mcp(
+        data,
+        {"flossiullk-consensus": {"url": "http://127.0.0.1:7331/mcp"}},
+        name_map={},
+        overrides={"flossiullk-consensus": {"enabled": True, "timeout": 120}},
+    )
+    assert data["mcp_servers"]["flossiullk-consensus"]["timeout"] == 120
+
+
+def test_hermes_override_beats_existing_field():
+    """Overrides are highest precedence, matching apply_codex_mcp."""
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    mas.apply_hermes_mcp(
+        data,
+        {"docker-shared": {"command": "docker", "args": []}},
+        name_map={"docker-shared": "docker"},
+        overrides={"docker-shared": {"enabled": True}},
+    )
+    assert data["mcp_servers"]["docker"]["enabled"] is True
+
+
+def test_hermes_gateway_alive_returns_none_without_pid_file(tmp_path):
+    assert mas.hermes_gateway_alive(tmp_path) is None
+
+
+def test_hermes_gateway_alive_detects_dead_pid(tmp_path):
+    (tmp_path / "gateway.pid").write_text(
+        json.dumps({"pid": 999999, "kind": "hermes-gateway"}), encoding="utf-8"
+    )
+    assert mas.hermes_gateway_alive(tmp_path) is None
+
+
+def test_hermes_gateway_alive_detects_own_process(tmp_path):
+    import os
+
+    (tmp_path / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid(), "kind": "hermes-gateway"}), encoding="utf-8"
+    )
+    assert mas.hermes_gateway_alive(tmp_path) == os.getpid()
+
+
+def test_hermes_gateway_alive_tolerates_corrupt_pid_file(tmp_path):
+    (tmp_path / "gateway.pid").write_text("not json{", encoding="utf-8")
+    assert mas.hermes_gateway_alive(tmp_path) is None
+
+
+def test_hermes_name_map_collision_raises():
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    with pytest.raises(mas.SharedSurfaceError, match="name_map collision"):
+        mas.apply_hermes_mcp(
+            data,
+            {
+                "agentmemory": {"command": "januscope", "args": []},
+                "agentmemory-alt": {"command": "other", "args": []},
+            },
+            name_map={
+                "agentmemory": "shared_target",
+                "agentmemory-alt": "shared_target",
+            },
+            overrides={},
+        )
+
+
+def test_hermes_rejects_non_mapping_existing_entry():
+    yaml, data = _roundtrip(HERMES_EXISTING)
+    data["mcp_servers"]["serena"] = "foo"
+    with pytest.raises(mas.SharedSurfaceError, match="not a mapping"):
+        mas.apply_hermes_mcp(
+            data,
+            {"serena": {"command": "januscope", "args": []}},
+            name_map={},
+            overrides={},
+        )
