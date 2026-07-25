@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-24-mcp-surface-propagation-design.md`
 
-> **Status: COMPLETE (2026-07-24).** All 11 tasks executed via subagent-driven development with two-stage review (spec compliance, then code quality) per task. 86 unit tests pass. The Task 9 fidelity gate passed against live configs — see the spec for the evidence table.
+> **Status: COMPLETE (2026-07-24).** All 11 tasks executed via subagent-driven development with two-stage review (spec compliance, then code quality) per task. 90 unit tests pass. The Task 9 fidelity gate passed against live configs — see the spec for the evidence table.
 >
 > **Three defects were found by review that the implementing agent's own tests did not catch**, each of which would have defeated the fidelity gate or a safety property:
 > 1. **Codex `overrides` applied too early** — silently discarded any override whose key already existed in the target file, and contradicted the Hermes writer's ordering. *(Originated in this plan, not the implementation.)*

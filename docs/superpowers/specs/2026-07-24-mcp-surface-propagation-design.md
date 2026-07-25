@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-24
 **Author:** Claude Code (Fable 5 → Opus 5 session), with operator
-**Truth Status:** ✅ Verified — implemented and propagated 2026-07-24. 86 unit tests pass; the fidelity gate ran against live harness configs with a pre-write snapshot and every check held (evidence below).
+**Truth Status:** ✅ Verified — implemented and propagated 2026-07-24. 90 unit tests pass; the fidelity gate ran against live harness configs with a pre-write snapshot and every check held (evidence below).
 
 **Fidelity gate evidence (2026-07-24, repo scope):**
 
