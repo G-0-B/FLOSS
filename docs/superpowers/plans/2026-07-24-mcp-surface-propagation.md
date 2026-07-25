@@ -557,16 +557,12 @@ def apply_codex_mcp(
             entry["command"] = spec["command"]
             entry["args"] = spec["args"]
 
-        # 2. manifest overrides
-        for key, value in (overrides.get(shared_name) or {}).items():
-            entry[key] = value
-
-        # 3. preserved scalars (startup_timeout_sec, enabled, ...)
+        # 2. preserved scalars (startup_timeout_sec, enabled, ...)
         for key, value in preserved_scalars.items():
             entry[key] = value
 
-        # 4. tables last, or TOML re-parents every later scalar into them.
-        #    `env` is managed only when the shared entry defines one.
+        # 3. tables before overrides. `env` is managed only when the shared
+        #    entry defines one.
         if transport == "stdio" and spec["env"] is not None:
             entry["env"] = spec["env"]
         elif preserved_env is not None:
@@ -574,10 +570,20 @@ def apply_codex_mcp(
         for key, value in preserved_tables.items():
             entry[key] = value
 
+        # 4. manifest overrides LAST so they beat everything, including
+        #    pre-existing file content. Both this and `apply_hermes_mcp` must
+        #    apply overrides last or the two targets honor opposite contracts.
+        for key, value in (overrides.get(shared_name) or {}).items():
+            entry[key] = value
+
         servers[target_name] = entry
 
     return doc
 ```
+
+> **Correction (2026-07-24, from Task 5's code review):** an earlier revision of this plan applied overrides at step 2, *before* preserved scalars. That silently discarded any override whose key already existed in the target file — verified empirically: an override of `startup_timeout_sec: 5` against an existing `startup_timeout_sec = 30` yielded 30. It also contradicted `apply_hermes_mcp` below, which applies overrides last. Overrides must be applied last in **both** writers.
+>
+> Also from that review: the scalars-before-tables ordering is **defense-in-depth, not load-bearing** on tomlkit 0.15.0 — `Container.append()` auto-reorders scalars ahead of sub-tables for freshly-built tables, so even a naive merge currently round-trips correctly. Keep the ordering as insurance against a tomlkit behavior change, but do not describe it as the only thing preventing corruption, and do not trust `test_codex_output_reparses_with_values_in_the_right_tables` to catch a regression to naive merging.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -815,6 +821,14 @@ git commit -m "surface: add Hermes YAML MCP writer with gateway liveness guard"
 ---
 
 ### Task 7: Wire the new targets into `materialize()` with scope gating
+
+> **Required amendments discovered during Task 3's review — read before starting.**
+>
+> 1. **Reuse `resolve_manifest_path`, don't hand-roll path resolution.** It already exists (`scripts/materialize_shared_agent_surface.py:~462`) and does `Path(raw).expanduser()` then returns it if absolute, else joins to `workspace_root`. The existing per-target blocks bypass it and use `workspace_root / cfg[...]` — which happens to work for absolute paths (pathlib discards the left operand) but does **not** expand `~`. It also does **not** expand `%LOCALAPPDATA%`, which `hermes_user` needs. Extend `resolve_manifest_path` with `os.path.expandvars` (a safe improvement for all callers) and route the four new targets through it.
+> 2. **`check_or_write_text` CREATES missing files.** It delegates to `write_text`, which does `path.parent.mkdir(parents=True, exist_ok=True)`. There is no "update only if present" mode, and `changed` defaults to `True` for a nonexistent file — missing is indistinguishable from "content differs". The Hermes blocks must therefore guard existence *before* calling it, or they will fabricate a Hermes config where none exists.
+> 3. **There is no "REFUSED" vocabulary in this codebase.** The message set is `CHECK DRIFT/OK`, `PLAN WRITE/KEEP`, `WROTE`, `OK`. A refused Hermes write must append its own message to `results` and set `drift_found = True` manually. Note that `main()` only converts `drift_found` into exit 1 **when `--check` is passed** — in a normal writing run the message is the only signal.
+> 4. **`materialize()`'s per-target dispatch has ZERO test coverage today.** The only end-to-end test (`scripts/tests/test_shared_agent_surface.py::test_umbrella_materializer_refreshes_memory_before_context`) passes `"targets": {}`, so it never enters the per-target blocks. Every other test calls `build_*` helpers directly. **Task 7 must add `materialize()`-level tests with populated `targets`** covering: repo-scope target written, user-scope target skipped without the flag, user-scope target written with the flag, and Hermes refused when a gateway PID is live. Without these the four new blocks land unprotected.
+> 5. **Validate `name_map` collisions once, centrally.** Two shared servers mapping to one target name is silent data loss. Task 5's review added a guard inside the Codex writer; prefer hoisting the check so every target gets it rather than duplicating per-writer.
 
 **Files:**
 - Modify: `scripts/materialize_shared_agent_surface.py` (`materialize()` signature + dispatch, `main()` argparse)
