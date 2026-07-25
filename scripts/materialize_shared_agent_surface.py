@@ -424,8 +424,9 @@ def apply_codex_mcp(
     everything, including pre-existing file content. This matches the
     contract the Hermes writer (Task 6) uses.
 
-    Scalar transport keys and manifest overrides are written into a fresh
-    table before any preserved sub-tables are re-attached. On tomlkit 0.15.0
+    Scalar transport keys are written into a fresh table before any preserved
+    sub-tables are re-attached (overrides land last, per the precedence rule
+    above, and may be scalars or tables). On tomlkit 0.15.0
     this ordering is not load-bearing -- `Container` reliably bubbles scalar
     keys ahead of sub-tables at render time regardless of assignment order
     (verified empirically: assigning a table then a scalar into the same
