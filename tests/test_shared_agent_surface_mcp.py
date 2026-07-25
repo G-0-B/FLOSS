@@ -179,10 +179,17 @@ def test_codex_preserves_unmanaged_servers_and_subtables():
 
 
 def test_codex_output_reparses_with_values_in_the_right_tables():
-    """Guards the TOML key-ordering hazard.
+    """Regression check on the TOML key-ordering hazard the writer guards
+    against with defense-in-depth ordering (scalars/overrides before
+    sub-tables).
 
-    A scalar written after a sub-table header belongs to that sub-table, so a
-    naive append would silently move `command` into `agentmemory.tools`.
+    Note: on tomlkit 0.15.0 this test does NOT actually discriminate a
+    careful scalars-before-tables merge from a naive one -- `tomlkit`'s
+    `Container` bubbles scalar keys ahead of sub-tables at render time
+    regardless of assignment order (verified empirically). This test just
+    confirms the writer's output re-parses with `command` in the server
+    table and not inside `agentmemory.tools`; it is not proof the ordering
+    discipline in `apply_codex_mcp` is load-bearing on this tomlkit version.
     """
     doc = tomlkit.parse(CODEX_EXISTING)
     mas.apply_codex_mcp(
@@ -213,3 +220,80 @@ def test_codex_env_preserved_when_shared_entry_has_no_env():
         doc["mcp_servers"]["agentmemory"]["env"]["AGENTMEMORY_URL"]
         == "${AGENTMEMORY_URL}"
     )
+
+
+CODEX_EXISTING_WITH_TIMEOUT = """\
+model = "gpt-5.6-sol"
+
+[mcp_servers.agentmemory]
+type = "stdio"
+command = "npx"
+args = ["-y", "@agentmemory/mcp"]
+startup_timeout_sec = 30
+
+[mcp_servers.agentmemory.tools.memory_save]
+approval_mode = "approve"
+"""
+
+
+def test_codex_override_beats_existing_field():
+    """Overrides must win even over a pre-existing field of the same name.
+
+    Reviewer-verified regression: with the overrides loop applied before the
+    preserved-scalars loop, a pre-existing `startup_timeout_sec = 30` on the
+    target entry silently discarded an `overrides` value of 5.
+    """
+    doc = tomlkit.parse(CODEX_EXISTING_WITH_TIMEOUT)
+    mas.apply_codex_mcp(
+        doc,
+        {"agentmemory": {"command": "januscope", "args": []}},
+        name_map={},
+        overrides={"agentmemory": {"startup_timeout_sec": 5}},
+    )
+    reparsed = tomlkit.parse(tomlkit.dumps(doc))
+    assert reparsed["mcp_servers"]["agentmemory"]["startup_timeout_sec"] == 5
+
+
+def test_codex_name_map_renames_server():
+    doc = tomlkit.parse(CODEX_EXISTING)
+    mas.apply_codex_mcp(
+        doc,
+        {"agentmemory": {"command": "januscope", "args": ["--config", "am.yaml"]}},
+        name_map={"agentmemory": "Agent Memory"},
+        overrides={},
+    )
+    reparsed = tomlkit.parse(tomlkit.dumps(doc))
+    mapped = reparsed["mcp_servers"]["Agent Memory"]
+    assert mapped["type"] == "stdio"
+    assert mapped["command"] == "januscope"
+    assert mapped["args"] == ["--config", "am.yaml"]
+
+
+def test_codex_name_map_collision_raises():
+    doc = tomlkit.parse(CODEX_EXISTING)
+    with pytest.raises(mas.SharedSurfaceError, match="name_map collision"):
+        mas.apply_codex_mcp(
+            doc,
+            {
+                "agentmemory": {"command": "januscope", "args": []},
+                "agentmemory-alt": {"command": "other", "args": []},
+            },
+            name_map={
+                "agentmemory": "shared_target",
+                "agentmemory-alt": "shared_target",
+            },
+            overrides={},
+        )
+
+
+def test_codex_rejects_non_table_existing_entry():
+    doc = tomlkit.parse('agentmemory = "foo"\n')
+    doc["mcp_servers"] = tomlkit.table(is_super_table=True)
+    doc["mcp_servers"]["agentmemory"] = "foo"
+    with pytest.raises(mas.SharedSurfaceError, match="not a table"):
+        mas.apply_codex_mcp(
+            doc,
+            {"agentmemory": {"command": "januscope", "args": []}},
+            name_map={},
+            overrides={},
+        )

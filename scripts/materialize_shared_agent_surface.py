@@ -419,13 +419,37 @@ def apply_codex_mcp(
     `env` is treated as managed only when the shared entry defines it, so a
     target-local templated env block survives.
 
-    Scalar transport keys are written into a fresh table that is re-inserted
-    ahead of any existing sub-tables. In TOML a scalar key appearing after a
-    sub-table header belongs to that sub-table, so appending `command` to a
-    server that already has `[mcp_servers.<name>.tools.*]` would silently
-    produce a wrong (or invalid) document.
+    Precedence, low to high: managed transport fields, then whatever already
+    existed on the target entry, then manifest `overrides` -- overrides beat
+    everything, including pre-existing file content. This matches the
+    contract the Hermes writer (Task 6) uses.
+
+    Scalar transport keys and manifest overrides are written into a fresh
+    table before any preserved sub-tables are re-attached. On tomlkit 0.15.0
+    this ordering is not load-bearing -- `Container` reliably bubbles scalar
+    keys ahead of sub-tables at render time regardless of assignment order
+    (verified empirically: assigning a table then a scalar into the same
+    `tomlkit.table()` still renders the scalar inside `[mcp_servers.<name>]`,
+    not the sub-table). We keep the ordering anyway as cheap defense-in-depth
+    against a future tomlkit behavior change, not because today's output
+    depends on it.
     """
     tomlkit = require_module("tomlkit", "codex")
+
+    # Detect name_map collisions up front. Two shared servers silently
+    # colliding on one target name would otherwise last-write-win and lose
+    # a server's config with no warning -- and this comes from a manifest
+    # file, so that's silent data loss.
+    target_to_shared: dict[str, list[str]] = {}
+    for shared_name in shared_mcp:
+        target_name = name_map.get(shared_name, shared_name)
+        target_to_shared.setdefault(target_name, []).append(shared_name)
+    for target_name, shared_names in target_to_shared.items():
+        if len(shared_names) > 1:
+            raise SharedSurfaceError(
+                f"Codex name_map collision: shared servers {shared_names!r} "
+                f"all map to target name {target_name!r}"
+            )
 
     if "mcp_servers" not in doc:
         doc["mcp_servers"] = tomlkit.table(is_super_table=True)
@@ -440,12 +464,21 @@ def apply_codex_mcp(
         preserved_tables: dict[str, Any] = {}
         preserved_env: Any = None
         if existing is not None:
+            if not hasattr(existing, "items"):
+                raise SharedSurfaceError(
+                    f"Codex mcp_servers.{target_name!r} exists but is not a "
+                    f"table (got {type(existing).__name__}); refusing to "
+                    "merge into it"
+                )
             for key, value in existing.items():
                 if key in MANAGED_TRANSPORT_FIELDS:
                     continue
                 if key == "env":
                     preserved_env = value
-                elif hasattr(value, "items"):
+                elif isinstance(
+                    value,
+                    (tomlkit.items.Table, tomlkit.items.AoT, tomlkit.items.InlineTable),
+                ):
                     preserved_tables[key] = value
                 else:
                     preserved_scalars[key] = value
@@ -461,21 +494,23 @@ def apply_codex_mcp(
             entry["command"] = spec["command"]
             entry["args"] = spec["args"]
 
-        # 2. manifest overrides
-        for key, value in (overrides.get(shared_name) or {}).items():
-            entry[key] = value
-
-        # 3. preserved scalars (startup_timeout_sec, enabled, ...)
+        # 2. preserved scalars (startup_timeout_sec, enabled, ...)
         for key, value in preserved_scalars.items():
             entry[key] = value
 
-        # 4. tables last, or TOML re-parents every later scalar into them.
+        # 3. tables, or TOML re-parents every later scalar into them (see
+        #    docstring above -- defense-in-depth, not load-bearing today).
         #    `env` is managed only when the shared entry defines one.
         if transport == "stdio" and spec["env"] is not None:
             entry["env"] = spec["env"]
         elif preserved_env is not None:
             entry["env"] = preserved_env
         for key, value in preserved_tables.items():
+            entry[key] = value
+
+        # 4. manifest overrides go LAST -- overrides beat everything,
+        #    including pre-existing file content.
+        for key, value in (overrides.get(shared_name) or {}).items():
             entry[key] = value
 
         servers[target_name] = entry
