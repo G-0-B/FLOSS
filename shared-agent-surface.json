@@ -1,5 +1,5 @@
 {
-  "manifest_version": "0.1.4",
+  "manifest_version": "0.2.0",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
   "mcp_source": ".mcp.json",
@@ -44,6 +44,7 @@
     "FLOSS/.serena/project.yml",
     "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
     "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+    "FLOSS/docs/architecture/YUMEICHAN_ARCHITECTURE.md",
     "FLOSS/docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md",
     "FLOSS/docs/superpowers/plans/2026-04-16-external-adoption-and-shared-surface.md",
     ".agent-surface/harness/AI_ROSTER.md",
@@ -176,6 +177,60 @@
         "FLOSS/docs/specs/phase0-substrate-bridge.spec.md",
         "FLOSS/docs/research/2026-05-15-working-todo-list.md"
       ]
+    },
+    "codex": {
+      "scope": "repo",
+      "config_path": ".codex/config.toml",
+      "name_map": {},
+      "overrides": {}
+    },
+    "codex_user": {
+      "scope": "user",
+      "config_path": "~/.codex/config.toml",
+      "name_map": {},
+      "overrides": {}
+    },
+    "hermes_workspace": {
+      "scope": "repo",
+      "config_path": ".toilet/hermes/config.yaml",
+      "name_map": {
+        "agentmemory": "Agent Memory"
+      },
+      "overrides": {
+        "serena": {
+          "enabled": true,
+          "timeout": 120
+        },
+        "flossiullk-consensus": {
+          "enabled": true,
+          "timeout": 120
+        },
+        "flossiullk-reasoning-ensemble": {
+          "enabled": true,
+          "timeout": 120
+        }
+      }
+    },
+    "hermes_user": {
+      "scope": "user",
+      "config_path": "%LOCALAPPDATA%/hermes/config.yaml",
+      "name_map": {
+        "agentmemory": "Agent Memory"
+      },
+      "overrides": {
+        "serena": {
+          "enabled": true,
+          "timeout": 120
+        },
+        "flossiullk-consensus": {
+          "enabled": true,
+          "timeout": 120
+        },
+        "flossiullk-reasoning-ensemble": {
+          "enabled": true,
+          "timeout": 120
+        }
+      }
     }
   }
 }
