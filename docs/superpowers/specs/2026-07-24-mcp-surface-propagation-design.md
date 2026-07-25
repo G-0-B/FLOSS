@@ -15,6 +15,10 @@
 | `hermes_user` | correctly REFUSED (live gateway PID 57416) — no clobber |
 | `codex_user` | `PLAN KEEP` — already matched canonical |
 
+**Convergence caveat (found by the final holistic review, resolved):** the first real write left `.codex/config.toml` reporting `CHECK DRIFT`. `tomlkit` emits an extra blank line when first *inserting* a table but collapses it on re-parse, so the initial output did not equal its own regeneration. This is a one-time convergence, not an oscillation — `apply(apply(x)) == apply(x)` was verified — and a second real run fixed it permanently (`defb907`). `python FLOSS/scripts/refresh_agent_surfaces.py --check` now reports **all six steps clean**, which is the standing acceptance criterion.
+
+This is worth recording because the Truth Status above was briefly asserted while `--check` was still drifting. The lesson: for this surface, "Verified" means `--check` was re-run *after* the write, not merely that the write succeeded.
+
 Implementation commits: `862aff3` (classify_transport) · `478937d` (OpenCode HTTP fix — the outage) · `195edd1` (scope bug) · `cea5e5e`→`673d08e`→`10f3694` (Codex writer) · `82745d7`→`b7ea068` (Hermes writer) · `79dd0d6`→`6d9327f` (dispatch + scope gating) · `ac19988`→`b0030f0`→`699cb2d` (runner) · `dc1a581`→`23cbe53` (manifest) · `0781bd1` (regenerated projections, workspace repo)
 **Related:** `docs/superpowers/plans/2026-07-24-mcp-migration-fixup.md` (the incident that motivated this), ADR-19 (OmniRoute inference plane), `.claude/skills/flossi0ullk-shared-surface`
 
