@@ -124,3 +124,92 @@ def test_opencode_payload_preserves_unmanaged_servers():
         "url": "http://x/mcp",
     }
     assert payload["mcp"]["flossiullk-consensus"]["type"] == "remote"
+
+
+import tomlkit
+
+CODEX_EXISTING = """\
+model = "gpt-5.6-sol"
+
+[mcp_servers.node_repl]
+type = "stdio"
+command = "node_repl.exe"
+
+[mcp_servers.agentmemory]
+type = "stdio"
+command = "npx"
+args = ["-y", "@agentmemory/mcp"]
+
+[mcp_servers.agentmemory.tools.memory_save]
+approval_mode = "approve"
+"""
+
+
+def test_codex_http_uses_streamable_http_discriminator():
+    doc = tomlkit.parse(CODEX_EXISTING)
+    mas.apply_codex_mcp(
+        doc,
+        {"flossiullk-consensus": {"url": "http://127.0.0.1:7331/mcp"}},
+        name_map={},
+        overrides={},
+    )
+    entry = doc["mcp_servers"]["flossiullk-consensus"]
+    assert entry["type"] == "streamable_http"
+    assert entry["url"] == "http://127.0.0.1:7331/mcp"
+    assert "command" not in entry
+
+
+def test_codex_preserves_unmanaged_servers_and_subtables():
+    doc = tomlkit.parse(CODEX_EXISTING)
+    mas.apply_codex_mcp(
+        doc,
+        {"agentmemory": {"command": "januscope", "args": ["--config", "am.yaml"]}},
+        name_map={},
+        overrides={},
+    )
+    rendered = tomlkit.dumps(doc)
+    assert doc["mcp_servers"]["node_repl"]["command"] == "node_repl.exe"
+    assert (
+        doc["mcp_servers"]["agentmemory"]["tools"]["memory_save"]["approval_mode"]
+        == "approve"
+    )
+    assert doc["mcp_servers"]["agentmemory"]["command"] == "januscope"
+    assert doc["mcp_servers"]["agentmemory"]["args"] == ["--config", "am.yaml"]
+    assert 'model = "gpt-5.6-sol"' in rendered
+
+
+def test_codex_output_reparses_with_values_in_the_right_tables():
+    """Guards the TOML key-ordering hazard.
+
+    A scalar written after a sub-table header belongs to that sub-table, so a
+    naive append would silently move `command` into `agentmemory.tools`.
+    """
+    doc = tomlkit.parse(CODEX_EXISTING)
+    mas.apply_codex_mcp(
+        doc,
+        {"agentmemory": {"command": "januscope", "args": ["--config", "am.yaml"]}},
+        name_map={},
+        overrides={},
+    )
+    reparsed = tomlkit.parse(tomlkit.dumps(doc))
+    server = reparsed["mcp_servers"]["agentmemory"]
+    assert server["command"] == "januscope"
+    assert "command" not in server["tools"]["memory_save"]
+    assert server["tools"]["memory_save"]["approval_mode"] == "approve"
+
+
+def test_codex_env_preserved_when_shared_entry_has_no_env():
+    doc = tomlkit.parse(
+        '[mcp_servers.agentmemory]\ntype = "stdio"\ncommand = "npx"\n\n'
+        '[mcp_servers.agentmemory.env]\nAGENTMEMORY_URL = "${AGENTMEMORY_URL}"\n'
+    )
+    mas.apply_codex_mcp(
+        doc,
+        {"agentmemory": {"command": "januscope", "args": []}},
+        name_map={},
+        overrides={},
+    )
+    assert (
+        doc["mcp_servers"]["agentmemory"]["env"]["AGENTMEMORY_URL"]
+        == "${AGENTMEMORY_URL}"
+    )

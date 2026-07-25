@@ -60,6 +60,23 @@ class SharedSurfaceError(Exception):
     """Raised for manifest, source, or target projection problems."""
 
 
+def require_module(module_name: str, target: str) -> Any:
+    """Import a round-trip serializer, failing loudly for one target only.
+
+    Never fall back to a non-round-trip writer -- that would silently strip
+    comments and reorder keys in large hand-maintained configs.
+    """
+    import importlib
+
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise SharedSurfaceError(
+            f"Target {target!r} requires the {module_name!r} package "
+            f"(pip install {module_name.split('.')[0]})"
+        ) from exc
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -380,6 +397,90 @@ def build_opencode_payload(
         merged_mcp[name] = convert_mcp_server_to_opencode(name, server)
     payload["mcp"] = merged_mcp
     return payload
+
+
+# Transport fields the propagator owns on a managed server. Everything else
+# on that server (tools tables, timeouts, approval modes) is preserved.
+MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url")
+
+
+def apply_codex_mcp(
+    doc: Any,
+    shared_mcp: dict[str, Any],
+    name_map: dict[str, str],
+    overrides: dict[str, Any],
+) -> Any:
+    """Merge shared MCP servers into a parsed Codex config.toml document.
+
+    Codex requires an explicit transport discriminator: `type = "stdio"` with
+    command/args, or `type = "streamable_http"` with url. A bare `url` key is
+    rejected with `url is not supported for stdio`.
+
+    `env` is treated as managed only when the shared entry defines it, so a
+    target-local templated env block survives.
+
+    Scalar transport keys are written into a fresh table that is re-inserted
+    ahead of any existing sub-tables. In TOML a scalar key appearing after a
+    sub-table header belongs to that sub-table, so appending `command` to a
+    server that already has `[mcp_servers.<name>.tools.*]` would silently
+    produce a wrong (or invalid) document.
+    """
+    tomlkit = require_module("tomlkit", "codex")
+
+    if "mcp_servers" not in doc:
+        doc["mcp_servers"] = tomlkit.table(is_super_table=True)
+    servers = doc["mcp_servers"]
+
+    for shared_name, server in shared_mcp.items():
+        target_name = name_map.get(shared_name, shared_name)
+        transport, spec = classify_transport(shared_name, server)
+
+        existing = servers.get(target_name)
+        preserved_scalars: dict[str, Any] = {}
+        preserved_tables: dict[str, Any] = {}
+        preserved_env: Any = None
+        if existing is not None:
+            for key, value in existing.items():
+                if key in MANAGED_TRANSPORT_FIELDS:
+                    continue
+                if key == "env":
+                    preserved_env = value
+                elif hasattr(value, "items"):
+                    preserved_tables[key] = value
+                else:
+                    preserved_scalars[key] = value
+
+        entry = tomlkit.table()
+
+        # 1. managed scalars
+        if transport == "http":
+            entry["type"] = "streamable_http"
+            entry["url"] = spec["url"]
+        else:
+            entry["type"] = "stdio"
+            entry["command"] = spec["command"]
+            entry["args"] = spec["args"]
+
+        # 2. manifest overrides
+        for key, value in (overrides.get(shared_name) or {}).items():
+            entry[key] = value
+
+        # 3. preserved scalars (startup_timeout_sec, enabled, ...)
+        for key, value in preserved_scalars.items():
+            entry[key] = value
+
+        # 4. tables last, or TOML re-parents every later scalar into them.
+        #    `env` is managed only when the shared entry defines one.
+        if transport == "stdio" and spec["env"] is not None:
+            entry["env"] = spec["env"]
+        elif preserved_env is not None:
+            entry["env"] = preserved_env
+        for key, value in preserved_tables.items():
+            entry[key] = value
+
+        servers[target_name] = entry
+
+    return doc
 
 
 def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
