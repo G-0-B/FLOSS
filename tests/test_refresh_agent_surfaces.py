@@ -172,6 +172,23 @@ def test_summarize_dry_run_only_reports_planned():
     assert "clean" not in joined
 
 
+def test_summarize_dry_run_only_still_surfaces_a_failing_step():
+    """A step that fails during dry-run must not hide behind "planned".
+
+    Dry-run materializers normally exit 0 regardless of what they would
+    write, so a nonzero code here means a genuine error -- it has to beat
+    the "planned" framing, not be absorbed by it.
+    """
+    runner = _load_runner()
+    lines, exit_code = runner.summarize(
+        [("agent-surface", 0), ("ai-roster", 1)], check=False, dry_run=True
+    )
+    assert exit_code == 1
+    joined = "\n".join(lines)
+    assert "FAILED" in joined
+    assert "need attention" in joined
+
+
 def test_summarize_check_and_dry_run_together_prefers_check_wording():
     runner = _load_runner()
     lines, exit_code = runner.summarize(
