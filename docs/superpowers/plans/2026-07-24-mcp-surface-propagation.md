@@ -10,6 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-24-mcp-surface-propagation-design.md`
 
+> **Status: COMPLETE (2026-07-24).** All 11 tasks executed via subagent-driven development with two-stage review (spec compliance, then code quality) per task. 86 unit tests pass. The Task 9 fidelity gate passed against live configs — see the spec for the evidence table.
+>
+> **Three defects were found by review that the implementing agent's own tests did not catch**, each of which would have defeated the fidelity gate or a safety property:
+> 1. **Codex `overrides` applied too early** — silently discarded any override whose key already existed in the target file, and contradicted the Hermes writer's ordering. *(Originated in this plan, not the implementation.)*
+> 2. **Hermes delete-then-reinsert reordered keys on every run** — a no-op merge reordered `['command','args','env']` → `['env','command','args']`, guaranteeing a spurious diff on every propagation.
+> 3. **A REFUSED write exited 0** — a live-gateway refusal on a real run reported success, and the runner would have printed `agent-surface ok`.
+>
+> Reviewers also determined the exact ruamel configuration that shrinks the Hermes round-trip diff from 398 lines to a single irreducible hunk (amendment 6 below), without which the fidelity gate could not have passed.
+
 **Working directory:** All paths are relative to `C:\~shit\FLOSS` unless prefixed with `../`. The FLOSS directory is its own git repo (branch `working/2026-06-16-adr-cleanup-reconverge`); the workspace root `C:\~shit` is a *separate* repo. Commit in the FLOSS repo.
 
 **Run tests with:** `C:\Python313\python.exe -m pytest FLOSS/tests/test_shared_agent_surface_mcp.py -v` from `C:\~shit`, or `python -m pytest tests/test_shared_agent_surface_mcp.py -v` from `C:\~shit\FLOSS`.

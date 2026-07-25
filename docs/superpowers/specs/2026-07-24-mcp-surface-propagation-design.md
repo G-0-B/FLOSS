@@ -2,7 +2,20 @@
 
 **Date:** 2026-07-24
 **Author:** Claude Code (Fable 5 → Opus 5 session), with operator
-**Truth Status:** ⚠️ Specified (design approved, not yet implemented)
+**Truth Status:** ✅ Verified — implemented and propagated 2026-07-24. 86 unit tests pass; the fidelity gate ran against live harness configs with a pre-write snapshot and every check held (evidence below).
+
+**Fidelity gate evidence (2026-07-24, repo scope):**
+
+| Surface | Result |
+|---|---|
+| `opworkers/opencode.jsonc` | byte-identical to the hand-verified config — propagator reproduced it exactly |
+| `.codex/config.toml` | additive only (+serena, +agentmemory); consensus/ensemble untouched; `codex mcp list` loads cleanly, all four servers present, no duplication |
+| `.toilet/hermes/config.yaml` | `Agent Memory` env preserved, unmanaged `docker` untouched, overrides applied, `_config_version` and all 67 top-level keys intact, trailing `fallback_model` comment block survived |
+| `.gemini/settings.json` | migrated off stale `npx -y januscope@latest` to canonical — a sixth drifted surface nobody had noticed |
+| `hermes_user` | correctly REFUSED (live gateway PID 57416) — no clobber |
+| `codex_user` | `PLAN KEEP` — already matched canonical |
+
+Implementation commits: `862aff3` (classify_transport) · `478937d` (OpenCode HTTP fix — the outage) · `195edd1` (scope bug) · `cea5e5e`→`673d08e`→`10f3694` (Codex writer) · `82745d7`→`b7ea068` (Hermes writer) · `79dd0d6`→`6d9327f` (dispatch + scope gating) · `ac19988`→`b0030f0`→`699cb2d` (runner) · `dc1a581`→`23cbe53` (manifest) · `0781bd1` (regenerated projections, workspace repo)
 **Related:** `docs/superpowers/plans/2026-07-24-mcp-migration-fixup.md` (the incident that motivated this), ADR-19 (OmniRoute inference plane), `.claude/skills/flossi0ullk-shared-surface`
 
 ## Problem
