@@ -563,3 +563,277 @@ mcp_servers:
     assert entry["args"] == ["--new"]
     assert "type" not in entry
     assert "url" not in entry
+
+
+# ---------------------------------------------------------------------------
+# materialize()-level dispatch tests (Task 7)
+#
+# Before this, materialize()'s per-target blocks had zero test coverage --
+# the only end-to-end test (test_umbrella_materializer_refreshes_memory_
+# before_context in scripts/tests/test_shared_agent_surface.py) passes
+# `"targets": {}` and never enters the Codex/Hermes dispatch. These tests
+# exercise the real materialize() with a synthetic manifest and tmp_path
+# fixtures -- never the real workspace configs -- so a real write can never
+# land on this machine's actual Codex/Hermes config.
+# ---------------------------------------------------------------------------
+
+
+def _stub_downstream_materializers(monkeypatch, workspace: Path) -> None:
+    """Point the five downstream per-surface manifests at nonexistent files.
+
+    materialize() unconditionally probes DEFAULT_AI_ROSTER_MANIFEST_PATH,
+    DEFAULT_MEMORY_MANIFEST_PATH, DEFAULT_CONTEXT_MANIFEST_PATH,
+    DEFAULT_HOOK_MANIFEST_PATH, and DEFAULT_SKILL_MANIFEST_PATH -- which
+    default to the real `FLOSS/shared-*-surface.json` files -- and
+    materializes each one if it `.exists()`. Left unpatched, calling
+    materialize() from this test file would touch the real repo's
+    `.agent-surface/` tree. Redirecting them into `tmp_path` (which does not
+    contain those filenames) makes each `.exists()` check False, so those
+    blocks are skipped entirely and this test is isolated to the Codex/
+    Hermes dispatch under test.
+    """
+    for attr in (
+        "DEFAULT_AI_ROSTER_MANIFEST_PATH",
+        "DEFAULT_MEMORY_MANIFEST_PATH",
+        "DEFAULT_CONTEXT_MANIFEST_PATH",
+        "DEFAULT_HOOK_MANIFEST_PATH",
+        "DEFAULT_SKILL_MANIFEST_PATH",
+    ):
+        monkeypatch.setattr(mas, attr, workspace / f"missing-{attr}.json")
+
+
+def _write_synthetic_manifest(workspace: Path, targets: dict) -> Path:
+    """Write a minimal valid shared-agent-surface manifest plus its
+    `.mcp.json` source into `workspace`, with only the given `targets`.
+    """
+    manifest_path = workspace / "shared-agent-surface.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_version": "0.2.0",
+                "workspace_id": "test",
+                "workspace_name": "Test",
+                "mcp_source": ".mcp.json",
+                "targets": targets,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (workspace / ".mcp.json").write_text(
+        json.dumps(
+            {"mcpServers": {"agentmemory": {"command": "januscope", "args": []}}}
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
+def test_materialize_writes_repo_scope_codex_target(tmp_path, monkeypatch):
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": "codex/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    results, drift = mas.materialize(
+        tmp_path, manifest_path, check=False, dry_run=False
+    )
+
+    codex_path = tmp_path / "codex" / "config.toml"
+    assert codex_path.exists()
+    assert 'command = "januscope"' in codex_path.read_text(encoding="utf-8")
+    assert drift is True
+    assert any(msg.startswith("WROTE") and "codex" in msg for msg in results)
+
+
+def test_materialize_skips_user_scope_codex_target_without_flag(tmp_path, monkeypatch):
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "codex_user": {
+                "scope": "user",
+                "config_path": "codex_user/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+    codex_user_path = tmp_path / "codex_user" / "config.toml"
+
+    results, drift = mas.materialize(
+        tmp_path, manifest_path, check=False, dry_run=False
+    )
+
+    assert not codex_user_path.exists()
+    assert any("SKIP  codex_user (user scope" in msg for msg in results)
+    assert drift is False
+
+
+def test_materialize_writes_user_scope_codex_target_with_flag(tmp_path, monkeypatch):
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "codex_user": {
+                "scope": "user",
+                "config_path": "codex_user/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+    codex_user_path = tmp_path / "codex_user" / "config.toml"
+
+    results, drift = mas.materialize(
+        tmp_path,
+        manifest_path,
+        check=False,
+        dry_run=False,
+        include_user_scope=True,
+    )
+
+    assert codex_user_path.exists()
+    assert drift is True
+    assert any(msg.startswith("WROTE") for msg in results)
+
+
+def test_materialize_skips_hermes_target_with_no_existing_config(tmp_path, monkeypatch):
+    """Constraint 1: Hermes targets must never fabricate a config where none
+    exists -- `check_or_write_text` would happily create one via
+    `write_text`'s `mkdir(parents=True, exist_ok=True)`, which is correct
+    for Codex but wrong for Hermes (there is no "update only if present"
+    write primitive, so the dispatch itself must check `.exists()` first).
+    """
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+    hermes_path = tmp_path / "hermes" / "config.yaml"
+
+    results, drift = mas.materialize(
+        tmp_path, manifest_path, check=False, dry_run=False
+    )
+
+    assert not hermes_path.exists()
+    assert any(
+        "SKIP  hermes_workspace" in msg and "no config at" in msg for msg in results
+    )
+    assert drift is False
+
+
+def test_materialize_refuses_hermes_write_when_gateway_is_live(tmp_path, monkeypatch):
+    import os
+
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    hermes_config_path = hermes_dir / "config.yaml"
+    original_content = "mcp_servers:\n  existing:\n    command: foo\n"
+    hermes_config_path.write_text(original_content, encoding="utf-8")
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid(), "kind": "hermes-gateway"}), encoding="utf-8"
+    )
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    results, drift = mas.materialize(
+        tmp_path, manifest_path, check=False, dry_run=False
+    )
+
+    assert drift is True
+    assert any(
+        msg.startswith("REFUSED hermes_workspace:") and str(os.getpid()) in msg
+        for msg in results
+    )
+    # The refused write must not have touched the file at all.
+    assert hermes_config_path.read_text(encoding="utf-8") == original_content
+
+
+def test_materialize_refuses_hermes_write_under_check_too(tmp_path, monkeypatch):
+    """Design decision: REFUSED fires during `--check` as well as a real
+    write. `--check` never writes either way, but the point of `--check` is
+    to let an operator discover problems -- including "a live gateway will
+    clobber this on shutdown" -- before attempting a real write, not only
+    after one has already failed.
+    """
+    import os
+
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    (hermes_dir / "config.yaml").write_text(
+        "mcp_servers:\n  existing:\n    command: foo\n", encoding="utf-8"
+    )
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid(), "kind": "hermes-gateway"}), encoding="utf-8"
+    )
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    results, drift = mas.materialize(tmp_path, manifest_path, check=True, dry_run=False)
+
+    assert drift is True
+    assert any(msg.startswith("REFUSED hermes_workspace:") for msg in results)
+
+
+def test_target_in_scope_repo_always_true():
+    assert mas.target_in_scope({"scope": "repo"}, False) is True
+    assert mas.target_in_scope({"scope": "repo"}, True) is True
+
+
+def test_target_in_scope_user_requires_flag():
+    assert mas.target_in_scope({"scope": "user"}, False) is False
+    assert mas.target_in_scope({"scope": "user"}, True) is True
+
+
+def test_target_in_scope_defaults_to_repo_when_absent():
+    assert mas.target_in_scope({}, False) is True
+
+
+def test_target_in_scope_rejects_invalid_scope_value():
+    with pytest.raises(mas.SharedSurfaceError, match="scope"):
+        mas.target_in_scope({"scope": "workspace"}, False)
+
+
+def test_resolve_manifest_path_expands_env_vars(tmp_path, monkeypatch):
+    """Extension for Task 7: resolve_manifest_path must also expand
+    `%VAR%`/`$VAR` environment references, not just `~`, since
+    `hermes_user`'s manifest path is `%LOCALAPPDATA%/hermes/config.yaml`.
+    """
+    monkeypatch.setenv("MAS_TEST_VAR", str(tmp_path / "expanded"))
+    resolved = mas.resolve_manifest_path(tmp_path, "%MAS_TEST_VAR%/hermes/config.yaml")
+    assert resolved == (tmp_path / "expanded" / "hermes" / "config.yaml").resolve()

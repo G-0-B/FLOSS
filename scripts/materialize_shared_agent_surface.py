@@ -32,6 +32,7 @@ Design rules:
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 from pathlib import Path
@@ -754,7 +755,15 @@ def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
 
 
 def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
-    path = Path(raw_path).expanduser()
+    """Resolve a manifest-declared path against the workspace root.
+
+    Expands both `~` (user home, e.g. `~/.codex/config.toml`) and
+    environment-variable references such as `%LOCALAPPDATA%` on Windows or
+    `$HOME` on POSIX (e.g. `%LOCALAPPDATA%/hermes/config.yaml`). This is the
+    single path resolver every target should route through -- do not
+    hand-roll a second one for a new writer.
+    """
+    path = Path(os.path.expandvars(raw_path)).expanduser()
     if path.is_absolute():
         return path
     return (workspace_root / path).resolve()
@@ -1342,8 +1351,29 @@ def check_or_write_text(
     return (f"OK    {path}", changed)
 
 
+def target_in_scope(target_cfg: dict[str, Any], include_user_scope: bool) -> bool:
+    """Repo-scope targets always run; user-scope needs an explicit opt-in.
+
+    User-scope targets write outside the repo (e.g. `~/.codex/config.toml`,
+    `%LOCALAPPDATA%/hermes/config.yaml`), which affects every project on the
+    machine, not just this workspace -- so they only run when the caller
+    explicitly opts in via `--include-user-scope`.
+    """
+    scope = str(target_cfg.get("scope", "repo")).strip().lower()
+    if scope not in {"repo", "user"}:
+        raise SharedSurfaceError(
+            f"Target `scope` must be 'repo' or 'user', got {scope!r}"
+        )
+    return scope == "repo" or include_user_scope
+
+
 def materialize(
-    workspace_root: Path, manifest_path: Path, *, check: bool, dry_run: bool
+    workspace_root: Path,
+    manifest_path: Path,
+    *,
+    check: bool,
+    dry_run: bool,
+    include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = resolve_manifest(workspace_root, manifest_path)
     shared_mcp = manifest["_resolved_mcp"]["mcpServers"]
@@ -1475,6 +1505,88 @@ def materialize(
             results.append(message)
             drift_found = drift_found or changed
 
+    for codex_key in ("codex", "codex_user"):
+        codex_cfg = targets.get(codex_key)
+        if not (isinstance(codex_cfg, dict) and codex_cfg.get("config_path")):
+            continue
+        if not target_in_scope(codex_cfg, include_user_scope):
+            results.append(f"SKIP  {codex_key} (user scope; pass --include-user-scope)")
+            continue
+        codex_path = resolve_manifest_path(
+            workspace_root, str(codex_cfg["config_path"])
+        )
+        tomlkit = require_module("tomlkit", codex_key)
+        existing_text = (
+            codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
+        )
+        doc = tomlkit.parse(existing_text)
+        apply_codex_mcp(
+            doc,
+            shared_mcp,
+            codex_cfg.get("name_map") or {},
+            codex_cfg.get("overrides") or {},
+        )
+        message, changed = check_or_write_text(
+            codex_path, tomlkit.dumps(doc), check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
+
+    # Whether a REFUSED Hermes write should also fire under `--check`:
+    # decided YES. `--check` never writes either way, so refusing isn't
+    # strictly necessary to prevent data loss here -- but `--check` exists
+    # so an operator can learn about drift/blockers *before* attempting a
+    # real write, and "a live gateway will clobber this on shutdown" is
+    # exactly that kind of actionable, pre-write-discoverable fact. Reporting
+    # it only during a real write attempt would mean the first time an
+    # operator learns the gateway is blocking is when their write already
+    # failed, which defeats the point of having a dry, inspectable `--check`
+    # pass. So the liveness guard runs unconditionally, before the
+    # check/dry_run branch, same as every other check in this block.
+    for hermes_key in ("hermes_workspace", "hermes_user"):
+        hermes_cfg = targets.get(hermes_key)
+        if not (isinstance(hermes_cfg, dict) and hermes_cfg.get("config_path")):
+            continue
+        if not target_in_scope(hermes_cfg, include_user_scope):
+            results.append(
+                f"SKIP  {hermes_key} (user scope; pass --include-user-scope)"
+            )
+            continue
+        hermes_path = resolve_manifest_path(
+            workspace_root, str(hermes_cfg["config_path"])
+        )
+        if not hermes_path.exists():
+            results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
+            continue
+        live_pid = hermes_gateway_alive(hermes_path.parent)
+        if live_pid is not None:
+            results.append(
+                f"REFUSED {hermes_key}: gateway PID {live_pid} is live; "
+                "stop it and re-run, or the config is clobbered on shutdown"
+            )
+            drift_found = True
+            continue
+        ruamel_yaml = require_module("ruamel.yaml", hermes_key)
+        yaml_rt = ruamel_yaml.YAML()
+        yaml_rt.preserve_quotes = True
+        yaml_rt.indent(mapping=2, sequence=4, offset=2)
+        yaml_rt.width = 4096
+        with hermes_path.open("r", encoding="utf-8") as handle:
+            data = yaml_rt.load(handle)
+        apply_hermes_mcp(
+            data,
+            shared_mcp,
+            hermes_cfg.get("name_map") or {},
+            hermes_cfg.get("overrides") or {},
+        )
+        buffer = io.StringIO()
+        yaml_rt.dump(data, buffer)
+        message, changed = check_or_write_text(
+            hermes_path, buffer.getvalue(), check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
+
     if DEFAULT_AI_ROSTER_MANIFEST_PATH.exists():
         roster_results, roster_drift = materialize_ai_roster_surface(
             workspace_root=workspace_root,
@@ -1566,6 +1678,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Read-only status report for shared surfaces, harness roster, agentmemory, heartbeat, and provenance",
     )
+    parser.add_argument(
+        "--include-user-scope",
+        action="store_true",
+        help=(
+            "Also materialize user-scope targets (e.g. ~/.codex/config.toml, "
+            "%%LOCALAPPDATA%%/hermes/config.yaml) that affect this machine "
+            "beyond this repo. Repo-scope targets always run."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1582,6 +1703,7 @@ def main() -> int:
         manifest_path,
         check=args.check,
         dry_run=args.dry_run,
+        include_user_scope=args.include_user_scope,
     )
     for line in results:
         print(line)
