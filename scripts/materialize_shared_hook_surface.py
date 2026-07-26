@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -302,6 +303,28 @@ def build_target_payload(
     return merge_hook_payload(existing, target_cfg, mapped_hooks)
 
 
+def hermes_gateway_alive_for(target_path: Path) -> int | None:
+    """Return the PID of a live Hermes gateway guarding `target_path`, else None.
+
+    Delegates to `hermes_gateway_alive` in the sibling
+    `materialize_shared_agent_surface` module rather than reimplementing the
+    liveness check -- a running Hermes gateway rewrites its own config.yaml
+    on shutdown, which would clobber a write made underneath it, and both
+    the MCP surface and this hook surface write into the same file for the
+    `hermes_workspace` case. Imported lazily, and only via `sys.path`
+    manipulation (both scripts live in the same `scripts/` directory but
+    this module is not part of a package), so a plain claude/gemini/codex
+    JSON-only run never pays for importing the much larger agent-surface
+    module.
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import hermes_gateway_alive
+
+    return hermes_gateway_alive(target_path.parent)
+
+
 def merge_hook_payload_into_yaml_doc(
     doc: Any, target_cfg: dict[str, Any], mapped_hooks: dict[str, Any]
 ) -> None:
@@ -358,6 +381,16 @@ def apply_yaml_target(
     existing document to preserve comments/structure against; nothing here
     owns creating a fresh YAML config from scratch.
 
+    Before reading, this also refuses to write if a live Hermes gateway is
+    guarding `target_path`'s directory (a `gateway.pid` naming a running
+    process) -- a running gateway rewrites its own config.yaml on shutdown
+    and would clobber anything written underneath it. This check runs
+    unconditionally, even under `--check`/`--dry-run`, the same way and for
+    the same reason `materialize_shared_agent_surface.py`'s Hermes MCP block
+    does: `--check` exists so an operator learns about a blocker *before*
+    attempting a real write. For a target whose directory has no
+    `gateway.pid` at all (claude/gemini/codex today), this is a fast no-op.
+
     Uses the exact ruamel configuration established for Hermes's
     `config.yaml` (`apply_hermes_mcp`'s caller): `preserve_quotes = True`,
     `indent(mapping=2, sequence=4, offset=2)`, `width = 4096`. A bare
@@ -368,6 +401,14 @@ def apply_yaml_target(
     """
     if not target_path.exists():
         return (f"SKIP  {target_path} (no config at {target_path})", False)
+
+    live_pid = hermes_gateway_alive_for(target_path)
+    if live_pid is not None:
+        return (
+            f"REFUSED {target_path} (gateway PID {live_pid} is live; "
+            "stop it and re-run, or the config is clobbered on shutdown)",
+            True,
+        )
 
     ruamel_yaml = require_module("ruamel.yaml", str(target_path))
     yaml_rt = ruamel_yaml.YAML()
@@ -579,6 +620,15 @@ def main() -> int:
     )
     for line in results:
         print(line)
+    # A REFUSED write (currently only a live-gateway-blocked Hermes target)
+    # is a failure to converge, not routine drift -- it must exit non-zero
+    # regardless of --check/--dry-run, mirroring
+    # `materialize_shared_agent_surface.py`'s main(), whose orchestrator
+    # (`refresh_agent_surfaces.py`) keys its ok/fail summary off the process
+    # exit code alone.
+    refused = [line for line in results if line.startswith("REFUSED")]
+    if refused:
+        return 1
     if args.check and drift_found:
         return 1
     return 0

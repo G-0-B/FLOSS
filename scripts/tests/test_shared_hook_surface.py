@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -531,3 +532,199 @@ def test_default_format_is_json_and_existing_targets_unaffected(tmp_path):
     # today -- build_target_payload must not require it.
     payload = surface.build_target_payload({}, target_cfg)
     assert payload["hooks"]["PreToolUse"] == [{"matcher": "*", "hooks": []}]
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Hermes liveness guard (reused from materialize_shared_agent_surface)
+# ---------------------------------------------------------------------------
+
+
+def _hermes_target_cfg() -> dict:
+    return {
+        "format": "yaml",
+        "event_map": {"PreToolUse": "pre_tool_call", "PostToolUse": "post_tool_call"},
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_pre_write.py"}
+                    ],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_post_write.py"}
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def test_hermes_gateway_alive_for_reuses_sibling_liveness_check(tmp_path):
+    """`hermes_gateway_alive_for` must delegate to
+    `materialize_shared_agent_surface.hermes_gateway_alive` rather than
+    reimplementing it -- this is the same liveness guard the MCP Hermes
+    target relies on, and there must be exactly one implementation of "is a
+    Hermes gateway alive for this home directory".
+    """
+    surface = load_hook_surface_module()
+
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    config_path = hermes_dir / "config.yaml"
+
+    # No gateway.pid at all -- not a Hermes home, or the gateway never ran.
+    assert surface.hermes_gateway_alive_for(config_path) is None
+
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid()}), encoding="utf-8"
+    )
+    assert surface.hermes_gateway_alive_for(config_path) == os.getpid()
+
+
+def test_yaml_target_refuses_write_when_gateway_pid_is_live(tmp_path):
+    """A running gateway rewrites its own config.yaml on shutdown, which
+    would clobber a write made underneath it -- so a live `gateway.pid` in
+    the target's directory must block the write entirely, not just flag
+    drift. The fixture stands in for a live Hermes gateway; `os.getpid()` is
+    guaranteed alive without needing to actually spawn one.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    config_path = hermes_dir / "config.yaml"
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path.write_text(fixture_text, encoding="utf-8")
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid()}), encoding="utf-8"
+    )
+
+    message, changed = surface.apply_yaml_target(
+        config_path, _hermes_target_cfg(), check=False, dry_run=False
+    )
+
+    assert message.startswith("REFUSED")
+    assert str(os.getpid()) in message
+    assert changed is True
+    # The file must be byte-unchanged -- the whole point of the guard.
+    assert config_path.read_text(encoding="utf-8") == fixture_text
+
+
+@pytest.mark.parametrize("check,dry_run", [(True, False), (False, True)])
+def test_yaml_target_refuses_under_check_and_dry_run_too(tmp_path, check, dry_run):
+    """The liveness guard must fire before the check/dry-run branch, so an
+    operator learns about the blocker from a dry `--check` pass, not only
+    when a real write already failed.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    config_path = hermes_dir / "config.yaml"
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path.write_text(fixture_text, encoding="utf-8")
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid()}), encoding="utf-8"
+    )
+
+    message, changed = surface.apply_yaml_target(
+        config_path, _hermes_target_cfg(), check=check, dry_run=dry_run
+    )
+
+    assert message.startswith("REFUSED")
+    assert changed is True
+    assert config_path.read_text(encoding="utf-8") == fixture_text
+
+
+def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
+    """A `gateway.pid` naming a process that is no longer running must NOT
+    block the write -- only an actually-live gateway is a clobber risk.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    hermes_dir = tmp_path / "hermes"
+    hermes_dir.mkdir()
+    config_path = hermes_dir / "config.yaml"
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path.write_text(fixture_text, encoding="utf-8")
+    # An implausibly large PID: on Windows, `tasklist /FI "PID eq N"` for a
+    # nonexistent PID returns a non-empty "no tasks match" message (not an
+    # error and not empty output), which `_pid_alive` correctly reads as
+    # "not alive" rather than failing closed.
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": 99999999}), encoding="utf-8"
+    )
+
+    message, changed = surface.apply_yaml_target(
+        config_path, _hermes_target_cfg(), check=False, dry_run=False
+    )
+
+    assert "WROTE" in message
+    assert changed is True
+    assert "REFUSED" not in message
+
+
+def test_materialize_reports_refused_for_live_gateway_and_leaves_file_untouched(
+    tmp_path,
+):
+    """End-to-end through `materialize()`: a live-gateway-blocked Hermes-like
+    target must surface a REFUSED line, report drift, and leave the on-disk
+    config byte-unchanged.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    _write_hook_script(tmp_path, "FLOSS/scripts/hook_pre_write.py")
+    _write_hook_script(tmp_path, "FLOSS/scripts/hook_post_write.py")
+
+    hermes_dir = tmp_path / ".toilet" / "hermes"
+    hermes_dir.mkdir(parents=True)
+    config_path = hermes_dir / "config.yaml"
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path.write_text(fixture_text, encoding="utf-8")
+    (hermes_dir / "gateway.pid").write_text(
+        json.dumps({"pid": os.getpid()}), encoding="utf-8"
+    )
+
+    manifest_path = tmp_path / "FLOSS" / "shared-hook-surface.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "manifest_version": "0.1.0",
+        "workspace_id": "test-workspace",
+        "workspace_name": "Test Workspace",
+        "rules": [],
+        "hook_scripts": [
+            "FLOSS/scripts/hook_pre_write.py",
+            "FLOSS/scripts/hook_post_write.py",
+        ],
+        "targets": {
+            "hermes_workspace": {
+                "enabled": True,
+                "settings_path": ".toilet/hermes/config.yaml",
+                **_hermes_target_cfg(),
+            }
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    output_dir = tmp_path / ".agent-surface" / "hooks"
+
+    results, drift_found = surface.materialize(
+        workspace_root=tmp_path,
+        manifest_path=manifest_path,
+        output_dir=output_dir,
+        check=False,
+        dry_run=False,
+    )
+
+    assert drift_found is True
+    assert any(line.startswith("REFUSED") and "config.yaml" in line for line in results)
+    assert config_path.read_text(encoding="utf-8") == fixture_text

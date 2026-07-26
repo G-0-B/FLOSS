@@ -123,6 +123,41 @@
         ]
       }
     },
+    "hermes_workspace": {
+      "enabled": true,
+      "scope": "repo",
+      "settings_path": ".toilet/hermes/config.yaml",
+      "format": "yaml",
+      "event_map": {
+        "PreToolUse": "pre_tool_call",
+        "PostToolUse": "post_tool_call"
+      },
+      "reason": "SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. This is the same config.yaml the hermes_workspace MCP target writes (workspace-scoped, repo .toilet/), never the AppData hermes_user home -- that gateway is live and out of scope for this target.",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+              }
+            ]
+          }
+        ]
+      }
+    },
     "opencode": {
       "enabled": false,
       "status": "pending",
