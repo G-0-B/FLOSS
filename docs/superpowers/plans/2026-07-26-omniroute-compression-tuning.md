@@ -43,11 +43,31 @@ Verified persisted across a fresh MCP connection.
 
 Unchanged and deliberately so: `enabled: true`, `strategy: standard`, `autoTriggerMode: lite`, `targetRatio: 0.7`, `preserveSystemPrompt: true`. Compression remains available as a pressure-relief valve.
 
+## Preview works — and it revises the diagnosis
+
+`omniroute compression preview` returns 401 when the key is passed via `--api-key`. It succeeds when passed as an **environment variable** using the admin key:
+
+```bash
+OMNIROUTE_API_KEY=$OMNIROUTE_ADMIN_API_KEY omniroute compression preview --file <request.json>
+```
+
+Result against `scratchpad/compression_probe.json` (real technical content — file paths, commit SHAs, ports, ruamel parameters, matcher strings):
+
+```
+263 tok -> 257 tok (2%)
+techniques: ["filler_adverbs", "articles"]
+validation: {"valid": true, "errors": [], "warnings": [], "fallbackApplied": false}
+```
+
+Every removal in the diff was an article or filler word (`"the "`, `"a "`, `"The "`, `"currently "`). **Every technical identifier survived verbatim** — `materialize_shared_agent_surface.py`, `convert_mcp_server_to_opencode`, `01bdeb8`, ports `7331`/`7332`, `write_file|patch`, `preserve_quotes=True, indent(mapping=2, sequence=4, offset=2), width=4096`, `-0.4000`, `10844 ms`. The engine also returns an explicit `preserved` list protecting version numbers and function calls.
+
+**This weakens the earlier attribution.** An earlier revision of this document implied compression was a substantial cause of the 2026-07-26 context degradation. On this evidence it is far gentler than assumed: article-stripping with active identifier protection, not content mangling. The incident is better explained by the skill's executable-looking documentation example. Compression remains a plausible *contributing* factor, not a demonstrated cause.
+
 ## Still to do
 
-1. **Measure the new trigger rate.** Re-run `omniroute_compression_status` after a day of normal use and compare `compressedRequests` against `totalRequests`. Target: compression is the exception, not the rule. If it is still firing on most requests, raise to `262144`.
-2. **Fix `omniroute compression preview`.** It returns `Error: 401` with both the `FLOSS/.env` key and the `omniroute-local` default, then trips a libuv assertion (`!(handle->flags & UV_HANDLE_CLOSING)`). Until this works there is no way to inspect what compression actually does to a given payload — which is the only way to judge quality rather than infer it from ratios.
-3. **Quality test once preview works.** A probe request already exists at `scratchpad/compression_probe.json`, shaped like real work: exact file paths, port numbers, commit SHAs, ruamel parameters, matcher strings. Those specifics are precisely what must survive. Compare each strategy (`lite`, `standard`, `aggressive`, `ultra`, `rtk`, `stacked`) against it and check whether identifiers and numbers are preserved verbatim.
+1. **Explain the 2% vs 13% gap — highest value remaining test.** This probe compressed at 2%, but live analytics show `lite` mode averaging **13%** across 228 real requests. A 6x gap is unexplained. It may be scale-dependent behaviour on large conversational payloads, which is exactly the regime Hermes operates in. Build a probe an order of magnitude larger (multi-turn, ~10-50k tokens) and preview it. Until that is done, "compression is safe" is proven only for small technical payloads.
+2. **Measure the new trigger rate.** Re-run `omniroute_compression_status` after a day of normal use and compare `compressedRequests` against `totalRequests`. Target: compression is the exception, not the rule. If it is still firing on most requests, raise to `262144`.
+3. **Compare strategies on the same probe.** Run `lite`, `standard`, `aggressive`, `ultra`, `rtk`, `stacked` against identical input and diff the `preserved` lists and validation results. `standard` is currently active; `aggressive` and `ultra` are untested here and may not protect identifiers the same way.
 4. **Consider `preserveSystemPrompt`'s blind spot.** It protects the system prompt only. If a strategy is ever needed at high volume, find out whether tool definitions and recent turns can be protected too.
 
 ## Note on the 99-tool surface
