@@ -1,5 +1,7 @@
 use hdi::prelude::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
+
+const BUDGET_ENTRY_FUTURE_SKEW_SECONDS: u64 = 300;
 
 /// Represents a node in the Rose-Forest knowledge graph.
 ///
@@ -106,11 +108,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         // from its own action field rather than sharing one binding.
         FlatOp::StoreEntry(store) => match store {
             OpEntry::CreateEntry { app_entry, action } => {
-                validate_app_entry(app_entry, &action.author)
+                validate_app_entry(app_entry, &action.author, &action.timestamp)
             }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                validate_app_entry(app_entry, &action.author)
-            }
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => validate_app_entry(app_entry, &action.author, &action.timestamp),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -122,11 +124,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 fn validate_app_entry(
     app_entry: EntryTypes,
     author: &AgentPubKey,
+    action_timestamp: &Timestamp,
 ) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
         EntryTypes::RoseNode(node) => validate_rose_node(&node),
         EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
-        EntryTypes::BudgetEntry(budget) => validate_budget_entry(&budget, author),
+        EntryTypes::BudgetEntry(budget) => validate_budget_entry(&budget, author, action_timestamp),
         EntryTypes::ThoughtCredential(credential) => {
             validate_thought_credential(&credential, author)
         }
@@ -285,21 +288,36 @@ fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbac
 }
 
 /// ADR-15 R2: `BudgetEntry` was previously accepted unconditionally (`Ok(Valid)`), letting any
-/// agent mint a budget naming any other agent. Bind it to the author and reject negative balances.
+/// agent mint a budget naming any other agent. Bind it to the author, reject invalid balances,
+/// and use the deterministic action timestamp to constrain future-dated windows.
 fn validate_budget_entry(
     budget: &BudgetEntry,
     author: &AgentPubKey,
+    action_timestamp: &Timestamp,
 ) -> ExternResult<ValidateCallbackResult> {
     if &budget.agent != author {
         return Ok(ValidateCallbackResult::Invalid(
             "E_BUDGET_AUTHOR: agent must equal the action author".into(),
         ));
     }
-    if budget.remaining_ru < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "E_BUDGET_RU: {} must be >= 0.0",
-            budget.remaining_ru
-        )));
+    if !budget.remaining_ru.is_finite() || budget.remaining_ru < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into(),
+        ));
+    }
+    let Some(latest_permitted_window_start) =
+        action_timestamp.checked_add(&Duration::from_secs(BUDGET_ENTRY_FUTURE_SKEW_SECONDS))
+    else {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_WINDOW_FUTURE: action timestamp overflow while constructing future-skew boundary"
+                .into(),
+        ));
+    };
+    if budget.window_start > latest_permitted_window_start {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_WINDOW_FUTURE: window_start exceeds action timestamp by more than 300 seconds"
+                .into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -341,31 +359,128 @@ mod tests {
         Timestamp::from_micros(1_000_000)
     }
 
+    fn validate_budget_at(
+        budget: &BudgetEntry,
+        author: &AgentPubKey,
+        action_timestamp: Timestamp,
+    ) -> ValidateCallbackResult {
+        validate_budget_entry(budget, author, &action_timestamp).unwrap()
+    }
+
     #[test]
     fn budget_rejects_author_mismatch() {
-        let b = BudgetEntry { agent: agent(1), remaining_ru: 10.0, window_start: ts() };
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
         assert!(matches!(
-            validate_budget_entry(&b, &agent(2)).unwrap(),
+            validate_budget_entry(&b, &agent(2), &ts()).unwrap(),
             ValidateCallbackResult::Invalid(_)
         ));
     }
 
     #[test]
     fn budget_accepts_self_authored() {
-        let b = BudgetEntry { agent: agent(1), remaining_ru: 10.0, window_start: ts() };
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
         assert_eq!(
-            validate_budget_entry(&b, &agent(1)).unwrap(),
+            validate_budget_entry(&b, &agent(1), &ts()).unwrap(),
             ValidateCallbackResult::Valid
         );
     }
 
     #[test]
     fn budget_rejects_negative_balance() {
-        let b = BudgetEntry { agent: agent(1), remaining_ru: -1.0, window_start: ts() };
-        assert!(matches!(
-            validate_budget_entry(&b, &agent(1)).unwrap(),
-            ValidateCallbackResult::Invalid(_)
-        ));
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: -1.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_nan_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::NAN,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_infinite_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::INFINITY,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_accepts_window_start_at_future_skew_boundary() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: Timestamp::from_micros(301_000_000),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_rejects_window_start_one_microsecond_beyond_future_skew_boundary() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: Timestamp::from_micros(301_000_001),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_WINDOW_FUTURE: window_start exceeds action timestamp by more than 300 seconds"
+                    .into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_when_future_skew_boundary_overflows() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), Timestamp::MAX),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_WINDOW_FUTURE: action timestamp overflow while constructing future-skew boundary"
+                    .into()
+            )
+        );
     }
 
     #[test]
