@@ -209,6 +209,13 @@
           "enabled": true,
           "timeout": 120
         }
+      },
+      "guarded_keys": {
+        "hooks_auto_accept": false,
+        "approvals.mode": "smart",
+        "approvals.cron_mode": "deny",
+        "approvals.mcp_reload_confirm": true,
+        "approvals.destructive_slash_confirm": true
       }
     },
     "hermes_user": {
@@ -226,6 +233,13 @@
           "enabled": true,
           "timeout": 120
         }
+      },
+      "guarded_keys": {
+        "hooks_auto_accept": false,
+        "approvals.mode": "smart",
+        "approvals.cron_mode": "deny",
+        "approvals.mcp_reload_confirm": true,
+        "approvals.destructive_slash_confirm": true
       }
     }
   }

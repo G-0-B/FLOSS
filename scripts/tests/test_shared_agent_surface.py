@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -172,8 +173,12 @@ def test_umbrella_materializer_refreshes_memory_before_context(tmp_path, monkeyp
     monkeypatch.setattr(surface, "DEFAULT_AI_ROSTER_MANIFEST_PATH", roster_manifest)
     monkeypatch.setattr(surface, "DEFAULT_MEMORY_MANIFEST_PATH", memory_manifest)
     monkeypatch.setattr(surface, "DEFAULT_CONTEXT_MANIFEST_PATH", context_manifest)
-    monkeypatch.setattr(surface, "DEFAULT_HOOK_MANIFEST_PATH", floss / "missing-hooks.json")
-    monkeypatch.setattr(surface, "DEFAULT_SKILL_MANIFEST_PATH", floss / "missing-skills.json")
+    monkeypatch.setattr(
+        surface, "DEFAULT_HOOK_MANIFEST_PATH", floss / "missing-hooks.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_SKILL_MANIFEST_PATH", floss / "missing-skills.json"
+    )
 
     calls: list[str] = []
 
@@ -220,3 +225,216 @@ def test_doctor_report_summarizes_surface_memory_provenance_and_heartbeat():
     assert "- Heartbeat STOP: `present`" in report
     assert "- Providers: `12`" in report
     assert "- Provenance: `8 valid`, `2 superseded`, `1 invalid`" in report
+
+
+def _mute_sub_materializers(surface, floss_dir, monkeypatch):
+    """Point every optional sub-manifest at a nonexistent path.
+
+    Their real counterparts live in the actual repo (this module is loaded
+    from the real `scripts/` dir), which would make them run against a
+    workspace_root that doesn't match -- irrelevant noise for guard tests
+    that only care about the Hermes dispatch block.
+    """
+    monkeypatch.setattr(
+        surface, "DEFAULT_AI_ROSTER_MANIFEST_PATH", floss_dir / "missing-roster.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_MEMORY_MANIFEST_PATH", floss_dir / "missing-memory.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_CONTEXT_MANIFEST_PATH", floss_dir / "missing-context.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_HOOK_MANIFEST_PATH", floss_dir / "missing-hooks.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_SKILL_MANIFEST_PATH", floss_dir / "missing-skills.json"
+    )
+
+
+def test_resolve_dotted_key_handles_nested_and_missing_paths():
+    surface = load_surface_module()
+    doc = {"approvals": {"mode": "smart"}, "hooks_auto_accept": False}
+
+    assert surface.resolve_dotted_key(doc, "hooks_auto_accept") == (True, False)
+    assert surface.resolve_dotted_key(doc, "approvals.mode") == (True, "smart")
+    assert surface.resolve_dotted_key(doc, "approvals.cron_mode") == (False, None)
+    assert surface.resolve_dotted_key(doc, "missing_top.level") == (False, None)
+    # An intermediate segment that is not itself a mapping must not be
+    # indexed into -- treated as "not found", not a crash.
+    assert surface.resolve_dotted_key(
+        {"approvals": "not-a-dict"}, "approvals.mode"
+    ) == (False, None)
+
+
+def test_check_guarded_keys_distinguishes_wrong_value_absent_and_match():
+    surface = load_surface_module()
+    doc = {
+        "hooks_auto_accept": True,  # wrong -- expected False
+        "approvals": {"mode": "smart"},  # matches expectation
+        # approvals.cron_mode is entirely absent
+    }
+    guarded_keys = {
+        "hooks_auto_accept": False,
+        "approvals.mode": "smart",
+        "approvals.cron_mode": "deny",
+    }
+
+    findings = surface.check_guarded_keys("hermes_user", doc, guarded_keys)
+
+    assert (
+        "GUARD DRIFT hermes_user hooks_auto_accept: expected False, found True"
+        in findings
+    )
+    assert (
+        "GUARD DRIFT hermes_user approvals.cron_mode: expected 'deny', key is absent"
+        in findings
+    )
+    # A matching key produces no finding at all.
+    assert not any("approvals.mode" in line for line in findings)
+    assert len(findings) == 2
+
+
+def test_guard_hermes_config_skips_silently_when_config_missing(tmp_path):
+    surface = load_surface_module()
+    missing = tmp_path / "does-not-exist" / "config.yaml"
+
+    findings = surface.guard_hermes_config(
+        "hermes_user", missing, {"hooks_auto_accept": False}
+    )
+
+    assert findings == []
+
+
+def test_guard_hermes_config_reports_parse_failure_without_raising(tmp_path):
+    surface = load_surface_module()
+    bad = tmp_path / "config.yaml"
+    bad.write_text("hooks_auto_accept: [unterminated\n", encoding="utf-8")
+
+    findings = surface.guard_hermes_config(
+        "hermes_user", bad, {"hooks_auto_accept": False}
+    )
+
+    assert len(findings) == 1
+    assert findings[0].startswith("GUARD DRIFT hermes_user: could not parse")
+
+
+def test_user_scope_hermes_target_guarded_without_include_user_scope(
+    tmp_path, monkeypatch
+):
+    """The key regression test.
+
+    A `hooks_auto_accept` flip in the user-scope (AppData) Hermes home must
+    be caught by a routine repo-scope `--check` -- i.e. WITHOUT passing
+    `--include-user-scope`. Scope gating exists to protect *writes* outside
+    the repo; a guard check is read-only, so gating it behind the write
+    flag would leave exactly the hole that let a real flip go unnoticed.
+    """
+    surface = load_surface_module()
+    workspace = tmp_path
+    floss = workspace / "FLOSS"
+    floss.mkdir()
+    (workspace / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    hermes_user_dir = workspace / "fake_appdata_hermes"
+    hermes_user_dir.mkdir()
+    hermes_user_config = hermes_user_dir / "config.yaml"
+    hermes_user_config.write_text(
+        "hooks_auto_accept: true\n_config_version: 33\n",
+        encoding="utf-8",
+    )
+    original_bytes = hermes_user_config.read_bytes()
+
+    manifest = floss / "shared-agent-surface.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": "0.1.0",
+                "workspace_id": "flossi0ullk",
+                "workspace_name": "FLOSSI0ULLK",
+                "mcp_source": ".mcp.json",
+                "targets": {
+                    "hermes_user": {
+                        "scope": "user",
+                        "config_path": "fake_appdata_hermes/config.yaml",
+                        "guarded_keys": {"hooks_auto_accept": False},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _mute_sub_materializers(surface, floss, monkeypatch)
+
+    # No --include-user-scope: include_user_scope defaults False here, same
+    # as a routine `refresh_agent_surfaces.py --check` invocation.
+    results, drift_found = surface.materialize(
+        workspace, manifest, check=True, dry_run=False, include_user_scope=False
+    )
+
+    assert drift_found is True
+    assert (
+        "GUARD DRIFT hermes_user hooks_auto_accept: expected False, found True"
+        in results
+    )
+    # The write path is still scope-skipped -- guard visibility and write
+    # gating are independent.
+    assert any(line.startswith("SKIP  hermes_user (user scope") for line in results)
+    # Read-only: the guard must never touch the file, drifted or not.
+    assert hermes_user_config.read_bytes() == original_bytes
+
+
+def test_repo_scope_hermes_guard_drift_never_raises_and_leaves_key_untouched(
+    tmp_path, monkeypatch
+):
+    surface = load_surface_module()
+    workspace = tmp_path
+    floss = workspace / "FLOSS"
+    floss.mkdir()
+    (workspace / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    hermes_dir = workspace / ".toilet" / "hermes"
+    hermes_dir.mkdir(parents=True)
+    hermes_config = hermes_dir / "config.yaml"
+    hermes_config.write_text(
+        "hooks_auto_accept: true\nmcp_servers: {}\n",
+        encoding="utf-8",
+    )
+
+    manifest = floss / "shared-agent-surface.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": "0.1.0",
+                "workspace_id": "flossi0ullk",
+                "workspace_name": "FLOSSI0ULLK",
+                "mcp_source": ".mcp.json",
+                "targets": {
+                    "hermes_workspace": {
+                        "scope": "repo",
+                        "config_path": ".toilet/hermes/config.yaml",
+                        "guarded_keys": {"hooks_auto_accept": False},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _mute_sub_materializers(surface, floss, monkeypatch)
+
+    # Must not raise even though this target's write path (mcp merge) also
+    # executes in the same run -- the guard finding and the mcp write are
+    # independent, and neither should crash the other.
+    results, drift_found = surface.materialize(
+        workspace, manifest, check=False, dry_run=False, include_user_scope=False
+    )
+
+    assert drift_found is True
+    assert (
+        "GUARD DRIFT hermes_workspace hooks_auto_accept: expected False, found True"
+        in results
+    )
+    # The write path only ever touches `mcp_servers`; the guarded key itself
+    # must never be silently reset back to the expected value.
+    updated = hermes_config.read_text(encoding="utf-8")
+    assert "hooks_auto_accept: true" in updated

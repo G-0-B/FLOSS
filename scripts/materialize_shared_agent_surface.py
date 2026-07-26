@@ -634,6 +634,112 @@ def hermes_gateway_alive(home: Path) -> int | None:
     return pid if _pid_alive(pid) else None
 
 
+def resolve_dotted_key(doc: Any, dotted_path: str) -> tuple[bool, Any]:
+    """Resolve a dotted key path (e.g. `"approvals.mode"`) against a parsed
+    mapping document.
+
+    Returns `(found, value)`. `found` is `False` if any segment of the path
+    is missing, or an intermediate segment resolves to something that is
+    not itself a mapping. This is deliberately different from
+    `dict.get(path, None)`: a guarded key that legitimately resolves to
+    `None`/`False`/`0` must not be conflated with "the key does not exist
+    at all" -- that distinction is exactly what lets the guard report
+    "absent" separately from "expected X, found Y".
+    """
+    current = doc
+    for segment in dotted_path.split("."):
+        if not isinstance(current, dict) or segment not in current:
+            return False, None
+        current = current[segment]
+    return True, current
+
+
+def check_guarded_keys(
+    target: str, doc: dict[str, Any], guarded_keys: dict[str, Any]
+) -> list[str]:
+    """Compare guarded key expectations against an already-parsed config doc.
+
+    Emits one `GUARD DRIFT {target} {dotted_path}: ...` line per drifted
+    key, in `guarded_keys` iteration order. A key whose live value equals
+    its expectation produces no output at all -- this function is silent
+    on a clean config.
+
+    Read-only and side-effect-free: never mutates `doc`, never writes
+    anything, never restores a drifted value. Auto-restoring a guarded key
+    would silently override a deliberate operator change to their own
+    config -- the same class of silent, unasked-for mutation this guard
+    exists to detect, not repeat. Reporting drift loudly and leaving the
+    decision to the operator is the entire point.
+    """
+    findings: list[str] = []
+    for dotted_path, expected in guarded_keys.items():
+        found, actual = resolve_dotted_key(doc, dotted_path)
+        if not found:
+            findings.append(
+                f"GUARD DRIFT {target} {dotted_path}: expected {expected!r}, "
+                "key is absent"
+            )
+        elif actual != expected:
+            findings.append(
+                f"GUARD DRIFT {target} {dotted_path}: expected {expected!r}, "
+                f"found {actual!r}"
+            )
+    return findings
+
+
+def guard_hermes_config(
+    target: str, config_path: Path, guarded_keys: dict[str, Any]
+) -> list[str]:
+    """Read-only drift check for guarded Hermes approval/hook-gate keys.
+
+    This MUST be called for a Hermes target regardless of `target_in_scope`
+    and regardless of whether the config write path runs this call --
+    see the call site in `materialize()`. A guard check never writes
+    anything, so gating it behind `--include-user-scope` (a write-scope
+    flag meant to protect writes outside the repo) would silently leave
+    user-scope Hermes homes (e.g. the AppData `hermes_user` config)
+    unguarded on every routine repo-scope `--check` run. That is exactly
+    the hole that let a live `hooks_auto_accept` flip in that file go
+    unnoticed: the flip happened in user scope, and nothing read-only was
+    watching it.
+
+    Uses plain `yaml.safe_load` (PyYAML) rather than the round-trip
+    `ruamel.yaml` loader `apply_hermes_mcp` uses: guarding only ever reads a
+    value for comparison and never re-serializes the document, so there is
+    no comment/key-order fidelity to preserve here, and no reason to pull
+    in the heavier round-trip parser (or its `require_module` hard-fail
+    gate) just to look at a handful of scalars.
+
+    Returns `[]` when there is nothing to guard: `guarded_keys` is empty,
+    or no config file exists at `config_path` (an absent config has nothing
+    to drift -- that is not itself a finding). A parse failure (invalid
+    YAML, a non-mapping document, or a missing YAML dependency) is
+    reported as a single finding line rather than raised: this function
+    must never throw, since a broken Hermes config is precisely the kind
+    of thing this guard exists to surface, not to crash `materialize()`
+    over before the other sub-materializers get a chance to run.
+    """
+    if not guarded_keys:
+        return []
+    if not config_path.exists():
+        return []
+    try:
+        import yaml as pyyaml
+
+        doc = pyyaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # guard must report, never crash materialize()
+        return [
+            f"GUARD DRIFT {target}: could not parse {config_path} for guard "
+            f"check ({type(exc).__name__}: {exc}); guarded keys unchecked"
+        ]
+    if not isinstance(doc, dict):
+        return [
+            f"GUARD DRIFT {target}: {config_path} did not parse to a mapping "
+            "document; guarded keys unchecked"
+        ]
+    return check_guarded_keys(target, doc, guarded_keys)
+
+
 def apply_hermes_mcp(
     data: Any,
     shared_mcp: dict[str, Any],
@@ -1646,14 +1752,29 @@ def materialize(
         hermes_cfg = targets.get(hermes_key)
         if not (isinstance(hermes_cfg, dict) and hermes_cfg.get("config_path")):
             continue
+        hermes_path = resolve_manifest_path(
+            workspace_root, str(hermes_cfg["config_path"])
+        )
+
+        # Guard check runs unconditionally, BEFORE the target_in_scope
+        # write-gate below, and regardless of whether this target is about
+        # to be scope-skipped. It is a read-only inspection -- it writes
+        # nothing -- so gating it behind `--include-user-scope` would leave
+        # exactly the hole that let a real `hooks_auto_accept` flip in the
+        # user-scope (AppData) Hermes home go unnoticed. See
+        # `guard_hermes_config` for the full rationale.
+        guard_findings = guard_hermes_config(
+            hermes_key, hermes_path, hermes_cfg.get("guarded_keys") or {}
+        )
+        if guard_findings:
+            results.extend(guard_findings)
+            drift_found = True
+
         if not target_in_scope(hermes_cfg, include_user_scope):
             results.append(
                 f"SKIP  {hermes_key} (user scope; pass --include-user-scope)"
             )
             continue
-        hermes_path = resolve_manifest_path(
-            workspace_root, str(hermes_cfg["config_path"])
-        )
         if not hermes_path.exists():
             results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
             continue
