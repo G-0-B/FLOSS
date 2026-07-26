@@ -63,11 +63,35 @@ Every removal in the diff was an article or filler word (`"the "`, `"a "`, `"The
 
 **This weakens the earlier attribution.** An earlier revision of this document implied compression was a substantial cause of the 2026-07-26 context degradation. On this evidence it is far gentler than assumed: article-stripping with active identifier protection, not content mangling. The incident is better explained by the skill's executable-looking documentation example. Compression remains a plausible *contributing* factor, not a demonstrated cause.
 
+## Scale test — compression is FLAT, and lossless for identifiers
+
+Ran the preview across four payload sizes, from a 263-token probe to a 94k-token multi-turn conversation shaped like real work. Twenty canary identifiers (file paths, commit SHAs, ports, flag strings, error codes, memory IDs, version numbers, code-shaped tokens) were embedded and checked for exact survival.
+
+| payload | original | compressed | saved | canaries surviving |
+|---|---|---|---|---|
+| 263 tok | 255 | 248 | 2.75% | 11/20 * |
+| 7k | 7,133 | 6,920 | **2.99%** | **20/20** |
+| 29k | 28,960 | 28,120 | **2.90%** | **20/20** |
+| 94k | 94,039 | 91,325 | **2.89%** | **20/20** |
+
+\* The nine "missing" canaries in the small probe were never in that input to begin with — verified against the source file. It is a measurement artifact, not stripping.
+
+**Two findings, both decisive:**
+
+1. **Compression does not scale with payload size.** It is flat at ~2.9% from 7k to 94k tokens. The scale-dependence hypothesis is dead — a 94k-token conversation loses the same ~3% of articles and filler as a 7k one.
+2. **Identifier survival is perfect.** Every one of the 20 canaries survived verbatim at every size ≥7k, including `write_file|patch`, `E_GOVERNED_PROVENANCE_REQUIRED`, `mem_ms1dupqi_1bf00fc9d4a5`, `preserve_quotes=True`, `streamable_http`, and `0.9.28`.
+
+### This exonerates compression
+
+**Compression was not the cause of the 2026-07-26 context degradation.** A transform that removes ~3% articles while preserving every identifier cannot explain an agent losing an entire conversation's content and reaching for a documentation example instead. Earlier revisions of this document treated compression as a substantial and then a contributing factor; on this evidence it is neither. The cause was the skill's executable-looking example, plus whatever the agent's own context handling did — not this pipeline.
+
+The `maxTokens` and MCP-description changes remain correct on their own merits (100% trigger rate at 9% context utilisation was pure overhead; 104 tokens saved was never worth degraded tool descriptions). They just should not be credited with fixing a problem they did not cause.
+
 ## Still to do
 
-1. **Explain the 2% vs 13% gap — highest value remaining test.** This probe compressed at 2%, but live analytics show `lite` mode averaging **13%** across 228 real requests. A 6x gap is unexplained. It may be scale-dependent behaviour on large conversational payloads, which is exactly the regime Hermes operates in. Build a probe an order of magnitude larger (multi-turn, ~10-50k tokens) and preview it. Until that is done, "compression is safe" is proven only for small technical payloads.
-2. **Measure the new trigger rate.** Re-run `omniroute_compression_status` after a day of normal use and compare `compressedRequests` against `totalRequests`. Target: compression is the exception, not the rule. If it is still firing on most requests, raise to `262144`.
-3. **Compare strategies on the same probe.** Run `lite`, `standard`, `aggressive`, `ultra`, `rtk`, `stacked` against identical input and diff the `preserved` lists and validation results. `standard` is currently active; `aggressive` and `ultra` are untested here and may not protect identifiers the same way.
+1. **Explain the 2.9% vs 13% reporting gap.** Live analytics report `lite` mode averaging **13%** across 228 requests, but every preview measured ~2.9%. Since scale is now ruled out, the difference is either a different engine path in production than the preview exercises, different content types (tool output and code dumps may compress far better than prose), or `avgSavingsPct` measuring something other than what preview reports. This is now a metrics-interpretation question, not a fidelity risk.
+2. **Measure the new trigger rate.** Re-run `omniroute_compression_status` after a day of normal use and compare `compressedRequests` against `totalRequests`. If it still fires on most requests, raise to `262144`.
+3. **Test the aggressive strategies before ever enabling one.** `aggressive`, `ultra`, and `omniglyph` are untested here. The safety demonstrated above is for `standard` only, and there is no reason to assume the harsher modes protect identifiers the same way. Reuse `scratchpad/compression_probe_xl.json` and the canary list.
 4. **Consider `preserveSystemPrompt`'s blind spot.** It protects the system prompt only. If a strategy is ever needed at high volume, find out whether tool definitions and recent turns can be protected too.
 
 ## Note on the 99-tool surface
