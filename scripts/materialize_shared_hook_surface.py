@@ -244,6 +244,88 @@ def resolve_target_hooks(target_cfg: dict[str, Any]) -> dict[str, Any]:
     return mapped
 
 
+VALID_ENTRY_SHAPES = ("nested", "flat")
+
+
+def apply_entry_shape(mapped_hooks: dict[str, Any], entry_shape: str) -> dict[str, Any]:
+    """Convert manifest hook definitions into a target's on-disk entry shape.
+
+    The manifest always authors each event's hook list in the
+    Claude-Code-nested shape::
+
+        [{"matcher": ..., "hooks": [{"type": "command", "command": ...}]}]
+
+    Claude, Gemini, and Codex all consume that shape directly --
+    `entry_shape: "nested"` (the default, so every target that predates this
+    field and never sets it gets byte-identical output). Hermes's own
+    `agent/shell_hooks.py::_parse_single_entry` reads a flat mapping per
+    hook instead -- `{"command": <str>, "matcher"?: <regex str>, "timeout"?:
+    <int seconds>}` -- and warns-and-skips (`"is missing a non-empty
+    'command' field"`) on anything nested, which is exactly the bug this
+    function exists to fix: the nested shape was being written into a
+    target whose parser only understands the flat one, so every entry
+    silently failed to parse and zero hooks ever fired.
+
+    `entry_shape: "flat"` performs that flattening: each inner `hooks: [...]`
+    command is lifted to a sibling of `matcher` on the outer definition, and
+    a `matcher` of `None` or the nested convention's `"*"` (meaning "match
+    everything") is omitted entirely -- Hermes already treats an absent
+    `matcher` as match-everything (`ShellHookSpec.matches_tool` returns
+    `True` when `self.matcher` is falsy), so `"*"` would otherwise be
+    compiled as a literal (and invalid) regex.
+
+    Driven entirely by the manifest's `entry_shape` field -- this function
+    never special-cases a target name.
+    """
+    if entry_shape == "nested":
+        return mapped_hooks
+    if entry_shape != "flat":
+        raise HookSurfaceError(
+            f"Unsupported entry_shape {entry_shape!r} "
+            f"(expected one of {VALID_ENTRY_SHAPES!r})"
+        )
+
+    flattened: dict[str, Any] = {}
+    for event_name, definitions in mapped_hooks.items():
+        if not isinstance(definitions, list):
+            raise HookSurfaceError(
+                f"Hook event {event_name!r} must contain a list of definitions"
+            )
+        flat_entries: list[dict[str, Any]] = []
+        for definition in definitions:
+            if not isinstance(definition, dict):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} definitions must be objects "
+                    "when entry_shape is 'flat'"
+                )
+            matcher = definition.get("matcher")
+            inner_hooks = definition.get("hooks")
+            if not isinstance(inner_hooks, list):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} definition is missing a "
+                    "`hooks` list required to flatten entry_shape 'flat'"
+                )
+            for inner in inner_hooks:
+                if not isinstance(inner, dict):
+                    raise HookSurfaceError(
+                        f"Hook event {event_name!r} inner hook entries must "
+                        "be objects when entry_shape is 'flat'"
+                    )
+                command = inner.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    raise HookSurfaceError(
+                        f"Hook event {event_name!r} inner hook entry is "
+                        "missing a non-empty `command`"
+                    )
+                flat_entry: dict[str, Any] = {}
+                if isinstance(matcher, str) and matcher.strip() and matcher != "*":
+                    flat_entry["matcher"] = matcher
+                flat_entry["command"] = command
+                flat_entries.append(flat_entry)
+        flattened[event_name] = flat_entries
+    return flattened
+
+
 def merge_hook_payload(
     existing: dict[str, Any],
     target_cfg: dict[str, Any],
@@ -298,6 +380,9 @@ def build_target_payload(
     incidental keys ever get carried forward into a file Codex re-hashes.
     """
     mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = apply_entry_shape(
+        mapped_hooks, target_cfg.get("entry_shape", "nested")
+    )
     if target_cfg.get("payload_shape") == "hooks_only":
         return {"hooks": mapped_hooks}
     return merge_hook_payload(existing, target_cfg, mapped_hooks)
@@ -433,6 +518,9 @@ def apply_yaml_target(
         )
 
     mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = apply_entry_shape(
+        mapped_hooks, target_cfg.get("entry_shape", "nested")
+    )
     merge_hook_payload_into_yaml_doc(doc, target_cfg, mapped_hooks)
 
     buffer = io.StringIO()

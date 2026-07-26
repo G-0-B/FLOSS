@@ -181,6 +181,319 @@ def test_merge_shape_target_still_preserves_unrelated_settings_keys():
 
 
 # ---------------------------------------------------------------------------
+# Capability C: `entry_shape` per target (nested -> flat, for Hermes)
+# ---------------------------------------------------------------------------
+
+
+def test_entry_shape_flat_produces_matcher_and_command_per_entry():
+    """`entry_shape: "flat"` must lift each inner `hooks: [{type, command}]`
+    command up to a sibling of `matcher` on the outer definition -- the
+    shape Hermes's `agent/shell_hooks.py::_parse_single_entry` actually
+    reads (`{"matcher"?: <regex>, "command": <str>}`), instead of the
+    Claude-Code-nested shape it silently fails to parse.
+    """
+    surface = load_hook_surface_module()
+
+    mapped_hooks = {
+        "pre_tool_call": [
+            {
+                "matcher": "write_file|patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python hook_pre_write.py",
+                    }
+                ],
+            }
+        ],
+        "post_tool_call": [
+            {
+                "matcher": "write_file|patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python hook_post_write.py",
+                    }
+                ],
+            }
+        ],
+    }
+
+    flat = surface.apply_entry_shape(mapped_hooks, "flat")
+
+    assert flat == {
+        "pre_tool_call": [
+            {"matcher": "write_file|patch", "command": "python hook_pre_write.py"}
+        ],
+        "post_tool_call": [
+            {"matcher": "write_file|patch", "command": "python hook_post_write.py"}
+        ],
+    }
+    # No entry may carry a nested `hooks` key or a `type` key -- Hermes has
+    # no use for either and `_parse_single_entry` only reads `command`,
+    # `matcher`, and `timeout` off the top-level mapping.
+    for entries in flat.values():
+        for entry in entries:
+            assert "hooks" not in entry
+            assert "type" not in entry
+
+
+def test_entry_shape_flat_omits_wildcard_matcher():
+    """A nested `matcher: "*"` (the Claude-Code "match everything"
+    convention) must be omitted entirely in the flat shape, not carried
+    over as a literal `"*"` regex -- Hermes already treats an absent
+    `matcher` as match-everything, and compiling `"*"` as a regex would be
+    a `re.error` (nothing to repeat).
+    """
+    surface = load_hook_surface_module()
+
+    mapped_hooks = {
+        "on_session_start": [
+            {
+                "matcher": "*",
+                "hooks": [{"type": "command", "command": "python inject.py"}],
+            }
+        ],
+        "pre_tool_call": [
+            {
+                "hooks": [{"type": "command", "command": "python nomax.py"}],
+            }
+        ],
+    }
+
+    flat = surface.apply_entry_shape(mapped_hooks, "flat")
+
+    assert flat == {
+        "on_session_start": [{"command": "python inject.py"}],
+        "pre_tool_call": [{"command": "python nomax.py"}],
+    }
+
+
+def test_entry_shape_default_nested_leaves_definitions_untouched():
+    """The default (`entry_shape` absent, or explicitly `"nested"`) must be
+    a pure passthrough -- this is what keeps claude/gemini/codex byte-for-
+    byte unchanged by the `entry_shape` capability landing.
+    """
+    surface = load_hook_surface_module()
+
+    mapped_hooks = {
+        "PreToolUse": [
+            {
+                "matcher": "Write|Edit|MultiEdit",
+                "hooks": [{"type": "command", "command": "python hook.py"}],
+            }
+        ],
+    }
+
+    assert surface.apply_entry_shape(mapped_hooks, "nested") == mapped_hooks
+    assert surface.apply_entry_shape(dict(mapped_hooks), "nested") == mapped_hooks
+
+
+def test_entry_shape_flat_wired_through_build_target_payload():
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "entry_shape": "flat",
+        "event_map": {"PreToolUse": "pre_tool_call"},
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "write_file|patch",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_pre_write.py"}
+                    ],
+                }
+            ]
+        },
+    }
+
+    payload = surface.build_target_payload({}, target_cfg)
+
+    assert payload == {
+        "hooks": {
+            "pre_tool_call": [
+                {"matcher": "write_file|patch", "command": "python hook_pre_write.py"}
+            ]
+        }
+    }
+
+
+def test_entry_shape_flat_wired_through_yaml_target(tmp_path):
+    """End-to-end through `apply_yaml_target` -- this is the exact path the
+    real `hermes_workspace` target takes. Asserts the written YAML has
+    `command` as a direct sibling of `matcher` per hook entry (Hermes's
+    actual schema), not the nested Claude-Code shape.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(_canonical_yaml_text(_YAML_FIXTURE_RAW), encoding="utf-8")
+
+    target_cfg = {
+        "format": "yaml",
+        "entry_shape": "flat",
+        "event_map": {"PreToolUse": "pre_tool_call", "PostToolUse": "post_tool_call"},
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "write_file|patch",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_pre_write.py"}
+                    ],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "write_file|patch",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_post_write.py"}
+                    ],
+                }
+            ],
+        },
+    }
+
+    message, changed = surface.apply_yaml_target(
+        config_path, target_cfg, check=False, dry_run=False
+    )
+    assert "WROTE" in message
+    assert changed is True
+
+    ruamel_yaml = pytest.importorskip("ruamel.yaml")
+    reloaded = ruamel_yaml.YAML().load(config_path.read_text(encoding="utf-8"))
+    pre = reloaded["hooks"]["pre_tool_call"]
+    post = reloaded["hooks"]["post_tool_call"]
+    assert list(pre) == [
+        {"matcher": "write_file|patch", "command": "python hook_pre_write.py"}
+    ]
+    assert list(post) == [
+        {"matcher": "write_file|patch", "command": "python hook_post_write.py"}
+    ]
+
+
+def test_entry_shape_flat_rejects_missing_command():
+    """A malformed manifest entry (no inner `hooks` list, or an inner hook
+    missing `command`) must fail loudly at materialize time rather than
+    silently emitting an entry Hermes would warn-and-skip -- the exact
+    failure mode this whole capability exists to prevent.
+    """
+    surface = load_hook_surface_module()
+
+    with pytest.raises(surface.HookSurfaceError):
+        surface.apply_entry_shape(
+            {
+                "pre_tool_call": [
+                    {"matcher": "write_file", "hooks": [{"type": "command"}]}
+                ]
+            },
+            "flat",
+        )
+
+    with pytest.raises(surface.HookSurfaceError):
+        surface.apply_entry_shape(
+            {"pre_tool_call": [{"matcher": "write_file"}]},  # no `hooks` key at all
+            "flat",
+        )
+
+
+def test_entry_shape_rejects_unknown_value():
+    surface = load_hook_surface_module()
+
+    with pytest.raises(surface.HookSurfaceError):
+        surface.apply_entry_shape({"pre_tool_call": []}, "some_other_shape")
+
+
+# ---------------------------------------------------------------------------
+# Regression: the flat entries this materializer emits must actually be
+# parseable by Hermes's own `agent/shell_hooks.py::_parse_single_entry`.
+# This mirrors (does NOT execute) Hermes's real parser -- Hermes lives in a
+# separate install (`%LOCALAPPDATA%\hermes\hermes-agent`) with its own venv
+# and module graph (`hermes_constants`, `hermes_cli.plugins`,
+# platform-conditional `fcntl`, etc.) that is impractical to import from
+# this repo's test environment. The mirrored rule, verified by reading
+# `_parse_single_entry` directly (2026-07): every entry in `hooks.<event>`
+# must be a mapping with a non-empty string `command` key -- anything else
+# is warn-and-skipped, which is exactly how this bug went undetected by
+# inspection: the nested shape parses as valid JSON/YAML and looks
+# reasonable, but every entry is missing the `command` key Hermes actually
+# reads (`raw.get("command")`), so `iter_configured_hooks` silently returns
+# an empty list. This test would have caught that: it fails on the old
+# nested-shape output and passes on the flat one.
+# ---------------------------------------------------------------------------
+
+
+def _hermes_parses_entry(entry: dict) -> bool:
+    """Mirrors `agent/shell_hooks.py::_parse_single_entry`'s command check."""
+    if not isinstance(entry, dict):
+        return False
+    command = entry.get("command")
+    return isinstance(command, str) and bool(command.strip())
+
+
+def test_hermes_flat_output_parses_under_hermes_command_rule():
+    surface = load_hook_surface_module()
+
+    hermes_hooks_block = {
+        "PreToolUse": [
+            {
+                "matcher": "write_file|patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py",
+                    }
+                ],
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "write_file|patch",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py",
+                    }
+                ],
+            }
+        ],
+    }
+
+    mapped = surface.resolve_target_hooks(
+        {
+            "event_map": {
+                "PreToolUse": "pre_tool_call",
+                "PostToolUse": "post_tool_call",
+            },
+            "hooks": hermes_hooks_block,
+        }
+    )
+    flat = surface.apply_entry_shape(mapped, "flat")
+
+    parsed_count = 0
+    for entries in flat.values():
+        for entry in entries:
+            assert _hermes_parses_entry(entry), (
+                f"entry {entry!r} would be warn-and-skipped by Hermes's "
+                "_parse_single_entry (missing/empty `command`)"
+            )
+            parsed_count += 1
+    assert parsed_count == 2  # pre_tool_call + post_tool_call, one each
+
+    # The bug this test is a regression guard for: the OLD nested shape
+    # (matcher + inner `hooks: [...]`, no top-level `command`) fails the
+    # exact same rule -- prove it, so a future revert of `entry_shape` is
+    # caught here even if someone forgets to re-run the flatten step.
+    for entries in mapped.values():
+        for entry in entries:
+            assert not _hermes_parses_entry(entry), (
+                "the nested shape must NOT satisfy Hermes's command check -- "
+                "if it does, this regression test is no longer testing "
+                "anything"
+            )
+
+
+# ---------------------------------------------------------------------------
 # Capability B: `event_map` per target
 # ---------------------------------------------------------------------------
 
