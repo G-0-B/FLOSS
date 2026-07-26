@@ -227,13 +227,13 @@
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
     },
-    "FLOSS/scripts/hook_bg_round.py": {
+    "FLOSS/hooks/hook_bg_round.py": {
       "spec": "Detached background consensus-round runner spawned by hook_post_write"
     },
-    "FLOSS/scripts/hook_post_write.py": {
+    "FLOSS/hooks/hook_post_write.py": {
       "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
     },
-    "FLOSS/scripts/hook_pre_write.py": {
+    "FLOSS/hooks/hook_pre_write.py": {
       "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
@@ -275,7 +275,7 @@
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
     },
-    "FLOSS/scripts/session_start_inject.py": {
+    "FLOSS/hooks/session_start_inject.py": {
       "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/smoke_test_gateway.py": {

@@ -1,4 +1,4 @@
-"""Tests for the agentmemory recall wired into scripts/session_start_inject.py.
+"""Tests for the agentmemory recall wired into hooks/session_start_inject.py.
 
 This hook is on the critical path (session start), so the spec requires:
   - hard-capped added latency (<=1s total)
@@ -27,7 +27,7 @@ FLOSS_ROOT = Path(__file__).resolve().parents[2]
 def load_session_start_module(tmp_path: Path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "session_start_inject_under_test",
-        FLOSS_ROOT / "scripts" / "session_start_inject.py",
+        FLOSS_ROOT / "hooks" / "session_start_inject.py",
     )
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)

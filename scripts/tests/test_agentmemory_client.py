@@ -1,4 +1,4 @@
-"""Tests for scripts/agentmemory_client.py -- the minimal MCP-stdio client
+"""Tests for hooks/agentmemory_client.py -- the minimal MCP-stdio client
 used by the hook scripts.
 
 Every test runs against a stubbed/fake stdio MCP server
@@ -21,7 +21,7 @@ FIXTURE_SERVER = Path(__file__).resolve().parent / "fixtures" / "fake_mcp_server
 def load_client_module(tmp_path: Path, mode: str = "ok"):
     spec = importlib.util.spec_from_file_location(
         "agentmemory_client_under_test",
-        FLOSS_ROOT / "scripts" / "agentmemory_client.py",
+        FLOSS_ROOT / "hooks" / "agentmemory_client.py",
     )
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)

@@ -39,9 +39,9 @@ def recall_recent_memories() -> list[str]:
     to the pre-existing behavior of injecting only the startup contract.
     """
     try:
-        scripts_dir = str(Path(__file__).resolve().parent)
-        if scripts_dir not in sys.path:
-            sys.path.insert(0, scripts_dir)
+        hooks_dir = str(Path(__file__).resolve().parent)
+        if hooks_dir not in sys.path:
+            sys.path.insert(0, hooks_dir)
         import agentmemory_client
 
         items = agentmemory_client.recall(

@@ -24,7 +24,7 @@ FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
 def load_hook_post_write_module(tmp_path: Path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
-        "hook_post_write_under_test", FLOSS_ROOT / "scripts" / "hook_post_write.py"
+        "hook_post_write_under_test", FLOSS_ROOT / "hooks" / "hook_post_write.py"
     )
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -216,6 +216,6 @@ def test_spawn_background_round_omits_argv_when_no_edit_note(tmp_path, monkeypat
     argv = captured_argv["argv"]
     assert argv == [
         sys.executable,
-        str(module.REPO_ROOT / "scripts" / "hook_bg_round.py"),
+        str(module.REPO_ROOT / "hooks" / "hook_bg_round.py"),
         "claim_456",
     ]

@@ -1,4 +1,4 @@
-"""Tests for the agentmemory wiring added to scripts/hook_bg_round.py.
+"""Tests for the agentmemory wiring added to hooks/hook_bg_round.py.
 
 hook_bg_round.py is the DETACHED consensus-round runner spawned by
 hook_post_write.py -- it is already slow (~10s, network calls to Groq /
@@ -22,7 +22,7 @@ FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
 def load_bg_round_module():
     spec = importlib.util.spec_from_file_location(
-        "hook_bg_round_under_test", FLOSS_ROOT / "scripts" / "hook_bg_round.py"
+        "hook_bg_round_under_test", FLOSS_ROOT / "hooks" / "hook_bg_round.py"
     )
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)

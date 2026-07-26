@@ -207,8 +207,8 @@ def save_edit_accepted_to_memory(claim_id: str, edit_note: str) -> None:
     if not edit_note:
         return
     try:
-        if str(REPO_ROOT / "scripts") not in sys.path:
-            sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        if str(REPO_ROOT / "hooks") not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT / "hooks"))
         import agentmemory_client
 
         text = f"Accepted edit (claim {claim_id}): {edit_note}"
@@ -233,8 +233,8 @@ def save_consensus_outcome_to_memory(
     agentmemory_client itself (it never raises) plus this outer guard.
     """
     try:
-        if str(REPO_ROOT / "scripts") not in sys.path:
-            sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        if str(REPO_ROOT / "hooks") not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT / "hooks"))
         import agentmemory_client
 
         outcome = result.get("outcome", "?")

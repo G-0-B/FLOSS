@@ -18,7 +18,7 @@ evidence_sources:
   - "packages/activity_log/schema.py"
   - "scripts/context_router.py"
   - "scripts/review_queue.py"
-  - "scripts/hook_post_write.py"
+  - "hooks/hook_post_write.py"
   - "packages/metacoordinator_mcp/hashline.py"
   - "packages/metacoordinator_mcp/voters.py"
 ```

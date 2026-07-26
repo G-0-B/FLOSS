@@ -9,9 +9,9 @@
     "Prefer non-blocking observability and cheap background consensus over prompt-time token burn."
   ],
   "hook_scripts": [
-    "FLOSS/scripts/hook_pre_write.py",
-    "FLOSS/scripts/hook_post_write.py",
-    "FLOSS/scripts/hook_bg_round.py"
+    "FLOSS/hooks/hook_pre_write.py",
+    "FLOSS/hooks/hook_post_write.py",
+    "FLOSS/hooks/hook_bg_round.py"
   ],
   "targets": {
     "claude": {
@@ -24,7 +24,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
               }
             ]
           }
@@ -35,7 +35,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
               }
             ]
           }
@@ -59,7 +59,7 @@
               {
                 "name": "flossi0ullk-pre-write",
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py --stdout-json",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py --stdout-json",
                 "timeout": 60000,
                 "description": "Checkpoint substantive code edits before the tool mutates the file."
               }
@@ -74,7 +74,7 @@
               {
                 "name": "flossi0ullk-post-write",
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py --stdout-json",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py --stdout-json",
                 "timeout": 60000,
                 "description": "Submit substantive code edits into the FLOSSI0ULLK local consensus gateway."
               }
@@ -94,7 +94,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
               }
             ]
           }
@@ -105,7 +105,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
               }
             ]
           }
@@ -116,7 +116,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/session_start_inject.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/session_start_inject.py"
               }
             ]
           }
@@ -140,7 +140,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
               }
             ]
           }
@@ -151,7 +151,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
               }
             ]
           }

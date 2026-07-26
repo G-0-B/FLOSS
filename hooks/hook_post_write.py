@@ -207,7 +207,7 @@ def spawn_background_round(claim_id: str, edit_note: str = "") -> None:
     measurable latency to the synchronous fast path: it's just one more
     string in a Popen argv list.
     """
-    bg_script = REPO_ROOT / "scripts" / "hook_bg_round.py"
+    bg_script = REPO_ROOT / "hooks" / "hook_bg_round.py"
     if not bg_script.exists():
         log(f"[hook] bg script missing: {bg_script}")
         return
@@ -261,7 +261,7 @@ def main() -> int:
     # scripts/ and docs/{specs,adr}/ are exactly the surfaces that filter
     # skips. Read-only registry lookup; advisory only; never raises.
     try:
-        _scripts_dir = str(Path(__file__).resolve().parent)
+        _scripts_dir = str(REPO_ROOT / "scripts")
         if _scripts_dir not in sys.path:
             sys.path.insert(0, _scripts_dir)
         from spec_gate import advisory_note

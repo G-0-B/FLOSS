@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python scripts/hook_pre_write.py"
+            "command": "python hooks/hook_pre_write.py"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python scripts/hook_post_write.py"
+            "command": "python hooks/hook_post_write.py"
           }
         ]
       }
