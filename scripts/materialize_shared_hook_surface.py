@@ -228,6 +228,36 @@ def merge_hook_payload(
     return payload
 
 
+def build_target_payload(
+    existing: dict[str, Any], target_cfg: dict[str, Any]
+) -> dict[str, Any]:
+    """Build the on-disk payload for a hook target.
+
+    Most targets (`claude`, `gemini`) live in a settings file shared with
+    unrelated agent-native keys, so their payload is produced by merging
+    managed hook events into whatever already exists on disk.
+
+    Targets marked `payload_shape: "hooks_only"` own a settings file whose
+    *entire* content is the hook definitions (e.g. Codex's `.codex/hooks.json`,
+    which Codex pins by content hash). For those, the payload is built fresh
+    from the manifest only -- `existing` is intentionally ignored so no
+    incidental keys ever get carried forward into a file Codex re-hashes.
+    """
+    if target_cfg.get("payload_shape") == "hooks_only":
+        target_hooks = target_cfg.get("hooks", {})
+        if not isinstance(target_hooks, dict):
+            raise HookSurfaceError("Target `hooks` field must be an object if present")
+        payload_hooks: dict[str, Any] = {}
+        for event_name, definitions in target_hooks.items():
+            if not isinstance(definitions, list):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} must contain a list of definitions"
+                )
+            payload_hooks[event_name] = definitions
+        return {"hooks": payload_hooks}
+    return merge_hook_payload(existing, target_cfg)
+
+
 def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
     registry_targets: dict[str, Any] = {}
     for target_name, target_cfg in manifest["targets"].items():
@@ -357,7 +387,7 @@ def materialize(
             if target_path.exists() and target_path.suffix == ".jsonc"
             else (load_json(target_path) if target_path.exists() else {})
         )
-        payload = merge_hook_payload(existing, target_cfg)
+        payload = build_target_payload(existing, target_cfg)
         message, changed = check_or_write_json(
             target_path, payload, check=check, dry_run=dry_run
         )

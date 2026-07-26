@@ -84,9 +84,44 @@
       }
     },
     "codex": {
-      "enabled": false,
-      "status": "pending",
-      "reason": "No repo-local native hook settings surface is currently materialized in this workspace."
+      "enabled": true,
+      "settings_path": ".codex/hooks.json",
+      "payload_shape": "hooks_only",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_pre_write.py"
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/hook_post_write.py"
+              }
+            ]
+          }
+        ],
+        "SessionStart": [
+          {
+            "matcher": "*",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "C:/Python313/python.exe C:/~shit/FLOSS/scripts/session_start_inject.py"
+              }
+            ]
+          }
+        ]
+      }
     },
     "opencode": {
       "enabled": false,
