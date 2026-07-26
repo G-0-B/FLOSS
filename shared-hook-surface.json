@@ -123,17 +123,16 @@
         ]
       }
     },
-    "hermes_workspace": {
+    "hermes_user": {
       "enabled": true,
-      "scope": "repo",
-      "settings_path": ".toilet/hermes/config.yaml",
+      "settings_path": "%LOCALAPPDATA%/hermes/config.yaml",
       "format": "yaml",
       "entry_shape": "flat",
       "event_map": {
         "PreToolUse": "pre_tool_call",
         "PostToolUse": "post_tool_call"
       },
-      "reason": "SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. This is the same config.yaml the hermes_workspace MCP target writes (workspace-scoped, repo .toilet/), never the AppData hermes_user home -- that gateway is live and out of scope for this target. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`.",
+      "reason": "This is the REAL Hermes home -- where the gateway actually runs and where Hermes reads its config -- not `.toilet/hermes/`, which is the operator's scratch document dump (gitignored) and was never the live gateway. The former `hermes_workspace` target (pointing at `.toilet/hermes/config.yaml`) has been removed entirely; this manifest no longer manages anything under `.toilet`. SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`. This hook block matches, byte-for-byte, the hooks already present and allowlisted (`hermes hooks list` reports both ✓ allowed) in the live AppData config -- adopted as-is, not rewritten.",
       "hooks": {
         "PreToolUse": [
           {

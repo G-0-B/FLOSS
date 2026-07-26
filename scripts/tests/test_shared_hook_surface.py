@@ -985,6 +985,161 @@ def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
     assert "REFUSED" not in message
 
 
+def test_targeting_correction_manifests_do_not_reference_toilet():
+    """Repo-level guard for the 2026-07-26 targeting-error fix: `.toilet` is
+    the operator's scratch dump, not a real Hermes home, and neither shared
+    manifest may reference it any more -- `hermes_workspace` was removed
+    from both `shared-agent-surface.json` (MCP targets) and
+    `shared-hook-surface.json` (hook targets) in favor of `hermes_user`
+    pointing at the real AppData Hermes home.
+    """
+    agent_surface_path = FLOSS_ROOT / "shared-agent-surface.json"
+    hook_surface_path = FLOSS_ROOT / "shared-hook-surface.json"
+
+    agent_surface = json.loads(agent_surface_path.read_text(encoding="utf-8"))
+    hook_surface = json.loads(hook_surface_path.read_text(encoding="utf-8"))
+
+    assert "hermes_workspace" not in agent_surface["targets"]
+    assert "hermes_workspace" not in hook_surface["targets"]
+
+    # No target's *path* fields may point at `.toilet` -- a `reason` field
+    # documenting that `.toilet` was removed and is no longer managed is
+    # fine (and expected); only path-bearing keys are checked here.
+    path_keys = (
+        "config_path",
+        "settings_path",
+        "context_pack_path",
+        "config_path",
+    )
+    for surface_doc in (agent_surface, hook_surface):
+        for target_cfg in surface_doc["targets"].values():
+            if not isinstance(target_cfg, dict):
+                continue
+            for key in path_keys:
+                value = target_cfg.get(key)
+                if isinstance(value, str):
+                    assert ".toilet" not in value
+
+    hermes_user_hook = hook_surface["targets"]["hermes_user"]
+    assert hermes_user_hook["settings_path"] == "%LOCALAPPDATA%/hermes/config.yaml"
+    assert hermes_user_hook["format"] == "yaml"
+    assert hermes_user_hook["entry_shape"] == "flat"
+
+
+# ---------------------------------------------------------------------------
+# Path expansion: `resolve_target_path` must expand `~` and `%VAR%`/`$VAR`
+# references in a target's `settings_path`, mirroring
+# `resolve_manifest_path` in `materialize_shared_agent_surface.py`. Without
+# this, `%LOCALAPPDATA%/hermes/config.yaml` resolves to a bogus path nested
+# inside the workspace tree instead of the real AppData Hermes home.
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_target_path_expands_defined_env_var(tmp_path, monkeypatch):
+    surface = load_hook_surface_module()
+
+    monkeypatch.setenv("HOOK_SURFACE_TEST_VAR", str(tmp_path / "expanded"))
+    resolved = surface.resolve_target_path(
+        tmp_path, "%HOOK_SURFACE_TEST_VAR%/hermes/config.yaml"
+    )
+
+    assert resolved == (tmp_path / "expanded" / "hermes" / "config.yaml").resolve()
+
+
+def test_resolve_target_path_raises_on_undefined_env_var(tmp_path, monkeypatch):
+    surface = load_hook_surface_module()
+
+    monkeypatch.delenv("HOOK_SURFACE_TEST_DEFINITELY_UNDEFINED", raising=False)
+
+    with pytest.raises(Exception, match="HOOK_SURFACE_TEST_DEFINITELY_UNDEFINED"):
+        surface.resolve_target_path(
+            tmp_path, "%HOOK_SURFACE_TEST_DEFINITELY_UNDEFINED%/hermes/config.yaml"
+        )
+
+
+def test_resolve_target_path_expands_tilde(tmp_path, monkeypatch):
+    surface = load_hook_surface_module()
+
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    resolved = surface.resolve_target_path(tmp_path, "~/hermes/config.yaml")
+
+    assert resolved == (tmp_path / "hermes" / "config.yaml").resolve()
+
+
+def test_resolve_target_path_absolute_passthrough(tmp_path):
+    surface = load_hook_surface_module()
+
+    absolute = tmp_path / "abs-target" / "config.yaml"
+    resolved = surface.resolve_target_path(tmp_path, str(absolute))
+
+    assert resolved == absolute.resolve()
+
+
+def test_resolve_target_path_relative_joins_workspace_root(tmp_path):
+    surface = load_hook_surface_module()
+
+    resolved = surface.resolve_target_path(tmp_path, ".claude/settings.json")
+
+    assert resolved == (tmp_path / ".claude" / "settings.json").resolve()
+
+
+def test_materialize_expands_env_var_settings_path_end_to_end(tmp_path, monkeypatch):
+    """End-to-end through `materialize()`: an enabled target whose
+    `settings_path` contains `%VAR%` must be written at the expanded
+    location, not at a literal `<workspace_root>/%VAR%/...` path.
+    """
+    surface = load_hook_surface_module()
+
+    _write_hook_script(tmp_path, "FLOSS/scripts/hook_pre_write.py")
+
+    fake_home = tmp_path / "fake_appdata"
+    fake_home.mkdir()
+    monkeypatch.setenv("HOOK_SURFACE_TEST_HOME", str(fake_home))
+
+    manifest_path = tmp_path / "FLOSS" / "shared-hook-surface.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "manifest_version": "0.1.0",
+        "workspace_id": "test-workspace",
+        "workspace_name": "Test Workspace",
+        "rules": [],
+        "hook_scripts": ["FLOSS/scripts/hook_pre_write.py"],
+        "targets": {
+            "env_target": {
+                "enabled": True,
+                "settings_path": "%HOOK_SURFACE_TEST_HOME%/settings.json",
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Write|Edit|MultiEdit",
+                            "hooks": [{"type": "command", "command": "python hook.py"}],
+                        }
+                    ]
+                },
+            }
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    output_dir = tmp_path / ".agent-surface" / "hooks"
+
+    results, drift_found = surface.materialize(
+        workspace_root=tmp_path,
+        manifest_path=manifest_path,
+        output_dir=output_dir,
+        check=False,
+        dry_run=False,
+    )
+
+    assert drift_found is True
+    written_path = fake_home / "settings.json"
+    assert written_path.exists()
+    assert any("WROTE" in line and "settings.json" in line for line in results)
+    # Must NOT have been written under a literal, unexpanded path.
+    assert not (tmp_path / "%HOOK_SURFACE_TEST_HOME%").exists()
+
+
 def test_materialize_reports_refused_for_live_gateway_and_leaves_file_untouched(
     tmp_path,
 ):

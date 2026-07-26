@@ -388,6 +388,40 @@ def build_target_payload(
     return merge_hook_payload(existing, target_cfg, mapped_hooks)
 
 
+def resolve_target_path(workspace_root: Path, raw_path: str) -> Path:
+    """Resolve a hook target's `settings_path`, expanding `~` and env vars.
+
+    Delegates to `resolve_manifest_path` in the sibling
+    `materialize_shared_agent_surface` module rather than reimplementing
+    `~`/`%VAR%`/`$VAR` expansion a second time -- imported lazily via the
+    same `sys.path` manipulation `hermes_gateway_alive_for` below already
+    uses, for the same reason: `materialize_shared_agent_surface` imports
+    *this* module at module load time (`from materialize_shared_hook_surface
+    import materialize as materialize_hook_surface`), so a module-level
+    `from materialize_shared_agent_surface import ...` here would be
+    circular. A lazy, function-scoped import breaks that cycle while still
+    giving every hook target (not just Hermes) exactly one place that knows
+    how to expand a manifest path -- without this, a target whose
+    `settings_path` is `%LOCALAPPDATA%/hermes/config.yaml` would resolve to
+    a bogus path nested inside the workspace tree (`<workspace_root>/
+    %LOCALAPPDATA%/hermes/config.yaml`), since `Path.__truediv__` does not
+    expand environment variables.
+
+    Raises `materialize_shared_agent_surface.SharedSurfaceError` (not
+    `HookSurfaceError`) on an unresolved `%VAR%`/`$VAR` -- that exception
+    type is already what `resolve_manifest_path` raises, and re-wrapping it
+    here would just lose the underlying message for no benefit; callers in
+    this module already let unexpected exceptions propagate as fatal errors
+    (see `materialize()`, which raises loudly rather than swallowing).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import resolve_manifest_path
+
+    return resolve_manifest_path(workspace_root, raw_path)
+
+
 def hermes_gateway_alive_for(target_path: Path) -> int | None:
     """Return the PID of a live Hermes gateway guarding `target_path`, else None.
 
@@ -396,11 +430,11 @@ def hermes_gateway_alive_for(target_path: Path) -> int | None:
     liveness check -- a running Hermes gateway rewrites its own config.yaml
     on shutdown, which would clobber a write made underneath it, and both
     the MCP surface and this hook surface write into the same file for the
-    `hermes_workspace` case. Imported lazily, and only via `sys.path`
-    manipulation (both scripts live in the same `scripts/` directory but
-    this module is not part of a package), so a plain claude/gemini/codex
-    JSON-only run never pays for importing the much larger agent-surface
-    module.
+    `hermes_user` target (the real AppData Hermes home). Imported lazily,
+    and only via `sys.path` manipulation (both scripts live in the same
+    `scripts/` directory but this module is not part of a package), so a
+    plain claude/gemini/codex JSON-only run never pays for importing the
+    much larger agent-surface module.
     """
     scripts_dir = Path(__file__).resolve().parent
     if str(scripts_dir) not in sys.path:
@@ -423,6 +457,19 @@ def merge_hook_payload_into_yaml_doc(
     positional/header hazard, so there is no need to rebuild the node, and
     mutating in place is what lets ruamel preserve comments, key order, and
     unrelated top-level content.
+
+    An event (or `hooksConfig` key) whose incoming value already compares
+    equal to what is on disk is left untouched rather than unconditionally
+    reassigned. `CommentedSeq`/`CommentedMap` subclass `list`/`dict`, so `==`
+    against a plain manifest-derived list/dict already compares structurally
+    -- but a wholesale `existing_hooks[event_name] = definitions`
+    reassignment, even to an equal value, can still drop ruamel's trailing
+    blank-line/comment bookkeeping attached to the replaced node (observed
+    empirically against the real AppData Hermes config: a genuine no-op
+    dropped the blank line between the `hooks:` block and the next
+    top-level key). Skipping the reassignment when nothing actually changed
+    is what keeps a true no-op byte-identical, the same fidelity goal
+    `apply_hermes_mcp` documents for its own field-clearing discipline.
     """
     existing_hooks = doc.get("hooks")
     if existing_hooks is None:
@@ -431,6 +478,8 @@ def merge_hook_payload_into_yaml_doc(
     if not hasattr(existing_hooks, "items"):
         raise HookSurfaceError("Existing `hooks` field must be a mapping if present")
     for event_name, definitions in mapped_hooks.items():
+        if event_name in existing_hooks and existing_hooks[event_name] == definitions:
+            continue
         existing_hooks[event_name] = definitions
 
     target_hooks_config = target_cfg.get("hooksConfig")
@@ -448,6 +497,8 @@ def merge_hook_payload_into_yaml_doc(
                 "Existing `hooksConfig` field must be a mapping if present"
             )
         for key, value in target_hooks_config.items():
+            if key in existing_hooks_config and existing_hooks_config[key] == value:
+                continue
             existing_hooks_config[key] = value
 
 
@@ -539,7 +590,7 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
         settings_path = target_cfg.get("settings_path")
         if isinstance(settings_path, str) and settings_path.strip():
             resolved_cfg["resolved_settings_path"] = str(
-                (workspace_root / settings_path).resolve()
+                resolve_target_path(workspace_root, settings_path)
             )
         registry_targets[target_name] = resolved_cfg
 
@@ -653,7 +704,7 @@ def materialize(
             raise HookSurfaceError(
                 f"Enabled target {target_name!r} must define `settings_path`"
             )
-        target_path = (workspace_root / settings_path).resolve()
+        target_path = resolve_target_path(workspace_root, settings_path)
 
         target_format = target_cfg.get("format", "json")
         if target_format not in ("json", "yaml"):

@@ -190,34 +190,6 @@
       "name_map": {},
       "overrides": {}
     },
-    "hermes_workspace": {
-      "scope": "repo",
-      "config_path": ".toilet/hermes/config.yaml",
-      "name_map": {
-        "agentmemory": "Agent Memory"
-      },
-      "overrides": {
-        "serena": {
-          "enabled": true,
-          "timeout": 120
-        },
-        "flossiullk-consensus": {
-          "enabled": true,
-          "timeout": 120
-        },
-        "flossiullk-reasoning-ensemble": {
-          "enabled": true,
-          "timeout": 120
-        }
-      },
-      "guarded_keys": {
-        "hooks_auto_accept": true,
-        "approvals.mode": "smart",
-        "approvals.cron_mode": "deny",
-        "approvals.mcp_reload_confirm": true,
-        "approvals.destructive_slash_confirm": true
-      }
-    },
     "hermes_user": {
       "scope": "user",
       "config_path": "%LOCALAPPDATA%/hermes/config.yaml",
