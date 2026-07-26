@@ -36,36 +36,142 @@ def valid_capability() -> dict[str, object]:
     }
 
 
-def test_smoke_script_valid_capability_satisfies_schema() -> None:
-    source = ast.parse(SMOKE_SCRIPT_PATH.read_text(encoding="utf-8"))
-    assignment = next(
+def _ast_to_data(node: ast.AST) -> object:
+    if isinstance(node, ast.Constant):
+        if type(node.value) in {str, int, float, bool} or node.value is None:
+            return node.value
+        raise AssertionError(f"Unsupported constant: {type(node.value).__name__}")
+
+    if isinstance(node, ast.Dict):
+        assert all(key is not None for key in node.keys), "Dict unpacking is unsupported"
+        return {
+            _ast_to_data(key): _ast_to_data(value)
+            for key, value in zip(node.keys, node.values)
+        }
+
+    if isinstance(node, ast.List):
+        return [_ast_to_data(element) for element in node.elts]
+
+    if isinstance(node, ast.Tuple):
+        return tuple(_ast_to_data(element) for element in node.elts)
+
+    if (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, (ast.USub, ast.UAdd))
+        and isinstance(node.operand, ast.Constant)
+        and type(node.operand.value) in {int, float}
+    ):
+        return -node.operand.value if isinstance(node.op, ast.USub) else node.operand.value
+
+    if (
+        isinstance(node, ast.BinOp)
+        and isinstance(node.op, ast.Mult)
+        and isinstance(node.left, ast.Constant)
+        and type(node.left.value) is str
+        and isinstance(node.right, ast.Constant)
+        and type(node.right.value) is int
+        and 0 <= node.right.value <= 4096
+    ):
+        return node.left.value * node.right.value
+
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "isoformat"
+        and not node.args
+        and not node.keywords
+        and isinstance(node.func.value, ast.Call)
+        and isinstance(node.func.value.func, ast.Attribute)
+        and node.func.value.func.attr == "now"
+        and not node.func.value.keywords
+        and len(node.func.value.args) == 1
+        and isinstance(node.func.value.func.value, ast.Name)
+        and node.func.value.func.value.id == "datetime"
+        and isinstance(node.func.value.args[0], ast.Attribute)
+        and node.func.value.args[0].attr == "utc"
+        and isinstance(node.func.value.args[0].value, ast.Name)
+        and node.func.value.args[0].value.id == "timezone"
+    ):
+        return "2026-07-26T00:00:00+00:00"
+
+    raise AssertionError(f"Unsupported AST node: {type(node).__name__}")
+
+
+def _extract_valid_capability_from_source(source: ast.Module) -> dict[str, object]:
+    main_functions = [
         node
-        for node in ast.walk(source)
+        for node in source.body
+        if isinstance(node, ast.FunctionDef) and node.name == "main"
+    ]
+    assert len(main_functions) == 1, "Expected exactly one main() function"
+
+    def main_scope_nodes(nodes):
+        for node in nodes:
+            yield node
+            if isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+            ):
+                continue
+            yield from main_scope_nodes(ast.iter_child_nodes(node))
+
+    assignments = [
+        node
+        for node in main_scope_nodes(main_functions[0].body)
         if isinstance(node, ast.Assign)
         and any(
             isinstance(target, ast.Name) and target.id == "valid_capability"
             for target in node.targets
         )
+    ]
+    assert len(assignments) == 1, (
+        "Expected exactly one direct valid_capability assignment in main()"
     )
+    capability = _ast_to_data(assignments[0].value)
+    assert isinstance(capability, dict), "valid_capability must be a dict"
+    return capability
 
-    class _FakeDatetime:
-        @classmethod
-        def now(cls, _timezone):
-            return cls()
 
-        def isoformat(self):
-            return "2026-07-26T00:00:00+00:00"
+def _extract_smoke_valid_capability() -> dict[str, object]:
+    source = ast.parse(SMOKE_SCRIPT_PATH.read_text(encoding="utf-8"))
+    return _extract_valid_capability_from_source(source)
 
-    capability = eval(
-        compile(ast.Expression(assignment.value), str(SMOKE_SCRIPT_PATH), "eval"),
-        {
-            "datetime": _FakeDatetime,
-            "timezone": type("Timezone", (), {"utc": object()}),
-        },
-    )
+
+def test_smoke_script_valid_capability_satisfies_schema() -> None:
+    capability = _extract_smoke_valid_capability()
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
     jsonschema.validate(capability, schema)
+
+
+def test_smoke_fixture_rejects_unsupported_executable_ast() -> None:
+    with pytest.raises(AssertionError, match="Unsupported AST node"):
+        _ast_to_data(ast.parse("read_credentials()").body[0].value)
+
+
+def test_smoke_fixture_requires_one_direct_main_assignment() -> None:
+    source = ast.parse(
+        """
+def main():
+    valid_capability = {}
+    valid_capability = {}
+"""
+    )
+
+    with pytest.raises(AssertionError, match="exactly one"):
+        _extract_valid_capability_from_source(source)
+
+
+def test_smoke_fixture_ignores_module_level_decoy_assignment() -> None:
+    source = ast.parse(
+        """
+valid_capability = {"source": "module"}
+def main():
+    with open("fixture"):
+        valid_capability = {"source": "main"}
+"""
+    )
+
+    assert _extract_valid_capability_from_source(source) == {"source": "main"}
 
 
 def test_capability_schema_requires_ed25519_proof() -> None:
