@@ -193,12 +193,19 @@ def _render_change_section(tool_name: str, tool_input: dict) -> str:
     return f"CHANGE ({tool_name}):\n" + _trim(serialized)
 
 
-def spawn_background_round(claim_id: str) -> None:
+def spawn_background_round(claim_id: str, edit_note: str = "") -> None:
     """Fire-and-forget subprocess to run the consensus round.
 
     On Windows uses DETACHED_PROCESS + CREATE_NO_WINDOW so the child lives
     past the hook's exit and doesn't flash a console window. On POSIX we
     use start_new_session to detach from the hook's process group.
+
+    `edit_note` (optional, may be empty) is a terse, already-bounded
+    description of the accepted edit. It rides along as argv[2] purely so
+    the DETACHED child (hook_bg_round.py) can record it to agentmemory on
+    its own time -- this function itself makes no memory call and adds no
+    measurable latency to the synchronous fast path: it's just one more
+    string in a Popen argv list.
     """
     bg_script = REPO_ROOT / "scripts" / "hook_bg_round.py"
     if not bg_script.exists():
@@ -217,8 +224,11 @@ def spawn_background_round(claim_id: str) -> None:
             )
         else:
             kwargs["start_new_session"] = True
+        argv = [sys.executable, str(bg_script), claim_id]
+        if edit_note:
+            argv.append(edit_note)
         subprocess.Popen(
-            [sys.executable, str(bg_script), claim_id],
+            argv,
             **kwargs,
         )
         log(f"[hook] spawned bg round for {claim_id}")
@@ -429,7 +439,12 @@ def main() -> int:
     claim_id = result.get("claim_id", "")
     log(f"[hook] claimed {rel_path} → {claim_id}")
 
-    spawn_background_round(claim_id)
+    # `summary` is already a terse, bounded (<=200 char) description of this
+    # accepted substantive edit -- pass it through to the DETACHED bg round
+    # so it can record a memory observation on its own time. This function
+    # (hook_post_write's synchronous fast path) makes no agentmemory call
+    # itself; see hook_bg_round.py for where the actual save happens.
+    spawn_background_round(claim_id, summary)
     return finish()
 
 

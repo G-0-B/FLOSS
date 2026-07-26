@@ -62,8 +62,15 @@ def main() -> int:
         log("[bg] no claim_id argument")
         return 1
     claim_id = sys.argv[1]
+    edit_note = sys.argv[2] if len(sys.argv) > 2 else ""
     profile = os.environ.get("FLOSS_VOTER_PROFILE", "balanced").strip() or "balanced"
     roster: list[dict] = []
+
+    # Terse "accepted edit" observation, forwarded by hook_post_write.py's
+    # fast path (which never calls agentmemory itself -- see that file).
+    # This process is DETACHED, so recording it here costs the fast path
+    # nothing.
+    save_edit_accepted_to_memory(claim_id, edit_note)
 
     # Load .env so CEREBRAS_API_KEY / GROQ_API_KEY reach litellm. The hook
     # runs in a detached process group — it does NOT inherit Claude Code's
@@ -187,7 +194,66 @@ def main() -> int:
         f"({dt*1000:.0f}ms) — {per_voter}"
     )
     write_trace(claim_id, trace_payload)
+    save_consensus_outcome_to_memory(claim_id, result, roster)
     return 0
+
+
+def save_edit_accepted_to_memory(claim_id: str, edit_note: str) -> None:
+    """Save a terse observation for a substantive edit that was accepted by
+    the post-write hook (claim submitted successfully). Best-effort, never
+    raises -- this runs on the DETACHED branch only, never on
+    hook_post_write.py's <100ms synchronous fast path.
+    """
+    if not edit_note:
+        return
+    try:
+        if str(REPO_ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        import agentmemory_client
+
+        text = f"Accepted edit (claim {claim_id}): {edit_note}"
+        agentmemory_client.save(text, concepts=["code-change", "accepted"], timeout=5.0)
+    except Exception:  # noqa: BLE001 -- must never affect the consensus round
+        log(
+            f"[bg] agentmemory edit-note save skipped for {claim_id}:\n{traceback.format_exc()}"
+        )
+
+
+def save_consensus_outcome_to_memory(
+    claim_id: str, result: dict, roster: list[dict]
+) -> None:
+    """Save the resolved consensus outcome as a durable agentmemory
+    observation. This process is already detached and already ~10s of
+    wall-clock, so a ~240ms memory call is free here in a way it isn't on
+    any synchronous hook path.
+
+    Best-effort only: agentmemory being unavailable must never affect the
+    consensus round itself, which has already completed and been logged and
+    traced by the time this runs. Any failure here is swallowed by
+    agentmemory_client itself (it never raises) plus this outer guard.
+    """
+    try:
+        if str(REPO_ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        import agentmemory_client
+
+        outcome = result.get("outcome", "?")
+        mean = result.get("tally_mean")
+        var = result.get("tally_variance")
+        voter_names = [
+            v.get("voter", "?") for v in result.get("votes", []) if isinstance(v, dict)
+        ]
+        mean_str = f"{mean:+.3f}" if isinstance(mean, (int, float)) else "?"
+        var_str = f"{var:.3f}" if isinstance(var, (int, float)) else "?"
+
+        text = (
+            f"Consensus round resolved for claim {claim_id}: {outcome} "
+            f"(mean={mean_str}, variance={var_str}), voters=[{', '.join(voter_names)}]"
+        )
+        concepts = ["consensus", "claim", str(outcome).lower()] + voter_names
+        agentmemory_client.save(text, concepts=concepts, timeout=5.0)
+    except Exception:  # noqa: BLE001 -- must never affect the round outcome
+        log(f"[bg] agentmemory save skipped for {claim_id}:\n{traceback.format_exc()}")
 
 
 if __name__ == "__main__":
