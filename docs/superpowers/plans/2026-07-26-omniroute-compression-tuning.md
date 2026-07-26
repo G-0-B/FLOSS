@@ -81,7 +81,40 @@ Ran the preview across four payload sizes, from a 263-token probe to a 94k-token
 1. **Compression does not scale with payload size.** It is flat at ~2.9% from 7k to 94k tokens. The scale-dependence hypothesis is dead — a 94k-token conversation loses the same ~3% of articles and filler as a 7k one.
 2. **Identifier survival is perfect.** Every one of the 20 canaries survived verbatim at every size ≥7k, including `write_file|patch`, `E_GOVERNED_PROVENANCE_REQUIRED`, `mem_ms1dupqi_1bf00fc9d4a5`, `preserve_quotes=True`, `streamable_http`, and `0.9.28`.
 
-### This exonerates compression
+### CORRECTION: the scale test covered 2 of 10 pipeline stages
+
+The operator reported the **effective pipeline** as:
+
+```
+session-dedup → ccr → lite → rtk(standard) → headroom → relevance → caveman(full) → aggressive → llmlingua → ultra
+```
+
+`omniroute compression preview` exercises only `rtk(standard) + caveman(full)` — the single registered combo (`default-caveman`). It does **not** exercise session-dedup, ccr, headroom, relevance, llmlingua, aggressive, or ultra. Proof: the 94k probe was 13 identical copies of the same 57 turns; if `repeated_context` dedup were running it would have collapsed massively, and it saved 2.9%.
+
+So the "flat 2.9%, zero identifier loss" result is real but **narrowly scoped**. It characterises rtk+caveman. It does not characterise the production pipeline, and the exoneration below was presented far more broadly than the evidence supported.
+
+**What actually protected the workspace:** the harsh stages are OFF, not harmless. Verified:
+- `omniroute compression engine get` → `standard` (not aggressive, not ultra)
+- Across 260 recorded requests, `byMode`/`byEngine` contain only `lite`, `stacked`, `output-caveman`, `mcp-description` — **zero** aggressive / ultra / llmlingua / ccr / relevance / headroom entries.
+
+The operator disabled them after observing that aggressive/ultra crushed payloads to roughly 2000 tokens. That recollection is consistent with the rule catalogue.
+
+### Rules that drop content at `lite` intensity — the real risk surface
+
+`omniroute compression rules list` returns 34 rules gated by `minIntensity`. These are active from **`lite`** upward, i.e. under the current `autoTriggerMode`:
+
+| Rule | Context | Category | Why it matters |
+|---|---|---|---|
+| `summary_replacement` | **assistant** | dedup | Prior assistant turns replaced with summaries — genuine content loss |
+| `background_removal` | all | context | Removes background/context framing |
+| `repeated_context` | all | dedup | Collapses repeated context |
+| `reestablished_context` | all | dedup | Collapses re-stated context |
+
+`articles` and `passive_voice` require `full`; `ultra_abbreviations` requires `ultra`. So the *cosmetic* rules are gated higher than the *content-dropping* dedup rules — the inverse of what intuition suggests.
+
+`summary_replacement` acting on assistant messages at the lowest intensity is the single most plausible compression-side mechanism for an agent losing what was said earlier in a conversation.
+
+### The earlier exoneration, restated correctly
 
 **Compression was not the cause of the 2026-07-26 context degradation.** A transform that removes ~3% articles while preserving every identifier cannot explain an agent losing an entire conversation's content and reaching for a documentation example instead. Earlier revisions of this document treated compression as a substantial and then a contributing factor; on this evidence it is neither. The cause was the skill's executable-looking example, plus whatever the agent's own context handling did — not this pipeline.
 
@@ -89,7 +122,8 @@ The `maxTokens` and MCP-description changes remain correct on their own merits (
 
 ## Still to do
 
-1. **Explain the 2.9% vs 13% reporting gap.** Live analytics report `lite` mode averaging **13%** across 228 requests, but every preview measured ~2.9%. Since scale is now ruled out, the difference is either a different engine path in production than the preview exercises, different content types (tool output and code dumps may compress far better than prose), or `avgSavingsPct` measuring something other than what preview reports. This is now a metrics-interpretation question, not a fidelity risk.
+1. **The 2.9% vs 13% gap is now explained, and it is a fidelity question after all.** Preview runs 2 stages at 2.9%; production runs a 10-stage chain and reports 13%. The extra ~10% is coming from stages preview never touches — most likely the dedup family (`repeated_context`, `reestablished_context`, `summary_replacement`) plus `background_removal`. Those *remove* content rather than tighten prose. **Do not treat 13% as "3% articles plus rounding."**
+   Next step: find a way to exercise the full effective pipeline, not just the registered combo. Options: register a combo that mirrors the effective chain and preview against it; or capture a real request/response pair through the proxy and diff what the provider actually received against what was sent. The second is authoritative and worth the effort.
 2. **Measure the new trigger rate.** Re-run `omniroute_compression_status` after a day of normal use and compare `compressedRequests` against `totalRequests`. If it still fires on most requests, raise to `262144`.
 3. **Test the aggressive strategies before ever enabling one.** `aggressive`, `ultra`, and `omniglyph` are untested here. The safety demonstrated above is for `standard` only, and there is no reason to assume the harsher modes protect identifiers the same way. Reuse `scratchpad/compression_probe_xl.json` and the canary list.
 4. **Consider `preserveSystemPrompt`'s blind spot.** It protects the system prompt only. If a strategy is ever needed at high volume, find out whether tool definitions and recent turns can be protected too.
