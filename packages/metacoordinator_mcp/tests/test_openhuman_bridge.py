@@ -7,8 +7,8 @@ from packages.orchestrator.claim_schema import (
     ProposalType,
     BlastRadius,
     Outcome,
-    Decision,
 )
+from packages.orchestrator.consensus_gate import tally
 
 
 @pytest.fixture
@@ -65,7 +65,23 @@ def test_openhuman_claim_and_verify_bridge(
     # --- Gossip occurs here (simulated by passing the claim_id) ---
     claim_id_for_vote = chain_1[0]["content"]["id"]
 
-    # 3. OpenHuman 2 receives the claim, evaluates it against its own memory, and votes
+    # 3. OpenHuman 1 records its independent supporting evaluation locally.
+    agent_1_vote = Vote(
+        voter=agent_1_did,
+        weight=0.85,
+        rationale="My local Tauri traces observed the same parallel-sync starvation.",
+    )
+    agent_1_vote.validate()
+    agent_1_vote_hash = openhuman_1_cell.append_entry(
+        entry_type="vote",
+        author_did=agent_1_did,
+        content={"claim_id": claim_id_for_vote, "vote": agent_1_vote.to_dict()},
+    )
+
+    assert agent_1_vote_hash is not None
+    assert len(openhuman_1_cell.read_chain()) == 2
+
+    # 4. OpenHuman 2 receives the claim, evaluates it against its own memory, and votes.
     agent_2_did = "did:key:zOpenHuman2"
 
     oh_vote = Vote(
@@ -75,7 +91,7 @@ def test_openhuman_claim_and_verify_bridge(
     )
     oh_vote.validate()
 
-    # 4. OpenHuman 2 appends the vote to its own local source chain
+    # 5. OpenHuman 2 appends the vote to its own local source chain.
     vote_hash = openhuman_2_cell.append_entry(
         entry_type="vote",
         author_did=agent_2_did,
@@ -88,18 +104,13 @@ def test_openhuman_claim_and_verify_bridge(
     assert chain_2[0]["content"]["vote"]["voter"] == agent_2_did
     assert chain_2[0]["content"]["vote"]["weight"] == 0.95
 
-    # 5. The FLOSSI0ULLK Consensus Gateway resolves the decision
-    # Simulated resolution based on BlastRadius.MODULE threshold (0.50)
-    decision = Decision(
-        claim_id=claim_id_for_vote,
-        blast_radius=BlastRadius.MODULE,
-        outcome=Outcome.APPROVED,
-        votes=[oh_vote],
-        tally_mean=0.95,
-        tally_variance=0.0,
-    )
-    decision.validate()
+    # 6. The FLOSSI0ULLK Consensus Gateway resolves the two-vote Module ballot.
+    votes = [agent_1_vote, oh_vote]
+    outcome, mean, variance = tally(oh_claim, votes)
 
-    assert decision.outcome == Outcome.APPROVED
+    assert outcome == Outcome.APPROVED
+    assert len(votes) == 2
+    assert mean == pytest.approx(0.90)
+    assert variance == pytest.approx(0.0025)
 
     # Success! Two isolated personal AIs just formed a verifiable knowledge commons.
