@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import math
 from pathlib import Path
@@ -14,6 +15,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "docs" / "specs" / "yumeichan-watch-capabilities.schema.json"
+SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke_test_gateway.py"
 
 
 def valid_capability() -> dict[str, object]:
@@ -32,6 +34,38 @@ def valid_capability() -> dict[str, object]:
             "signature": "base64-ed25519-signature",
         },
     }
+
+
+def test_smoke_script_valid_capability_satisfies_schema() -> None:
+    source = ast.parse(SMOKE_SCRIPT_PATH.read_text(encoding="utf-8"))
+    assignment = next(
+        node
+        for node in ast.walk(source)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "valid_capability"
+            for target in node.targets
+        )
+    )
+
+    class _FakeDatetime:
+        @classmethod
+        def now(cls, _timezone):
+            return cls()
+
+        def isoformat(self):
+            return "2026-07-26T00:00:00+00:00"
+
+    capability = eval(
+        compile(ast.Expression(assignment.value), str(SMOKE_SCRIPT_PATH), "eval"),
+        {
+            "datetime": _FakeDatetime,
+            "timezone": type("Timezone", (), {"utc": object()}),
+        },
+    )
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    jsonschema.validate(capability, schema)
 
 
 def test_capability_schema_requires_ed25519_proof() -> None:

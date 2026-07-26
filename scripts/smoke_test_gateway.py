@@ -89,6 +89,12 @@ def main() -> int:
             "analog_threshold_bounds": [-0.5, 0.8],
             "ttl_seconds": 3600,
             "issued_at": datetime.now(timezone.utc).isoformat(),
+            "proof": {
+                "algorithm": "Ed25519",
+                "canonicalization": "RFC8785",
+                "payload_digest": "a" * 64,
+                "signature": "base64-ed25519-signature",
+            },
         }
 
         try:
