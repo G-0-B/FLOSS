@@ -36,6 +36,7 @@ it retires confusion rather than adding a layer.
 | Strength (vs. Power) | Capacity to carry the past forward without closing the game | continuation; education | V (Carse 1986) |
 | Agent-centric | Identity/data/authority rooted in the agent, not a global ledger | source chain + DHT neighborhood | V (Holochain) |
 | Provenance | Verifiable author-of-record bound to an entry | attestation; signed claim | V (primitive) / S (enforcement — see ADR-15) |
+| FLOSSI0ULLK | Defined project name: Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge | FLOSSIOULLK (spelling alias) | V (workspace/project orientation) |
 | Doula (Peony) | Agent that holds a human's *stated values* in trust without controlling | peony; friend (Seed) | A (Seed; design note 2026-06-13) |
 | Anti-sycophancy | Reflection of the user's values, not their mood | sacred friction | A → grounding V (Harber 1998 positive-feedback bias) |
 | Anti-dependence | Support that increases the user's own capacity over time | "many ways of knowing" | A (Seed) |
@@ -47,7 +48,6 @@ These are **fine in mythos prose; harmful in specs.** Mark `U` until given an op
 
 | Term | Issue | Disposition |
 |---|---|---|
-| **FLOSSIOULLK** | Never defined as acronym/framework/movement in the corpus | Decide: define it, or declare it a brand-mark (ROI item 22) |
 | **Carrier-equivalence** | Used in the substantiate doc; no operational definition | Define or retire |
 | **Anti-hoarding** | Slogan, not a mechanism | Define or move to Voice & Vision |
 | **Agent-centric relativity** | Gestures at Holochain; not a specified property | Define or retire |

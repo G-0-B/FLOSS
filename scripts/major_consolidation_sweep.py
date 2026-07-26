@@ -8,7 +8,6 @@ It tracks alignment, contradictions, assumptions, and citations.
 """
 
 import os
-import sys
 import glob
 import time
 from pathlib import Path
@@ -20,6 +19,14 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 ENV_PATH = REPO_ROOT / ".env"
 VISION_DOC = REPO_ROOT / "docs" / "research" / "Holistic_Vision.md"
 PROCESSED_LOG = REPO_ROOT / "docs" / "research" / "consolidation_processed.txt"
+
+
+def configure_togetherai_api_key() -> None:
+    """Preserve the canonical key, falling back only to a non-empty legacy key."""
+    if "TOGETHERAI_API_KEY" not in os.environ:
+        legacy_key = os.environ.get("togetherai_API_key")
+        if legacy_key:
+            os.environ["TOGETHERAI_API_KEY"] = legacy_key
 
 def load_processed_files() -> set[str]:
     if not PROCESSED_LOG.exists():
@@ -105,7 +112,7 @@ def main():
     if ENV_PATH.exists():
         load_dotenv(ENV_PATH)
         
-    os.environ["TOGETHERAI_API_KEY"] = os.environ.get("togetherai_API_key", "")
+    configure_togetherai_api_key()
     model = "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo"
     all_files = get_target_files()
     processed = load_processed_files()

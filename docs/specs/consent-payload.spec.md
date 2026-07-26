@@ -52,7 +52,7 @@ Per ADR-12 §4:
 - Does NOT specify how recipients are notified — push notification, polling, gateway subscription are all viable
 - Does NOT define cross-substrate consent translation (Holochain ↔ Radicle ↔ AD4M) — open question #5 in ADR-12 §7
 - Does NOT define revocation forward-propagation semantics — open question #4 in ADR-12 §7
-- Does NOT mandate Substrate-class blast radius for `kernel`/`constitution` — defaults named in schema, override possible via explicit governance ADR (likely ADR-13 Steward Vote)
+- Does NOT mandate Substrate-class blast radius for `kernel`/`constitution` — defaults named in schema, override possible via an explicit future companion ADR (unassigned; Steward Vote Protocol)
 
 ---
 
@@ -80,7 +80,7 @@ Per ADR-12 §4:
 - **Resonance kernel P1-P5:** `resonance_mechanism_v2.md` §P3 (selective coupling function is the substrate-physics analog of consent)
 - **Positive Alignment paper §"Paternalism Problem":** `FLOSS/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md` §4.2 (citation anchor for the consented-guidance-vs-technocratic-imposition distinction)
 - **ADR-10 Consensus Gateway:** `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` (gateway routes ConsentPayloads same as Claims; both are append-only entry types)
-- **Companion ADR-13 Steward Vote:** named-but-undrafted; structurally a special case of ADR-12 with collective `decider_did`
+- **Future companion ADR (unassigned; Steward Vote Protocol):** named-but-undrafted; structurally a special case of ADR-12 with collective `decider_did`
 
 ---
 

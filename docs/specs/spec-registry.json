@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-06-12",
+  "updated": "2026-07-26",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
@@ -21,9 +21,36 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-1: The Carrier Equivalence Principle)",
       "grandfathered": true
     },
+    "FLOSS/docs/adr/ADR-10-local-agent-node.md": {
+      "spec": "ADR-10: Local Agent Node and consensus gateway"
+    },
+    "FLOSS/docs/adr/ADR-11-ipfs-large-file-integration.md": {
+      "spec": "ADR-11: IPFS large-file integration"
+    },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
+      "spec": "ADR-13: Yumeichan Watch architecture"
+    },
+    "FLOSS/docs/adr/ADR-14-objectgraph-projection.md": {
+      "spec": "ADR-14: Objectgraph projection"
+    },
+    "FLOSS/docs/adr/ADR-15-provenance-validation-enforcement.md": {
+      "spec": "ADR-15: Provenance validation enforcement"
+    },
+    "FLOSS/docs/adr/ADR-16-omnigent-execution-surface.md": {
+      "spec": "ADR-16: Omnigent execution surface"
+    },
+    "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
+      "spec": "ADR-17: KnowledgeTriple contract reconciliation"
+    },
+    "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
+      "spec": "ADR-18: Prior-art reuse gate"
+    },
+    "FLOSS/docs/adr/ADR-19-omniroute-inference-plane.md": {
+      "spec": "ADR-19: OmniRoute inference plane"
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -109,6 +136,9 @@
       "spec": "GRANDFATHERED 2026-06-12 (Heartbeat Runtime Budget Spec)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
+      "spec": "Specified integrity-zome provenance and authorization validation rules"
+    },
     "FLOSS/docs/specs/intake-event.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (intake-event.schema)",
       "grandfathered": true
@@ -133,6 +163,9 @@
       "spec": "GRANDFATHERED 2026-06-12 (Knowledge Triple Specification)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
+      "spec": "OpenHuman bridge experiment specification"
+    },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
       "grandfathered": true
@@ -156,6 +189,12 @@
     "FLOSS/docs/specs/reasoning-ensemble-synthesizer.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/reuse-gate.schema.json": {
+      "spec": "JSON Schema for the prior-art reuse gate"
+    },
+    "FLOSS/docs/specs/reuse-gate.spec.md": {
+      "spec": "Prior-art reuse gate specification"
     },
     "FLOSS/docs/specs/rose-node.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (rose-node.schema)",
@@ -191,6 +230,12 @@
     "FLOSS/docs/specs/thought-credential.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ThoughtCredential Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
+      "spec": "Yumeichan Watch architecture specification"
+    },
+    "FLOSS/docs/specs/yumeichan-watch-capabilities.schema.json": {
+      "spec": "Yumeichan Watch capability-token schema and proof shape"
     },
     "FLOSS/scripts/artifact_actions.py": {
       "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
@@ -239,6 +284,9 @@
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
     },
+    "FLOSS/scripts/major_consolidation_sweep.py": {
+      "spec": "LLM-assisted consolidation sweep over designated research sources"
+    },
     "FLOSS/scripts/materialize_shared_agent_memory.py": {
       "spec": "Agent-memory canonical markdown -> registry + per-client projections"
     },
@@ -275,6 +323,9 @@
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
     },
+    "FLOSS/scripts/refresh_agent_surfaces.py": {
+      "spec": "Refresh generated local agent-surface projections"
+    },
     "FLOSS/scripts/session_start_inject.py": {
       "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
@@ -287,6 +338,12 @@
     "FLOSS/scripts/smoke_test_voters.py": {
       "spec": "Smoke test: voter roster resolution + credentials"
     },
+    "FLOSS/scripts/start_mcp_daemons.ps1": {
+      "spec": "Start local MCP daemon processes"
+    },
+    "FLOSS/scripts/stop_mcp_daemons.ps1": {
+      "spec": "Stop local MCP daemon processes"
+    },
     "FLOSS/scripts/spec_gate.py": {
       "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",
       "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
@@ -297,6 +354,9 @@
     "FLOSS/scripts/watch_intake.py": {
       "spec": "Polling intake watcher: root drops -> IntakeEvents",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    },
+    "FLOSS/scripts/yumeichan_watch_capabilities.py": {
+      "spec": "Semantic validation for Yumeichan Watch capability-token bounds"
     }
   }
 }
