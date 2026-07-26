@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
+import re
 from unittest.mock import patch
 
 import jsonschema
@@ -68,6 +70,39 @@ def test_semantic_validator_rejects_inverted_threshold_bounds() -> None:
     capability["analog_threshold_bounds"] = [0.8, -0.5]
 
     with pytest.raises(jsonschema.ValidationError, match="minimum must not exceed maximum"):
+        validate_capability(capability)
+
+
+@pytest.mark.parametrize(
+    ("non_finite_bound", "bound_position", "expected_message"),
+    [
+        (math.nan, 0, "must be finite"),
+        (math.nan, 1, "must be finite"),
+        (math.inf, 0, None),
+        (math.inf, 1, None),
+        (-math.inf, 0, None),
+        (-math.inf, 1, None),
+    ],
+    ids=[
+        "nan-minimum",
+        "nan-maximum",
+        "positive-infinity-minimum",
+        "positive-infinity-maximum",
+        "negative-infinity-minimum",
+        "negative-infinity-maximum",
+    ],
+)
+def test_semantic_validator_rejects_non_finite_threshold_bounds(
+    non_finite_bound, bound_position, expected_message
+) -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    capability = valid_capability()
+    bounds = [-0.5, 0.8]
+    bounds[bound_position] = non_finite_bound
+    capability["analog_threshold_bounds"] = bounds
+
+    with pytest.raises(jsonschema.ValidationError, match=expected_message):
         validate_capability(capability)
 
 
@@ -187,7 +222,7 @@ def test_spec_gate_normalizes_and_audits_named_and_linked_worktrees(
 
 
 @pytest.mark.parametrize("root_name", ["FLOSS", "_codex_pr38_cleanup"])
-def test_spec_gate_advisory_add_argument_works_in_all_worktree_layouts(
+def test_spec_gate_advisory_command_resolves_in_all_worktree_layouts(
     tmp_path, monkeypatch, root_name
 ) -> None:
     from scripts import spec_gate
@@ -195,19 +230,32 @@ def test_spec_gate_advisory_add_argument_works_in_all_worktree_layouts(
     repo_root = tmp_path / root_name
     advisory_target = repo_root / "scripts" / "advisory_target.py"
     physical_target = repo_root / "scripts" / "physical_target.py"
+    script_entrypoint = repo_root / "scripts" / "spec_gate.py"
     registry_path = repo_root / "docs" / "specs" / "spec-registry.json"
     advisory_target.parent.mkdir(parents=True)
     registry_path.parent.mkdir(parents=True)
     advisory_target.write_text("# advisory target\n", encoding="utf-8")
     physical_target.write_text("# physical target\n", encoding="utf-8")
+    script_entrypoint.write_text("# spec-gate entrypoint\n", encoding="utf-8")
     registry_path.write_text('{"version": "test", "entries": {}}\n', encoding="utf-8")
 
     monkeypatch.setattr(spec_gate, "REPO_ROOT", repo_root)
     monkeypatch.setattr(spec_gate, "REGISTRY_PATH", registry_path)
+    monkeypatch.setattr(spec_gate, "__file__", str(script_entrypoint))
 
     advisory = spec_gate.advisory_note(advisory_target)
     assert advisory is not None
-    advisory_argument = advisory.split('--add "', 1)[1].split('"', 1)[0]
+    command = advisory.rsplit("register it before it ossifies: ", 1)[1]
+    command_match = re.fullmatch(
+        r'python "(?P<script_path>[^"]+)" --add "(?P<add_path>[^"]+)" '
+        r'--spec "<one-line intent>"',
+        command,
+    )
+    assert command_match is not None
+    emitted_script_path = Path(command_match["script_path"]).resolve()
+    assert emitted_script_path == script_entrypoint.resolve()
+    assert emitted_script_path.is_file()
+    advisory_argument = command_match["add_path"]
     assert advisory_argument == "FLOSS/scripts/advisory_target.py"
 
     assert spec_gate.run_add(advisory_argument, "advisory target", None) == 0

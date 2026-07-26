@@ -110,10 +110,11 @@ def advisory_note(path_str: str | Path) -> str | None:
             return f"spec-gate: registry unreadable ({registry['load_error']})"
         if rel in registry.get("entries", {}):
             return None
+        script_path = Path(__file__).resolve()
         return (
             f"spec-gate: `{rel}` is on a gated surface but has no spec stub in "
             f"docs/specs/spec-registry.json — register it before it ossifies: "
-            f'python FLOSS/scripts/spec_gate.py --add "{rel}" --spec "<one-line intent>"'
+            f'python "{script_path}" --add "{rel}" --spec "<one-line intent>"'
         )
     except Exception:  # noqa: BLE001 — advisory must never break a hook
         return None

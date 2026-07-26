@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -28,6 +29,10 @@ def validate_capability(capability: Mapping[str, Any]) -> None:
     jsonschema.validate(instance=capability, schema=schema)
 
     minimum, maximum = capability["analog_threshold_bounds"]
+    if not math.isfinite(minimum) or not math.isfinite(maximum):
+        raise jsonschema.ValidationError(
+            "analog_threshold_bounds values must be finite"
+        )
     if minimum > maximum:
         raise jsonschema.ValidationError(
             "analog_threshold_bounds minimum must not exceed maximum"
