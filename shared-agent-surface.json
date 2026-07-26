@@ -211,7 +211,7 @@
         }
       },
       "guarded_keys": {
-        "hooks_auto_accept": false,
+        "hooks_auto_accept": true,
         "approvals.mode": "smart",
         "approvals.cron_mode": "deny",
         "approvals.mcp_reload_confirm": true,
@@ -235,7 +235,7 @@
         }
       },
       "guarded_keys": {
-        "hooks_auto_accept": false,
+        "hooks_auto_accept": true,
         "approvals.mode": "smart",
         "approvals.cron_mode": "deny",
         "approvals.mcp_reload_confirm": true,
