@@ -5,7 +5,11 @@
 **Blast Radius:** System
 **Truth Status:** Verified (Stages 0–3.5 implemented + tested; equivalence run closed 2026-07-26 — see Evidence, incl. two disclosed caveats)
 
-**Consensus ratification: BLOCKED, not pending.** A System-radius `AdrChange` claim fails closed with `E_GOVERNED_PROVENANCE_REQUIRED` unless it carries `provenance_packet` evidence containing a `consent_ref.decision_action_hash`. No such convention exists yet: across 105 provenance packets in `.agent-surface/provenance/`, zero carry a `consent_ref`. `entry_has_consent()` only checks the field is a non-empty string — it does not resolve the hash — so the gate is trivially satisfiable by any value, which is precisely why it should not be satisfied ad hoc. Choosing what `decision_action_hash` anchors to is consent-gate design (ADR-12), and ADR-5's standing rule forbids starting that work silently. **Operator decision required.**
+**Consensus ratification: DEFERRED by operator decision (2026-07-26) until the consent gate (ADR-12) exists.** This ADR stands on operator consent alone, which is sufficient for it to be Accepted and live.
+
+Why it was deferred rather than forced: a System-radius `AdrChange` claim fails closed with `E_GOVERNED_PROVENANCE_REQUIRED` unless it carries `provenance_packet` evidence containing a `consent_ref.decision_action_hash`. No such convention exists — across 105 provenance packets in `.agent-surface/provenance/`, zero carry a `consent_ref`. `entry_has_consent()` merely checks the field is a non-empty string; it never resolves the hash, so the gate is satisfiable by any value. Choosing what `decision_action_hash` anchors to is consent-gate design (ADR-12), which ADR-5's standing rule forbids starting silently.
+
+**Do not re-attempt this claim** until ADR-12 defines how consent decisions are recorded and addressed. The claim body and its verified evidence are ready; only the consent anchor is missing. Nothing is operationally blocked — the daemons are live and OmniRoute is the default backend.
 
 ## Context
 

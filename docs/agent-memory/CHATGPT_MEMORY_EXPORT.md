@@ -23,6 +23,7 @@ Generated projection: `.agent-surface/memory/AGENT_MEMORY.md`
 ## Project
 
 - `project-adr-suite-v2-canonical`: ADR-Suite v2.0 is hand-verified canonical — `FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26, Perplexity AI synthesis, hand-verified and approved by Anthony) is the consolidated authoritative ADR registry. Treat it as canon when it conflicts with older `docs/adr/INDEX.md` content.
+- `project-adr19-ratification-deferred-to-consent-gate`: ADR-19 consensus ratification is deferred until the consent gate exists — do not re-attempt — **Do not submit a consensus claim to ratify ADR-19.** The operator decided on 2026-07-26 to defer ratification until the consent gate (ADR-12) exists. ADR-19 stands as **Accepted (operator-consented)** and is fully live — daemons on :7331/:7332, `FLOSS_MODEL_BACKEND=omniroute` is the default in `FLOSS/.env`.
 - `project-adr7-agpl-cascade`: ADR-7 embraces AGPL-3.0 copyleft cascade — **ADR-7: Embracing AGPL-3.0 Copyleft Cascade** — at `FLOSS/docs/adr/ADR-7-agpl-cascade.md` (renamed from `ADR-7-agpl-mcp-integration.md`). Accepted 2026-04-15.
 - `project-agentmemory-adapter-test-passed`: agentmemory MCP wired + REST adapter-test passed — Plane A semantic memory federation live
 - `project-agentmemory-running`: agentmemory is a live root operator surface and local memory server — `AGENTMEMORY.md` at the workspace root is a live operator surface for the local
