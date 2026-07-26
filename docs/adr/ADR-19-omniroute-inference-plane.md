@@ -3,7 +3,9 @@
 **Date:** 2026-07-17
 **Status:** Accepted (operator-consented, consensus-pending)
 **Blast Radius:** System
-**Truth Status:** Verified (Stages 0–3.4 implemented + tested; Stage 3.5 equivalence run pending)
+**Truth Status:** Verified (Stages 0–3.5 implemented + tested; equivalence run closed 2026-07-26 — see Evidence, incl. two disclosed caveats)
+
+**Consensus ratification: BLOCKED, not pending.** A System-radius `AdrChange` claim fails closed with `E_GOVERNED_PROVENANCE_REQUIRED` unless it carries `provenance_packet` evidence containing a `consent_ref.decision_action_hash`. No such convention exists yet: across 105 provenance packets in `.agent-surface/provenance/`, zero carry a `consent_ref`. `entry_has_consent()` only checks the field is a non-empty string — it does not resolve the hash — so the gate is trivially satisfiable by any value, which is precisely why it should not be satisfied ad hoc. Choosing what `decision_action_hash` anchors to is consent-gate design (ADR-12), and ADR-5's standing rule forbids starting that work silently. **Operator decision required.**
 
 ## Context
 
@@ -51,6 +53,16 @@ An external audit artifact (`.toilet/2026-7-17_OMNIROUTE_ARCHITECTURE_UPGRADE_MI
 | 3.3: OmniRoute client | `cf89501` | 3/3 TDD tests passing |
 | 3.4: Flag-gated routing | `258f0db` | 70/70 tests passing |
 | Roster fix: qwen3.6-27b | `47ed474` | Live consensus round: APPROVED +0.533, all 3 voters functional |
+| 3.5 Step 3: hook-path | — | 2026-07-24: `hook_bg_round.py` with `FLOSS_MODEL_BACKEND=omniroute` on claim `019f9697-734b-7b32-bf86-b81798a9cb7c` — round completed 10.4 s, 3/3 voters parseable, no `[voter error]` |
+| 3.5 Steps 1–2: equivalence | — | 2026-07-26: `scripts/smoke_test_voters.py` both backends. litellm → weights −0.400/−0.400/−0.400, mean −0.4000, var 0.0000, 10844 ms. omniroute → identical weights, mean −0.4000, var 0.0000, 7033 ms. Both PASS; OmniRoute faster |
+| 3.5 Step 4: flip default | — | `FLOSS/.env` sets `FLOSS_MODEL_BACKEND=omniroute` — OmniRoute is the live default |
+
+**Stage 3.5 is now closed.** Truth Status for Stage 3.5 upgrades from *pending* to *Verified*, with two disclosed caveats:
+
+1. **Prompt-bleed on the OmniRoute path.** In the equivalence run, voter `groq-qwen3-32b` emitted a style-prompt fragment inside its `RATIONALE` text instead of a clean rationale. The `WEIGHT` parsed correctly and the tally matched baseline exactly, so equivalence holds — but this artifact is not root-caused and does not occur on the litellm path.
+2. **Single claim shape.** Equivalence was demonstrated on one claim (evidence-empty, unanimously rejected). It establishes weight and tally agreement across backends; it is not a multi-claim equivalence corpus.
+
+Scheduled Task registration for the boot launcher remains unverified.
 
 ## Operator Consent
 
