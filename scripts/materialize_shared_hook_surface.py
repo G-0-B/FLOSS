@@ -13,6 +13,7 @@ Generated artifacts:
 from __future__ import annotations
 
 import argparse
+import io
 import json
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,26 @@ DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / ".agent-surface" / "hooks"
 
 class HookSurfaceError(Exception):
     """Raised for manifest, target, or projection errors."""
+
+
+def require_module(module_name: str, target: str) -> Any:
+    """Import a round-trip serializer, failing loudly for one target only.
+
+    Never fall back to a non-round-trip writer -- that would silently strip
+    comments and reorder keys in large hand-maintained configs. Imported
+    lazily (only when a `format: "yaml"` target is actually processed) so a
+    missing package fails just that target, not every target -- mirrors
+    `require_module` in `materialize_shared_agent_surface.py`.
+    """
+    import importlib
+
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise HookSurfaceError(
+            f"Target {target!r} requires the {module_name!r} package "
+            f"(pip install {module_name.split('.')[0]})"
+        ) from exc
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -185,8 +206,47 @@ def validate_hook_scripts(
     return scripts
 
 
+def resolve_target_hooks(target_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Return a target's hook block after applying its `event_map`, if any.
+
+    A target may declare `event_map: {"PreToolUse": "pre_tool_call", ...}`
+    to rename manifest event names into its own native vocabulary (e.g.
+    Hermes's snake_case events vs. Claude/Codex's PascalCase). Events
+    present in the manifest but ABSENT from a target's `event_map` are
+    OMITTED for that target rather than passed through raw -- emitting an
+    event name a harness doesn't understand is a silently broken hook, and
+    omission is the honest behavior. When no `event_map` is declared,
+    events pass through unchanged (existing behavior, preserved for every
+    target that predates this capability).
+    """
+    target_hooks = target_cfg.get("hooks", {})
+    if not isinstance(target_hooks, dict):
+        raise HookSurfaceError("Target `hooks` field must be an object if present")
+    for event_name, definitions in target_hooks.items():
+        if not isinstance(definitions, list):
+            raise HookSurfaceError(
+                f"Hook event {event_name!r} must contain a list of definitions"
+            )
+
+    event_map = target_cfg.get("event_map")
+    if event_map is None:
+        return dict(target_hooks)
+    if not isinstance(event_map, dict):
+        raise HookSurfaceError("Target `event_map` field must be an object if present")
+
+    mapped: dict[str, Any] = {}
+    for event_name, definitions in target_hooks.items():
+        mapped_name = event_map.get(event_name)
+        if mapped_name is None:
+            continue
+        mapped[mapped_name] = definitions
+    return mapped
+
+
 def merge_hook_payload(
-    existing: dict[str, Any], target_cfg: dict[str, Any]
+    existing: dict[str, Any],
+    target_cfg: dict[str, Any],
+    mapped_hooks: dict[str, Any],
 ) -> dict[str, Any]:
     payload = dict(existing)
 
@@ -197,14 +257,7 @@ def merge_hook_payload(
         raise HookSurfaceError("Existing `hooks` field must be an object if present")
     merged_hooks = dict(existing_hooks)
 
-    target_hooks = target_cfg.get("hooks", {})
-    if not isinstance(target_hooks, dict):
-        raise HookSurfaceError("Target `hooks` field must be an object if present")
-    for event_name, definitions in target_hooks.items():
-        if not isinstance(definitions, list):
-            raise HookSurfaceError(
-                f"Hook event {event_name!r} must contain a list of definitions"
-            )
+    for event_name, definitions in mapped_hooks.items():
         merged_hooks[event_name] = definitions
     payload["hooks"] = merged_hooks
 
@@ -243,19 +296,109 @@ def build_target_payload(
     from the manifest only -- `existing` is intentionally ignored so no
     incidental keys ever get carried forward into a file Codex re-hashes.
     """
+    mapped_hooks = resolve_target_hooks(target_cfg)
     if target_cfg.get("payload_shape") == "hooks_only":
-        target_hooks = target_cfg.get("hooks", {})
-        if not isinstance(target_hooks, dict):
-            raise HookSurfaceError("Target `hooks` field must be an object if present")
-        payload_hooks: dict[str, Any] = {}
-        for event_name, definitions in target_hooks.items():
-            if not isinstance(definitions, list):
-                raise HookSurfaceError(
-                    f"Hook event {event_name!r} must contain a list of definitions"
-                )
-            payload_hooks[event_name] = definitions
-        return {"hooks": payload_hooks}
-    return merge_hook_payload(existing, target_cfg)
+        return {"hooks": mapped_hooks}
+    return merge_hook_payload(existing, target_cfg, mapped_hooks)
+
+
+def merge_hook_payload_into_yaml_doc(
+    doc: Any, target_cfg: dict[str, Any], mapped_hooks: dict[str, Any]
+) -> None:
+    """Mutate a parsed YAML document in place, merging managed hook events.
+
+    Same merge semantics as `merge_hook_payload` (managed events overwrite
+    same-named existing events; unrelated keys are left untouched), but
+    mutates the already-parsed ruamel node in place instead of returning a
+    fresh dict. Mirrors `apply_hermes_mcp` in
+    `materialize_shared_agent_surface.py`: YAML mappings have no
+    positional/header hazard, so there is no need to rebuild the node, and
+    mutating in place is what lets ruamel preserve comments, key order, and
+    unrelated top-level content.
+    """
+    existing_hooks = doc.get("hooks")
+    if existing_hooks is None:
+        doc["hooks"] = {}
+        existing_hooks = doc["hooks"]
+    if not hasattr(existing_hooks, "items"):
+        raise HookSurfaceError("Existing `hooks` field must be a mapping if present")
+    for event_name, definitions in mapped_hooks.items():
+        existing_hooks[event_name] = definitions
+
+    target_hooks_config = target_cfg.get("hooksConfig")
+    if target_hooks_config is not None:
+        if not isinstance(target_hooks_config, dict):
+            raise HookSurfaceError(
+                "Target `hooksConfig` field must be an object if present"
+            )
+        existing_hooks_config = doc.get("hooksConfig")
+        if existing_hooks_config is None:
+            doc["hooksConfig"] = {}
+            existing_hooks_config = doc["hooksConfig"]
+        if not hasattr(existing_hooks_config, "items"):
+            raise HookSurfaceError(
+                "Existing `hooksConfig` field must be a mapping if present"
+            )
+        for key, value in target_hooks_config.items():
+            existing_hooks_config[key] = value
+
+
+def apply_yaml_target(
+    target_path: Path,
+    target_cfg: dict[str, Any],
+    *,
+    check: bool,
+    dry_run: bool,
+) -> tuple[str, bool]:
+    """Materialize a `format: "yaml"` hook target.
+
+    A missing file is SKIPPED rather than fabricated -- mirroring how the
+    MCP Hermes target guards with `.exists()` in
+    `materialize_shared_agent_surface.py`. Round-tripping requires an
+    existing document to preserve comments/structure against; nothing here
+    owns creating a fresh YAML config from scratch.
+
+    Uses the exact ruamel configuration established for Hermes's
+    `config.yaml` (`apply_hermes_mcp`'s caller): `preserve_quotes = True`,
+    `indent(mapping=2, sequence=4, offset=2)`, `width = 4096`. A bare
+    `ruamel.yaml.YAML()` reflows an entire hand-maintained document on a
+    no-op change (measured on the real Hermes config: a 398-line diff for
+    zero semantic change); this configuration is required to keep a true
+    no-op round-trip byte-identical.
+    """
+    if not target_path.exists():
+        return (f"SKIP  {target_path} (no config at {target_path})", False)
+
+    ruamel_yaml = require_module("ruamel.yaml", str(target_path))
+    yaml_rt = ruamel_yaml.YAML()
+    yaml_rt.preserve_quotes = True
+    yaml_rt.indent(mapping=2, sequence=4, offset=2)
+    yaml_rt.width = 4096
+
+    try:
+        with target_path.open("r", encoding="utf-8") as handle:
+            doc = yaml_rt.load(handle)
+    except HookSurfaceError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - surfaced as one actionable error
+        raise HookSurfaceError(
+            f"Could not read/parse YAML hook target at {target_path}: {exc}"
+        ) from exc
+    if doc is None:
+        raise HookSurfaceError(f"YAML hook target at {target_path} is empty")
+    if not hasattr(doc, "items"):
+        raise HookSurfaceError(
+            f"YAML hook target at {target_path} must parse to a mapping"
+        )
+
+    mapped_hooks = resolve_target_hooks(target_cfg)
+    merge_hook_payload_into_yaml_doc(doc, target_cfg, mapped_hooks)
+
+    buffer = io.StringIO()
+    yaml_rt.dump(doc, buffer)
+    return check_or_write_text(
+        target_path, buffer.getvalue(), check=check, dry_run=dry_run
+    )
 
 
 def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
@@ -382,6 +525,22 @@ def materialize(
                 f"Enabled target {target_name!r} must define `settings_path`"
             )
         target_path = (workspace_root / settings_path).resolve()
+
+        target_format = target_cfg.get("format", "json")
+        if target_format not in ("json", "yaml"):
+            raise HookSurfaceError(
+                f"Target {target_name!r} has unsupported `format` "
+                f"{target_format!r} (expected 'json' or 'yaml')"
+            )
+
+        if target_format == "yaml":
+            message, changed = apply_yaml_target(
+                target_path, target_cfg, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+            continue
+
         existing = (
             load_jsonc(target_path)
             if target_path.exists() and target_path.suffix == ".jsonc"

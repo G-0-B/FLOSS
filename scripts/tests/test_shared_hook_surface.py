@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
@@ -174,3 +177,357 @@ def test_merge_shape_target_still_preserves_unrelated_settings_keys():
 
     assert payload["permissions"] == {"allow": ["Bash"]}
     assert payload["hooks"]["PreToolUse"][0]["matcher"] == "Write|Edit|MultiEdit"
+
+
+# ---------------------------------------------------------------------------
+# Capability B: `event_map` per target
+# ---------------------------------------------------------------------------
+
+
+def test_event_map_renames_events():
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "event_map": {"PreToolUse": "pre_tool_call", "PostToolUse": "post_tool_call"},
+        "hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": []}],
+            "PostToolUse": [{"matcher": "*", "hooks": []}],
+        },
+    }
+
+    mapped = surface.resolve_target_hooks(target_cfg)
+
+    assert set(mapped.keys()) == {"pre_tool_call", "post_tool_call"}
+    assert mapped["pre_tool_call"] == target_cfg["hooks"]["PreToolUse"]
+    assert mapped["post_tool_call"] == target_cfg["hooks"]["PostToolUse"]
+
+
+def test_event_map_omits_event_absent_from_map():
+    surface = load_hook_surface_module()
+
+    # SessionStart is present in the manifest hooks but absent from this
+    # target's event_map -- it must be dropped, not passed through raw.
+    target_cfg = {
+        "event_map": {"PreToolUse": "pre_tool_call"},
+        "hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": []}],
+            "SessionStart": [{"matcher": "*", "hooks": []}],
+        },
+    }
+
+    mapped = surface.resolve_target_hooks(target_cfg)
+
+    assert set(mapped.keys()) == {"pre_tool_call"}
+    assert "SessionStart" not in mapped
+
+
+def test_no_event_map_preserves_events_unchanged():
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": []}],
+            "SessionStart": [{"matcher": "*", "hooks": []}],
+        }
+    }
+
+    mapped = surface.resolve_target_hooks(target_cfg)
+
+    assert mapped == target_cfg["hooks"]
+    assert mapped is not target_cfg["hooks"]  # returns a copy, not the same object
+
+
+def test_event_map_wired_through_build_target_payload_for_hooks_only_shape():
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "payload_shape": "hooks_only",
+        "event_map": {"PreToolUse": "pre_tool_call"},
+        "hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": []}],
+            "SessionStart": [{"matcher": "*", "hooks": []}],
+        },
+    }
+
+    payload = surface.build_target_payload({}, target_cfg)
+
+    assert payload == {"hooks": {"pre_tool_call": [{"matcher": "*", "hooks": []}]}}
+
+
+def test_event_map_wired_through_build_target_payload_for_merge_shape():
+    surface = load_hook_surface_module()
+
+    existing = {"hooks": {"pre_tool_call": [{"matcher": "old", "hooks": []}]}}
+    target_cfg = {
+        "event_map": {"PreToolUse": "pre_tool_call"},
+        "hooks": {
+            "PreToolUse": [{"matcher": "Write|Edit|MultiEdit", "hooks": []}],
+            "SessionStart": [{"matcher": "*", "hooks": []}],
+        },
+    }
+
+    payload = surface.build_target_payload(existing, target_cfg)
+
+    assert payload["hooks"] == {
+        "pre_tool_call": [{"matcher": "Write|Edit|MultiEdit", "hooks": []}]
+    }
+    assert "SessionStart" not in payload["hooks"]
+    assert "session_start" not in payload["hooks"]
+
+
+# ---------------------------------------------------------------------------
+# Capability A: `format: json | yaml` per target
+# ---------------------------------------------------------------------------
+
+
+def _canonical_yaml_text(raw_yaml: str) -> str:
+    """Round-trip `raw_yaml` once through the exact ruamel config the
+    materializer uses, so a fixture is already in the writer's canonical
+    formatting before a test diffs it against the writer's output.
+    """
+    ruamel_yaml = pytest.importorskip("ruamel.yaml")
+    yaml_rt = ruamel_yaml.YAML()
+    yaml_rt.preserve_quotes = True
+    yaml_rt.indent(mapping=2, sequence=4, offset=2)
+    yaml_rt.width = 4096
+    doc = yaml_rt.load(raw_yaml)
+    buffer = io.StringIO()
+    yaml_rt.dump(doc, buffer)
+    return buffer.getvalue()
+
+
+_YAML_FIXTURE_RAW = """\
+# workspace config
+name: test-harness  # inline comment
+mcp_servers:
+  foo:
+    command: foo-cmd
+    args:
+      - --bar
+    # a comment inside the mapping
+unrelated_settings:
+  nested: true
+  items:
+    - alpha
+    - beta
+hooks:
+  pre_tool_call:
+    - matcher: old
+      hooks: []
+"""
+
+
+def test_yaml_target_writes_valid_yaml(tmp_path):
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(_canonical_yaml_text(_YAML_FIXTURE_RAW), encoding="utf-8")
+
+    target_cfg = {
+        "format": "yaml",
+        "event_map": {"PreToolUse": "pre_tool_call", "PostToolUse": "post_tool_call"},
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_pre_write.py"}
+                    ],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_post_write.py"}
+                    ],
+                }
+            ],
+        },
+    }
+
+    message, changed = surface.apply_yaml_target(
+        config_path, target_cfg, check=False, dry_run=False
+    )
+
+    assert "WROTE" in message
+    assert changed is True
+
+    ruamel_yaml = pytest.importorskip("ruamel.yaml")
+    reloaded = ruamel_yaml.YAML().load(config_path.read_text(encoding="utf-8"))
+    assert set(reloaded["hooks"].keys()) == {"pre_tool_call", "post_tool_call"}
+    assert reloaded["hooks"]["pre_tool_call"][0]["matcher"] == "Write|Edit|MultiEdit"
+
+
+def test_yaml_fixture_round_trips_apart_from_hook_block(tmp_path):
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(fixture_text, encoding="utf-8")
+
+    target_cfg = {
+        "format": "yaml",
+        "event_map": {"PreToolUse": "pre_tool_call", "PostToolUse": "post_tool_call"},
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_pre_write.py"}
+                    ],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "Write|Edit|MultiEdit",
+                    "hooks": [
+                        {"type": "command", "command": "python hook_post_write.py"}
+                    ],
+                }
+            ],
+            # Absent from event_map -- must not leak into the yaml target.
+            "SessionStart": [
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "python session_start_inject.py",
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+
+    message, changed = surface.apply_yaml_target(
+        config_path, target_cfg, check=False, dry_run=False
+    )
+    assert changed is True
+    result_text = config_path.read_text(encoding="utf-8")
+
+    # `hooks:` is the last top-level key in the fixture, so everything
+    # before it is untouched content that must survive byte-for-byte --
+    # comments, unrelated top-level keys, and nested comments included.
+    boundary = fixture_text.index("hooks:\n")
+    assert result_text[:boundary] == fixture_text[:boundary]
+    assert "# workspace config" in result_text
+    assert "name: test-harness  # inline comment" in result_text
+    assert "# a comment inside the mapping" in result_text
+    assert "unrelated_settings:" in result_text
+    assert "nested: true" in result_text
+
+    assert "SessionStart" not in result_text
+    assert "session_start" not in result_text
+
+    ruamel_yaml = pytest.importorskip("ruamel.yaml")
+    reloaded = ruamel_yaml.YAML().load(result_text)
+    assert set(reloaded["hooks"].keys()) == {"pre_tool_call", "post_tool_call"}
+
+
+def test_yaml_true_noop_round_trip_is_byte_identical(tmp_path):
+    """The ruamel config's whole point: a no-op merge must not reflow the
+    document. This is what the Hermes `config.yaml` case (Task 3) depends
+    on -- a bare `ruamel.yaml.YAML()` measurably reflows an entire
+    unrelated 726-line document on a no-op change.
+    """
+    pytest.importorskip("ruamel.yaml")
+    surface = load_hook_surface_module()
+
+    fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(fixture_text, encoding="utf-8")
+
+    # Target hooks already match exactly what's on disk (pre_tool_call with
+    # matcher "old" and an empty hooks list) -- a genuine no-op.
+    target_cfg = {
+        "format": "yaml",
+        "event_map": {"PreToolUse": "pre_tool_call"},
+        "hooks": {"PreToolUse": [{"matcher": "old", "hooks": []}]},
+    }
+
+    message, changed = surface.apply_yaml_target(
+        config_path, target_cfg, check=False, dry_run=False
+    )
+
+    assert changed is False
+    assert "OK" in message
+    assert config_path.read_text(encoding="utf-8") == fixture_text
+
+
+def test_missing_file_yaml_target_does_not_fabricate_file(tmp_path):
+    surface = load_hook_surface_module()
+
+    config_path = tmp_path / "does-not-exist" / "config.yaml"
+    target_cfg = {
+        "format": "yaml",
+        "hooks": {"PreToolUse": [{"matcher": "*", "hooks": []}]},
+    }
+
+    message, changed = surface.apply_yaml_target(
+        config_path, target_cfg, check=False, dry_run=False
+    )
+
+    assert "SKIP" in message
+    assert changed is False
+    assert not config_path.exists()
+
+
+def test_missing_file_yaml_target_skipped_via_materialize_without_drift(tmp_path):
+    surface = load_hook_surface_module()
+
+    _write_hook_script(tmp_path, "FLOSS/scripts/hook_pre_write.py")
+
+    manifest_path = tmp_path / "FLOSS" / "shared-hook-surface.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "manifest_version": "0.1.0",
+        "workspace_id": "test-workspace",
+        "workspace_name": "Test Workspace",
+        "rules": [],
+        "hook_scripts": ["FLOSS/scripts/hook_pre_write.py"],
+        "targets": {
+            "hermes": {
+                "enabled": True,
+                "settings_path": "config.yaml",
+                "format": "yaml",
+                "event_map": {"PreToolUse": "pre_tool_call"},
+                "hooks": {
+                    "PreToolUse": [{"matcher": "*", "hooks": []}],
+                },
+            }
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    output_dir = tmp_path / ".agent-surface" / "hooks"
+
+    results, drift_found = surface.materialize(
+        workspace_root=tmp_path,
+        manifest_path=manifest_path,
+        output_dir=output_dir,
+        check=False,
+        dry_run=False,
+    )
+
+    assert not (tmp_path / "config.yaml").exists()
+    assert any("SKIP" in line and "config.yaml" in line for line in results)
+
+
+def test_default_format_is_json_and_existing_targets_unaffected(tmp_path):
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "enabled": True,
+        "settings_path": "settings.json",
+        "hooks": {"PreToolUse": [{"matcher": "*", "hooks": []}]},
+    }
+
+    assert target_cfg.get("format", "json") == "json"
+    # No `format` key at all is exactly what claude/gemini/codex declare
+    # today -- build_target_payload must not require it.
+    payload = surface.build_target_payload({}, target_cfg)
+    assert payload["hooks"]["PreToolUse"] == [{"matcher": "*", "hooks": []}]
