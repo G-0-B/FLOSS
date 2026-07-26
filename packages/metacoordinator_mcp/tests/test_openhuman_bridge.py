@@ -8,7 +8,7 @@ from packages.orchestrator.claim_schema import (
     BlastRadius,
     Outcome,
 )
-from packages.orchestrator.consensus_gate import tally
+from packages.orchestrator.consensus_gate import decide
 
 
 @pytest.fixture
@@ -79,7 +79,13 @@ def test_openhuman_claim_and_verify_bridge(
     )
 
     assert agent_1_vote_hash is not None
-    assert len(openhuman_1_cell.read_chain()) == 2
+    chain_1 = openhuman_1_cell.read_chain()
+    assert len(chain_1) == 2
+    assert chain_1[0]["type"] == "vote"
+    assert chain_1[0]["author_did"] == agent_1_did
+    assert chain_1[0]["content"]["claim_id"] == claim_id_for_vote
+    assert chain_1[0]["content"]["vote"]["voter"] == agent_1_vote.voter
+    assert chain_1[0]["content"]["vote"]["weight"] == agent_1_vote.weight
 
     # 4. OpenHuman 2 receives the claim, evaluates it against its own memory, and votes.
     agent_2_did = "did:key:zOpenHuman2"
@@ -105,12 +111,18 @@ def test_openhuman_claim_and_verify_bridge(
     assert chain_2[0]["content"]["vote"]["weight"] == 0.95
 
     # 6. The FLOSSI0ULLK Consensus Gateway resolves the two-vote Module ballot.
-    votes = [agent_1_vote, oh_vote]
-    outcome, mean, variance = tally(oh_claim, votes)
+    def agent_1_voter(_: Claim) -> Vote:
+        return agent_1_vote
 
-    assert outcome == Outcome.APPROVED
-    assert len(votes) == 2
-    assert mean == pytest.approx(0.90)
-    assert variance == pytest.approx(0.0025)
+    def agent_2_voter(_: Claim) -> Vote:
+        return oh_vote
+
+    decision = decide(oh_claim, [agent_1_voter, agent_2_voter])
+
+    assert decision.outcome == Outcome.APPROVED
+    assert len(decision.votes) == 2
+    assert [vote.voter for vote in decision.votes] == [agent_1_did, agent_2_did]
+    assert decision.tally_mean == pytest.approx(0.90)
+    assert decision.tally_variance == pytest.approx(0.0025)
 
     # Success! Two isolated personal AIs just formed a verifiable knowledge commons.
