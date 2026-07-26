@@ -184,3 +184,39 @@ def test_spec_gate_normalizes_and_audits_named_and_linked_worktrees(
         encoding="utf-8",
     )
     assert spec_gate.run_check() == 0
+
+
+@pytest.mark.parametrize("root_name", ["FLOSS", "_codex_pr38_cleanup"])
+def test_spec_gate_advisory_add_argument_works_in_all_worktree_layouts(
+    tmp_path, monkeypatch, root_name
+) -> None:
+    from scripts import spec_gate
+
+    repo_root = tmp_path / root_name
+    advisory_target = repo_root / "scripts" / "advisory_target.py"
+    physical_target = repo_root / "scripts" / "physical_target.py"
+    registry_path = repo_root / "docs" / "specs" / "spec-registry.json"
+    advisory_target.parent.mkdir(parents=True)
+    registry_path.parent.mkdir(parents=True)
+    advisory_target.write_text("# advisory target\n", encoding="utf-8")
+    physical_target.write_text("# physical target\n", encoding="utf-8")
+    registry_path.write_text('{"version": "test", "entries": {}}\n', encoding="utf-8")
+
+    monkeypatch.setattr(spec_gate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(spec_gate, "REGISTRY_PATH", registry_path)
+
+    advisory = spec_gate.advisory_note(advisory_target)
+    assert advisory is not None
+    advisory_argument = advisory.split('--add "', 1)[1].split('"', 1)[0]
+    assert advisory_argument == "FLOSS/scripts/advisory_target.py"
+
+    assert spec_gate.run_add(advisory_argument, "advisory target", None) == 0
+    assert spec_gate.run_add("scripts/physical_target.py", "physical target", None) == 0
+    assert spec_gate._normalize(tmp_path / "outside.py") is None
+    assert spec_gate.run_add(str(tmp_path / "outside.py"), "outside", None) == 1
+
+    entries = json.loads(registry_path.read_text(encoding="utf-8"))["entries"]
+    assert set(entries) == {
+        "FLOSS/scripts/advisory_target.py",
+        "FLOSS/scripts/physical_target.py",
+    }

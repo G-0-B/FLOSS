@@ -51,8 +51,16 @@ EXEMPT_NAMES = ("INDEX.md", ".gitignore", "__init__.py")
 
 def _normalize(path_str: str | Path) -> str | None:
     """Return a canonical FLOSS-prefixed path for a file inside this worktree."""
+    canonical_parts = PurePosixPath(str(path_str).replace("\\", "/")).parts
     try:
-        resolved = Path(path_str).resolve()
+        if canonical_parts and canonical_parts[0] == CANONICAL_REPO_PREFIX:
+            physical_path = _physical_path("/".join(canonical_parts))
+            if physical_path is None:
+                return None
+            resolved = physical_path.resolve()
+        else:
+            candidate = Path(path_str)
+            resolved = (candidate if candidate.is_absolute() else REPO_ROOT / candidate).resolve()
     except OSError:
         return None
     try:
