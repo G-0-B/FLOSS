@@ -21,12 +21,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-1: The Carrier Equivalence Principle)",
       "grandfathered": true
     },
-    "FLOSS/docs/adr/ADR-10-local-agent-node.md": {
-      "spec": "ADR-10: Local Agent Node and consensus gateway"
-    },
-    "FLOSS/docs/adr/ADR-11-ipfs-large-file-integration.md": {
-      "spec": "ADR-11: IPFS large-file integration"
-    },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
@@ -45,12 +39,6 @@
     },
     "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
       "spec": "ADR-17: KnowledgeTriple contract reconciliation"
-    },
-    "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
-      "spec": "ADR-18: Prior-art reuse gate"
-    },
-    "FLOSS/docs/adr/ADR-19-omniroute-inference-plane.md": {
-      "spec": "ADR-19: OmniRoute inference plane"
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -190,12 +178,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
       "grandfathered": true
     },
-    "FLOSS/docs/specs/reuse-gate.schema.json": {
-      "spec": "JSON Schema for the prior-art reuse gate"
-    },
-    "FLOSS/docs/specs/reuse-gate.spec.md": {
-      "spec": "Prior-art reuse gate specification"
-    },
     "FLOSS/docs/specs/rose-node.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (rose-node.schema)",
       "grandfathered": true
@@ -323,9 +305,6 @@
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
     },
-    "FLOSS/scripts/refresh_agent_surfaces.py": {
-      "spec": "Refresh generated local agent-surface projections"
-    },
     "FLOSS/scripts/session_start_inject.py": {
       "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
@@ -337,12 +316,6 @@
     },
     "FLOSS/scripts/smoke_test_voters.py": {
       "spec": "Smoke test: voter roster resolution + credentials"
-    },
-    "FLOSS/scripts/start_mcp_daemons.ps1": {
-      "spec": "Start local MCP daemon processes"
-    },
-    "FLOSS/scripts/stop_mcp_daemons.ps1": {
-      "spec": "Stop local MCP daemon processes"
     },
     "FLOSS/scripts/spec_gate.py": {
       "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",

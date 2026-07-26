@@ -1,29 +1,29 @@
 # Spec: Integrity Zome Provenance & Authorization Validation
 
-**Status:** ⚠️ Specified (fix not yet implemented or tested)
+**Status:** ⚠️ Partially implemented — R3/R4 author binding is implemented and unit-tested;
+BudgetEntry finite/action-time constraints remain Specified pending Task 2 evidence.
 **Severity:** P1 — security / core-invariant
 **Backs:** ADR-15
 **Date:** 2026-06-13
 
 ## Problem
 
-A 2026-06-07 Semgrep scan (HIGH, true-positive) plus direct code review found that the
-`rose_forest` integrity zome — the layer the project's "logic validates, neural assists"
-and `provenance_first` non-negotiables depend on — **does not enforce authorship/provenance
-binding.** Confirmed in `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs`:
+A 2026-06-07 Semgrep scan (HIGH, true-positive) plus direct code review found missing
+authorship/provenance binding in the `rose_forest` integrity zome — the layer the project's
+"logic validates, neural assists" and `provenance_first` non-negotiables depend on. The
+follow-on implementation partially closed that gap; the remaining BudgetEntry requirements are:
 
 1. **`BudgetEntry` needs complete deterministic action-time validation** — its contract must bind
    `agent` to the action author, require a finite non-negative `remaining_ru`, and reject a
    `window_start` more than **300 seconds (5 minutes)** after the deterministic action timestamp.
    This rule is ⚠️ Specified until the Rust task supplies test evidence.
-2. **`ThoughtCredential.provenance` is not bound to the author** — `validate_thought_credential`
-   checks content dimension, connotation, and impact ranges, but never verifies
-   `credential.provenance == <action author>`. The code comment admits it ("Further validation
-   could include checking provenance signature"). Any agent can publish a credential attributed
-   to another agent.
-3. **`KnowledgeTriple.source` is author-bound.** `KnowledgeEdge` has no author/provenance field
-   and is outside the current author-binding rule; it must not be described as though it carried
-   provenance requiring this comparison.
+2. **`ThoughtCredential.provenance` is author-bound (implemented).**
+   `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs:137-145` rejects a provenance/action-author
+   mismatch; `:372-399` covers mismatched and self-authored credentials.
+3. **`KnowledgeTriple.source` is author-bound (implemented).**
+   `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs:198-206` rejects a source/action-author
+   mismatch; `:402-430` covers mismatched and self-authored triples. `KnowledgeEdge` has no
+   author/provenance field and is outside the current author-binding rule.
 4. **Connotation drift** — `connotation` is validated as **integer ternary** `(-1..=1)`, which
    contradicts the analog `[-1.0, +1.0]` model adopted in ADR-10 v2.0 and required by ADR-13.
 

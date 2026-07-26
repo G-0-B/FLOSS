@@ -71,6 +71,53 @@ def test_semantic_validator_rejects_inverted_threshold_bounds() -> None:
         validate_capability(capability)
 
 
+@pytest.mark.parametrize(
+    "proof",
+    [
+        {"canonicalization": "RFC8785", "payload_digest": "a" * 64, "signature": "sig"},
+        {
+            "algorithm": "RSA",
+            "canonicalization": "RFC8785",
+            "payload_digest": "a" * 64,
+            "signature": "sig",
+        },
+        {
+            "algorithm": "Ed25519",
+            "canonicalization": "JCS",
+            "payload_digest": "a" * 64,
+            "signature": "sig",
+        },
+        {
+            "algorithm": "Ed25519",
+            "canonicalization": "RFC8785",
+            "payload_digest": "not-a-sha256-digest",
+            "signature": "sig",
+        },
+        {
+            "algorithm": "Ed25519",
+            "canonicalization": "RFC8785",
+            "payload_digest": "a" * 64,
+            "signature": "",
+        },
+    ],
+    ids=[
+        "missing-nested-member",
+        "wrong-algorithm",
+        "wrong-canonicalization",
+        "malformed-digest",
+        "empty-signature",
+    ],
+)
+def test_semantic_validator_rejects_invalid_proof_shape(proof) -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    capability = valid_capability()
+    capability["proof"] = proof
+
+    with pytest.raises(jsonschema.ValidationError):
+        validate_capability(capability)
+
+
 def test_uppercase_togetherai_key_is_preserved() -> None:
     from scripts import major_consolidation_sweep
 
@@ -78,6 +125,15 @@ def test_uppercase_togetherai_key_is_preserved() -> None:
     with patch.object(major_consolidation_sweep.os, "environ", environment):
         major_consolidation_sweep.configure_togetherai_api_key()
         assert environment["TOGETHERAI_API_KEY"] == "uppercase"
+
+
+def test_empty_existing_uppercase_togetherai_key_is_preserved() -> None:
+    from scripts import major_consolidation_sweep
+
+    environment = {"TOGETHERAI_API_KEY": "", "togetherai_API_key": "legacy"}
+    with patch.object(major_consolidation_sweep.os, "environ", environment):
+        major_consolidation_sweep.configure_togetherai_api_key()
+        assert environment["TOGETHERAI_API_KEY"] == ""
 
 
 @pytest.mark.parametrize(
@@ -101,3 +157,30 @@ def test_empty_sweep_never_makes_an_external_llm_call() -> None:
         major_consolidation_sweep.main()
 
     completion.assert_not_called()
+
+
+@pytest.mark.parametrize("root_name", ["FLOSS", "_codex_pr38_cleanup"])
+def test_spec_gate_normalizes_and_audits_named_and_linked_worktrees(
+    tmp_path, monkeypatch, root_name
+) -> None:
+    from scripts import spec_gate
+
+    repo_root = tmp_path / root_name
+    script_path = repo_root / "scripts" / "probe.py"
+    registry_path = repo_root / "docs" / "specs" / "spec-registry.json"
+    script_path.parent.mkdir(parents=True)
+    registry_path.parent.mkdir(parents=True)
+    script_path.write_text("# gated probe\n", encoding="utf-8")
+    registry_path.write_text('{"version": "test", "entries": {}}\n', encoding="utf-8")
+
+    monkeypatch.setattr(spec_gate, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(spec_gate, "REGISTRY_PATH", registry_path)
+
+    assert spec_gate._normalize(script_path) == "FLOSS/scripts/probe.py"
+    assert spec_gate.run_check() == 1
+
+    registry_path.write_text(
+        '{"version": "test", "entries": {"FLOSS/docs/specs/spec-registry.json": {"spec": "registry"}, "FLOSS/scripts/probe.py": {"spec": "probe"}}}\n',
+        encoding="utf-8",
+    )
+    assert spec_gate.run_check() == 0
