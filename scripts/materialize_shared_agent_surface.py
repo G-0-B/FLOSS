@@ -1248,12 +1248,20 @@ def build_vibe_launcher(vibe_cfg: dict[str, Any]) -> str:
     startup_prompt_rel = str(
         vibe_cfg.get("startup_prompt_path", ".agent-surface/VIBE_STARTUP.md")
     )
+    # Hoisted out of the f-string below: backslashes inside f-string
+    # expressions are only legal on Python 3.12+ (PEP 701). The workspace
+    # convention is C:\Python313\python.exe, but heartbeat/CI shells have
+    # invoked this via a bare `python` (3.11) where the inline form is a
+    # SyntaxError at import time — which took down every materializer that
+    # imports this module (hook surface, refresh runner). Keep these hoisted.
+    env_rel_win = env_rel.replace("/", "\\")
+    startup_prompt_rel_win = startup_prompt_rel.replace("/", "\\")
     script = f"""
     $ErrorActionPreference = "Stop"
 
     $workspaceRoot = (Split-Path -Parent $PSCommandPath)
-    $envFile = Join-Path $workspaceRoot "{env_rel.replace('/', '\\')}"
-    $startupPromptPath = Join-Path $workspaceRoot "{startup_prompt_rel.replace('/', '\\')}"
+    $envFile = Join-Path $workspaceRoot "{env_rel_win}"
+    $startupPromptPath = Join-Path $workspaceRoot "{startup_prompt_rel_win}"
     $vibeFallback = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
     $vibeCommand = Get-Command vibe.exe -ErrorAction SilentlyContinue
     if (-not $vibeCommand) {{
