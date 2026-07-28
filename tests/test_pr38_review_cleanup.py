@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from datetime import datetime, timedelta, timezone
 import json
 import math
 from pathlib import Path
@@ -200,7 +201,77 @@ def test_capability_schema_rejects_unknown_top_level_and_nested_fields(mutate) -
 def test_semantic_validator_accepts_ordered_threshold_bounds() -> None:
     from scripts.yumeichan_watch_capabilities import validate_capability
 
-    validate_capability(valid_capability())
+    validate_capability(
+        valid_capability(),
+        now=datetime(2026, 7, 26, 0, 0, 30, tzinfo=timezone.utc),
+    )
+
+
+def test_semantic_validator_rejects_expired_capability() -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    with pytest.raises(jsonschema.ValidationError, match="expired"):
+        validate_capability(
+            valid_capability(),
+            now=datetime(2026, 7, 26, 0, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_semantic_validator_rejects_future_issued_capability() -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    with pytest.raises(jsonschema.ValidationError, match="future"):
+        validate_capability(
+            valid_capability(),
+            now=datetime(2026, 7, 25, 23, 59, 59, tzinfo=timezone.utc),
+        )
+
+
+def test_semantic_validator_accepts_timezone_aware_injected_now() -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    eastern = timezone(-timedelta(hours=4))
+    validate_capability(
+        valid_capability(),
+        now=datetime(2026, 7, 25, 20, 0, 30, tzinfo=eastern),
+    )
+
+
+def test_semantic_validator_accepts_unexpired_capability() -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    validate_capability(
+        valid_capability(),
+        now=datetime(2026, 7, 26, 0, 0, 59, tzinfo=timezone.utc),
+    )
+
+
+def test_semantic_validator_rejects_naive_injected_now() -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    with pytest.raises(jsonschema.ValidationError, match="timezone-aware"):
+        validate_capability(
+            valid_capability(),
+            now=datetime(2026, 7, 26, 0, 0, 30),
+        )
+
+
+@pytest.mark.parametrize(
+    "issued_at",
+    ["not-an-instant", "2026-07-26T00:00:00"],
+    ids=["malformed", "naive"],
+)
+def test_semantic_validator_rejects_unusable_issued_at(issued_at: str) -> None:
+    from scripts.yumeichan_watch_capabilities import validate_capability
+
+    capability = valid_capability()
+    capability["issued_at"] = issued_at
+
+    with pytest.raises(jsonschema.ValidationError, match="timezone-aware"):
+        validate_capability(
+            capability,
+            now=datetime(2026, 7, 26, 0, 0, 30, tzinfo=timezone.utc),
+        )
 
 
 def test_semantic_validator_rejects_inverted_threshold_bounds() -> None:
