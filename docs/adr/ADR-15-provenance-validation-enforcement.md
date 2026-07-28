@@ -30,18 +30,23 @@ runtime, conductor, or cross-agent enforcement.
 
 The project's non-negotiables include `provenance_first` and "logic validates, neural assists —
 truth is established by symbolic validation in Holochain integrity zomes, which cannot be
-bypassed." A 2026-06-07 Semgrep scan (two HIGH true-positives) and direct review of
-`ARF/dnas/rose_forest/zomes/integrity/src/lib.rs` found that the integrity zome at that time did
-**not** enforce that an entry's identity field (`agent`, `provenance`) matched the action's
+bypassed."
+
+⚠️ Specified — historical record retained from the accepted ADR, not independently
+reproducible from this exact head because the referenced Semgrep CSV is absent: a 2026-06-07
+Semgrep scan (two HIGH true-positives) and direct review of
+`ARF/dnas/rose_forest/zomes/integrity/src/lib.rs` reported that the integrity zome at that time
+did **not** enforce that an entry's identity field (`agent`, `provenance`) matched the action's
 author:
 
-- `BudgetEntry` validation was an unconditional `Ok(Valid)`.
-- `ThoughtCredential` provenance was not bound to the author.
-- `KnowledgeTriple` provenance was unenforced; `KnowledgeEdge` has no author/provenance field
-  and is outside the current author-binding rule.
+- ⚠️ Specified — historical record: `BudgetEntry` validation was an unconditional `Ok(Valid)`.
+- ⚠️ Specified — historical record: `ThoughtCredential` provenance was not bound to the author.
+- ⚠️ Specified — historical record: `KnowledgeTriple` provenance was unenforced;
+  `KnowledgeEdge` has no author/provenance field and is outside the current author-binding rule.
 
-The independent Lovable synthesis (2026-06-13) flagged the same gap architecturally:
-"permeability without capability gates is just a hole."
+⚠️ Specified — historical record retained from the accepted ADR: the independent Lovable
+synthesis (2026-06-13) flagged the same gap architecturally: "permeability without capability
+gates is just a hole."
 
 This was a contradiction between **doctrine** (`provenance_first`, ✅-able verification) and
 **code** (no author binding). ✅ Verified — R2–R4 now resolve that contradiction at the validator
