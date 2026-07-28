@@ -139,6 +139,9 @@ def main():
                 print("Rate limit hit. Waiting 60s...")
                 time.sleep(60)
                 insights = extract_and_synthesize(fp, model)
+                if "LLM Extraction Failed" in insights:
+                    print(f"Skipping {fp.name} after failed retry.")
+                    continue
             else:
                 print(f"Skipping {fp.name} due to hard LLM error.")
                 continue

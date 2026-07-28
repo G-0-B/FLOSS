@@ -8,7 +8,7 @@ import json
 import math
 from pathlib import Path
 import re
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import jsonschema
 import pytest
@@ -403,6 +403,107 @@ def test_empty_sweep_never_makes_an_external_llm_call() -> None:
         major_consolidation_sweep.main()
 
     completion.assert_not_called()
+
+
+def test_consolidation_retry_failure_is_not_appended_or_marked() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "retry-failure.md"
+    rate_limit_failure = "LLM Extraction Failed for chunk 1: RateLimitError"
+    retry_failure = "LLM Extraction Failed for chunk 1: 429 retry exhausted"
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            side_effect=[rate_limit_failure, retry_failure],
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    assert extract.call_count == 2
+    append.assert_not_called()
+    mark.assert_not_called()
+    completion.assert_not_called()
+    sleep.assert_called_once_with(60)
+
+
+def test_consolidation_successful_retry_is_appended_and_marked_once() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "retry-success.md"
+    rate_limit_failure = "LLM Extraction Failed for chunk 1: 429"
+    retry_success = "Retry synthesis succeeded."
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            side_effect=[rate_limit_failure, retry_success],
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    assert extract.call_count == 2
+    append.assert_called_once_with(source_path, retry_success)
+    mark.assert_called_once_with(str(source_path.resolve()))
+    completion.assert_not_called()
+    assert sleep.call_args_list == [call(60), call(5)]
+
+
+def test_consolidation_hard_error_remains_skipped_without_retry_or_side_effects() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "hard-error.md"
+    hard_failure = "LLM Extraction Failed for chunk 1: authentication failed"
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            return_value=hard_failure,
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    extract.assert_called_once()
+    append.assert_not_called()
+    mark.assert_not_called()
+    completion.assert_not_called()
+    sleep.assert_not_called()
 
 
 @pytest.mark.parametrize("root_name", ["FLOSS", "_codex_pr38_cleanup"])
