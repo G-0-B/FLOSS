@@ -10,6 +10,8 @@ It tracks alignment, contradictions, assumptions, and citations.
 import os
 import glob
 import time
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from dotenv import load_dotenv
 import litellm
@@ -19,6 +21,19 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 ENV_PATH = REPO_ROOT / ".env"
 VISION_DOC = REPO_ROOT / "docs" / "research" / "Holistic_Vision.md"
 PROCESSED_LOG = REPO_ROOT / "docs" / "research" / "consolidation_processed.txt"
+
+
+class ExtractionStatus(Enum):
+    SUCCESS = "success"
+    FILE_READ_FAILURE = "file_read_failure"
+    LLM_FAILURE = "llm_failure"
+    RATE_LIMIT_FAILURE = "rate_limit_failure"
+
+
+@dataclass(frozen=True)
+class ExtractionResult:
+    status: ExtractionStatus
+    insights: str
 
 
 def configure_togetherai_api_key() -> None:
@@ -50,18 +65,22 @@ def get_target_files() -> list[Path]:
             files.append(Path(match))
     return sorted(list(set(files)))
 
-def extract_and_synthesize(file_path: Path, model: str) -> str:
+def extract_and_synthesize(file_path: Path, model: str) -> ExtractionResult:
     try:
         content = file_path.read_text(encoding="utf-8")
     except Exception as e:
-        return f"Error reading file: {e}"
+        return ExtractionResult(
+            ExtractionStatus.FILE_READ_FAILURE,
+            f"Error reading file: {e}",
+        )
 
     chunk_size = 14000
     chunks = [content[i:i + chunk_size] for i in range(0, len(content), chunk_size)]
     if not chunks:
-        return "No content found."
+        return ExtractionResult(ExtractionStatus.SUCCESS, "No content found.")
 
     all_insights = []
+    status = ExtractionStatus.SUCCESS
     for idx, chunk in enumerate(chunks):
         prompt = f"""You are the FLOSSI0ULLK Consolidator AI.
 Analyze the following document chunk and extract knowledge for the holistic overarching vision.
@@ -90,11 +109,20 @@ DOCUMENT CONTENT CHUNK:
             all_insights.append(response.choices[0].message.content.strip())
         except Exception as e:
             all_insights.append(f"LLM Extraction Failed for chunk {idx + 1}: {e}")
+            is_rate_limit = (
+                type(e).__name__ == "RateLimitError"
+                or getattr(e, "status_code", None) == 429
+                or "429" in str(e)
+            )
+            if is_rate_limit:
+                status = ExtractionStatus.RATE_LIMIT_FAILURE
+            elif status is ExtractionStatus.SUCCESS:
+                status = ExtractionStatus.LLM_FAILURE
 
         if idx < len(chunks) - 1:
             time.sleep(3) # Groq rate limits
 
-    return "\n\n".join(all_insights)
+    return ExtractionResult(status, "\n\n".join(all_insights))
 
 def append_to_vision(file_path: Path, insights: str):
     header = f"## Analysis of `{file_path.name}`\n**Path:** `{file_path.relative_to(WORKSPACE_ROOT)}`\n\n"
@@ -132,21 +160,20 @@ def main():
     
     for fp in to_process:
         print(f"Processing: {fp.name} ...")
-        insights = extract_and_synthesize(fp, model)
+        result = extract_and_synthesize(fp, model)
         
-        if "LLM Extraction Failed" in insights:
-            if "RateLimitError" in insights or "429" in insights:
-                print("Rate limit hit. Waiting 60s...")
-                time.sleep(60)
-                insights = extract_and_synthesize(fp, model)
-                if "LLM Extraction Failed" in insights:
-                    print(f"Skipping {fp.name} after failed retry.")
-                    continue
-            else:
-                print(f"Skipping {fp.name} due to hard LLM error.")
+        if result.status is ExtractionStatus.RATE_LIMIT_FAILURE:
+            print("Rate limit hit. Waiting 60s...")
+            time.sleep(60)
+            result = extract_and_synthesize(fp, model)
+            if result.status is not ExtractionStatus.SUCCESS:
+                print(f"Skipping {fp.name} after failed retry.")
                 continue
+        elif result.status is not ExtractionStatus.SUCCESS:
+            print(f"Skipping {fp.name} due to extraction failure.")
+            continue
                 
-        append_to_vision(fp, insights)
+        append_to_vision(fp, result.insights)
         mark_processed(str(fp.resolve()))
         print(f"Successfully processed and appended {fp.name} to Holistic Vision.")
         time.sleep(5) # Delay between files

@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 import re
+from types import SimpleNamespace
 from unittest.mock import call, patch
 
 import jsonschema
@@ -405,12 +406,110 @@ def test_empty_sweep_never_makes_an_external_llm_call() -> None:
     completion.assert_not_called()
 
 
+def test_extraction_result_reports_file_read_failure_without_external_call() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "unreadable.md"
+
+    with (
+        patch.object(Path, "read_text", side_effect=PermissionError("permission denied")),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        result = major_consolidation_sweep.extract_and_synthesize(
+            source_path, "test-model"
+        )
+
+    assert (
+        result.status
+        is major_consolidation_sweep.ExtractionStatus.FILE_READ_FAILURE
+    )
+    assert result.insights == "Error reading file: permission denied"
+    completion.assert_not_called()
+    sleep.assert_not_called()
+
+
+class RateLimitError(Exception):
+    pass
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status"),
+    [
+        (RuntimeError("authentication failed"), "LLM_FAILURE"),
+        (RateLimitError("provider rejected request"), "RATE_LIMIT_FAILURE"),
+    ],
+    ids=["hard-error", "rate-limit"],
+)
+def test_extraction_result_classifies_llm_failures_without_external_effects(
+    error, expected_status
+) -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "llm-failure.md"
+
+    with (
+        patch.object(Path, "read_text", return_value="source content"),
+        patch.object(
+            major_consolidation_sweep.litellm,
+            "completion",
+            side_effect=error,
+        ),
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        result = major_consolidation_sweep.extract_and_synthesize(
+            source_path, "test-model"
+        )
+
+    assert result.status is getattr(
+        major_consolidation_sweep.ExtractionStatus, expected_status
+    )
+    assert result.insights == f"LLM Extraction Failed for chunk 1: {error}"
+    sleep.assert_not_called()
+
+
+def test_extraction_success_status_is_independent_of_synthesis_prose() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "successful-discussion.md"
+    synthesis = (
+        "The source discusses LLM Extraction Failed, RateLimitError, and 429 "
+        "as prior art."
+    )
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=synthesis))]
+    )
+
+    with (
+        patch.object(Path, "read_text", return_value="source content"),
+        patch.object(
+            major_consolidation_sweep.litellm,
+            "completion",
+            return_value=response,
+        ),
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        result = major_consolidation_sweep.extract_and_synthesize(
+            source_path, "test-model"
+        )
+
+    assert result.status is major_consolidation_sweep.ExtractionStatus.SUCCESS
+    assert result.insights == synthesis
+    sleep.assert_not_called()
+
+
 def test_consolidation_retry_failure_is_not_appended_or_marked() -> None:
     from scripts import major_consolidation_sweep
 
     source_path = REPO_ROOT / "retry-failure.md"
-    rate_limit_failure = "LLM Extraction Failed for chunk 1: RateLimitError"
-    retry_failure = "LLM Extraction Failed for chunk 1: 429 retry exhausted"
+    rate_limit_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE,
+        "LLM Extraction Failed for chunk 1: RateLimitError",
+    )
+    retry_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.LLM_FAILURE,
+        "LLM Extraction Failed for chunk 1: retry exhausted",
+    )
 
     with (
         patch.object(
@@ -439,12 +538,95 @@ def test_consolidation_retry_failure_is_not_appended_or_marked() -> None:
     sleep.assert_called_once_with(60)
 
 
+def test_consolidation_retry_file_read_failure_is_not_appended_or_marked() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "retry-file-read-failure.md"
+    rate_limit_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE,
+        "LLM Extraction Failed for chunk 1: RateLimitError",
+    )
+    retry_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.FILE_READ_FAILURE,
+        "Error reading file: permission denied",
+    )
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            side_effect=[rate_limit_failure, retry_failure],
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    assert extract.call_count == 2
+    append.assert_not_called()
+    mark.assert_not_called()
+    completion.assert_not_called()
+    sleep.assert_called_once_with(60)
+
+
+def test_consolidation_first_file_read_failure_is_not_appended_or_marked() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "first-file-read-failure.md"
+    file_read_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.FILE_READ_FAILURE,
+        "Error reading file: permission denied",
+    )
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            return_value=file_read_failure,
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    extract.assert_called_once()
+    append.assert_not_called()
+    mark.assert_not_called()
+    completion.assert_not_called()
+    sleep.assert_not_called()
+
+
 def test_consolidation_successful_retry_is_appended_and_marked_once() -> None:
     from scripts import major_consolidation_sweep
 
     source_path = REPO_ROOT / "retry-success.md"
-    rate_limit_failure = "LLM Extraction Failed for chunk 1: 429"
-    retry_success = "Retry synthesis succeeded."
+    rate_limit_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE,
+        "LLM Extraction Failed for chunk 1: 429",
+    )
+    retry_insights = "Retry synthesis succeeded."
+    retry_success = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.SUCCESS,
+        retry_insights,
+    )
 
     with (
         patch.object(
@@ -467,7 +649,51 @@ def test_consolidation_successful_retry_is_appended_and_marked_once() -> None:
         major_consolidation_sweep.main()
 
     assert extract.call_count == 2
-    append.assert_called_once_with(source_path, retry_success)
+    append.assert_called_once_with(source_path, retry_insights)
+    mark.assert_called_once_with(str(source_path.resolve()))
+    completion.assert_not_called()
+    assert sleep.call_args_list == [call(60), call(5)]
+
+
+def test_consolidation_successful_retry_may_discuss_failure_marker() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "retry-success-discussion.md"
+    rate_limit_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE,
+        "LLM Extraction Failed for chunk 1: 429",
+    )
+    retry_insights = (
+        "The source discusses LLM Extraction Failed, RateLimitError, and 429 "
+        "as prior art."
+    )
+    retry_success = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.SUCCESS,
+        retry_insights,
+    )
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            side_effect=[rate_limit_failure, retry_success],
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    assert extract.call_count == 2
+    append.assert_called_once_with(source_path, retry_insights)
     mark.assert_called_once_with(str(source_path.resolve()))
     completion.assert_not_called()
     assert sleep.call_args_list == [call(60), call(5)]
@@ -477,7 +703,10 @@ def test_consolidation_hard_error_remains_skipped_without_retry_or_side_effects(
     from scripts import major_consolidation_sweep
 
     source_path = REPO_ROOT / "hard-error.md"
-    hard_failure = "LLM Extraction Failed for chunk 1: authentication failed"
+    hard_failure = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.LLM_FAILURE,
+        "LLM Extraction Failed for chunk 1: authentication failed",
+    )
 
     with (
         patch.object(
