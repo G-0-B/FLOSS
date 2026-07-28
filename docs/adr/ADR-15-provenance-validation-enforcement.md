@@ -48,10 +48,11 @@ author:
 synthesis (2026-06-13) flagged the same gap architecturally: "permeability without capability
 gates is just a hole."
 
-This was a contradiction between **doctrine** (`provenance_first`, ✅-able verification) and
-**code** (no author binding). ✅ Verified — R2–R4 now resolve that contradiction at the validator
-unit-test level. ⚠️ Specified — provenance claims requiring running-conductor or cross-agent
-enforcement remain unverified until the two-agent Tryorama gate passes.
+⚠️ Specified — historical record: this was a contradiction between **doctrine**
+(`provenance_first`, ✅-able verification) and **code** (no author binding). ✅ Verified — R2–R4
+now resolve that contradiction at the validator unit-test level. ⚠️ Specified — provenance
+claims requiring running-conductor or cross-agent enforcement remain unverified until the
+two-agent Tryorama gate passes.
 
 ## Decision
 
