@@ -112,7 +112,6 @@ DOCUMENT CONTENT CHUNK:
             is_rate_limit = (
                 type(e).__name__ == "RateLimitError"
                 or getattr(e, "status_code", None) == 429
-                or "429" in str(e)
             )
             if is_rate_limit:
                 status = ExtractionStatus.RATE_LIMIT_FAILURE

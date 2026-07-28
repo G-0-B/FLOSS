@@ -468,6 +468,62 @@ def test_extraction_result_classifies_llm_failures_without_external_effects(
     sleep.assert_not_called()
 
 
+def test_numeric_exception_text_remains_hard_failure_without_retry_or_writes() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "numeric-hard-failure.md"
+    error = RuntimeError("record 1429 is malformed")
+
+    with (
+        patch.object(Path, "read_text", return_value="source content"),
+        patch.object(
+            major_consolidation_sweep.litellm,
+            "completion",
+            side_effect=error,
+        ),
+        patch.object(major_consolidation_sweep.time, "sleep") as extraction_sleep,
+    ):
+        classified_result = major_consolidation_sweep.extract_and_synthesize(
+            source_path, "test-model"
+        )
+
+    unexpected_retry_success = major_consolidation_sweep.ExtractionResult(
+        major_consolidation_sweep.ExtractionStatus.SUCCESS,
+        "This retry must not happen.",
+    )
+
+    with (
+        patch.object(
+            major_consolidation_sweep, "get_target_files", return_value=[source_path]
+        ),
+        patch.object(
+            major_consolidation_sweep, "load_processed_files", return_value=set()
+        ),
+        patch.object(
+            major_consolidation_sweep,
+            "extract_and_synthesize",
+            side_effect=[classified_result, unexpected_retry_success],
+        ) as extract,
+        patch.object(major_consolidation_sweep, "append_to_vision") as append,
+        patch.object(major_consolidation_sweep, "mark_processed") as mark,
+        patch.object(major_consolidation_sweep, "load_dotenv"),
+        patch.object(major_consolidation_sweep.litellm, "completion") as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        major_consolidation_sweep.main()
+
+    assert (
+        classified_result.status
+        is major_consolidation_sweep.ExtractionStatus.LLM_FAILURE
+    )
+    assert extract.call_count == 1
+    append.assert_not_called()
+    mark.assert_not_called()
+    completion.assert_not_called()
+    extraction_sleep.assert_not_called()
+    sleep.assert_not_called()
+
+
 def test_extraction_success_status_is_independent_of_synthesis_prose() -> None:
     from scripts import major_consolidation_sweep
 
