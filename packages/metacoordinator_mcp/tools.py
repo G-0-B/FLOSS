@@ -13,6 +13,7 @@ Errors are returned as {"error": "<message>"} rather than raised, so callers
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -38,7 +39,7 @@ from packages.source_chain.cell import CellDirectory  # noqa: E402
 
 # Deferred type — avoids importing voters.py (and LiteLLM) at module load.
 # Tests that never call run_consensus_round should never touch the network.
-VoterFactory = Callable[[], list[Callable[[Claim], Vote]]]
+VoterFactory = Callable[[], list[Callable[..., Vote]]]
 
 
 def _claim_from_chain_entry(entry_content: dict[str, Any]) -> Claim:
@@ -91,7 +92,7 @@ def _decision_outcome(entry_content: dict[str, Any]) -> Outcome:
     return Outcome(entry_content["outcome"])
 
 
-def _known_voter_name(voter: Callable[[Claim], Vote]) -> Optional[str]:
+def _known_voter_name(voter: Callable[..., Vote]) -> Optional[str]:
     """Return the configured voter name when inference is purely local."""
     name = getattr(voter, "__name__", "")
     for prefix in ("litellm_voter_", "flowith_voter_"):
@@ -184,10 +185,50 @@ def _resolve_voter_factory(factory: Optional[VoterFactory]) -> VoterFactory:
     return build_default_voters
 
 
+def _call_voter(
+    voter: Callable[..., Vote], claim: Claim, context: str
+) -> Vote:
+    """Invoke a voter with (claim, context); fall back to legacy 1-arg voters.
+
+    PR38 review thread PRRT_kwDOPkAi3s6UUuKj: voters gained a `context`
+    parameter so they can see the validated provenance_packet metadata
+    (digest + consent decision hash + nested non-packet evidence roots)
+    that the hard gate already accepted. Old test harnesses that supplied
+    a 1-arg voter must keep working, so we introspect the callable and
+    dispatch based on how many positional parameters it accepts. A blind
+    ``except TypeError`` would silently swallow errors raised INSIDE the
+    voter body; we avoid that by pre-checking arity.
+    """
+    try:
+        params = inspect.signature(voter).parameters
+    except (TypeError, ValueError):
+        # Builtins or C-implemented callables — try the wider signature first.
+        try:
+            return voter(claim, context)
+        except TypeError:
+            return voter(claim)
+    positional = [
+        p
+        for p in params.values()
+        if p.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    accepts_var_args = any(
+        p.kind == inspect.Parameter.VAR_POSITIONAL for p in params.values()
+    )
+    if accepts_var_args or len(positional) >= 2:
+        return voter(claim, context)
+    return voter(claim)
+
+
 def _collect_new_votes(
-    voters: list[Callable[[Claim], Vote]],
+    voters: list[Callable[..., Vote]],
     claim: Claim,
     existing_votes_by_voter: dict[str, Vote],
+    context: str = "(none)",
 ) -> list[Vote]:
     """Run voters and keep only newly contributed, validated votes."""
     new_votes: list[Vote] = []
@@ -196,7 +237,7 @@ def _collect_new_votes(
         known_name = _known_voter_name(voter)
         if known_name and known_name in seen_voters:
             continue
-        vote = voter(claim)
+        vote = _call_voter(voter, claim, context)
         vote.validate()
         if vote.voter in seen_voters:
             continue
@@ -250,11 +291,27 @@ class GatewayTools:
     ) -> tuple[bool, bool, list[str]]:
         """Validate packet evidence and report whether any valid packet has consent."""
 
+        has_valid_packet, has_consent, errors, _packets = (
+            self._collect_provenance_state(evidence)
+        )
+        return has_valid_packet, has_consent, errors
+
+    def _collect_provenance_state(
+        self, evidence: list[EvidenceRef]
+    ) -> tuple[bool, bool, list[str], list[dict]]:
+        """Validate packets and additionally return each validated packet dict.
+
+        Used by both ``submit_claim`` (via the 3-tuple wrapper above) and
+        ``_render_voter_context`` — the latter needs the packet payloads to
+        surface digest, consent decision hash, and nested non-packet
+        evidence roots to voters.
+        """
         from packages.activity_log import provenance
 
         has_valid_packet = False
         has_consent = False
         errors: list[str] = []
+        validated_packets: list[dict] = []
         for ref in evidence:
             if ref.type != "provenance_packet":
                 continue
@@ -278,10 +335,69 @@ class GatewayTools:
                 errors.extend(result.errors)
                 continue
             has_valid_packet = True
-            has_consent = has_consent or provenance.packet_has_consent(
-                result.packet or {}
+            packet = result.packet or {}
+            has_consent = has_consent or provenance.packet_has_consent(packet)
+            if packet:
+                validated_packets.append(packet)
+        return has_valid_packet, has_consent, errors, validated_packets
+
+    def _render_voter_context(self, claim: Claim) -> str:
+        """Compose the voter-visible context string from validated packet metadata.
+
+        PR38 review thread PRRT_kwDOPkAi3s6UUuKj: the hard gate on
+        ``submit_claim`` verifies every ``provenance_packet`` evidence ref
+        (digest, signature, consent, nested non-packet evidence root) but
+        the voter prompt only rendered the top-level ``[provenance_packet]``
+        ref and a literal ``(none)`` context. Governed System/Substrate
+        claims then looked identical to broken ones from the voter's seat,
+        and the calibrated checklist forced non-positive votes even when
+        the submission was fully valid.
+
+        This method rebuilds a compact context digest voters can read:
+        one line per validated packet naming its digest, whether a
+        consent decision reference is attached, and the nested non-packet
+        evidence refs the packet transports. Non-packet evidence stays in
+        the ``Evidence:`` field of the prompt; only packet-derived context
+        goes here.
+        """
+        from packages.activity_log import provenance
+
+        try:
+            _has_packet, _has_consent, _errors, packets = (
+                self._collect_provenance_state(claim.evidence)
             )
-        return has_valid_packet, has_consent, errors
+        except Exception:  # noqa: BLE001
+            # Never let context rendering block a round; voters will see the
+            # default "(none)" and reason from the top-level Evidence field.
+            return "(none)"
+        if not packets:
+            return "(none)"
+        lines: list[str] = []
+        for packet in packets:
+            digest = packet.get("d") or "(no-digest)"
+            consent_hash: Optional[str] = None
+            nested_refs: list[str] = []
+            for entry in packet.get("a", []) or []:
+                if provenance.entry_has_consent(entry):
+                    consent_ref = entry.get("consent_ref") or {}
+                    decision = consent_ref.get("decision_action_hash")
+                    if isinstance(decision, str) and decision.strip():
+                        consent_hash = consent_hash or decision.strip()
+                for nested in entry.get("evidence_refs", []) or []:
+                    if (
+                        isinstance(nested, dict)
+                        and nested.get("type") != "provenance_packet"
+                    ):
+                        nested_type = nested.get("type", "?")
+                        nested_ref = nested.get("ref", "?")
+                        nested_refs.append(f"[{nested_type}] {nested_ref}")
+            consent_str = consent_hash if consent_hash else "(none)"
+            nested_str = "; ".join(nested_refs) if nested_refs else "(none)"
+            lines.append(
+                f"packet digest={digest} consent_ref={consent_str} "
+                f"nested_evidence={nested_str}"
+            )
+        return " | ".join(lines)
 
     # ------------------------------------------------------------------
     # Tool 1 — submit_claim
@@ -524,7 +640,12 @@ class GatewayTools:
             return _err(f"E_VOTER_BUILD_FAILED: {type(exc).__name__}: {exc}")
 
         try:
-            new_votes = _collect_new_votes(voters, claim, existing_votes_by_voter)
+            new_votes = _collect_new_votes(
+                voters,
+                claim,
+                existing_votes_by_voter,
+                context=self._render_voter_context(claim),
+            )
         except Exception as exc:  # noqa: BLE001
             return _err(f"E_CONSENSUS_FAILED: {type(exc).__name__}: {exc}")
 

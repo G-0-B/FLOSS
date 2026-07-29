@@ -32,7 +32,13 @@ from packages.orchestrator.claim_schema import (  # noqa: E402
     Vote,
 )  # noqa: E402
 
-Voter = Callable[[Claim], Vote]
+# Voter callables were originally 1-arg (Claim). PR38 review thread
+# PRRT_kwDOPkAi3s6UUuKj adds a 2nd context arg so voters can see the
+# validated provenance_packet metadata (digest, consent decision hash,
+# nested non-packet evidence roots) that submit_claim already verified.
+# Legacy 1-arg voters remain valid — GatewayTools._call_voter falls back
+# via arity inspection when a caller doesn't accept the context arg.
+Voter = Callable[..., Vote]
 
 # VOTER_PROMPT v2 (WS2 meta-prompting sweep, 2026-07-03).
 # v1 hid `evidence` and `truth_status` from voters, producing the measured
@@ -277,9 +283,9 @@ def make_omo_momus_voter(
     rather than generally vibing on the proposal.
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call the underlying model with Momus persona + standard voter prompt."""
-        user_prompt = render_voter_prompt(claim)
+        user_prompt = render_voter_prompt(claim, context)
         try:
             from litellm import completion
 
@@ -343,9 +349,9 @@ def make_omo_critic_voter(
     the standard VOTER_PROMPT as USER message.
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call the underlying model with Critic persona + standard voter prompt."""
-        user_prompt = render_voter_prompt(claim)
+        user_prompt = render_voter_prompt(claim, context)
         try:
             from litellm import completion
 
@@ -395,9 +401,9 @@ def make_litellm_voter(
     temperature: low by default; consensus prefers determinism
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call LiteLLM for one claim and normalize the provider output into a Vote."""
-        prompt = render_voter_prompt(claim)
+        prompt = render_voter_prompt(claim, context)
         try:
             from litellm import completion
 
@@ -512,9 +518,9 @@ def make_flowith_voter(
     """Build a sync Voter that queries Flowith's multi-model endpoint."""
     models = _parse_flowith_models(model)
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call Flowith for one claim and normalize the provider output into a Vote."""
-        prompt = render_voter_prompt(claim)
+        prompt = render_voter_prompt(claim, context)
         try:
             import requests
 
