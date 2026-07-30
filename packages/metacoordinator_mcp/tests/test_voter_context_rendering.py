@@ -78,8 +78,8 @@ def _make_governed_packet(
     return ref, packet
 
 
-def _claim_with_packet_ref(ref: dict) -> Claim:
-    """Build a minimal governed Claim carrying a single provenance_packet ref."""
+def _claim_with_packet_refs(refs: list[dict]) -> Claim:
+    """Build a minimal governed Claim carrying provenance-packet refs."""
     return Claim(
         proposer="claude",
         proposal_type=ProposalType.SPEC_CHANGE,
@@ -92,8 +92,14 @@ def _claim_with_packet_ref(ref: dict) -> Claim:
                 ref=ref["ref"],
                 sha256=ref.get("sha256"),
             )
+            for ref in refs
         ],
     )
+
+
+def _claim_with_packet_ref(ref: dict) -> Claim:
+    """Build a minimal governed Claim carrying one provenance-packet ref."""
+    return _claim_with_packet_refs([ref])
 
 
 def _packet_entry(
@@ -101,6 +107,7 @@ def _packet_entry(
     *,
     evidence_refs: list[dict],
     created_at: str = "2026-05-24T10:00:00Z",
+    consent_hash: str = "uhCAk" + ("a" * 32),
 ) -> dict:
     """Build a complete packet entry with a real artifact for validation."""
     artifact = workspace_root / "FLOSS" / "docs" / "specs" / "packet-artifact.md"
@@ -119,7 +126,7 @@ def _packet_entry(
         "risks": [],
         "benefits": [],
         "next_action": "submit claim",
-        "consent_ref": {"decision_action_hash": "uhCAk" + ("a" * 32)},
+        "consent_ref": {"decision_action_hash": consent_hash},
     }
 
 
@@ -278,6 +285,84 @@ def test_render_voter_context_preserves_packet_metadata_when_evidence_is_oversiz
     assert "[truncated]" in context
     assert packet["d"] in context
     assert "uhCAk" + ("a" * 32) in context
+
+
+def test_render_voter_context_reserves_both_signed_packet_headers(tmp_path):
+    """Earlier optional evidence cannot suppress a later packet header."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        packets: list[dict] = []
+        packet_refs: list[dict] = []
+        consent_hashes = ["consent-one-hash", "consent-two-hash"]
+        for packet_index, consent_hash in enumerate(consent_hashes):
+            refs = [
+                {
+                    "type": "spec",
+                    "ref": (
+                        f"packet-{packet_index}-doc-{ref_index}\n\r\t"
+                        f"{'x' * 500}.md"
+                    ),
+                }
+                for ref_index in range(16)
+            ]
+            packet, packet_path = provenance.create_packet(
+                [
+                    _packet_entry(
+                        tmp_path,
+                        evidence_refs=refs,
+                        consent_hash=consent_hash,
+                    )
+                ],
+                identity_dir=tmp_path / f"identity-{packet_index}",
+                output_root=output_root,
+                prior_digest=None,
+            )
+            packets.append(packet)
+            packet_refs.append(_packet_ref(packet_path, tmp_path))
+
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_refs(packet_refs)
+        )
+
+    assert len(context) <= 4096
+    assert "[truncated]" in context
+    for packet, consent_hash in zip(packets, consent_hashes):
+        assert packet["d"] in context
+        assert consent_hash in context
+    assert "\n" not in context
+    assert "\r" not in context
+    assert "\t" not in context
+
+
+def test_render_voter_context_fails_closed_when_packet_headers_exceed_bound(tmp_path):
+    """Unbounded top-level packet lists cannot imply partial metadata coverage."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        packet_refs: list[dict] = []
+        for packet_index in range(17):
+            consent_hash = f"consent-{packet_index:02d}-" + ("c" * 149)
+            _packet, packet_path = provenance.create_packet(
+                [
+                    _packet_entry(
+                        tmp_path,
+                        evidence_refs=[
+                            {"type": "spec", "ref": f"packet-{packet_index}.md"}
+                        ],
+                        consent_hash=consent_hash,
+                    )
+                ],
+                identity_dir=tmp_path / f"overflow-identity-{packet_index}",
+                output_root=output_root,
+                prior_digest=None,
+            )
+            packet_refs.append(_packet_ref(packet_path, tmp_path))
+
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_refs(packet_refs)
+        )
+
+    assert context == "[packet metadata exceeds 4096-character voter context limit]"
+    assert len(context) <= 4096
 
 
 def test_render_voter_context_deduplicates_before_unique_ref_budget(tmp_path):

@@ -446,31 +446,38 @@ class GatewayTools:
                     nested_refs,
                 )
             )
-        context = ""
+        context_limit = 4096
+        truncated_marker = " [truncated]"
+        full_lines = [
+            f"{header}{'; '.join(nested_refs) if nested_refs else '(none)'}"
+            for header, nested_refs in packet_contexts
+        ]
+        full_context = " | ".join(full_lines)
+        if not truncated and len(full_context) <= context_limit:
+            return full_context
+
+        mandatory_length = sum(len(header) for header, _refs in packet_contexts)
+        mandatory_length += len(" | ") * (len(packet_contexts) - 1)
+        if mandatory_length + len(truncated_marker) > context_limit:
+            return "[packet metadata exceeds 4096-character voter context limit]"
+
+        optional_budget = context_limit - mandatory_length - len(truncated_marker)
+        bounded_lines: list[str] = []
+        optional_open = True
         for header, nested_refs in packet_contexts:
-            separator = " | " if context else ""
-            if len(context) + len(separator) + len(header) > 4096:
-                truncated = True
-                break
-            context += f"{separator}{header}"
-            if not nested_refs:
-                if len(context) + len("(none)") > 4096:
-                    truncated = True
-                    break
-                context += "(none)"
-                continue
-            for index, nested_ref in enumerate(nested_refs):
-                ref_separator = "; " if index else ""
-                if len(context) + len(ref_separator) + len(nested_ref) > 4096:
-                    truncated = True
-                    break
-                context += f"{ref_separator}{nested_ref}"
-            if truncated:
-                break
-        if truncated:
-            marker = " [truncated]"
-            context = f"{context[: 4096 - len(marker)].rstrip()}{marker}"
-        return context
+            line = header
+            optional_values = nested_refs if nested_refs else ["(none)"]
+            if optional_open:
+                for index, value in enumerate(optional_values):
+                    value_separator = "; " if index else ""
+                    segment = f"{value_separator}{value}"
+                    if len(segment) > optional_budget:
+                        optional_open = False
+                        break
+                    line += segment
+                    optional_budget -= len(segment)
+            bounded_lines.append(line)
+        return f"{' | '.join(bounded_lines)}{truncated_marker}"
 
     # ------------------------------------------------------------------
     # Tool 1 — submit_claim
