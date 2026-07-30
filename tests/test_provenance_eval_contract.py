@@ -1,10 +1,12 @@
 """Regression contract for provenance-packet validation eval fixtures."""
 
+import base64
 import hashlib
 import json
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
+from packages.activity_log.provenance import _public_key_from_aid
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,21 +89,29 @@ def test_artifact_mismatch_goldens_exactly_match_false_facts() -> None:
 
 def test_ppv_dev_007_accepts_a_nontransferable_signing_aid() -> None:
     row = next(row for row in load_rows() if row["id"] == "ppv-dev-007")
+    aid = row["input"]["packet"]["i"]
 
     assert row["golden"] == {"status": "valid", "defects": ["PPV-OK"]}
     assert "valid non-transferable signing AID" in row["rationale"]
+    assert bytes(_public_key_from_aid(aid)) == base64.urlsafe_b64decode(aid[1:] + "=")
 
 
 def test_rubric_documents_the_db_aid_contract_and_oracle_facts() -> None:
-    rubric = (EVAL_DIR / "rubric.json").read_text(encoding="utf-8")
+    rubric = json.loads((EVAL_DIR / "rubric.json").read_text(encoding="utf-8"))
 
-    assert "[DB]" in rubric
-    assert "counterfactual oracle" in rubric
+    assert "^[DB][A-Za-z0-9_-]{43}$" in rubric["defect_codes"]["E-I-SHAPE"]
+    assert "counterfactual oracle" in rubric["crypto_facts_contract"]
 
 
 def test_prose_spec_documents_both_valid_signing_aid_prefixes() -> None:
-    spec = (ROOT / "docs" / "specs" / "provenance-packet.spec.md").read_text(
+    spec_lines = (ROOT / "docs" / "specs" / "provenance-packet.spec.md").read_text(
         encoding="utf-8"
-    )
+    ).splitlines()
+    aid_row = next(line for line in spec_lines if line.startswith("| `i` |"))
 
-    assert "`D` or `B`" in spec
+    assert (
+        aid_row
+        == "| `i` | string | `D` or `B` + 43-char base64url Ed25519 verify key; "
+        "`D` is transferable and `B` is non-transferable, and both are valid "
+        "signing identifiers in v1.4. |"
+    )
