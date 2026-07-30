@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -95,7 +96,12 @@ def _decision_outcome(entry_content: dict[str, Any]) -> Outcome:
 def _known_voter_name(voter: Callable[..., Vote]) -> Optional[str]:
     """Return the configured voter name when inference is purely local."""
     name = getattr(voter, "__name__", "")
-    for prefix in ("litellm_voter_", "flowith_voter_"):
+    for prefix in (
+        "litellm_voter_",
+        "flowith_voter_",
+        "omo_momus_voter_",
+        "omo_critic_voter_",
+    ):
         if name.startswith(prefix):
             return name[len(prefix) :]
     return None
@@ -235,7 +241,11 @@ def _collect_new_votes(
     seen_voters = set(existing_votes_by_voter)
     for voter in voters:
         known_name = _known_voter_name(voter)
-        if known_name and known_name in seen_voters:
+        wrapper_name = getattr(voter, "__name__", "")
+        if (
+            (known_name and known_name in seen_voters)
+            or wrapper_name in seen_voters
+        ):
             continue
         vote = _call_voter(voter, claim, context)
         vote.validate()
@@ -298,8 +308,8 @@ class GatewayTools:
 
     def _collect_provenance_state(
         self, evidence: list[EvidenceRef]
-    ) -> tuple[bool, bool, list[str], list[dict]]:
-        """Validate packets and additionally return each validated packet dict.
+    ) -> tuple[bool, bool, list[str], list[tuple[dict, Path]]]:
+        """Validate packets and additionally return each packet and resolved path.
 
         Used by both ``submit_claim`` (via the 3-tuple wrapper above) and
         ``_render_voter_context`` — the latter needs the packet payloads to
@@ -311,7 +321,7 @@ class GatewayTools:
         has_valid_packet = False
         has_consent = False
         errors: list[str] = []
-        validated_packets: list[dict] = []
+        validated_packets: list[tuple[dict, Path]] = []
         for ref in evidence:
             if ref.type != "provenance_packet":
                 continue
@@ -338,7 +348,7 @@ class GatewayTools:
             packet = result.packet or {}
             has_consent = has_consent or provenance.packet_has_consent(packet)
             if packet:
-                validated_packets.append(packet)
+                validated_packets.append((packet, packet_path))
         return has_valid_packet, has_consent, errors, validated_packets
 
     def _render_voter_context(self, claim: Claim) -> str:
@@ -373,31 +383,78 @@ class GatewayTools:
         if not packets:
             return "(none)"
         lines: list[str] = []
-        for packet in packets:
-            digest = packet.get("d") or "(no-digest)"
+        rendered_refs: set[tuple[str, str, str]] = set()
+        rendered_count = 0
+        truncated = False
+
+        def sanitize(value: object, limit: int = 240) -> str:
+            cleaned = re.sub(
+                r"\s+",
+                " ",
+                str(value)
+                .replace("\r", " ")
+                .replace("\n", " ")
+                .replace("\t", " "),
+            ).strip()
+            return cleaned[:limit]
+
+        for packet, packet_path in packets:
+            digest = sanitize(packet.get("d") or "(no-digest)", 96)
             consent_hash: Optional[str] = None
-            nested_refs: list[str] = []
             for entry in packet.get("a", []) or []:
                 if provenance.entry_has_consent(entry):
                     consent_ref = entry.get("consent_ref") or {}
                     decision = consent_ref.get("decision_action_hash")
                     if isinstance(decision, str) and decision.strip():
                         consent_hash = consent_hash or decision.strip()
-                for nested in entry.get("evidence_refs", []) or []:
-                    if (
-                        isinstance(nested, dict)
-                        and nested.get("type") != "provenance_packet"
-                    ):
-                        nested_type = nested.get("type", "?")
-                        nested_ref = nested.get("ref", "?")
-                        nested_refs.append(f"[{nested_type}] {nested_ref}")
-            consent_str = consent_hash if consent_hash else "(none)"
+            nested_refs: list[str] = []
+            try:
+                metadata_refs, packet_truncated = (
+                    provenance.validated_non_packet_evidence_refs(
+                        packet_path,
+                        workspace_root=self._workspace_root,
+                        max_refs=32,
+                    )
+                )
+                truncated = truncated or packet_truncated
+                for metadata in metadata_refs:
+                    key = (
+                        metadata["type"],
+                        metadata["ref"],
+                        metadata.get("sha256", ""),
+                    )
+                    if key in rendered_refs:
+                        continue
+                    if rendered_count >= 32:
+                        truncated = True
+                        break
+                    rendered_refs.add(key)
+                    rendered_count += 1
+                    nested_refs.append(
+                        f"[{sanitize(metadata['type'], 48)}] "
+                        f"{sanitize(metadata['ref'])}"
+                    )
+            except ValueError:
+                # The top-level packet remains validated for submission, but a
+                # changed or otherwise invalid child DAG contributes no context.
+                nested_refs = []
+            consent_str = sanitize(consent_hash, 160) if consent_hash else "(none)"
             nested_str = "; ".join(nested_refs) if nested_refs else "(none)"
             lines.append(
                 f"packet digest={digest} consent_ref={consent_str} "
                 f"nested_evidence={nested_str}"
             )
-        return " | ".join(lines)
+        context = ""
+        for line in lines:
+            separator = " | " if context else ""
+            if len(context) + len(separator) + len(line) > 4096:
+                truncated = True
+                break
+            context += f"{separator}{line}"
+        if truncated:
+            marker = " [truncated]"
+            context = f"{context[: 4096 - len(marker)].rstrip()}{marker}"
+        return context
 
     # ------------------------------------------------------------------
     # Tool 1 — submit_claim

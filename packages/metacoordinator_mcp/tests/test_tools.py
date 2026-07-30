@@ -474,6 +474,55 @@ def test_run_consensus_round_returns_json_error_on_write_failure():
         assert "disk full" in result["error"]
 
 
+def _assert_persisted_omo_voter_is_not_invoked(prefix: str, voter_id: str):
+    """Persisted OMO wrappers are skipped before their provider callable runs."""
+    calls: list[str] = []
+
+    def omo_voter(claim):
+        calls.append(claim.id)
+        return Vote(voter=voter_id, weight=0.7, rationale="must not run")
+
+    assert voter_id.startswith(prefix)
+    omo_voter.__name__ = voter_id
+
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=lambda: [omo_voter])
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="claude",
+                proposal_type="CodeChange",
+                summary="persisted OMO vote",
+                body="body",
+                blast_radius="Local",
+            )
+        )
+        cast_result = json.loads(
+            gw.cast_vote(
+                claim_id=claim_result["claim_id"],
+                voter=voter_id,
+                weight=0.7,
+                rationale="already persisted",
+            )
+        )
+        assert "error" not in cast_result, cast_result
+        result = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+
+    assert "error" not in result, result
+    assert calls == []
+
+
+def test_run_consensus_round_skips_persisted_omo_critic_voter():
+    _assert_persisted_omo_voter_is_not_invoked(
+        "omo_critic_voter_", "omo_critic_voter_critic-probe"
+    )
+
+
+def test_run_consensus_round_skips_persisted_omo_momus_voter():
+    _assert_persisted_omo_voter_is_not_invoked(
+        "omo_momus_voter_", "omo_momus_voter_momus-probe"
+    )
+
+
 # ---------------------------------------------------------------------------
 # CLI runner
 # ---------------------------------------------------------------------------

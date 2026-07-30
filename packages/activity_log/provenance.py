@@ -628,6 +628,90 @@ def validate_packet(
     )
 
 
+def validated_non_packet_evidence_refs(
+    packet_or_path: Path | str | dict[str, Any],
+    *,
+    workspace_root: Path | str | None = None,
+    provenance_root: Path | str | None = None,
+    max_depth: int = 8,
+    max_refs: int = 32,
+) -> tuple[list[dict[str, str]], bool]:
+    """Return stable validated non-packet metadata and whether it was truncated."""
+
+    root = Path(workspace_root or WORKSPACE_ROOT).resolve()
+    root_path = None if isinstance(packet_or_path, dict) else Path(packet_or_path)
+    result = validate_packet(
+        packet_or_path,
+        workspace_root=root,
+        provenance_root=provenance_root,
+        max_depth=max_depth,
+    )
+    if not result.ok:
+        raise ValueError("; ".join(result.errors))
+
+    packet = result.packet or {}
+    resolved_provenance_root = (
+        Path(provenance_root)
+        if provenance_root is not None
+        else _infer_provenance_root(root_path)
+    )
+    refs: list[dict[str, str]] = []
+    truncated = False
+    active_digests: set[str] = set()
+    visited_packets: set[str] = set()
+    ref_limit = max(0, max_refs)
+
+    def walk(current: dict[str, Any], current_path: Path | None, depth: int) -> None:
+        nonlocal truncated
+        if depth > max_depth:
+            raise ValueError("E_PROVENANCE_RECURSION_DEPTH_EXCEEDED")
+        digest = current.get("d")
+        if not isinstance(digest, str):
+            raise ValueError("E_PROVENANCE_DIGEST_MISMATCH")
+        if digest in active_digests:
+            raise ValueError("E_PROVENANCE_CYCLE_DETECTED")
+        if digest in visited_packets:
+            return
+
+        active_digests.add(digest)
+        visited_packets.add(digest)
+        try:
+            for entry in current.get("a", []) or []:
+                for evidence_ref in entry.get("evidence_refs", []) or []:
+                    if not isinstance(evidence_ref, dict):
+                        continue
+                    if evidence_ref.get("type") != "provenance_packet":
+                        if len(refs) >= ref_limit:
+                            truncated = True
+                            return
+                        metadata = {
+                            "type": str(evidence_ref["type"]),
+                            "ref": str(evidence_ref["ref"]),
+                        }
+                        if isinstance(evidence_ref.get("sha256"), str):
+                            metadata["sha256"] = evidence_ref["sha256"]
+                        refs.append(metadata)
+                        continue
+
+                    child_path = _resolve_workspace_ref(str(evidence_ref["ref"]), root)
+                    child_result = validate_packet(
+                        child_path,
+                        workspace_root=root,
+                        provenance_root=resolved_provenance_root,
+                        max_depth=max_depth,
+                    )
+                    if not child_result.ok:
+                        raise ValueError("; ".join(child_result.errors))
+                    walk(child_result.packet or {}, child_path, depth + 1)
+                    if truncated:
+                        return
+        finally:
+            active_digests.remove(digest)
+
+    walk(packet, root_path, 0)
+    return refs, truncated
+
+
 def entry_has_consent(entry: dict[str, Any]) -> bool:
     """Return True when a payload entry carries a consent decision reference."""
 

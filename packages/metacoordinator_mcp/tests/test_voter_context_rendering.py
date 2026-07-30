@@ -94,6 +94,42 @@ def _claim_with_packet_ref(ref: dict) -> Claim:
     )
 
 
+def _packet_entry(
+    workspace_root: Path,
+    *,
+    evidence_refs: list[dict],
+    created_at: str = "2026-05-24T10:00:00Z",
+) -> dict:
+    """Build a complete packet entry with a real artifact for validation."""
+    artifact = workspace_root / "FLOSS" / "docs" / "specs" / "packet-artifact.md"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text("packet artifact", encoding="utf-8")
+    return {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": created_at,
+        "human_collision_node": "anthony",
+        "artifact_refs": [
+            provenance.artifact_ref(artifact, workspace_root=workspace_root)
+        ],
+        "evidence_refs": evidence_refs,
+        "risks": [],
+        "benefits": [],
+        "next_action": "submit claim",
+        "consent_ref": {"decision_action_hash": "uhCAk" + ("a" * 32)},
+    }
+
+
+def _packet_ref(path: Path, workspace_root: Path) -> dict:
+    """Return a provenance-packet evidence reference for a written packet."""
+    return {
+        "type": "provenance_packet",
+        "ref": str(path.relative_to(workspace_root).as_posix()),
+        "sha256": provenance.sha256_file(path),
+    }
+
+
 def test_render_voter_context_returns_none_when_no_packet_evidence(tmp_path):
     with tempfile.TemporaryDirectory() as tmp:
         gw = _make_gateway(tmp, tmp_path)
@@ -125,6 +161,162 @@ def test_render_voter_context_exposes_digest_consent_and_nested_evidence(tmp_pat
     assert "consent_ref=uhCAk" in context
     assert "nested_evidence=" in context
     assert "[spec] docs/specs/provenance-packet.spec.md" in context
+
+
+def test_render_voter_context_traverses_real_signed_child_packet(tmp_path):
+    """A valid root may render a child's non-packet evidence exactly once."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        _child, child_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "child-only.md"}],
+                )
+            ],
+            identity_dir=tmp_path / "child-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        child_ref = _packet_ref(child_path, tmp_path)
+        root, root_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=[child_ref])],
+            identity_dir=tmp_path / "root-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        assert provenance.validate_packet(
+            root_path, workspace_root=tmp_path, provenance_root=output_root
+        ).ok
+
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(root_path, tmp_path))
+        )
+
+    assert root["d"] in context
+    assert "[spec] child-only.md" in context
+
+
+def test_render_voter_context_deduplicates_shared_child_evidence(tmp_path):
+    """A child cited twice contributes its validated metadata once."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        _child, child_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "shared-child.md"}],
+                )
+            ],
+            identity_dir=tmp_path / "child-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        child_ref = _packet_ref(child_path, tmp_path)
+        _root, root_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=[child_ref, child_ref])],
+            identity_dir=tmp_path / "root-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(root_path, tmp_path))
+        )
+
+    assert context.count("[spec] shared-child.md") == 1
+
+
+def test_render_voter_context_bounds_and_sanitizes_many_refs(tmp_path):
+    """Voter context is bounded, injection-safe, and explicitly truncates."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        refs = [
+            {"type": "spec", "ref": f"doc-{index}\n\t injected.md"}
+            for index in range(33)
+        ]
+        _packet, packet_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=refs)],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert "[truncated]" in context
+    assert context.count("[spec]") == 32
+    assert "\n" not in context
+    assert "\r" not in context
+    assert "\t" not in context
+    assert len(context) <= 4096
+
+
+def test_render_voter_context_omits_child_evidence_when_root_is_invalid(tmp_path):
+    """Invalid supplied packets cannot leak otherwise-valid child metadata."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        _child, child_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "do-not-render.md"}],
+                )
+            ],
+            identity_dir=tmp_path / "child-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        _root, root_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=[_packet_ref(child_path, tmp_path)])],
+            identity_dir=tmp_path / "root-identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        broken = json.loads(root_path.read_text(encoding="utf-8"))
+        broken["sigs"] = ["0B" + ("A" * 86)]
+        root_path.write_text(json.dumps(broken), encoding="utf-8")
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(
+                {
+                    "type": "provenance_packet",
+                    "ref": str(root_path.relative_to(tmp_path).as_posix()),
+                }
+            )
+        )
+
+    assert context == "(none)"
+    assert "do-not-render.md" not in context
+
+
+def test_render_voter_context_omits_child_evidence_when_depth_exceeds_limit(tmp_path):
+    """Depth-invalid evidence DAGs cannot supply voter-visible child metadata."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        _packet, packet_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "too-deep.md"}],
+                )
+            ],
+            identity_dir=tmp_path / "identity-0",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        for depth in range(1, 10):
+            _packet, packet_path = provenance.create_packet(
+                [_packet_entry(tmp_path, evidence_refs=[_packet_ref(packet_path, tmp_path)])],
+                identity_dir=tmp_path / f"identity-{depth}",
+                output_root=output_root,
+                prior_digest=None,
+            )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert context == "(none)"
+    assert "too-deep.md" not in context
 
 
 def test_render_voter_prompt_surfaces_context_in_prompt_body(tmp_path):
