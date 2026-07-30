@@ -21,7 +21,9 @@
 
 param(
     [switch]$DryRun,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [int]$MaxAgeMinutes = 20,
+    [int]$MaxCpuTotalSec = 3600
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,7 +60,9 @@ $mcpSignatures = @(
     '-m packages\.metacoordinator_mcp',
     '-m packages\.reasoning_ensemble',
     'spec-workflow-mcp',
-    '@upstash/context7-mcp'
+    '@upstash/context7-mcp',
+    'Marksman\\marksman\.exe',
+    '\.serena[\\/]language_servers'
 )
 $sigRegex = ($mcpSignatures -join '|')
 
@@ -68,13 +72,14 @@ $livePids = @{}
 foreach ($p in $allProcs) { $livePids[[int]$p.ProcessId] = $true }
 
 $candidates = $allProcs | Where-Object {
-    ($_.Name -eq 'node.exe' -or $_.Name -eq 'python.exe') -and
+    ($_.Name -eq 'node.exe' -or $_.Name -eq 'python.exe' -or $_.Name -eq 'marksman.exe') -and
     $_.CommandLine -and
     ($_.CommandLine -match $sigRegex)
 }
 
 $killed = @()
 $kept = @()
+$now = Get-Date
 foreach ($proc in $candidates) {
     $procId = [int]$proc.ProcessId
     $ppid = [int]$proc.ParentProcessId
@@ -84,18 +89,37 @@ foreach ($proc in $candidates) {
         $kept += "PROTECTED PID=$procId (daemon): $cmd"
         continue
     }
-    if ($livePids.ContainsKey($ppid) -and $ppid -gt 4) {
-        # parent still alive → this is a live harness's child, leave it
-        $kept += "LIVE-PARENT PID=$procId parent=${ppid}: $cmd"
+
+    # Age + CPU-consumed heuristic. Codex sandboxed subagents keep their
+    # parent (Codex main) alive across many spawns, so parent-alive alone
+    # correctly protected accumulating wrappers — right heuristic, wrong
+    # signal. A JanuScope wrapper legitimately spawned by an active
+    # subagent completes its polling quickly; one that's been up >20min
+    # AND has burned >1h of CPU is either stuck-polling or forgotten.
+    $liveProc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+    if (-not $liveProc) { continue }  # already died between snapshot and now
+    $ageMinutes = ($now - $liveProc.StartTime).TotalMinutes
+    $cpuSec = $liveProc.CPU
+    $parentAlive = $livePids.ContainsKey($ppid) -and $ppid -gt 4
+
+    $reason = $null
+    if (-not $parentAlive) {
+        $reason = "orphan (parent PID=$ppid dead)"
+    } elseif ($ageMinutes -gt $MaxAgeMinutes -and $cpuSec -gt $MaxCpuTotalSec) {
+        $reason = "stuck (age=$([math]::Round($ageMinutes,1))m, cpu=$([math]::Round($cpuSec,0))s, parent PID=$ppid alive but subagent leaked)"
+    }
+
+    if (-not $reason) {
+        $kept += "LIVE-CHILD PID=$procId age=$([math]::Round($ageMinutes,1))m cpu=$([math]::Round($cpuSec,0))s parent=${ppid}: $cmd"
         continue
     }
-    # Orphan (parent dead) — kill it
+
     if ($DryRun) {
-        $killed += "WOULD-KILL PID=$procId parent=$ppid (dead): $cmd"
+        $killed += "WOULD-KILL PID=$procId ${reason}: $cmd"
     } else {
         try {
             Stop-Process -Id $procId -Force -ErrorAction Stop
-            $killed += "KILLED PID=$procId parent=$ppid (dead): $cmd"
+            $killed += "KILLED PID=$procId ${reason}: $cmd"
         } catch {
             $killed += "FAIL-KILL PID=$procId ($($_.Exception.Message)): $cmd"
         }
