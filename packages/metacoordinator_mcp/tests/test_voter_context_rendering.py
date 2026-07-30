@@ -365,6 +365,32 @@ def test_render_voter_context_fails_closed_when_packet_headers_exceed_bound(tmp_
     assert len(context) <= 4096
 
 
+def test_render_voter_context_fails_closed_on_oversized_consent_hash(tmp_path):
+    """A valid oversized mandatory hash cannot be rendered as a partial value."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        consent_hash = "c" * 201
+        _packet, packet_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "oversized-hash.md"}],
+                    consent_hash=consent_hash,
+                )
+            ],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert context == "[packet metadata exceeds per-value voter context limit]"
+    assert consent_hash not in context
+    assert consent_hash[:160] not in context
+
+
 def test_render_voter_context_deduplicates_before_unique_ref_budget(tmp_path):
     """Repeated metadata cannot crowd out a later unique evidence ref."""
     with tempfile.TemporaryDirectory() as tmp:

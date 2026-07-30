@@ -386,9 +386,10 @@ class GatewayTools:
         rendered_refs: set[tuple[str, str, str]] = set()
         rendered_count = 0
         truncated = False
+        per_value_overflow = "[packet metadata exceeds per-value voter context limit]"
 
-        def sanitize(value: object, limit: int = 240) -> str:
-            cleaned = re.sub(
+        def sanitize(value: object) -> str:
+            return re.sub(
                 r"\s+",
                 " ",
                 str(value)
@@ -396,10 +397,11 @@ class GatewayTools:
                 .replace("\n", " ")
                 .replace("\t", " "),
             ).strip()
-            return cleaned[:limit]
 
         for packet, packet_path in packets:
-            digest = sanitize(packet.get("d") or "(no-digest)", 96)
+            digest = sanitize(packet.get("d") or "(no-digest)")
+            if len(digest) > 96:
+                return per_value_overflow
             consent_hash: Optional[str] = None
             for entry in packet.get("a", []) or []:
                 if provenance.entry_has_consent(entry):
@@ -431,14 +433,16 @@ class GatewayTools:
                     rendered_refs.add(key)
                     rendered_count += 1
                     nested_refs.append(
-                        f"[{sanitize(metadata['type'], 48)}] "
-                        f"{sanitize(metadata['ref'])}"
+                        f"[{sanitize(metadata['type'])[:48]}] "
+                        f"{sanitize(metadata['ref'])[:240]}"
                     )
             except ValueError:
                 # The top-level packet remains validated for submission, but a
                 # changed or otherwise invalid child DAG contributes no context.
                 nested_refs = []
-            consent_str = sanitize(consent_hash, 160) if consent_hash else "(none)"
+            consent_str = sanitize(consent_hash) if consent_hash else "(none)"
+            if len(consent_str) > 160:
+                return per_value_overflow
             packet_contexts.append(
                 (
                     f"packet digest={digest} consent_ref={consent_str} "
