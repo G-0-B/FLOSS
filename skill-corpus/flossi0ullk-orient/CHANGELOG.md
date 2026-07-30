@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.4
+
+- Split classification hygiene into required project-input and documentation-example
+  slots after injected pressure testing found a combined alternative omitted
+  explicit Quick Start exclusion.
+
+## 0.3.3
+
+- Added required Fact/Inference/Unknown and durable-write disposition slots to the
+  mandatory response skeleton.
+- Tightened nonzero-exit classification: absent output is `Unknown pending output`;
+  expected check/drift requires observed output.
+
+## 0.3.2
+
+- Moved the evidence, classification, and OmniRoute attempt/disposition templates
+  into a mandatory high-salience response skeleton.
+- Completion and any user-facing conclusion now depend on filled slots, including a
+  disposition when requests are prohibited.
+
+## 0.3.1
+
+- Refactored operational and OmniRoute guidance into required output slots after
+  post-edit tests showed incomplete evidence envelopes and attempt/disposition
+  records.
+- Added compact nonzero-exit and documentation-example classification hygiene.
+
+## 0.3.0
+
+- Added compact operational-claim contracts: functional-path probes,
+  Fact/Inference/Unknown separation, complete evidence envelopes, durable-write
+  readback, and manual OmniRoute fallback with attempt preservation, analog-vote
+  validation, verified-provider distinction, and human `CONFLICT` escalation.
+
 ## 0.2.0 — 2026-04-22
 
 ### Added
