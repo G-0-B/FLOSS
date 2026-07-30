@@ -7,7 +7,7 @@
     "date": "2026-07-03",
     "source": "synthetic"
   },
-  "crypto_facts_contract": "Text models cannot execute BLAKE3/Ed25519/JCS. Each item therefore supplies crypto_facts with the precomputed results of: signature verification over canonical bytes (sigs=[]), SAID digest recomputation, v byte-length check, and artifact re-hashing. The candidate must trust these facts and apply the spec's structural, sequencing, DAG, governed-boundary, and audit-disposition rules on top of them.",
+  "crypto_facts_contract": "This symbolic eval supplies crypto_facts as counterfactual oracle inputs because adversarial packets, such as self-referential cycles, cannot all be executable signed packets. Each item therefore supplies the oracle results for signature verification over canonical bytes (sigs=[]), SAID digest recomputation, v byte-length check, and artifact re-hashing. The candidate must apply the spec's structural, sequencing, DAG, governed-boundary, and audit-disposition rules on top of these facts; this fixture does not claim that every row replays through production cryptography.",
   "defect_codes": {
     "PPV-OK": "Packet passes strict validation.",
     "E-SIG-INVALID": "Signature does not verify over canonical bytes with sigs=[].",
@@ -15,7 +15,7 @@
     "E-V-SHAPE": "v field not of shape FLOSSI10JSON{6 hex}_ or length mismatch vs canonical bytes.",
     "E-T-NOT-PROV": "t is not the literal 'prov'.",
     "E-D-SHAPE": "d is not 'E' + 43 base64url chars.",
-    "E-I-SHAPE": "i is not 'D' + 43 base64url chars (B-prefixed ids are reserved, not usable as signing agent ids).",
+    "E-I-SHAPE": "i does not match ^[DB][A-Za-z0-9_-]{43}$; D is transferable and B is non-transferable, and both are valid signing identifiers.",
     "E-SIG-SHAPE": "sigs is not exactly one '0B' + 86 base64url string.",
     "E-SEQ-NONMONOTONIC": "s does not continue the per-agent monotonic sequence.",
     "E-P-MISSING-PRIOR": "p references a prior packet digest that does not exist in this agent's chain.",
