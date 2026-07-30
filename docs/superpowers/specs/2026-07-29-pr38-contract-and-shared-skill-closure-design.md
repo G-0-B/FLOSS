@@ -1,8 +1,8 @@
 # PR #38 Contract and Shared-Skill Closure Design
 
-**Date:** 2026-07-29  
-**Status:** ⚠️ Specified — implementation and verification have not yet landed  
-**Approved scope:** Human approval in the current task for closure items 1, 2, 3, and 5; Cloudflare explicitly excluded  
+**Date:** 2026-07-29
+**Status:** ⚠️ Specified — implementation and verification have not yet landed
+**Approved scope:** Human approval in the current task for closure items 1, 2, 3, and 5; Cloudflare explicitly excluded
 **Frozen starting head:** `705f555977e118c075ec0cccc2910bd2f5fe134a`
 
 ## Purpose
