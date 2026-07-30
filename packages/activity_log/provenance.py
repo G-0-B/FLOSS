@@ -656,6 +656,7 @@ def validated_non_packet_evidence_refs(
         else _infer_provenance_root(root_path)
     )
     refs: list[dict[str, str]] = []
+    seen_refs: set[tuple[str, str, str]] = set()
     truncated = False
     active_digests: set[str] = set()
     visited_packets: set[str] = set()
@@ -681,15 +682,23 @@ def validated_non_packet_evidence_refs(
                     if not isinstance(evidence_ref, dict):
                         continue
                     if evidence_ref.get("type") != "provenance_packet":
-                        if len(refs) >= ref_limit:
-                            truncated = True
-                            return
                         metadata = {
                             "type": str(evidence_ref["type"]),
                             "ref": str(evidence_ref["ref"]),
                         }
                         if isinstance(evidence_ref.get("sha256"), str):
                             metadata["sha256"] = evidence_ref["sha256"]
+                        metadata_key = (
+                            metadata["type"],
+                            metadata["ref"],
+                            metadata.get("sha256", ""),
+                        )
+                        if metadata_key in seen_refs:
+                            continue
+                        seen_refs.add(metadata_key)
+                        if len(refs) >= ref_limit:
+                            truncated = True
+                            continue
                         refs.append(metadata)
                         continue
 
@@ -703,8 +712,6 @@ def validated_non_packet_evidence_refs(
                     if not child_result.ok:
                         raise ValueError("; ".join(child_result.errors))
                     walk(child_result.packet or {}, child_path, depth + 1)
-                    if truncated:
-                        return
         finally:
             active_digests.remove(digest)
 

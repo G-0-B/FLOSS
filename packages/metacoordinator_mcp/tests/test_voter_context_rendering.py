@@ -14,6 +14,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 FLOSS_ROOT = Path(__file__).resolve().parents[3]
 if str(FLOSS_ROOT) not in sys.path:
     sys.path.insert(0, str(FLOSS_ROOT))
@@ -250,6 +252,123 @@ def test_render_voter_context_bounds_and_sanitizes_many_refs(tmp_path):
     assert "\r" not in context
     assert "\t" not in context
     assert len(context) <= 4096
+
+
+def test_render_voter_context_preserves_packet_metadata_when_evidence_is_oversized(
+    tmp_path,
+):
+    """Evidence truncation cannot erase the packet digest or consent hash."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        refs = [
+            {"type": "spec", "ref": f"doc-{index}-{'x' * 500}.md"}
+            for index in range(32)
+        ]
+        packet, packet_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=refs)],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert len(context) <= 4096
+    assert "[truncated]" in context
+    assert packet["d"] in context
+    assert "uhCAk" + ("a" * 32) in context
+
+
+def test_render_voter_context_deduplicates_before_unique_ref_budget(tmp_path):
+    """Repeated metadata cannot crowd out a later unique evidence ref."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        duplicate = {"type": "spec", "ref": "duplicate.md"}
+        refs = [dict(duplicate) for _ in range(32)]
+        refs.append({"type": "spec", "ref": "later-unique.md"})
+        _packet, packet_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=refs)],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert context.count("[spec] duplicate.md") == 1
+    assert context.count("[spec] later-unique.md") == 1
+    assert "[truncated]" not in context
+
+
+def test_cyclic_packet_traversal_returns_and_renders_no_evidence(
+    tmp_path, monkeypatch
+):
+    """A cycle hidden beyond the ref budget invalidates all derived metadata."""
+    root_path = tmp_path / "cycle-root.json"
+    child_path = tmp_path / "cycle-child.json"
+    root_path.write_text("{}", encoding="utf-8")
+    child_path.write_text("{}", encoding="utf-8")
+
+    root_packet = {
+        "d": "cycle-root-digest",
+        "a": [
+            {
+                "consent_ref": {"decision_action_hash": "cycle-consent-hash"},
+                "evidence_refs": [
+                    *[
+                        {"type": "spec", "ref": f"cycle-leak-{index}.md"}
+                        for index in range(33)
+                    ],
+                    {"type": "provenance_packet", "ref": child_path.name},
+                ],
+            }
+        ],
+    }
+    child_packet = {
+        "d": "cycle-child-digest",
+        "a": [
+            {
+                "evidence_refs": [
+                    {"type": "provenance_packet", "ref": root_path.name}
+                ]
+            }
+        ],
+    }
+
+    def fake_validate(packet_or_path, **_kwargs):
+        packet = (
+            child_packet
+            if Path(packet_or_path).name == child_path.name
+            else root_packet
+        )
+        return provenance.PacketValidation(
+            ok=True,
+            packet_digest=packet["d"],
+            packet=packet,
+        )
+
+    monkeypatch.setattr(provenance, "validate_packet", fake_validate)
+
+    with pytest.raises(ValueError, match="E_PROVENANCE_CYCLE_DETECTED"):
+        provenance.validated_non_packet_evidence_refs(
+            root_path,
+            workspace_root=tmp_path,
+            max_refs=32,
+        )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(
+                {"type": "provenance_packet", "ref": root_path.name}
+            )
+        )
+
+    assert "cycle-root-digest" in context
+    assert "cycle-consent-hash" in context
+    assert "nested_evidence=(none)" in context
+    assert "cycle-leak" not in context
 
 
 def test_render_voter_context_omits_child_evidence_when_root_is_invalid(tmp_path):

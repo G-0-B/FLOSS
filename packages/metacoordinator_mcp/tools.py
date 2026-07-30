@@ -382,7 +382,7 @@ class GatewayTools:
             return "(none)"
         if not packets:
             return "(none)"
-        lines: list[str] = []
+        packet_contexts: list[tuple[str, list[str]]] = []
         rendered_refs: set[tuple[str, str, str]] = set()
         rendered_count = 0
         truncated = False
@@ -439,18 +439,34 @@ class GatewayTools:
                 # changed or otherwise invalid child DAG contributes no context.
                 nested_refs = []
             consent_str = sanitize(consent_hash, 160) if consent_hash else "(none)"
-            nested_str = "; ".join(nested_refs) if nested_refs else "(none)"
-            lines.append(
-                f"packet digest={digest} consent_ref={consent_str} "
-                f"nested_evidence={nested_str}"
+            packet_contexts.append(
+                (
+                    f"packet digest={digest} consent_ref={consent_str} "
+                    "nested_evidence=",
+                    nested_refs,
+                )
             )
         context = ""
-        for line in lines:
+        for header, nested_refs in packet_contexts:
             separator = " | " if context else ""
-            if len(context) + len(separator) + len(line) > 4096:
+            if len(context) + len(separator) + len(header) > 4096:
                 truncated = True
                 break
-            context += f"{separator}{line}"
+            context += f"{separator}{header}"
+            if not nested_refs:
+                if len(context) + len("(none)") > 4096:
+                    truncated = True
+                    break
+                context += "(none)"
+                continue
+            for index, nested_ref in enumerate(nested_refs):
+                ref_separator = "; " if index else ""
+                if len(context) + len(ref_separator) + len(nested_ref) > 4096:
+                    truncated = True
+                    break
+                context += f"{ref_separator}{nested_ref}"
+            if truncated:
+                break
         if truncated:
             marker = " [truncated]"
             context = f"{context[: 4096 - len(marker)].rstrip()}{marker}"
