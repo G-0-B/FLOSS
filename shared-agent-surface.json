@@ -97,26 +97,11 @@
         "flossi0ullk-*"
       ],
       "mcp_servers": [
-        "serena",
         "flossiullk-consensus",
         "flossiullk-reasoning-ensemble",
         "agentmemory"
       ],
       "server_overrides": {
-        "serena": {
-          "args": [
-            "--from",
-            "git+https://github.com/oraios/serena",
-            "serena",
-            "start-mcp-server",
-            "--project",
-            "${repo_root}",
-            "--enable-web-dashboard=false",
-            "--open-web-dashboard=false"
-          ],
-          "startup_timeout_sec": 20,
-          "tool_timeout_sec": 120
-        },
         "flossiullk-consensus": {
           "startup_timeout_sec": 20,
           "tool_timeout_sec": 120,

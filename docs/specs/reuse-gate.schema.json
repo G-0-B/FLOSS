@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floss://specs/reuse-gate.schema.json",
+  "title": "Reuse block for spec-registry entries (ADR-18 Prior-Art & Reuse Gate)",
+  "description": "Optional per-entry block in FLOSS/docs/specs/spec-registry.json. Required (fail-closed) for entries with tier 1 or 2, unless emergency=true, in which case it is required before promotion/generalization.",
+  "type": "object",
+  "required": ["capability", "search_date", "candidates", "verdict", "irreducible_delta"],
+  "properties": {
+    "capability": {
+      "type": "string",
+      "description": "One-sentence statement of the capability being introduced."
+    },
+    "search_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of the prior-art search (YYYY-MM-DD). Evidence older than evidence_window_days fails --check."
+    },
+    "evidence_window_days": {
+      "type": "integer",
+      "default": 120,
+      "description": "Freshness window. Default 120 (operator-set 2026-07-16)."
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "truth_status"],
+        "properties": {
+          "name": { "type": "string" },
+          "version": { "type": "string" },
+          "license": { "type": "string" },
+          "maintenance": { "type": "string" },
+          "platform_fit": { "type": "string" },
+          "probe": {
+            "type": "string",
+            "description": "Result of a direct probe, or 'not_probed: <reason>'. Tier-2 compose/build verdicts require >=1 probed candidate."
+          },
+          "truth_status": { "enum": ["Verified", "Specified", "Unverified"] }
+        }
+      }
+    },
+    "verdict": { "enum": ["adopt", "extend", "compose", "build"] },
+    "irreducible_delta": {
+      "type": "string",
+      "description": "What remains custom, stated as capability subtraction; <=5 sentences; must be testable."
+    },
+    "rejected_because": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Requirement-by-candidate gaps, each carrying its truth status inline."
+    },
+    "reviewer": {
+      "type": "string",
+      "description": "Tier 2: reviewing surface + model family, distinct from proposer's family. Use voter profile 'reuse-review'."
+    },
+    "expiry_or_retest_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Mirrors ADR-17 open-review fields; re-scan trigger."
+    }
+  }
+}
