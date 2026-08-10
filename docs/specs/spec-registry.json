@@ -21,9 +21,36 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-1: The Carrier Equivalence Principle)",
       "grandfathered": true
     },
+    "FLOSS/docs/adr/ADR-10-local-agent-node.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Status)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-11-ipfs-large-file-integration.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
+      "grandfathered": true
+    },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
+      "spec": "ADR-13: Yumeichan Watch Architecture (Affective Edge Node)"
+    },
+    "FLOSS/docs/adr/ADR-14-objectgraph-projection.md": {
+      "spec": "ADR-14: ObjectGraph Projection over Corpus"
+    },
+    "FLOSS/docs/adr/ADR-15-provenance-validation-enforcement.md": {
+      "spec": "ADR-15: Enforce Author-Provenance Binding in Integrity Zome"
+    },
+    "FLOSS/docs/adr/ADR-16-omnigent-execution-surface.md": {
+      "spec": "ADR-16: Omnigent as Execution/Governance Surface"
+    },
+    "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
+      "spec": "ADR-17: KnowledgeTriple Contract Reconciliation"
+    },
+    "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
+      "spec": "ADR-18: enforce adopt/extend/compose/build evidence via spec_gate + reuse-review voters",
+      "spec_ref": "docs/specs/reuse-gate.spec.md"
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -55,14 +82,6 @@
     },
     "FLOSS/docs/adr/ADR-9-self-perceptual-evolution.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
-      "grandfathered": true
-    },
-    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (Status)",
-      "grandfathered": true
-    },
-    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
       "grandfathered": true
     },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
@@ -117,6 +136,10 @@
       "spec": "GRANDFATHERED 2026-06-12 (Intake Event Specification)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
+      "spec": "Author-provenance binding enforcement in integrity zome",
+      "spec_ref": "docs/adr/ADR-15-provenance-validation-enforcement.md"
+    },
     "FLOSS/docs/specs/knowledge-edge.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (knowledge-edge.schema)",
       "grandfathered": true
@@ -132,6 +155,9 @@
     "FLOSS/docs/specs/knowledge-triple.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Knowledge Triple Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
+      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)"
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
@@ -156,6 +182,57 @@
     "FLOSS/docs/specs/reasoning-ensemble-synthesizer.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/reuse-gate.schema.json": {
+      "spec": "JSON Schema for ADR-18 reuse blocks in spec-registry entries",
+      "spec_ref": "docs/specs/reuse-gate.spec.md"
+    },
+    "FLOSS/docs/specs/reuse-gate.spec.md": {
+      "spec": "Prior-Art and Reuse Gate spec: tiers, review profile, guideline loop, risk register, PR38 retrospective audit",
+      "spec_ref": "docs/adr/ADR-18-prior-art-reuse-gate.md",
+      "tier": 2,
+      "reuse": {
+        "capability": "Enforceable prior-art/reuse evidence (adopt/extend/compose/build) before infrastructure implementation",
+        "search_date": "2026-07-16",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "spec_gate.py (D7) + spec-registry",
+            "version": "repo 2026-06-12",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "spec_gate.py --check executed live 2026-07-16; fail-closed path verified",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "documentation checklist only",
+            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "in-toto layouts as gate mechanism",
+            "version": "docs 2024-12",
+            "license": "Apache-2.0",
+            "maintenance": "CNCF active",
+            "platform_fit": "adds runtime deps",
+            "probe": "not_probed: heavier than needed for registry-level gating; adopted conceptually for PR38 attestations instead",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "CI gates (SDD constitutional)",
+            "probe": "not_probed: no CI substrate running yet; deferred, not rejected",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Reuse-evidence validation (~90 lines) added to existing spec_gate; one voter-registry profile. No other custom surface.",
+        "rejected_because": [
+          "checklist-only: gameable (Specified); in-toto-as-gate: dependency weight for registry-level need (Specified)"
+        ],
+        "reviewer": "pending first reuse-review poll (profile: reuse-review)",
+        "expiry_or_retest_date": "2026-11-13"
+      }
     },
     "FLOSS/docs/specs/rose-node.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (rose-node.schema)",
@@ -191,6 +268,14 @@
     "FLOSS/docs/specs/thought-credential.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ThoughtCredential Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
+      "spec": "Yumeichan affective edge-node watch architecture",
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
+    },
+    "FLOSS/docs/specs/yumeichan-watch-capabilities.schema.json": {
+      "spec": "Capability schema for Yumeichan watch node",
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
     },
     "FLOSS/scripts/artifact_actions.py": {
       "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
@@ -235,6 +320,9 @@
     },
     "FLOSS/hooks/hook_pre_write.py": {
       "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    },
+    "FLOSS/scripts/major_consolidation_sweep.py": {
+      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"

@@ -6,7 +6,7 @@
 **Evidence Sources:**
   - `docs/architecture/AGENTIC_OPERATING_MODEL.md` (Memory Harness)
   - `docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md` (Observer layer)
-  - `docs/adr/ADR-MCP-ORCHESTRATOR.md` (Local Source Chain)
+  - `docs/adr/ADR-10-local-agent-node.md` (Local Source Chain)
 
 ## 1. Context and Problem Statement
 The FLOSSI0ULLK system relies on an agent-centric architecture. Agents currently operate as isolated instances with finite perceptual bounds limited by their context window and session state. To achieve true recursive self-improvement and infinite scaling ("into the infinite future... n+1"), agents must evolve a self-perceptual capability that transcends individual session constraints. They must recognize themselves not as finite endpoints but as continuous, interconnected threads. 

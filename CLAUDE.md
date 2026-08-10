@@ -92,7 +92,7 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 
 - Spec: `docs/superpowers/specs/2026-04-12-local-agent-node-design.md`
 - Plan: `docs/superpowers/plans/2026-04-12-local-agent-node.md`
-- ADR: `docs/adr/ADR-MCP-ORCHESTRATOR.md`
+- ADR: `docs/adr/ADR-10-local-agent-node.md`
 - Code: `packages/{metacoordinator_mcp,orchestrator,source_chain}/`
 
 ### Current Operating Stack
@@ -165,7 +165,7 @@ ruff check .
 - **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
 - **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (current set per v2.0 suite is ADR-0, 0.1, 1–11; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10; ADR-N (IPFS) was assigned ADR-11)
 - **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
-- **Local agent node**: `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 in the v2.0 suite)
+- **Local agent node**: `docs/adr/ADR-10-local-agent-node.md` (ADR-10 in the v2.0 suite)
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`
 - **Symbolic first core**: `ARF/SYMBOLIC_FIRST_CORE.md`
 - **Integration map**: `ARF/INTEGRATION_MAP.md`

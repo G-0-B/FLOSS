@@ -11,7 +11,7 @@ truth_status:
   adoption: "Not performed"
 compared_sources:
   - "Holo-RBI Recursive Event Swarm synthesis (chat paste, 2026-07-07, provenance: external AI session over user-uploaded papers)"
-  - "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md (ADR-10)"
+  - "FLOSS/docs/adr/ADR-10-local-agent-node.md (ADR-10)"
   - "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md"
   - "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md"
   - "FLOSS/docs/research/2026-05-18-conductor-paper-metaharness-implications.md"

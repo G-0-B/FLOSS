@@ -13,6 +13,12 @@ Scope (v0.1) — friction lands ONLY where canon status is claimed:
 
 Registry: FLOSS/docs/specs/spec-registry.json (hand-edited source of truth).
 
+Reuse gate (ADR-18, operator-approved 2026-07-16, shape B+C): entries carrying
+`"tier": 1|2` must also carry a `reuse` block (adopt/extend/compose/build
+evidence per docs/specs/reuse-gate.schema.json); `--check` fails closed on
+missing/stale/invalid blocks. `"emergency": true` downgrades to a warning
+until promotion. Tier-2 compose/build verdicts require >=1 direct probe.
+
 Wiring (both, per Anthony 2026-06-12):
     1. Audit path  — `python FLOSS/scripts/spec_gate.py --check` (exit 1 on any
        unregistered gated artifact; run alongside materializer --check sweeps;
@@ -24,13 +30,14 @@ Wiring (both, per Anthony 2026-06-12):
 Modes:
     --check               fail-closed audit (default)
     --path <p>            print advisory for one path; always exit 0 (hook use)
-    --add <p> --spec "…"  register an artifact [--spec-ref <doc>]
+    --add <p> --spec "…"  register an artifact [--spec-ref <doc>] [--tier 1|2]
     --list                dump registry entries
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import sys
 from pathlib import Path
@@ -48,6 +55,18 @@ EXEMPT_SEGMENTS = (
     "/archive/",
 )
 EXEMPT_NAMES = ("INDEX.md", ".gitignore", "__init__.py")
+
+# ADR-18 Prior-Art & Reuse Gate (shape B+C, operator-approved 2026-07-16).
+# Schema: docs/specs/reuse-gate.schema.json · Spec: docs/specs/reuse-gate.spec.md
+EVIDENCE_WINDOW_DAYS = 120  # operator-set 2026-07-16
+REUSE_REQUIRED_KEYS = (
+    "capability",
+    "search_date",
+    "candidates",
+    "verdict",
+    "irreducible_delta",
+)
+REUSE_VERDICTS = ("adopt", "extend", "compose", "build")
 
 
 def _normalize(path_str: str | Path) -> str | None:
@@ -92,7 +111,15 @@ def advisory_note(path_str: str | Path) -> str | None:
         registry = load_registry()
         if "load_error" in registry:
             return f"spec-gate: registry unreadable ({registry['load_error']})"
-        if rel in registry.get("entries", {}):
+        entry = registry.get("entries", {}).get(rel)
+        if entry is not None:
+            tier = entry.get("tier")
+            if tier in (1, 2) and "reuse" not in entry and not entry.get("emergency"):
+                return (
+                    f"reuse-gate (ADR-18): `{rel}` is tier {tier} but carries no "
+                    f"reuse block — record adopt/extend/compose/build evidence in "
+                    f"spec-registry.json (schema: docs/specs/reuse-gate.schema.json)"
+                )
             return None
         return (
             f"spec-gate: `{rel}` is on a gated surface but has no spec stub in "
@@ -117,6 +144,55 @@ def _gated_artifacts() -> list[str]:
     return found
 
 
+def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
+    """Validate an entry's reuse block (ADR-18). Returns (fails, warns)."""
+    tier = entry.get("tier")
+    if tier not in (1, 2):
+        return [], []
+    reuse = entry.get("reuse")
+    if not isinstance(reuse, dict):
+        if entry.get("emergency"):
+            return [], [
+                f"{rel}: emergency artifact without reuse record — retrospective "
+                f"audit required before promotion/generalization"
+            ]
+        return [f"{rel}: tier {tier} artifact has no reuse block"], []
+    fails: list[str] = []
+    missing_keys = [k for k in REUSE_REQUIRED_KEYS if k not in reuse]
+    if missing_keys:
+        fails.append(f"{rel}: reuse block missing keys: {', '.join(missing_keys)}")
+    verdict = reuse.get("verdict")
+    if verdict is not None and verdict not in REUSE_VERDICTS:
+        fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")
+    raw_date = str(reuse.get("search_date", ""))
+    try:
+        age = (_dt.date.today() - _dt.date.fromisoformat(raw_date)).days
+    except ValueError:
+        fails.append(f"{rel}: reuse search_date {raw_date!r} is not YYYY-MM-DD")
+    else:
+        window = int(reuse.get("evidence_window_days", EVIDENCE_WINDOW_DAYS))
+        if age > window:
+            fails.append(
+                f"{rel}: reuse evidence stale ({age}d > {window}d window) — "
+                f"re-run the scan"
+            )
+    if tier == 2 and verdict in ("compose", "build"):
+        candidates = reuse.get("candidates") or []
+        probed = [
+            c
+            for c in candidates
+            if isinstance(c, dict)
+            and c.get("probe")
+            and not str(c["probe"]).strip().lower().startswith("not_probed")
+        ]
+        if not probed:
+            fails.append(
+                f"{rel}: tier 2 {verdict!r} verdict requires >=1 direct probe "
+                f"(anti-gaming, ADR-18)"
+            )
+    return fails, []
+
+
 def run_check() -> int:
     registry = load_registry()
     if "load_error" in registry:
@@ -125,24 +201,45 @@ def run_check() -> int:
     entries = registry.get("entries", {})
     missing = [rel for rel in _gated_artifacts() if rel not in entries]
     stale = [rel for rel in entries if not (WORKSPACE_ROOT / rel).exists()]
+    reuse_fails: list[str] = []
+    reuse_warns: list[str] = []
+    for rel, entry in entries.items():
+        fails, warns = _reuse_problems(rel, entry)
+        reuse_fails.extend(fails)
+        reuse_warns.extend(warns)
     for rel in missing:
         print(f"SPEC-GATE MISSING {rel}")
     for rel in stale:
         print(f"SPEC-GATE STALE   {rel} (registered but absent — prune or restore)")
-    if missing:
-        print(
-            f"\nSPEC-GATE FAIL: {len(missing)} unregistered gated artifact(s). "
-            f"Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\""
-        )
+    for msg in reuse_warns:
+        print(f"SPEC-GATE REUSE-WARN {msg}")
+    for msg in reuse_fails:
+        print(f"SPEC-GATE REUSE-FAIL {msg}")
+    if missing or reuse_fails:
+        parts = []
+        if missing:
+            parts.append(
+                f"{len(missing)} unregistered gated artifact(s) — register with: "
+                f'python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>"'
+            )
+        if reuse_fails:
+            parts.append(
+                f"{len(reuse_fails)} reuse-gate violation(s) (ADR-18) — see "
+                f"docs/specs/reuse-gate.spec.md"
+            )
+        print("\nSPEC-GATE FAIL: " + "; ".join(parts))
         return 1
     print(
-        f"SPEC-GATE OK: {len(entries)} registered, 0 missing"
+        f"SPEC-GATE OK: {len(entries)} registered, 0 missing, 0 reuse violations"
         + (f", {len(stale)} stale (non-fatal)" if stale else "")
+        + (f", {len(reuse_warns)} emergency reuse warning(s)" if reuse_warns else "")
     )
     return 0
 
 
-def run_add(path_str: str, spec: str, spec_ref: str | None) -> int:
+def run_add(
+    path_str: str, spec: str, spec_ref: str | None, tier: int | None = None
+) -> int:
     rel = _normalize(path_str)
     if rel is None:
         print(f"spec-gate: {path_str} is outside the workspace")
@@ -157,6 +254,8 @@ def run_add(path_str: str, spec: str, spec_ref: str | None) -> int:
     entry: dict = {"spec": spec.strip()}
     if spec_ref:
         entry["spec_ref"] = spec_ref
+    if tier is not None:
+        entry["tier"] = tier
     registry.setdefault("entries", {})[rel] = entry
     registry["entries"] = dict(sorted(registry["entries"].items()))
     REGISTRY_PATH.write_text(
@@ -173,6 +272,12 @@ def main() -> int:
     parser.add_argument("--add", help="Register a gated artifact")
     parser.add_argument("--spec", help="One-line spec stub for --add")
     parser.add_argument("--spec-ref", help="Optional pointer to a fuller spec doc")
+    parser.add_argument(
+        "--tier",
+        type=int,
+        choices=(1, 2),
+        help="Reuse-gate tier for --add (ADR-18): 1 = evidence record, 2 = + review",
+    )
     parser.add_argument("--list", action="store_true", help="Dump registry entries")
     args = parser.parse_args()
 
@@ -185,7 +290,7 @@ def main() -> int:
         if not args.spec:
             print("spec-gate: --add requires --spec \"<one-line intent>\"")
             return 1
-        return run_add(args.add, args.spec, args.spec_ref)
+        return run_add(args.add, args.spec, args.spec_ref, args.tier)
     if args.list:
         registry = load_registry()
         for rel, entry in registry.get("entries", {}).items():

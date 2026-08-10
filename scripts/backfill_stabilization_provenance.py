@@ -65,7 +65,7 @@ COMMITS = [
             {"type": "commit", "ref": "8bfd4f8"},
         ],
         "risks": [
-            "Pending file renames flagged (ADR-MCP-ORCHESTRATOR.md -> ADR-10, ADR-N-IPFS -> ADR-11) leave dual references in canon.",
+            "Pending file renames flagged (ADR-10-local-agent-node.md -> ADR-10, ADR-N-IPFS -> ADR-11) leave dual references in canon.",
             "ADR-2 evidence drift preserved verbatim, not silently rewritten — must be patched as separate work.",
         ],
         "benefits": [

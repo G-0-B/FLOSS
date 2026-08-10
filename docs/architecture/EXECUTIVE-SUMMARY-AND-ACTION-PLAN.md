@@ -45,7 +45,7 @@
 
 | Document | Size | Purpose | Read Time |
 |----------|------|---------|-----------|
-| **ADR-N-IPFS-Integration-VVS.md** | 23KB | Complete ADR with implementation roadmap | 30 min |
+| **ADR-11-ipfs-large-file-integration.md** | 23KB | Complete ADR with implementation roadmap | 30 min |
 | **AD4M-hREA-Integration-Analysis.md** | 22KB | Deep dive on semantic + economic layers | 25 min |
 | **Fractal-Coordination-Patterns.md** | 19KB | Visual guide to fractal composability | 20 min |
 | **FLOSSIOULLK-Alignment-Verification.md** | 28KB | Compliance verification + gap analysis | 35 min |
@@ -440,7 +440,7 @@ This specification represents:
 ---
 
 **All Documents Available**:
-- [ADR-N-IPFS-Integration-VVS.md](computer:///mnt/user-data/outputs/ADR-N-IPFS-Integration-VVS.md) - Complete technical spec
+- [ADR-11-ipfs-large-file-integration.md](computer:///mnt/user-data/outputs/ADR-11-ipfs-large-file-integration.md) - Complete technical spec
 - [AD4M-hREA-Integration-Analysis.md](computer:///mnt/user-data/outputs/AD4M-hREA-Integration-Analysis.md) - Semantic + economic layers
 - [Fractal-Coordination-Patterns.md](computer:///mnt/user-data/outputs/Fractal-Coordination-Patterns.md) - Visual composability guide
 - [FLOSSIOULLK-Alignment-Verification.md](computer:///mnt/user-data/outputs/FLOSSIOULLK-Alignment-Verification.md) - Ecosystem compliance

@@ -35,7 +35,7 @@
 
 ### Forces a comparison
 
-- **ISEK 6-stage protocol (Publish → Discover → Recruit → Execute → Settle → Feedback)** vs **FLOSSI0ULLK Claim/Vote/Source-Chain protocol** ([`ADR-10`](../adr/ADR-MCP-ORCHESTRATOR.md)). Both are coordination-fabric designs for billions-of-agents scale. ISEK has Web3 tokenomics ($ISEK); FLOSSI0ULLK explicitly rejects tokens per [`project-omo-momus-voter`](../agent-memory/project/omo-momus-voter.md) lineage. The comparison is structural — worth a research note before next ADR-10 amendment.
+- **ISEK 6-stage protocol (Publish → Discover → Recruit → Execute → Settle → Feedback)** vs **FLOSSI0ULLK Claim/Vote/Source-Chain protocol** ([`ADR-10`](../adr/ADR-10-local-agent-node.md)). Both are coordination-fabric designs for billions-of-agents scale. ISEK has Web3 tokenomics ($ISEK); FLOSSI0ULLK explicitly rejects tokens per [`project-omo-momus-voter`](../agent-memory/project/omo-momus-voter.md) lineage. The comparison is structural — worth a research note before next ADR-10 amendment.
 - **Hu + Rong "Sovereign Body" (DePIN + TEE)** vs **FLOSSI0ULLK Layer 0 + Layer 4.5**. They put cryptographic autonomy at the substrate via DePIN; we put it at the source chain via Holochain + the consensus gateway. Same goal (cryptographic independence from corporate/state override), different substrate. Spot-check before adopting DePIN ideas wholesale.
 
 ### Surfaces a gap → new lane

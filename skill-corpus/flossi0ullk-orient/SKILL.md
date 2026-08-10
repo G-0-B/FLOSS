@@ -1,10 +1,64 @@
 ---
 name: flossi0ullk-orient
 description: Use when starting work in the FLOSSI0ULLK workspace, re-orienting after context loss, or deciding which canonical docs and corpora to load first before deeper research or code changes.
-version: 0.2.0
+version: 0.3.4
 ---
 
 # FLOSSI0ULLK Orientation
+
+## Mandatory response/output skeleton
+
+For any orientation that returns a user-facing conclusion, emit this skeleton in
+order and fill every required slot. Orientation is incomplete, and no user-facing
+conclusion may be returned, until these slots are present.
+
+```text
+Evidence envelope
+cwd: <absolute cwd | Unknown>
+commit: <full SHA | not a Git worktree | Unknown>
+command: <exact command | not run>
+output: <relevant observed output | not observed>
+truth status: <✅ Verified | ⚠️ Specified | 🔮 Aspirational | ❌ Blocked | Unknown>
+falsifier: <specific next observation that would overturn this conclusion>
+Fact: <observed artifact or output>
+Inference: <conclusion and its assumptions>
+Unknown: <not observed or not established>
+
+Classification hygiene
+project input: <observed project evidence | none>
+documentation examples: <excluded list | none>
+exit: <success — observed output | expected check/drift — observed output | failure — observed output | Unknown pending output>
+
+Durable-write disposition
+attempted: <attempted | not attempted>
+record id: <durable record identity | none | Unknown>
+readback command: <exact command | not run>
+readback result: <matched identity/content | mismatch | not observed>
+status: <✅ Verified | ❌ Blocked>
+
+OmniRoute attempts: <none — requests prohibited/not run | one block per actual request>
+OmniRoute attempt (repeat only for each actual request)
+attempt: <request identifier>
+intended provider / model / family: <catalog target | Unknown>
+actual provider / model / family: <response identity | no response | Unknown>
+family independence: <independent | same family as <attempt> | Unknown>
+command or request: <exact invocation | not run>
+outcome: <success | failed | partial | not run>
+result or error: <observed result/error | not observed>
+analog vote: <number | no vote>
+vote validation: <valid in [-0.999, +0.999] | invalid | no vote>
+
+OmniRoute disposition
+successful independent families: <family list and count | none>
+failed or partial attempts: <complete attempt-id list | none>
+polarization: <configured condition met | not met | threshold Unknown>
+disposition: <CONSENSUS | BLOCKED | CONFLICT — human resolution>
+```
+
+Skipped or prohibited operations fill their slots with `not run`, `none`, and
+`Unknown` as applicable; the OmniRoute disposition remains required. Absent command
+output **MUST** fill `Unknown pending output`; expected check/drift classification
+requires observed output.
 
 Regain orientation on **minimum tokens, maximum verifiability**. Read nothing before you know what is present and fresh.
 
@@ -49,6 +103,34 @@ python FLOSS/scripts/context_router.py "<query>" --format markdown --limit 4
 ```
 
 Open **only the top-routed corpus roots**. If the router is absent or errors, fall back to `references/entry-points.md` in this skill.
+
+### Step 2.5 — Prove operational claims (when applicable)
+
+Health, catalog, and configuration checks prove only those surfaces. Before calling
+an operational path ready, run its smallest safe intended operation and preserve the
+result. Keep claims separate:
+
+| Label | Meaning |
+| --- | --- |
+| Fact | Observed command output or readback. |
+| Inference | Conclusion drawn from facts; name its assumptions. |
+| Unknown | Not observed; do not upgrade it to a claim. |
+
+A health/catalog/configuration result without a successful functional-path probe is
+`⚠️ Specified` or `Unknown`, not `✅ Verified` operational readiness.
+
+For an authorized durable write, immediately read back the durable record and match
+its identity and required content. If readback is absent, mismatched, or fails, mark
+the write `❌ Blocked`/unverified; do not report it as saved.
+
+### Step 2.6 — Manual OmniRoute fallback
+
+Use this only when the packaged reasoning ensemble is unavailable or does not meet
+the task's roster requirement. Catalog entries fill the intended-provider slot; a
+successful recorded response fills the verified actual-provider slot. `CONSENSUS`
+requires at least three successful independent model families with valid analog votes.
+A met strong-polarization condition fills `CONFLICT — human resolution`; an
+unspecified threshold fills `threshold Unknown` and `BLOCKED`.
 
 ### Step 3 — Escalate (T2)
 
@@ -122,5 +204,24 @@ Before closing the task, answer:
 
 ## Changelog
 
+- **0.3.4** — Split classification hygiene into required project-input and
+  documentation-example slots after injected pressure testing found a combined
+  alternative omitted explicit Quick Start exclusion.
+- **0.3.3** — Added required Fact/Inference/Unknown and durable-write disposition
+  slots to the mandatory response skeleton. Tightened nonzero-exit classification:
+  absent output is `Unknown pending output`; expected check/drift requires observed
+  output.
+- **0.3.2** — Moved the evidence, classification, and OmniRoute attempt/disposition
+  templates into a mandatory high-salience response skeleton. Completion and any
+  user-facing conclusion now depend on filled slots, including a disposition when
+  requests are prohibited.
+- **0.3.1** — Refactored operational and OmniRoute guidance into required output
+  slots after post-edit tests showed incomplete evidence envelopes and attempt/
+  disposition records. Added compact nonzero-exit and documentation-example
+  classification hygiene.
+- **0.3.0** — Added compact operational-claim contracts: functional-path probes,
+  fact/inference/unknown separation, complete evidence envelopes, durable-write
+  readback, and manual OmniRoute fallback with attempt preservation, analog-vote
+  validation, verified-provider distinction, and human `CONFLICT` escalation.
 - **0.2.0** — Added Step 0 probe, token-budget tiers, failure ladder, manual fallback, self-audit. Tightened rules. Shipped missing `references/entry-points.md` and `scripts/orient_probe.py`.
 - **0.1.0** — Initial checklist.

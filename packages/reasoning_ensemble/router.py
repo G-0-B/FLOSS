@@ -57,7 +57,7 @@ SPECS, ADRS, AND RELATED RESEARCH (the WHY-it-works-this-way chain)
   LSM-Override — the Router implements `[auth:structural]` reasoning
   with explicit refusal handoff to Synthesizer for ensemble work)
 - Decision-grade peer:
-  `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10, the consensus gateway
+  `docs/adr/ADR-10-local-agent-node.md` (ADR-10, the consensus gateway
   is decision-grade; this Router is reasoning-grade — different
   retention and stakes)
 - Consent enforcement (substrate-class peer):

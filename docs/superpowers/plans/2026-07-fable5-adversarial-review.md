@@ -10,7 +10,7 @@ updated: "2026-07-03"
 supersedes: []
 truth_status: "Verified"   # for the findings' factual observations — each carries file/commit evidence; fixes are Proposed
 evidence_sources:
-  - "Live reads 2026-07-03: Kernel v1.3.1, spine-v0.5.md, SDD-Master-Spec-0.22.md, ADR-MCP-ORCHESTRATOR.md, 2026-05-26-holochain-0.7-migration.md, docs/adr/INDEX.md, FLOSSI0ULLK-ADR-Suite-v2.0.md"
+  - "Live reads 2026-07-03: Kernel v1.3.1, spine-v0.5.md, SDD-Master-Spec-0.22.md, ADR-10-local-agent-node.md, 2026-05-26-holochain-0.7-migration.md, docs/adr/INDEX.md, FLOSSI0ULLK-ADR-Suite-v2.0.md"
   - "WS0 verification block: docs/research/2026-05-15-working-todo-list.md §A.000"
   - "Live test runs 2026-07-03: gateway 147/147; native zomes 25/25; wasm32 cargo check exit 0"
   - "PR G-0-B/FLOSS#25 (MERGED 2026-06-16, 227 files, +29213/-5092)"
@@ -69,7 +69,7 @@ Kernel §11 and Spine §1 rank "SDD Master Spec" **above** ADRs. On paper, this 
 
 ### F5 — ADR-10 / gateway evidence staleness cluster — **MEDIUM**
 
-**Defect.** (a) `ADR-MCP-ORCHESTRATOR.md` Context: "32/32 tests passing" — live count 2026-07-03 is **147/147**; root CLAUDE.md layer table repeats "32/32 per ADR-10". Stale-low numbers still misinform sizing/risk judgments. (b) The ADR body still centers in-memory state + 5-tool registry; the 2026-04-16 note redirects to the file-based source chain but the un-annotated Context section is what gets quoted. (c) ADR-2 still carries the pre-MVP "round-trip unvalidated" note (WS0 phase-list item 3) — pending evidence reconciliation.
+**Defect.** (a) `ADR-10-local-agent-node.md` Context: "32/32 tests passing" — live count 2026-07-03 is **147/147**; root CLAUDE.md layer table repeats "32/32 per ADR-10". Stale-low numbers still misinform sizing/risk judgments. (b) The ADR body still centers in-memory state + 5-tool registry; the 2026-04-16 note redirects to the file-based source chain but the un-annotated Context section is what gets quoted. (c) ADR-2 still carries the pre-MVP "round-trip unvalidated" note (WS0 phase-list item 3) — pending evidence reconciliation.
 
 **Smallest fix.** Dated evidence-refresh lines: one in ADR-10's note ("test count 147/147 as of 2026-07-03; see packages/"), one in each CLAUDE.md table. Fold the ADR-2 evidence patch into the next ADR-suite touch rather than a standalone edit.
 

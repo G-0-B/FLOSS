@@ -5,14 +5,14 @@
 ```yaml
 # --- UpgradableArtifact Header (self-describing) ---
 id: "flossi0ullk-master-metaprompt"
-version: "1.3.1"
+version: "1.3.2"
 kind: "coordination_kernel"
 status: "Accepted"
-updated: "2026-03-11"
-supersedes: ["1.3.0", "1.2.0", "1.1.0", "1.0.0"]
+updated: "2026-07-16"
+supersedes: ["1.3.1", "1.3.0", "1.2.0", "1.1.0", "1.0.0"]
 truth_status: "verified"  # This kernel is in active production use
 evidence_sources:
-  - "ADR-003: Metaprompt Kernelization (rationale for v1.2)"
+  - "ADR-3: Metaprompt Kernelization (rationale for v1.2)"
   - "Project-Spine-FLOSSIOULLK_v0_5.md (governance integration)"
   - "2+ months production use across multi-AI collective"
 upgrade_path: "Propose via ADR -> test 1 week -> promote or rollback"
@@ -238,7 +238,7 @@ End each substantive reply with:
 |----------|---------|
 | ADR-0 | Recognition Protocol — conversation as coordination |
 | ADR-1 | Carrier Equivalence Principle |
-| ADR-003 | Metaprompt Kernelization (rationale for this format) |
+| ADR-3 | Metaprompt Kernelization (rationale for this format) |
 | Project Spine v0.5 | Invariants + enforcement + upgrade mechanics |
 | SDD Master Spec v0.22 | Architecture requirements + module boundaries |
 | AGENTS.md | Repository-level agent norms |
@@ -259,6 +259,10 @@ The protocol is the conversation. The system builds itself.
 
 ---
 
+**Changelog v1.3.2 (from v1.3.1):**
+- Updated internal references from legacy ADR-003 to ADR-3 per the ADR indexing standards.
+- Replaced references to legacy labels to align with project-wide ADR v2.0 consolidation numbering.
+
 **Changelog v1.3.1 (from v1.3.0):**
 - Added pre-decision spectrum mapping requirement to Section 5 — ternary system now does double duty: analysis lens (show -1/0/+1 outcome space) then decision gate (commit a position)
 - Sourced from cross-system comparison: ChatGPT project instructions surfaced gap where v1.3.0 jumped from lenses to decision without requiring the full outcome spectrum be visible first
@@ -274,4 +278,4 @@ The protocol is the conversation. The system builds itself.
 - Converted pure YAML sections to readable markdown tables where clarity improved
 - Removed ecosystem component descriptions (belong in appendix docs, not kernel)
 - Tightened from ~140 lines (v1.2) to ~120 enforceable lines (target: <100 next iteration)
-- Status: ADR-003 updated from PROPOSED to reference this version
+- Status: ADR-3 updated from PROPOSED to reference this version

@@ -2,7 +2,7 @@
   "manifest_version": "0.1.0",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
-  "updated": "2026-05-25",
+  "updated": "2026-07-16",
   "outputs": {
     "registry": ".agent-surface/harness/ai-roster.json",
     "markdown": ".agent-surface/harness/AI_ROSTER.md",
@@ -104,6 +104,10 @@
     {
       "id": "workspace-gemini",
       "path": "GEMINI.md"
+    },
+    {
+      "id": "antigravity-harness-gates",
+      "path": ".agent/rules/floss-harness-gates.md"
     },
     {
       "id": "agentmemory-operator",

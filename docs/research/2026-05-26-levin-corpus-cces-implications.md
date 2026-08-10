@@ -27,7 +27,7 @@ The Levin Corpus is the strongest n+3 substrate evidence we have for the "biolog
 The source's "Implications for Your Architecture" §  surfaces three claims that map directly to FLOSSI0ULLK substrate:
 
 1. **Holochain validation rules ≅ bioelectric morphogenetic attractor.** Validation rules don't specify path-to-valid-state; they specify what valid states look like. Agents navigate from arbitrary initial conditions. (Holochain integrity zomes per [`ADR-2`](../adr/ADR-2-holochain-substrate.md) work exactly this way — this isomorphism is verifiable, not metaphorical.)
-2. **Multi-AI consensus gateway ≅ heterarchical cortical wave coordination.** No privileged "controller" voter; coordination emerges from mutual constraint across voter families. Maps cleanly to the [`ADR-10`](../adr/ADR-MCP-ORCHESTRATOR.md) passive-router design + analog vote model.
+2. **Multi-AI consensus gateway ≅ heterarchical cortical wave coordination.** No privileged "controller" voter; coordination emerges from mutual constraint across voter families. Maps cleanly to the [`ADR-10`](../adr/ADR-10-local-agent-node.md) passive-router design + analog vote model.
 3. **Causal integration ≠ task performance.** Levin MT3 ratchet: causal integration *persists and compounds* even when specific learned content is lost. Implication for FLOSSI0ULLK: metric we should track on our substrate is **causal integration across the 8-layer stack** (mutual information / cross-layer dependence), not per-component task perf. This is a candidate new spec.
 
 ## New research/engineering questions surfaced for the working-todo

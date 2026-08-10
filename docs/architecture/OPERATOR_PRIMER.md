@@ -2,10 +2,10 @@
 
 ```yaml
 id: "flossi0ullk-operator-primer"
-version: "0.2.0"
+version: "0.3.0"
 kind: "operator_primer"
 status: "Active"
-updated: "2026-07-08"
+updated: "2026-07-16"
 truth_status: "Specified with verified runtime anchors"
 evidence_sources:
   - "INDEX.md"
@@ -161,7 +161,7 @@ not repeat the code-first sequence unless explicitly marked as emergency work.
 
 As of 2026-07-08, high-leverage work is:
 
-1. **ADR-17 KnowledgeTriple contract reconciliation** — the Phase 1 primary deliverable. Land D1/D2 gates (signed-gradient confidence, enum-now/URI-later predicates); review `valid_context`/`known_failures`/`expiry_or_retest_date` fields before hardening (working-todo §A.0000).
+1. **ADR-17 KnowledgeTriple contract reconciliation** — the Phase 1 primary deliverable. `valid_context`/`known_failures`/`expiry_or_retest_date` fields have been successfully implemented and landed. Pending: Land D1/D2 gates (signed-gradient confidence, enum-now/URI-later predicates).
 2. **ADR-12 action-time governed-pattern enforcement**, then harden DID/header binding; gate Substrate-class ratification on Sweettest e2e + cross-frame validation.
 3. **spec_gate adoption** (`FLOSS/scripts/spec_gate.py` + `docs/specs/spec-registry.json`) — the D7 "−1 layer" spec-gate is built; wire it into routine change discipline so artifacts are spec'd before they're built.
 4. **Sweettest migration** — port deprecated `ARF/tests/tryorama/*.test.ts` scenarios to Rust Sweettest (in-process conductor; sidesteps hc 0.6.1 pairing gap).

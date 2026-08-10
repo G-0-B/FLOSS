@@ -79,7 +79,7 @@ Per ADR-12 §4:
 - **CFIS v0.3 4-tier authority + LSM-Override:** `FLOSS/docs/architecture/CFIS_v0.3.md` (the `tourist_observe` mode operationalizes the `[auth:tourist]` tier)
 - **Resonance kernel P1-P5:** `resonance_mechanism_v2.md` §P3 (selective coupling function is the substrate-physics analog of consent)
 - **Positive Alignment paper §"Paternalism Problem":** `FLOSS/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md` §4.2 (citation anchor for the consented-guidance-vs-technocratic-imposition distinction)
-- **ADR-10 Consensus Gateway:** `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` (gateway routes ConsentPayloads same as Claims; both are append-only entry types)
+- **ADR-10 Consensus Gateway:** `FLOSS/docs/adr/ADR-10-local-agent-node.md` (gateway routes ConsentPayloads same as Claims; both are append-only entry types)
 - **Companion ADR-13 Steward Vote:** named-but-undrafted; structurally a special case of ADR-12 with collective `decider_did`
 
 ---

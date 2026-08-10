@@ -200,7 +200,7 @@
 
 ### Key Paradigm Shifts / Vision
 
-* **Orchestration**: Integration of local agent nodes (`packages/metacoordinator_mcp/`) with a meta-coordinator, as described in `docs/adr/ADR-MCP-ORCHESTRATOR.md`, is a key paradigm shift.
+* **Orchestration**: Integration of local agent nodes (`packages/metacoordinator_mcp/`) with a meta-coordinator, as described in `docs/adr/ADR-10-local-agent-node.md`, is a key paradigm shift.
 * **System Integration**: The Four-System Integration Analysis (`docs/research/4-4-26-FLOSSI0ULLK-Four-System-Integration-Analysis.md`) highlights the importance of harmonizing different systems.
 
 ### Architectural Constraints or Invariants

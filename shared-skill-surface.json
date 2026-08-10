@@ -141,6 +141,150 @@
    "upstreams": [
     "community/claude-reflect"
    ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/recall",
+   "category": "continuity",
+   "summary": "Hybrid BM25 + vector + graph search over agentmemory's past observations, sessions, and learnings. Plane A, trust-tier 4 \u2014 never overrides repo canon.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/recall)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/agentmemory-remember",
+   "category": "continuity",
+   "summary": "Save an insight, decision, or learning to agentmemory's long-term store with searchable concept tags. Renamed from upstream's bare `remember` to avoid colliding with this corpus's existing cross-session handoff-note skill of the same name.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/remember)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/forget",
+   "category": "continuity",
+   "summary": "Delete specific agentmemory observations after showing them and getting explicit confirmation. Destructive; delete-by-id only, never a bare session.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/forget)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/session-history",
+   "category": "observability",
+   "summary": "Clean reverse-chronological timeline of recent agentmemory sessions for this project. Distinct from this corpus's `session-report` (Claude Code token-usage retrospective).",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/session-history)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-brainstorming",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-dispatching-parallel-agents",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-executing-plans",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-finishing-a-development-branch",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-receiving-code-review",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-requesting-code-review",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-subagent-driven-development",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-systematic-debugging",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-test-driven-development",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-using-git-worktrees",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-using-superpowers",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-verification-before-completion",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-writing-plans",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus\\superpowers-writing-skills",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
   }
  ]
 }
