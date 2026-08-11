@@ -9,7 +9,7 @@ created: "2026-07-16"
 truth_status: "Specified; --check enforcement Verified on landing"
 schema: "reuse-gate.schema.json"
 adr: "docs/adr/ADR-18-prior-art-reuse-gate.md"
-design: "C:/~shit/2026-07-16-prior-art-reuse-gate-design-proposal.md (root intake, non-canonical)"
+design: "docs/research/intake_raw/2026-08-10-root/reports/2026-07-16-prior-art-reuse-gate-design-proposal.md (non-canonical; relocated from workspace root 2026-08-10)"
 approval: "Operator (Anthony) 2026-07-16: shape B+C; 120-day evidence window; voter roster reuse-review profile; retrospective PR38 audit"
 ```
 

@@ -10,7 +10,7 @@ date: "2026-07-16"
 generator: "claude-fable-5"
 supersedes: []
 relates_to: ["ADR-4 (SDD)", "ADR-10 (consensus gateway)", "ADR-17 (open-review field convention)", "D7 spec_gate 2026-06-12"]
-design_record: "C:/~shit/2026-07-16-prior-art-reuse-gate-design-proposal.md + 2026-07-16-prior-art-reuse-gate-continuation.md (root intake)"
+design_record: "docs/research/intake_raw/2026-08-10-root/reports/2026-07-16-prior-art-reuse-gate-design-proposal.md (relocated from workspace root 2026-08-10) + .toilet/2026-07-16-prior-art-reuse-gate-continuation.md (Codex packet, still in .toilet pending a later intake pass)"
 ```
 
 ## Context
