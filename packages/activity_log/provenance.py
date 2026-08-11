@@ -349,6 +349,57 @@ def _find_packet_by_digest(provenance_root: Path | None, digest: str) -> Path | 
     return matches[0] if matches else None
 
 
+def _has_valid_same_position_competitor(
+    packet: dict[str, Any],
+    *,
+    packet_path: Path | None,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    max_depth: int,
+    depth: int,
+) -> bool:
+    """Return whether another independently valid packet occupies this position."""
+
+    if provenance_root is None or not provenance_root.exists():
+        return False
+
+    current_path = packet_path.resolve() if packet_path is not None else None
+    chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
+    packet_digest = packet.get("d")
+    candidates = sorted(
+        provenance_root.rglob("*.json"), key=lambda path: path.as_posix()
+    )
+    for candidate_path in candidates:
+        try:
+            if current_path is not None and candidate_path.resolve() == current_path:
+                continue
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("d") == packet_digest:
+            # Exact-digest copies are duplicate evidence, not competing successors.
+            continue
+        if (
+            candidate.get("i"),
+            candidate.get("p"),
+            candidate.get("s"),
+        ) != chain_position:
+            continue
+        competitor = validate_packet(
+            candidate_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            max_depth=max_depth,
+            _depth=depth,
+            _skip_same_position_fork_check=True,
+        )
+        if competitor.ok:
+            return True
+    return False
+
+
 def _public_key_from_aid(aid: str) -> VerifyKey:
     if not isinstance(aid, str) or not aid.startswith(("D", "B")):
         raise ValueError("E_PROVENANCE_BAD_AID")
@@ -521,6 +572,7 @@ def validate_packet(
     max_depth: int = 8,
     _seen: set[str] | None = None,
     _depth: int = 0,
+    _skip_same_position_fork_check: bool = False,
 ) -> PacketValidation:
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
@@ -642,6 +694,20 @@ def validate_packet(
             max_depth=max_depth,
         )
     )
+
+    if (
+        not errors
+        and not _skip_same_position_fork_check
+        and _has_valid_same_position_competitor(
+            packet,
+            packet_path=packet_path,
+            workspace_root=root,
+            provenance_root=prov_root,
+            max_depth=max_depth,
+            depth=_depth,
+        )
+    ):
+        errors.append("E_PROVENANCE_CHAIN_FORK")
 
     return PacketValidation(
         ok=not errors,

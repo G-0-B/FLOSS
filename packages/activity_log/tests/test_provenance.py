@@ -437,6 +437,197 @@ def test_discontinuous_prior_sequence_is_rejected(tmp_path, monkeypatch):
     assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in result.errors
 
 
+def test_same_agent_same_prior_and_sequence_fork_is_rejected(tmp_path, monkeypatch):
+    """Two valid signed successors at one chain position are both rejected."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "id"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-11T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "prior",
+    }
+    prior, _prior_path = provenance.create_packet(
+        [entry],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    first, first_path = provenance.create_packet(
+        [{**entry, "created_at": "2026-08-11T00:00:01Z", "next_action": "first"}],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    second = json.loads(json.dumps(first))
+    second["a"][0]["next_action"] = "second"
+    second_bytes = _resign_packet(second, identity_dir=identity_dir)
+    second_path = first_path.with_name(f"{second['d']}.json")
+    second_path.write_bytes(second_bytes)
+
+    assert first["i"] == second["i"] == prior["i"]
+    assert first["p"] == second["p"] == prior["d"]
+    assert first["s"] == second["s"] == "1"
+    assert first["d"] != second["d"]
+
+    results = [
+        provenance.validate_packet(
+            path, workspace_root=tmp_path, provenance_root=output_root
+        )
+        for path in (first_path, second_path)
+    ]
+
+    assert [(result.ok, result.errors) for result in results] == [
+        (False, ["E_PROVENANCE_CHAIN_FORK"]),
+        (False, ["E_PROVENANCE_CHAIN_FORK"]),
+    ]
+
+
+@pytest.mark.parametrize(
+    "sibling_kind",
+    [
+        "unreadable",
+        "malformed",
+        "forged",
+        "bad-digest",
+        "discontinuous",
+        "invalid-payload",
+    ],
+)
+def test_invalid_same_position_sibling_does_not_poison_valid_packet(
+    tmp_path, monkeypatch, sibling_kind
+):
+    """A file drop is not a fork unless the sibling independently validates."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "id"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-11T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "prior",
+    }
+    prior, _prior_path = provenance.create_packet(
+        [entry],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    valid, valid_path = provenance.create_packet(
+        [{**entry, "created_at": "2026-08-11T00:00:01Z", "next_action": "valid"}],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    sibling_path = valid_path.with_name(f"000-{sibling_kind}.json")
+
+    if sibling_kind == "unreadable":
+        sibling_path.write_text("{", encoding="utf-8")
+    elif sibling_kind == "malformed":
+        sibling_path.write_text(
+            json.dumps({"i": valid["i"], "p": prior["d"], "s": "1"}),
+            encoding="utf-8",
+        )
+    elif sibling_kind == "forged":
+        sibling = json.loads(json.dumps(valid))
+        sibling["a"][0]["next_action"] = "forged"
+        sibling["d"] = "E" + ("f" * 43)
+        sibling_path.write_bytes(provenance.canonical_bytes(sibling) + b"\n")
+    else:
+        sibling = json.loads(json.dumps(valid))
+        sibling["a"][0]["next_action"] = sibling_kind
+        if sibling_kind == "bad-digest":
+            _resign_packet(sibling, identity_dir=identity_dir)
+            sibling["d"] = "E" + ("b" * 43)
+            identity = provenance.load_or_create_identity(identity_dir)
+            sibling["sigs"] = []
+            signature = identity.signing_key.sign(
+                provenance._signing_bytes(sibling)
+            ).signature
+            sibling["sigs"] = ["0B" + provenance._b64url_encode(signature)]
+            sibling_bytes = provenance.canonical_bytes(sibling) + b"\n"
+        else:
+            if sibling_kind == "discontinuous":
+                sibling["s"] = "3"
+            else:
+                del sibling["a"][0]["claim_type"]
+            sibling_bytes = _resign_packet(sibling, identity_dir=identity_dir)
+        sibling_path = valid_path.with_name(f"{sibling['d']}.json")
+        sibling_path.write_bytes(sibling_bytes)
+
+    result = provenance.validate_packet(
+        valid_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+    sibling_result = provenance.validate_packet(
+        sibling_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is True, result.errors
+    assert sibling_result.ok is False
+
+
+def test_duplicate_copy_of_exact_digest_is_not_a_fork(tmp_path, monkeypatch):
+    """The same signed packet at a second path remains duplicate evidence."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "id"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-11T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "prior",
+    }
+    provenance.create_packet(
+        [entry],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    _packet, packet_path = provenance.create_packet(
+        [{**entry, "created_at": "2026-08-11T00:00:01Z", "next_action": "valid"}],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    duplicate_path = output_root / "duplicate" / packet_path.name
+    duplicate_path.parent.mkdir()
+    duplicate_path.write_bytes(packet_path.read_bytes())
+
+    results = [
+        provenance.validate_packet(
+            path, workspace_root=tmp_path, provenance_root=output_root
+        )
+        for path in (packet_path, duplicate_path)
+    ]
+
+    assert [(result.ok, result.errors) for result in results] == [
+        (True, []),
+        (True, []),
+    ]
+
+
 @pytest.mark.parametrize(
     ("sequence", "expected_error"),
     [
