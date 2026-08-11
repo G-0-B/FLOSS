@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-07-16 (Doc drift sweep and ADR-17 consolidation)
+**Last refreshed:** 2026-08-10 (Root-drop consolidation pass — see A.000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -9,6 +9,66 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 ---
 
 ## Section A — Immediate threads (this session or next)
+
+### A.000000 Root-drop consolidation backlog (2026-08-10)
+
+Merged and deduplicated from four sources that had been tracking the same work separately: `CONTEXT.yaml.delta.next_actions` (11 `now` + 4 `later`), `HANDOFF.md` lanes A–D, the 2026-07-07 intake map's distillation queue (7 items), and open items harvested from Ember Seed Pack `02`/`03` before that pack was relocated. Landed here per the standing rule *"update, do not create a parallel one."*
+
+Provenance: `docs/research/2026-08-10-root-intake-digestion.md`, ledger `.agent-surface/intake/root-intake-moves-2026-08-10.json`.
+
+**P0 — blocking**
+
+1. **Rotate the `ow_mcp_at_…` bearer token** at app.openworklabs.com and de-inline it from `opencode.jsonc:22`. Verified never committed (`git log -S` empty) — exposure is working-tree-only, on one disk — but `opencode.jsonc` is tracked, so it cannot be committed until this is done.
+2. **Rotate the six provider keys** in `.hermes/plans/artifacts/omni-providers-before.json` (`sk-…` ×4, `gsk_…`). Untracked; blocks tracking any of `.hermes/`.
+3. ~~Working-tree triage, both repos~~ — **DONE 2026-08-10.** Root 137 → single digits; FLOSS salvage tree committed to `wip/salvage-20260804`.
+4. **FLOSS is 6 behind / 94 AHEAD of `origin/main`**, and `wip/salvage-20260804` has no upstream. ~2 months of work exists only on this machine. Push or merge; this is a data-loss exposure, not a staleness one.
+
+**P1 — keystone (each unblocks several others)**
+
+5. **ADR-12 consent anchoring.** Blocks provenance delta D1, ADR-19 ratification, and every governed binding.
+6. **ADR-15 implementation.** Semgrep HIGH ×2; unconditional `Ok(Valid)` in `BudgetEntry.validate()`. Needs `cargo test` + human review — not an agent edit. Confirm the author accessor against hdi 0.7.1 (tripwire T6).
+7. **Rebase and merge PR #38.** Correction on record: it is docs-only and stacks cleanly on #36.
+8. ~~Commit the untracked canon files INDEX.md cites~~ — **DONE 2026-08-10** (`9f18f07`): ADR-10, ADR-11, ADR-18, YUMEICHAN_ARCHITECTURE, Rose Forest spec.
+
+**P2 — bookkeeping**
+
+9. **`spec_gate --check` fails: 6 unregistered artifacts** — `refresh_agent_surfaces.py`, `research_log.py`, `start_mcp_daemons.ps1`, `stop_mcp_daemons.ps1`, `sweep_mcp_orphans.ps1`, `docs/adr/ADR-19-omniroute-inference-plane.md`.
+10. **4 dead `FLOSS/hooks/…` entries in `spec-registry.json`** — hooks moved off the gated surface in `cc216f8`, so `--check` cannot see this rot. Needs a deliberate edit.
+11. ~~Repoint the stale `context_views` root-intake source~~ — supersede the 2026-05-19 pointer with `2026-08-10-root-intake-digestion.md`.
+12. **ADR-7 relicense reconciliation** — LICENSE, artifact headers, manifests, README badge; Compassion Clause → `CODE_OF_CONDUCT.md`. Not a new ADR.
+13. **`spec-registry.json` `updated` field says 2026-06-12** but contains 2026-07-16 entries.
+14. **Backfill ADR-18 reuse blocks** for architecture-class registry entries, or record the coverage gap (91/92 missing).
+15. **Triage the PR backlog** — #37/#35/#34/#27/#26 (dependabot), #32/#31/#30 (deepsource), #33 (CodeQL), #29 (branch = main, inspect). Note `origin/main` now carries **PR #40** (`2c1db43`, 2026-08-02), later than anything this backlog was organized around.
+16. **Gate `ARF/**` or relocate its loose root docs.**
+17. **Write the PR size cap** (~15 files / 72 h) into `AGENTS.md`.
+18. **Shadow directories** — `docs/ADRs/` holds `ADR-2-*` and `ADR-3-*` that **collide by number** with the real ADR-2/ADR-3; `docs/specifications/` holds one stray yaml. Both unindexed and ungated. Likely destination `archive/` — these *are* superseded canonical docs, so archive is correct here.
+19. **27 unreviewed drafts** in `docs/knowledge_log/staging/`, all untracked. Review or expire.
+20. **PR #25 vs PR #36 discrepancy** — the v1.4 verification report cites #25 as merged 2026-06-16; the merged 2026-08-04 correction attributes that date to #36. One is wrong; needs authenticated repo access. Flagged in-place in the report.
+
+**P3 — runtime**
+
+21. **Fix `watch_intake.py`** — it does not exclude `node_modules`, so any run re-floods the queue (the 1.23M-event incident). Also decide the no-PDF gap. **Do this before item 22.**
+22. **Restart the heartbeat**, PYTHONPATH-clean, per A.00000's canonical invocation.
+23. **Heartbeat service runner** decision (Servy recipe + clean env).
+24. **M13** via `@holochain/client@0.19.3`.
+25. **`ConversationMemory.from_dict`** API reconciliation.
+26. **`loop_stdout.log`** dead surface — archive.
+
+**P4 — structural / long-horizon**
+
+27. **Generate `CONTEXT.yaml` from repo state.** Retires the entire drift error class; it is `0.5.0` on the artifact's own upgrade path.
+28. **Arkology Studio outreach** — the only non-code `now` item, flagged "long overdue".
+29. **Distillation queue.** First: `whites_resonance_corrections_critical_analysis.md` (2026-07-08, now in `intake_raw/2026-08-10-root/reports/`) — the strongest undigested critique in the tree; its Holochain findings are checkable against official docs. Then the memory-spine adversarial verification. Then the carried 2026-07-07 queue: permeable-shells reduction test, UTN v0.3 dogfooding, Peony doula MVP, anti-sycophancy/anti-dependence metrics, capability-token coverage audit, Self-Harness paper digestion, Carse → governance vocabulary.
+30. **Locate or declare-gone** the "antigravity" batch intake script.
+31. **Kernel §11d follow-through** — v1.4.0 now carries the doc-discipline clause and the explicit rescission of "integrate everything everywhere". Apply it: the next new doc should absorb or retire an old one.
+
+**Open questions (unanswered — do not guess)**
+
+- Does `evals/provenance_packet_validation/rubric.json` already cover delta items D1–D6?
+- Do the `_pr38_*` / `_codex_pr38_*` working dirs fold into intake once PR #38 lands? They are currently the evidence base for ADR-18's PR38 counterfactual.
+- Is the deferred AD4M/RDF mapping still blocked? Its stated blocker (ADR-numbering reconciliation) largely resolved with the ADR-10/11 renames.
+
+**Never unless evidence changes** — a fourth greenfield restart; Radicle-canonical migration; a bespoke provenance format where in-toto / SLSA / C2PA fits.
 
 ### A.00000 Heartbeat runtime repair + intake-flood quarantine (2026-07-07, Hermes session)
 

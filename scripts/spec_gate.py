@@ -6,7 +6,7 @@ that visible: every artifact on a GATED surface must carry a one-line spec
 stub in the registry, or `--check` fails closed.
 
 Scope (v0.1) — friction lands ONLY where canon status is claimed:
-    GATED:  FLOSS/scripts/*, FLOSS/docs/specs/*, FLOSS/docs/adr/*
+    GATED:  FLOSS/scripts/*, FLOSS/hooks/*, FLOSS/docs/specs/*, FLOSS/docs/adr/*
     EXEMPT: workspace root, docs/research/ (incl. intake_raw), docs/agent-memory/,
             .agent-surface/, tests/, caches — intake mouths and continuation/seed
             artifacts are definitionally pre-spec and NEVER gated.
@@ -46,7 +46,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE_ROOT = REPO_ROOT.parent
 REGISTRY_PATH = REPO_ROOT / "docs" / "specs" / "spec-registry.json"
 
-GATED_SURFACES = ("FLOSS/scripts", "FLOSS/docs/specs", "FLOSS/docs/adr")
+# Keep in sync with `gated_surfaces` in FLOSS/docs/specs/spec-registry.json.
+# That field is documentation; THIS tuple is what --check actually walks. They
+# drifted once already: hooks moved out of scripts/ in cc216f8 (2026-07-26) and
+# their four registry entries went silently unenforced until 2026-08-10.
+GATED_SURFACES = (
+    "FLOSS/scripts",
+    "FLOSS/hooks",
+    "FLOSS/docs/specs",
+    "FLOSS/docs/adr",
+)
 EXEMPT_SEGMENTS = (
     "/__pycache__/",
     "/scripts/tests/",

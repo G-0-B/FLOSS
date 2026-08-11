@@ -1,9 +1,10 @@
 {
   "version": "0.1.0",
-  "updated": "2026-06-12",
+  "updated": "2026-08-10",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
+    "FLOSS/hooks",
     "FLOSS/docs/specs",
     "FLOSS/docs/adr"
   ],
@@ -51,6 +52,10 @@
     "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
       "spec": "ADR-18: enforce adopt/extend/compose/build evidence via spec_gate + reuse-review voters",
       "spec_ref": "docs/specs/reuse-gate.spec.md"
+    },
+    "FLOSS/docs/adr/ADR-19-omniroute-inference-plane.md": {
+      "spec": "ADR-19: OmniRoute as the inference-routing plane",
+      "spec_ref": "docs/adr/ADR-19-omniroute-inference-plane.md"
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -277,6 +282,24 @@
       "spec": "Capability schema for Yumeichan watch node",
       "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
     },
+    "FLOSS/hooks/README.md": {
+      "spec": "Operator note describing what each hook fires on and how to disable one"
+    },
+    "FLOSS/hooks/agentmemory_client.py": {
+      "spec": "Thin REST client the hooks use to read/write the local agentmemory service"
+    },
+    "FLOSS/hooks/hook_bg_round.py": {
+      "spec": "Detached background consensus-round runner spawned by hook_post_write"
+    },
+    "FLOSS/hooks/hook_post_write.py": {
+      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
+    },
+    "FLOSS/hooks/hook_pre_write.py": {
+      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    },
+    "FLOSS/hooks/session_start_inject.py": {
+      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
+    },
     "FLOSS/scripts/artifact_actions.py": {
       "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
     },
@@ -311,15 +334,6 @@
     "FLOSS/scripts/heartbeat_slate.py": {
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
-    },
-    "FLOSS/hooks/hook_bg_round.py": {
-      "spec": "Detached background consensus-round runner spawned by hook_post_write"
-    },
-    "FLOSS/hooks/hook_post_write.py": {
-      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
-    },
-    "FLOSS/hooks/hook_pre_write.py": {
-      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
     },
     "FLOSS/scripts/major_consolidation_sweep.py": {
       "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
@@ -360,11 +374,14 @@
       "spec": "Intake event consolidator over the claim-by-rename queue",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
     },
+    "FLOSS/scripts/refresh_agent_surfaces.py": {
+      "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
+    },
+    "FLOSS/scripts/research_log.py": {
+      "spec": "Appends dated research-log entries to the shared research register"
+    },
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
-    },
-    "FLOSS/hooks/session_start_inject.py": {
-      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/smoke_test_gateway.py": {
       "spec": "Smoke test: consensus gateway end-to-end"
@@ -378,6 +395,15 @@
     "FLOSS/scripts/spec_gate.py": {
       "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",
       "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+    },
+    "FLOSS/scripts/start_mcp_daemons.ps1": {
+      "spec": "Starts the local MCP daemon set (consensus gateway, agentmemory, reasoning ensemble)"
+    },
+    "FLOSS/scripts/stop_mcp_daemons.ps1": {
+      "spec": "Stops the local MCP daemon set started by start_mcp_daemons.ps1"
+    },
+    "FLOSS/scripts/sweep_mcp_orphans.ps1": {
+      "spec": "Reaps orphaned MCP daemon processes left by crashed or detached sessions"
     },
     "FLOSS/scripts/triage_review_queue.py": {
       "spec": "DEPRECATED shim -> review_queue.py --triage"

@@ -91,7 +91,7 @@
       {
         "id": "root-intake-digestion",
         "label": "Root Intake Digestion Map",
-        "path": "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "path": "FLOSS/docs/research/2026-08-10-root-intake-digestion.md",
         "summary_chars": 260,
         "max_headings": 4,
         "max_bullets": 4
@@ -227,7 +227,7 @@
         "FLOSS/SDD-Master-Spec-0.22.md",
         "FLOSS/INSTRUCTIONS_FOR_CODE.md",
         "AGENTMEMORY.md",
-        "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "FLOSS/docs/research/2026-08-10-root-intake-digestion.md",
         "FLOSS/docs/agent-memory/MEMORY.md",
         "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md",
         "FLOSS/docs/adr/INDEX.md",
@@ -574,7 +574,7 @@
       ],
       "roots": [
         "FLOSS/docs/research",
-        "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "FLOSS/docs/research/2026-08-10-root-intake-digestion.md",
         "FLOSS/docs/research/2026-05-15-working-todo-list.md",
         "FLOSS/docs/research/2026-05-09-ad4m-coasys-audit-delta.md",
         "deep-flossi0ullkreport.md",
