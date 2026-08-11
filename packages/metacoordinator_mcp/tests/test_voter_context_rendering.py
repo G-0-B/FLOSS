@@ -287,6 +287,25 @@ def test_render_voter_context_preserves_packet_metadata_when_evidence_is_oversiz
     assert "uhCAk" + ("a" * 32) in context
 
 
+def test_render_voter_context_marks_an_individually_shortened_reference(tmp_path):
+    """A sliced evidence identity must be visibly marked as incomplete."""
+    long_ref = f"docs/{'x' * 260}.md"
+    with tempfile.TemporaryDirectory() as tmp:
+        ref, packet = _make_governed_packet(
+            tmp_path,
+            tmp_path / ".agent-surface" / "provenance",
+            nested_evidence_ref=long_ref,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(ref)
+        )
+
+    assert packet["d"] in context
+    assert f"[spec] {long_ref[:240]}" in context
+    assert long_ref not in context
+    assert "[truncated]" in context
+
+
 def test_render_voter_context_reserves_both_signed_packet_headers(tmp_path):
     """Earlier optional evidence cannot suppress a later packet header."""
     with tempfile.TemporaryDirectory() as tmp:

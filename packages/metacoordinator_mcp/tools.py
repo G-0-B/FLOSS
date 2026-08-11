@@ -444,9 +444,12 @@ class GatewayTools:
                         break
                     rendered_refs.add(key)
                     rendered_count += 1
+                    metadata_type = sanitize(metadata["type"])
+                    metadata_ref = sanitize(metadata["ref"])
+                    if len(metadata_type) > 48 or len(metadata_ref) > 240:
+                        truncated = True
                     nested_refs.append(
-                        f"[{sanitize(metadata['type'])[:48]}] "
-                        f"{sanitize(metadata['ref'])[:240]}"
+                        f"[{metadata_type[:48]}] {metadata_ref[:240]}"
                     )
             except ValueError:
                 # The top-level packet remains validated for submission, but a

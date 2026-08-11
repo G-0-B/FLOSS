@@ -18,6 +18,16 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "docs" / "specs" / "yumeichan-watch-capabilities.schema.json"
 SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke_test_gateway.py"
+ADR_13_PATH = REPO_ROOT / "docs" / "adr" / "ADR-13-yumeichan-watch-architecture.md"
+
+
+def test_adr_13_substrate_bridge_matches_live_ternary_model() -> None:
+    text = ADR_13_PATH.read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+
+    assert "`ThoughtCredential.connotation` remains ternary `i8`" in normalized
+    assert "analog migration is ⚠️ Specified and deferred" in normalized
+    assert "carries continuous `[-1.0,+1.0]` attestation" not in text
 
 
 def valid_capability() -> dict[str, object]:

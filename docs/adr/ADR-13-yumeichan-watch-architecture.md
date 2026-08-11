@@ -43,8 +43,9 @@ The Yumeichan Watch is a **Thin Capability Client and Sensory Edge** — not an 
    prevented by forced capability expiration, not by a tunable limit.
 4. **No sycophancy-linter bypass.** The Local Agent Node may not bypass Multi-Agent Debate
    for affective responses; the Watch cannot be a backdoor for limbic hijack.
-5. **Substrate bridge.** Capability tokens map to the `rose_forest` DNA: `ThoughtCredential`
-   carries continuous `[-1.0,+1.0]` attestation; Watch affective/biometric inputs map to the
+5. **Substrate bridge.** Capability tokens map to the `rose_forest` DNA:
+   `ThoughtCredential.connotation` remains ternary `i8` (`-1`/`0`/`+1`); its analog migration
+   is ⚠️ Specified and deferred. Watch affective/biometric inputs map to the
    `KnowledgeTriple.confidence` field in the integrity zome.
 
 Schema of record: `docs/specs/yumeichan-watch-capabilities.schema.json` (OCapN, draft-07).
