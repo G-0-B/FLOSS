@@ -370,6 +370,8 @@ class GatewayTools:
         the ``Evidence:`` field of the prompt; only packet-derived context
         goes here.
         """
+        if not any(ref.type == "provenance_packet" for ref in claim.evidence):
+            return "(none)"
         from packages.activity_log import provenance
 
         try:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 _THIS_DIR = Path(__file__).parent
 _REPO_ROOT = _THIS_DIR.parent.parent.parent
@@ -474,6 +476,34 @@ def test_run_consensus_round_returns_json_error_on_write_failure():
         assert "disk full" in result["error"]
 
 
+def test_run_consensus_round_without_packet_skips_provenance_import():
+    """Lean Local rounds do not load optional provenance dependencies."""
+    real_import = builtins.__import__
+
+    def fail_provenance_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "packages.activity_log" and "provenance" in fromlist:
+            raise ModuleNotFoundError("No module named 'blake3'", name="blake3")
+        return real_import(name, globals, locals, fromlist, level)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        gw = make_gateway(tmp, voter_factory=_approval_voter_factory)
+        claim_result = json.loads(
+            gw.submit_claim(
+                proposer="lean-agent",
+                proposal_type="CodeChange",
+                summary="lean local round",
+                body="No provenance packet is needed for this Local claim.",
+                blast_radius="Local",
+            )
+        )
+
+        with patch("builtins.__import__", side_effect=fail_provenance_import):
+            result = json.loads(gw.run_consensus_round(claim_result["claim_id"]))
+
+    assert "error" not in result, result
+    assert result["outcome"] == "APPROVED"
+
+
 def _assert_persisted_omo_voter_is_not_invoked(prefix: str, voter_id: str):
     """Persisted OMO wrappers are skipped before their provider callable runs."""
     calls: list[str] = []
@@ -548,6 +578,7 @@ def _run_all():
         test_run_consensus_round_retallies_manual_votes_after_deferred,
         test_get_decision_finds_buried_decision,
         test_run_consensus_round_returns_json_error_on_write_failure,
+        test_run_consensus_round_without_packet_skips_provenance_import,
         test_run_consensus_round_skips_persisted_omo_critic_voter,
         test_run_consensus_round_skips_persisted_omo_momus_voter,
     ]
