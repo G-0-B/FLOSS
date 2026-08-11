@@ -8,6 +8,15 @@ When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load docum
 **Purpose:** Always-on coordination rules. Non-negotiable constraints.
 **Key content:** Identity, prime directive, response modes, evidence gate (Now/Later/Never), symbolic-first validation, provenance packet schema.
 
+## 1b. UOP v2.1 (Execution Gate Loop)
+
+**File:** `uop-v2.1.md`
+**Purpose:** How work actually gets executed. The kernel says what is mandatory; the UOP says which gate you are in and what enforces it.
+**Key content:** The nine-gate loop (ORIENT → RECALL → REUSE GATE → PLAN → CLASSIFY → CONSENSUS → EXECUTE → VERIFY → TRACE), each with an enforcement mechanism rather than intent alone; the claim truth model with scope-stated negatives; the cross-verification protocol requiring every "not found" to state what was searched.
+**Prime rule:** *No claim, no artifact, no action survives compaction unless it is written to a file that outlives the context window.*
+
+Landed 2026-08-10 from workspace-root intake. Status: Specified.
+
 ## 2. Context Compression Packet v1.1 (Rationale)
 
 **File:** `context-compression-v1.1.md`
@@ -26,6 +35,13 @@ When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load docum
 **Index:** `../adr/INDEX.md`
 **Purpose:** Specific architectural decisions with rationale and supersession chains.
 **Load order within ADRs:** Start with ADR-0 (Recognition Protocol), then ADR-1 (Carrier Equivalence), then task-relevant ADRs.
+
+## 4b. Canonical Build Spine v0.3 (Current Execution Spine)
+
+**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md`
+**Purpose:** The contradiction-resolving execution spine — what is actually being built next and which conflicts between documents have been resolved which way.
+**Key content:** 10 tracked issues with phase gates. Self-declares supersession of v0.2 and two prior "merged upgradeable artifact" documents.
+**Status:** **Proposed**, not Accepted. Landed 2026-08-10 from workspace-root intake; promotion is a separate decision.
 
 ## 5. Seed Packet v1.0.0 (Bootstrapping)
 

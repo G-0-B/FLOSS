@@ -1,4 +1,23 @@
-# Provenance Packet Spec v1.4
+# Provenance Packet Spec v1.4 (+ v1.5 edits D2, D3)
+
+Applied 2026-08-10 from `docs/research/intake_raw/2026-08-10-root/reports/provenance-packet-v1.5-delta.md`:
+
+- **D2 — multisig headroom.** `sigs` no longer pins `maxItems: 1`. Exactly one
+  signature is still required today; the array form is retained so threshold
+  signing (KERI `kt`/`k`) becomes additive rather than a breaking schema change.
+- **D3 — evidence-type extension.** `file`, `log`, `activity`, `source_chain`
+  added to the evidence-root vocabulary, in this spec, in
+  `provenance-packet.schema.json`, and in `EVIDENCE_TYPES` in
+  `packages/orchestrator/claim_schema.py`.
+
+**D1 (bootstrap exemption) is deliberately NOT applied** — it is blocked on
+ADR-12 per `CONTEXT.yaml.consent_gate_defect.do_not`. D4–D6 remain unapplied
+proposals in the delta document.
+
+The delta is an edit-set against this spec, not a replacement: this file stays
+authoritative. Corrections edit the original; parallel specs are the failure
+mode that produced a 25 KB adversarial review orbiting a 20 KB artifact,
+forever unmerged.
 
 Status: Specified for Plane A pilot. This spec defines the packet contract used by
 local agent surfaces and the consensus gateway before any Plane B/Holochain
@@ -31,7 +50,7 @@ Required top-level fields:
 | `s` | string | Monotonic per-`i` sequence, decimal string. |
 | `p` | string or null | Prior packet digest in the same per-`i` chain only. |
 | `a` | array | One or more payload entries. |
-| `sigs` | array | One Ed25519 signature: `0B` + 86-char base64url raw signature. |
+| `sigs` | array | Ed25519 signatures: `0B` + 86-char base64url raw signature each. v1.5 requires exactly one; the array form is retained so threshold signing is additive. |
 
 `p` is only intra-agent chain continuity. Cross-agent lineage uses
 `a[].evidence_refs[type=provenance_packet]`, not `p`.
@@ -51,7 +70,7 @@ Required payload fields:
 | `created_at` | string | UTC ISO 8601 timestamp. |
 | `human_collision_node` | string | Human or operator node that bridged the handoff when applicable. |
 | `artifact_refs` | array | Content-addressed artifacts; each item has `path` and `sha256`. |
-| `evidence_refs` | array | Evidence roots; at least one non-packet evidence root is required across the DAG. |
+| `evidence_refs` | array | Evidence roots; at least one non-packet evidence root is required across the DAG. Types: `spec`, `test`, `adr`, `url`, `commit`, `provenance_packet`, `file`, `log`, `activity`, `source_chain`. |
 | `risks` | array | Known risks or empty list. |
 | `benefits` | array | Known benefits or empty list. |
 | `next_action` | string | Immediate next action or disposition. |

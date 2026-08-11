@@ -46,7 +46,6 @@
     "sigs": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 1,
       "items": {
         "type": "string",
         "pattern": "^0B[A-Za-z0-9_-]{86}$"
@@ -154,7 +153,18 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["spec", "test", "adr", "url", "commit", "provenance_packet"]
+          "enum": [
+            "spec",
+            "test",
+            "adr",
+            "url",
+            "commit",
+            "provenance_packet",
+            "file",
+            "log",
+            "activity",
+            "source_chain"
+          ]
         },
         "ref": {
           "type": "string",

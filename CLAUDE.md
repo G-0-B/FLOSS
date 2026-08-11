@@ -40,7 +40,7 @@ FLOSS/
 ├── docs/
 │   ├── adr/                                         # ADR-0..6 + ADR-0.1 + ADR-MCP-ORCHESTRATOR + INDEX
 │   ├── architecture/                                # 31 files — specs, blueprints, integration plans
-│   ├── governance/                                  # spine-v0.5, kernel-v1.2 (drift), seed-packet,
+│   ├── governance/                                  # spine-v0.5, uop-v2.1, build-spine-v0.3, seed-packet,
 │   │                                                #   LOADING_ORDER, HARVEST_LOG, LEGAL_DEFINITIONS
 │   ├── superpowers/                                 # Specs + plans for in-flight design work
 │   │   ├── specs/                                   # e.g. 2026-04-12-local-agent-node-design.md
@@ -97,7 +97,7 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 
 ### Current Operating Stack
 
-- **Canonical dev-plane code substrate:** `Radicle` (see `docs/adr/ADR-8-radicle-dev-substrate.md`). GitHub remains a pragmatic mirror, not the architectural center.
+- **Current dev-plane code substrate:** `GitHub` (`G-0-B/FLOSS`). Radicle (`docs/adr/ADR-8-radicle-dev-substrate.md`, Accepted, Specified — bridge unproven) is the sovereignty *target*, not the current fact — see `docs/governance/FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md` §C2/§C6 for the reconciliation. Promote to canonical only after a successful mirror workflow and contributor-onboarding test.
 - **Immediate coordination bridge:** the local source chain and MCP gateway under `packages/`.
 - **Runtime truth target:** `Holochain`.
 - **Operating structure:** four harnesses — execution, memory, retrieval, optimization (see `docs/architecture/AGENTIC_OPERATING_MODEL.md`).
@@ -163,7 +163,7 @@ ruff check .
 - **Architecture (operational axis)**: `docs/architecture/META_COORDINATION_KERNEL_v4.0.md` — 9-layer agent-centric stack + RICE overlay + Superalignment Triad + 10 named roles (what agents do, where authority sits). See §21 for the orthogonal-axis composition with CCES. Landed 2026-05-13 via consensus claim `019e2293` APPROVED mean +0.717.
 - **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`
 - **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
-- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (current set per v2.0 suite is ADR-0, 0.1, 1–11; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10; ADR-N (IPFS) was assigned ADR-11)
+- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (the v2.0 suite file is frozen at ADR-0, 0.1, 1–12; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10 and ADR-N (IPFS) became ADR-11; ADR-12 is the Consent Gate Protocol, `OVERRIDE FORBIDDEN`. **ADR-13..19 live only in `docs/adr/INDEX.md` v2.1.0+, not in the suite file** — always read the ADR INDEX, not the suite, for the current set)
 - **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
 - **Local agent node**: `docs/adr/ADR-10-local-agent-node.md` (ADR-10 in the v2.0 suite)
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`

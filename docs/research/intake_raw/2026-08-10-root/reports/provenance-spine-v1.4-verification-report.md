@@ -9,7 +9,16 @@ supersedes: []
 truth_status: "mixed"          # see truth_status_breakdown — NOT a kernel enum value, see note
 truth_status_breakdown:
   verified: "Part B B1–B4, B7, B8 (keripy source, RFC 8785, PyPI); Part A items 1–6, 8, 10 (file contents, single reader pass)"
-  refuted: "Part B B5–B6 (t:'prov' unregistered; 'additive KERI migration' claim FALSE); Part A greenfield assumption FALSE"
+  refuted: >
+    Part B B5–B6 (t:'prov' unregistered; 'additive KERI migration' claim FALSE);
+    Part A greenfield assumption FALSE.
+    CORRECTION 2026-08-04 (merged in from verification-report-sidecar.md on
+    2026-08-10): the spine is on origin/main via PR #36 (merged 2026-06-16),
+    NOT merely on a working branch. An intermediate claim that provenance.py
+    was absent from main came from a stale local main ref and was itself wrong.
+    PR #38 is docs-only and stacked cleanly on #36
+    (merge-base --is-ancestor = 0). This supersedes §9's "undetermined"
+    finding below.
   specified: "consent_integrity deployment status; repo-claimed test passes"
   unverified: "PR #38 in entirety; RUNTIME_SURFACES.md; METAHARNESS_OPERATING_MODEL.md; materializer --check; Action record volume; identity zome symbols; per-package dep pins"
 evidence_sources:
@@ -19,7 +28,7 @@ evidence_sources:
   - "IETF draft-ssmith-said; ToIP KERI specification"
   - "RFC 8785; PyPI (rfc8785, jcs, jsoncanon, blake3)"
   - "SLSA v1.0 Distributing Provenance; in-toto ITE-6; C2PA"
-upgrade_path: "Supersede when PR #38 is retrieved under authenticated access, or when a live CI run replaces self-reported test counts"
+upgrade_path: "PR #38 half-resolved 2026-08-04 (docs-only, stacked on #36) — see the CORRECTION in refuted. Still supersede when a live CI run replaces self-reported test counts."
 rollback_plan: "N/A — report is evidence, not a mutation. Discard and re-run verification if repo state has moved."
 friction_tier: "low"           # document; changes nothing executable
 license: "Compassion Clause + Apache-2.0"
@@ -49,7 +58,24 @@ license: "Compassion Clause + Apache-2.0"
 
 **Access note.** The public repo, its README, and PR #25 were retrievable in rendered HTML. GitHub tree/blob/raw/API pages and the PR list beyond the rendered HTML were robots-blocked for automated fetch. File-level internals below were retrieved by a subagent using a repository-reader tool reading `main` directly; those are marked **Verified (file contents)**. The repo is public (3 stars, 2 forks, 254 commits, GPL-3.0), languages HTML/Python/Rust/TypeScript, described as "a biomimetic distributed intelligence platform … built on agent-centric architecture, verifiable provenance, and voluntary convergence."
 
-### 9 & PR-status. What PR #38 is about — **UNVERIFIED (retrieval blocked)**
+### 9 & PR-status. What PR #38 is about — ~~UNVERIFIED (retrieval blocked)~~ **RESOLVED 2026-08-04**
+
+> **CORRECTION merged 2026-08-10** from the detached sidecar (`verification-report-sidecar.md`,
+> now in the same directory). PR #38 **exists**, is **docs-only**, and is stacked cleanly on
+> PR #36 (`merge-base --is-ancestor` = 0). The provenance spine reached `origin/main` via
+> **PR #36, merged 2026-06-16** — not merely a working branch. An intermediate claim that
+> `provenance.py` was absent from `main` came from a stale local `main` ref and was itself
+> wrong.
+>
+> ⚠️ **Unreconciled detail, flagged not fixed:** this report's own §9 text below cites
+> **PR #25** as "merged 2026-06-16", and the sidecar's `evidence_sources` repeats that,
+> while the sidecar's correction attributes the same date to **PR #36**. One of the two
+> numbers is wrong. Resolving it needs authenticated repo access; do not treat either
+> number as Verified until then.
+>
+> The original text is retained unedited below because it is a dated record of what was
+> checkable on 2026-07-30. Corrections annotate; they do not rewrite history.
+
 PR #38 could not be retrieved through any available channel (GitHub HTML robots-blocked; `.diff`/`.patch`/`api.github.com`/DeepWiki all unreachable; PR pages for this small repo are not search-indexed). The rendered open-PR list shows only **#35, #32, #31, #30, #25** (highest *open* is #35; 29 closed, 5 open). I therefore cannot confirm whether #38 exists, nor its title, description, author, commit count, files changed, merge status, review comments, or CI checks. This is a **could-not-verify**, not a confirmation of non-existence — a merged or closed PR can carry a number higher than the highest open one.
 
 Indirect evidence: the entire subject matter the design attributes to "two months of work in PR #38" — provenance packets, evidence-bearing claims, a consent gate — is already implemented and present on `main`. The last fully-visible large PR, **#25 (merged 2026-06-16, 79 commits, author kalisam, branch `lappytop`)**, delivered the ADR batch (ADR-0 marked Validated, ADR-5 Cognitive Virology, ADR-6 Four-System Integration), the Phase-0 substrate bridge spec + 2-agent Tryorama tests, the Seam-1 consensus gate (`packages/orchestrator/` with `claim_schema.py`, `consensus_gate.py`, 16/16 tests), signed-gradient confidence `[-1,+1]`, and a `ConversationMemory` module. CodeRabbit reviewed it (docstring coverage 45% vs 80% threshold flagged). The provenance/consent layer post-dates #25.

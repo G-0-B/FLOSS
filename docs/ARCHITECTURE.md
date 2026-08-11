@@ -127,11 +127,18 @@ Phase 0: Substrate Viability Spike    ← CURRENT TARGET
 
 ## Governance Stack (precedence order)
 
-1. Kernel v1.2 → `docs/governance/kernel-v1.2.md`
-2. Spine v0.5 → `docs/governance/spine-v0.5.md`
-3. ADRs → `docs/adr/INDEX.md`
-4. Specs → `docs/specs/`
-5. Code → `ARF/dnas/rose_forest/`
+1. Kernel → `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (repo root)
+2. UOP v2.1 → `docs/governance/uop-v2.1.md` (nine-gate execution loop)
+3. Spine v0.5 → `docs/governance/spine-v0.5.md`
+4. ADRs → `docs/adr/INDEX.md`
+5. Specs → `docs/specs/`
+6. Code → `ARF/dnas/rose_forest/`
+
+> Kernel v1.2 (`docs/governance/kernel-v1.2.md`) was removed 2026-08-10. It was a
+> byte-identical duplicate of `archive/metaprompt-versions/FLOSSI0ULLK Master
+> Metaprompt v1.2 (Kernel Edition).md`; the 2026-05 order to "forward-port then
+> archive" had been half-executed — copied, never removed. `LOADING_ORDER.md` never
+> listed it.
 
 Loading order for new agents: `docs/governance/LOADING_ORDER.md`
 
