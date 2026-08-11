@@ -152,7 +152,49 @@ def test_smoke_script_valid_capability_satisfies_schema() -> None:
     capability = _extract_smoke_valid_capability()
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
-    jsonschema.validate(capability, schema)
+    jsonschema.validate(
+        capability,
+        schema,
+        format_checker=jsonschema.FormatChecker(),
+    )
+
+
+@pytest.mark.parametrize(
+    "script_path",
+    [
+        SMOKE_SCRIPT_PATH,
+        REPO_ROOT / "scripts" / "yumeichan_watch_capabilities.py",
+    ],
+)
+def test_capability_schema_callers_enable_format_checking(script_path: Path) -> None:
+    source = ast.parse(script_path.read_text(encoding="utf-8"))
+    validation_calls = [
+        node
+        for node in ast.walk(source)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "jsonschema"
+        and node.func.attr == "validate"
+    ]
+
+    assert validation_calls, f"No jsonschema.validate call found in {script_path}"
+    for validation_call in validation_calls:
+        assert any(
+            keyword.arg == "format_checker" for keyword in validation_call.keywords
+        ), f"{script_path} validates schema formats without a FormatChecker"
+
+
+def test_capability_schema_rejects_malformed_issued_at() -> None:
+    capability = valid_capability()
+    capability["issued_at"] = "not-a-date"
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            capability,
+            json.loads(SCHEMA_PATH.read_text(encoding="utf-8")),
+            format_checker=jsonschema.FormatChecker(),
+        )
 
 
 def test_smoke_fixture_rejects_unsupported_executable_ast() -> None:
@@ -191,7 +233,11 @@ def test_capability_schema_requires_ed25519_proof() -> None:
     capability.pop("proof")
 
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(capability, json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+        jsonschema.validate(
+            capability,
+            json.loads(SCHEMA_PATH.read_text(encoding="utf-8")),
+            format_checker=jsonschema.FormatChecker(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -206,7 +252,11 @@ def test_capability_schema_rejects_unknown_top_level_and_nested_fields(mutate) -
     mutate(capability)
 
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(capability, json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+        jsonschema.validate(
+            capability,
+            json.loads(SCHEMA_PATH.read_text(encoding="utf-8")),
+            format_checker=jsonschema.FormatChecker(),
+        )
 
 
 def test_semantic_validator_accepts_ordered_threshold_bounds() -> None:
@@ -278,11 +328,14 @@ def test_semantic_validator_rejects_unusable_issued_at(issued_at: str) -> None:
     capability = valid_capability()
     capability["issued_at"] = issued_at
 
-    with pytest.raises(jsonschema.ValidationError, match="timezone-aware"):
+    with pytest.raises(jsonschema.ValidationError) as exc_info:
         validate_capability(
             capability,
             now=datetime(2026, 7, 26, 0, 0, 30, tzinfo=timezone.utc),
         )
+
+    error = exc_info.value
+    assert list(error.absolute_path) == ["issued_at"] or "timezone-aware" in str(error)
 
 
 def test_semantic_validator_rejects_inverted_threshold_bounds() -> None:
@@ -441,6 +494,32 @@ def test_extraction_result_reports_file_read_failure_without_external_call() -> 
 
 class RateLimitError(Exception):
     pass
+
+
+def test_rate_limit_stops_remaining_extraction_chunks() -> None:
+    from scripts import major_consolidation_sweep
+
+    source_path = REPO_ROOT / "rate-limited-multichunk.md"
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="must not run"))]
+    )
+
+    with (
+        patch.object(Path, "read_text", return_value="x" * 16_001),
+        patch.object(
+            major_consolidation_sweep.litellm,
+            "completion",
+            side_effect=[RateLimitError("provider rejected request"), response],
+        ) as completion,
+        patch.object(major_consolidation_sweep.time, "sleep") as sleep,
+    ):
+        result = major_consolidation_sweep.extract_and_synthesize(
+            source_path, "test-model"
+        )
+
+    assert result.status is major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE
+    assert completion.call_count == 1
+    sleep.assert_not_called()
 
 
 @pytest.mark.parametrize(

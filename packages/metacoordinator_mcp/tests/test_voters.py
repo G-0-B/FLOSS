@@ -6,8 +6,8 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock, patch
 
 _THIS_DIR = Path(__file__).parent
 _REPO_ROOT = _THIS_DIR.parent.parent.parent
@@ -99,7 +99,11 @@ def _assert_persona_system_keeps_shared_checklist_mandatory(factory):
         evidence=[],
     )
 
-    with patch("litellm.completion", return_value=response) as completion:
+    litellm = ModuleType("litellm")
+    completion = Mock(return_value=response)
+    litellm.completion = completion
+
+    with patch.dict(sys.modules, {"litellm": litellm}):
         voter(claim)
 
     messages = completion.call_args.kwargs["messages"]

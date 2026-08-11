@@ -352,9 +352,11 @@ fix: render validated voter evidence DAGs
   worktree
 
 **Interfaces:**
-- Consumes: private tested file
-  `C:\Users\kalis\.codex\skills\flossi0ullk-orient\SKILL.md`.
-- Produces: canonical `SKILL.md` with exact SHA-256
+- Historical staging input: private tested candidate
+  `C:\Users\kalis\.codex\skills\flossi0ullk-orient\SKILL.md`, verified by
+  digest during the original execution. This machine-local path was not a
+  reviewable canonical source and cannot independently establish origin.
+- Produces: repository-reviewable canonical `SKILL.md` with exact SHA-256
   `491A2B37B9CF73A3FCDF7FCA5D9CEF0B0E81D8B62A10DA40238E0EF695B266EE`
   and byte-identical enabled projections.
 
@@ -409,9 +411,13 @@ Expected: canonical source is v0.2.0 and the hash/changelog assertions fail.
 
 - [ ] **Step 3: Promote exact bytes to the branch canonical corpus**
 
-First verify the private file hash with `Get-FileHash`. Use `apply_patch` to
-make the branch corpus `SKILL.md` byte-identical to that private file. Update
-the separate corpus changelog with the v0.3.0 through v0.3.4 evolution history
+The original execution verified the private candidate hash with `Get-FileHash`,
+then used `apply_patch` to make the branch corpus `SKILL.md` byte-identical.
+After commit, the repository corpus—not the private path—is the reviewable
+canonical source. Do not repeat the private-source step for future promotions:
+first commit an immutable candidate artifact with its digest and source
+attestation, review it, and only then promote it into the corpus. Update the
+separate corpus changelog with the v0.3.0 through v0.3.4 evolution history
 already embedded in `SKILL.md`.
 
 Run:

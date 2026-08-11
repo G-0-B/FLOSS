@@ -61,16 +61,18 @@ def test_every_packet_satisfies_the_provenance_schema_or_its_intended_schema_gol
 
 def test_artifact_hashes_are_deterministic_lowercase_sha256() -> None:
     for row in load_rows():
-        artifact_number = 0
-        for payload in row["input"]["packet"]["a"]:
-            for artifact in payload["artifact_refs"]:
-                artifact_number += 1
-                expected = hashlib.sha256(
-                    f"FLOSS:provenance-eval:{row['id']}:artifact:{artifact_number}".encode(
-                        "utf-8"
-                    )
-                ).hexdigest()
-                assert artifact["sha256"] == expected
+        artifacts = [
+            artifact
+            for payload in row["input"]["packet"]["a"]
+            for artifact in payload["artifact_refs"]
+        ]
+        for artifact_index, artifact in enumerate(artifacts):
+            expected = hashlib.sha256(
+                f"FLOSS:provenance-eval:{row['id']}:artifact:{artifact_index}".encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            assert artifact["sha256"] == expected
 
 
 def test_crypto_facts_are_booleans() -> None:
@@ -120,6 +122,7 @@ def test_ppv_dev_007_accepts_a_nontransferable_signing_aid() -> None:
 
     assert row["golden"] == {"status": "valid", "defects": ["PPV-OK"]}
     assert "valid non-transferable signing AID" in row["rationale"]
+    assert aid.startswith("B")
     assert bytes(_public_key_from_aid(aid)) == base64.urlsafe_b64decode(aid[1:] + "=")
 
 
@@ -127,6 +130,9 @@ def test_rubric_documents_the_db_aid_contract_and_oracle_facts() -> None:
     rubric = json.loads((EVAL_DIR / "rubric.json").read_text(encoding="utf-8"))
 
     assert "^[DB][A-Za-z0-9_-]{43}$" in rubric["defect_codes"]["E-I-SHAPE"]
+    assert "latest sequence value for the same agent plus one" in rubric[
+        "defect_codes"
+    ]["E-SEQ-NONMONOTONIC"]
     assert "counterfactual oracle" in rubric["crypto_facts_contract"]
 
 

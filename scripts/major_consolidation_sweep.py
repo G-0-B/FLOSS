@@ -114,7 +114,10 @@ DOCUMENT CONTENT CHUNK:
                 or getattr(e, "status_code", None) == 429
             )
             if is_rate_limit:
-                status = ExtractionStatus.RATE_LIMIT_FAILURE
+                return ExtractionResult(
+                    ExtractionStatus.RATE_LIMIT_FAILURE,
+                    "\n\n".join(all_insights),
+                )
             elif status is ExtractionStatus.SUCCESS:
                 status = ExtractionStatus.LLM_FAILURE
 

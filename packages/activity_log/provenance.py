@@ -423,7 +423,7 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
     "risks",
     "benefits",
 )
-_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
 _EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
 
 

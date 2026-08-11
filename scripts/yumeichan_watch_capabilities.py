@@ -29,7 +29,11 @@ def validate_capability(
     signature verification remains outside this validator.
     """
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    jsonschema.validate(instance=capability, schema=schema)
+    jsonschema.validate(
+        instance=capability,
+        schema=schema,
+        format_checker=jsonschema.FormatChecker(),
+    )
 
     minimum, maximum = capability["analog_threshold_bounds"]
     if not math.isfinite(minimum) or not math.isfinite(maximum):

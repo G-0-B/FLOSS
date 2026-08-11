@@ -28,7 +28,7 @@ Required top-level fields:
 | `t` | string | Literal `prov`. |
 | `d` | string | Self-addressing digest: `E` + 43-char base64url BLAKE3-256 digest. |
 | `i` | string | `D` or `B` + 43-char base64url Ed25519 verify key; `D` is transferable and `B` is non-transferable, and both are valid signing identifiers in v1.4. |
-| `s` | string | Monotonic per-`i` sequence, decimal string. |
+| `s` | string | Gapless per-`i` sequence, decimal string: genesis is `0`; every successor equals the latest sequence for the same `i` plus one. |
 | `p` | string or null | Prior packet digest in the same per-`i` chain only. |
 | `a` | array | One or more payload entries. |
 | `sigs` | array | One Ed25519 signature: `0B` + 86-char base64url raw signature. |

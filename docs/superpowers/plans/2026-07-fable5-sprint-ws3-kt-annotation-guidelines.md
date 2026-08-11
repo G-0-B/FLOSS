@@ -87,19 +87,21 @@ checkpoint hash alongside the seed-set version that produced it).
 
 ## 5. ToS + learn-flag discipline (hard constraints)
 
-1. **Narrow extractor only.** This fine-tune sits inside Anthropic's
-   non-competing carve-out (classifiers/extractors). Do not extend the same
-   pipeline toward general instruction-following.
+1. **Policy hold (corrected 2026-08-11).** Anthropic's current
+   [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) §D.4
+   do not expose the previously claimed classifier/extractor carve-out. Do not
+   fine-tune a third-party model on Claude-origin output without express written
+   approval. Narrow task scope alone does not satisfy this gate.
 2. **No general conversation logs** in any Pioneer training set. Only items
    from this seed lineage (or its QA-gated extensions).
-3. **Per-call learn-flag rule** (operator-confirmed mechanism, 2026-07-04):
+3. **Per-call learn-flag proposal** (operator-reported mechanism, 2026-07-04):
    - Default for ALL API traffic: **no-learn**. Especially: any call whose
      content originates from Claude/frontier-model sessions.
    - Learn-flag is set **only** on calls whose payload is a QA-passed,
      provenance-tagged item from this lineage (`learn_flag: true` in the item).
-   - The WS3 adaptive-inference hold is **lifted conditionally** on this
-     discipline; if flag behavior is found not to hold in practice, the hold
-     snaps back (`[0]` pending re-verification).
+   - `learn_flag` in repository data is metadata, not machine enforcement. The
+     WS3 adaptive-inference hold therefore **remains active** until policy
+     approval and a fail-closed ingestion boundary are independently verified.
 4. **Provenance survives the pipeline:** checkpoint metadata records seed-set
    file + sha256, item count, and date, so any future audit can walk model → data → generator.
 

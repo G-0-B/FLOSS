@@ -52,7 +52,10 @@ Per ADR-12 §4:
 - Does NOT specify how recipients are notified — push notification, polling, gateway subscription are all viable
 - Does NOT define cross-substrate consent translation (Holochain ↔ Radicle ↔ AD4M) — open question #5 in ADR-12 §7
 - Does NOT define revocation forward-propagation semantics — open question #4 in ADR-12 §7
-- Does NOT mandate Substrate-class blast radius for `kernel`/`constitution` — defaults named in schema, override possible via an explicit future companion ADR (unassigned; Steward Vote Protocol)
+- The JSON Schema alone does NOT encode the cross-field Substrate-class rule for
+  `kernel`/`constitution`. The live consent integrity zome does enforce it and
+  remains binding unless an explicitly approved ADR, schema revision, and
+  integrity-code migration land together.
 
 ---
 

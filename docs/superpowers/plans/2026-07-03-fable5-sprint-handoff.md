@@ -112,9 +112,18 @@ Post-window policy (formalized in WS5): Fable 5 is invoked **only** on escalatio
 - Conform to the existing spec (`knowledge-triple_spec.md` — locate the repo-canonical version first; the project-upload copy is upload-tier authority). Extend only via PR if the spec is insufficient — do not fork it.
 - Fable 5 authors: annotation guidelines (1 doc), 50 golden extraction examples now (target 150–300 total; remainder can be generated post-window by retained models *following* the guidelines), eval split (reuse WS1 module if same), and the Pioneer task prompt.
 **ToS constraints (hard):**
-- Target = narrow extractor (GLiNER2/Qwen class). This is inside Anthropic's explicit non-competing carve-out (classifiers/extraction). **Verified in research report against Anthropic's published terms.**
+- **Correction checked 2026-08-11:** no classifier/extractor carve-out was found
+  in Anthropic's current [Commercial Terms](https://www.anthropic.com/legal/commercial-terms)
+  (effective 2025-06-17, §D.4) or [Service Specific Terms](https://www.anthropic.com/legal/service-specific-terms)
+  (effective 2026-06-08). Those terms prohibit use of the Services to train a
+  competing model absent express approval; the fine-tuning exception is scoped
+  to Anthropic's own Fine-Tuning Services. Treat third-party Pioneer training on
+  Claude-origin output as ❌ Blocked until express written approval is recorded.
 - Do NOT include general collective conversation logs in any Pioneer training set.
-- Do NOT enable Pioneer's adaptive-inference loop until Fastino confirms training-data filtering/exclusion by provenance tag — Claude-origin outputs flowing through live traffic into silent retraining is the prohibited path. `[0 — hold pending verification]`
+- Do NOT enable Pioneer's adaptive-inference loop until both policy approval and
+  fail-closed training-data filtering/exclusion are evidenced — Claude-origin
+  outputs flowing through live traffic into silent retraining remain blocked.
+  `[0 — hold pending verification]`
 - Prefer Apache-2.0 base (Qwen) for weight sovereignty; requires Pioneer Pro tier for weight download (**tier unconfirmed — ask Anthony**).
 **Output:** 1 guidelines doc + seed JSONL under the WS1 eval directory structure.
 **Success criterion:** Pioneer fine-tune achieves ≥ parity with the best retained API model on the held-out split at materially lower latency/cost; else document gap and hold.

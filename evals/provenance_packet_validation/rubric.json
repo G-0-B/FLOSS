@@ -17,7 +17,7 @@
     "E-D-SHAPE": "d is not 'E' + 43 base64url chars.",
     "E-I-SHAPE": "i does not match ^[DB][A-Za-z0-9_-]{43}$; D is transferable and B is non-transferable, and both are valid signing identifiers.",
     "E-SIG-SHAPE": "sigs is not exactly one '0B' + 86 base64url string.",
-    "E-SEQ-NONMONOTONIC": "s does not continue the per-agent monotonic sequence.",
+    "E-SEQ-NONMONOTONIC": "s does not equal the latest sequence value for the same agent plus one (gapless per-agent sequence).",
     "E-P-MISSING-PRIOR": "p references a prior packet digest that does not exist in this agent's chain.",
     "E-P-CROSS-AGENT": "p points at another agent's packet; p is intra-agent continuity only (cross-agent lineage goes in evidence_refs).",
     "E-PAYLOAD-MISSING-FIELD": "A required payload field is absent from an a[] entry.",

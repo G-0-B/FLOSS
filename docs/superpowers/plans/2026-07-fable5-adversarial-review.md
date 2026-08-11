@@ -6,7 +6,7 @@ id: "fable5-adversarial-review-2026-07"
 version: "1.0.0"
 kind: "adversarial_review"
 status: "Proposed"
-updated: "2026-07-03"
+updated: "2026-07-04"
 supersedes: []
 truth_status: "Verified"   # for the findings' factual observations — each carries file/commit evidence; fixes are Proposed
 evidence_sources:
@@ -14,6 +14,7 @@ evidence_sources:
   - "WS0 verification block: docs/research/2026-05-15-working-todo-list.md §A.000"
   - "Live test runs 2026-07-03: gateway 147/147; native zomes 25/25; wasm32 cargo check exit 0"
   - "PR G-0-B/FLOSS#25 (MERGED 2026-06-16, 227 files, +29213/-5092)"
+  - "F10 live reads 2026-07-04: docs/specs/knowledge-triple.spec.md, docs/specs/knowledge-triple.schema.json, ARF/dnas/rose_forest/zomes/integrity/src/lib.rs"
 generator: "claude-fable-5"
 sprint: "2026-07-03-fable5-sprint-handoff.md (WS4)"
 upgrade_path: "Findings convert to fixes via normal PR flow; F2/F7 kernel items go through the ADR-3 kernelization process (friction: high)"

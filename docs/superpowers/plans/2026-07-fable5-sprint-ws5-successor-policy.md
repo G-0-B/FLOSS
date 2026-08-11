@@ -76,7 +76,7 @@ else runs on the successor roster.
 | # | Trigger | Threshold | Fable task |
 |---|---|---|---|
 | E1 | **Consensus CONFLICT** at System/Substrate radius | `variance > θ_polarization` (0.40 / 0.25) on a governed claim | Adjudication memo: name the crux, propose the smallest decidable sub-claim |
-| E2 | **Persistent deadlock** at Substrate | DEFERRED twice consecutively on the same claim (|mean| inside the dead band) | Same as E1 |
+| E2 | **Persistent deadlock** at Substrate | DEFERRED twice consecutively on the same claim (\|mean\| inside the dead band) | Same as E1 |
 | E3 | **Security-sensitive diff** | Touches integrity zomes, consent semantics (ADR-12 surface), hashline, or provenance validation paths | One adversarial review pass pre-merge |
 | E4 | **Eval regression** | Any WS1 module dev-split score drops > 10 percentage points after a prompt/roster/model change | Root-cause + revised artifact |
 | E5 | **ADR-tier decision** | New ADR, or supersession/amendment of an Accepted ADR | Adversarial review of the draft (not authorship) |

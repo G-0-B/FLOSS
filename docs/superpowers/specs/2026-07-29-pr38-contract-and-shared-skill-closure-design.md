@@ -2,7 +2,11 @@
 
 **Date:** 2026-07-29
 **Status:** ⚠️ Specified design; branch implementation is evidenced by the tests named below, while merge and deployment status remain external
-**Approved scope:** Human approval in the current task for closure items 1, 2, 3, and 5; Cloudflare explicitly excluded
+**Approval record:** The operator approved PR #38 cleanup and shared-skill
+evolution; Cloudflare was explicitly excluded. The earlier `1, 2, 3, 5`
+response referred to a different action list and does not map to the Included
+numbering below. Included item 4 was treated as PR-cleanup work, not as a
+separately numbered approval.
 **Frozen starting head:** `705f555977e118c075ec0cccc2910bd2f5fe134a`
 
 ## Purpose

@@ -14,6 +14,27 @@ if str(FLOSS_ROOT) not in sys.path:
     sys.path.insert(0, str(FLOSS_ROOT))
 
 
+def test_payload_entry_rejects_sha256_with_trailing_newline():
+    from packages.activity_log import provenance
+
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-11T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [{"path": "artifact.txt", "sha256": "a" * 64 + "\n"}],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "none",
+    }
+
+    assert provenance._payload_entry_errors([entry]) == [
+        "E_PROVENANCE_ARTIFACT_REF_INVALID"
+    ]
+
+
 def test_self_application_genesis_packet_validates(tmp_path, monkeypatch):
     from packages.activity_log import provenance
 
