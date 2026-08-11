@@ -4,10 +4,9 @@
 //!
 //! First substrate-side enforcement slice for pluralistic, polycentric,
 //! user-authored consent. This zome registers the consent entries and enforces
-//! deterministic shape rules the LLM layer cannot evade. Cross-entry and
-//! action-time checks are intentionally split to the coordinator / follow-up
-//! substrate bridge work because they need chain reads or downstream action
-//! context.
+//! deterministic shape rules the LLM layer cannot evade. Dependency-tracked
+//! cross-entry checks run here at the integrity boundary; action-time checks
+//! remain coordinator / downstream substrate-bridge work.
 //!
 //! ## Authored under SDD discipline
 //!
@@ -35,17 +34,15 @@
 //!   (these live in the action header, queryable via `must_get_action`)
 //! - All `Option<T>` fields on entry types use `#[serde(default)]` for
 //!   forward-compatible schema evolution
-//! - `validate()` is purely deterministic — no `get()`, `get_links()`,
-//!   `agent_info()`, `sys_time()` calls
+//! - `validate()` avoids nondeterministic reads such as `get()`, `get_links()`,
+//!   `agent_info()`, and `sys_time()`; cross-entry checks use dependency-tracked
+//!   `must_get_valid_record()`
 //! - Validation dispatch uses `op.flattened::<EntryTypes, LinkTypes>()`
 //!
-//! ## Version skew note (surfaced by skill on first invocation)
+//! ## Holochain version line
 //!
-//! Workspace pins `hdi = "=0.5.1"`. Skill teaches HDI 0.7.1 / HDK 0.6.1.
-//! This file targets the workspace version to compile against current
-//! infrastructure. Future workspace-version bump (open work-item) will need
-//! API migration; the structural patterns here are version-neutral and should
-//! survive the bump unchanged.
+//! Workspace pins `hdi = "=0.7.1"` / `hdk = "=0.6.1"`, matching the skill's
+//! current API line.
 
 use hdi::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -273,21 +270,20 @@ pub enum LinkTypes {
 }
 
 // =============================================================================
-// SECTION 4: Validation — deterministic single-entry rules from
+// SECTION 4: Validation — deterministic entry and dependency-tracked rules from
 // consent-payload.spec.md §"Validation rules and current enforcement status".
-// Cross-entry rules that require resolving another action are explicitly
-// documented in Section 5.
 // =============================================================================
 
 /// Top-level validation callback. Dispatches to per-entry-type validators
-/// + per-op-type post-checks. Pure / deterministic — no DHT reads.
+/// + per-op-type post-checks. Ordinary DHT reads are forbidden here;
+/// `must_get_valid_record` provides deterministic dependency tracking.
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store) => match store {
             OpEntry::CreateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::ConsentPayload(payload) => validate_consent_payload(&payload),
-                EntryTypes::ConsentDecision(decision) => validate_consent_decision(&decision),
+                EntryTypes::ConsentDecision(decision) => validate_consent_decision_entry(&decision),
             },
             // ConsentPayload / ConsentDecision are append-only governance
             // records: a decision is superseded by authoring a NEW entry (with a
@@ -330,10 +326,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 /// 9. `pattern_type ∈ {Kernel, Constitution}` with `blast_radius < Substrate`
 ///    is rejected — these are inherently substrate-class
 ///
-/// Rules 4, 10 (subset checks + action-time enforcement) are out of
-/// validation-scope here because they require either reading the referenced
-/// ConsentPayload from chain (forbidden in validate()) or post-validation
-/// action-layer enforcement (a coordinator-zome concern).
+/// Rule 10 (action-time enforcement) remains coordinator-zome work because it
+/// governs downstream actions rather than ConsentPayload entry validity.
 pub fn validate_consent_payload(payload: &ConsentPayload) -> ExternResult<ValidateCallbackResult> {
     // Rule 1: pattern_hash is SHA-256 format (64 hex chars, lowercase)
     if payload.pattern_hash.len() != 64 {
@@ -407,10 +401,8 @@ pub fn validate_consent_payload(payload: &ConsentPayload) -> ExternResult<Valida
 
 /// Validate a ConsentDecision against the deterministic decision rules from the
 /// spec's current enforcement-status table:
-/// 5. `scope_granted` is non-empty iff outcome != Rejected (deferred: full
-///    subset-check against the referenced ConsentPayload requires reading
-///    chain, forbidden here; we enforce the contradiction-free invariant
-///    instead and defer subset enforcement to the coordinator layer)
+/// 5. `scope_granted` is non-empty iff outcome != Rejected. The full relation
+///    to the referenced ConsentPayload is checked after these shape rules.
 /// 6. outcome=Rejected ⟹ `scope_granted == []`
 /// 7. outcome=CounterPropose ⟹ `counter_frame_ref` is Some
 /// 8. outcome != Accepted ⟹ `rationale` is Some + non-empty
@@ -456,9 +448,9 @@ fn validate_consent_decision(decision: &ConsentDecision) -> ExternResult<Validat
         ));
     }
 
-    // Rule 5 (contradiction-free side): outcome != Rejected ⟹ scope_granted
-    // MUST be non-empty. Full subset-check against the referenced payload's
-    // consent_scope happens in the coordinator zome (would require DHT read).
+    // Rule 5 (single-entry side): outcome != Rejected ⟹ scope_granted MUST be
+    // non-empty. The referenced payload relation is checked only after all
+    // single-entry rules pass, avoiding unnecessary dependency lookups.
     if !matches!(decision.outcome, Outcome::Rejected) && decision.scope_granted.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(format!(
             "E_NON_REJECT_EMPTY_SCOPE: outcome={:?} with empty scope_granted is contradictory — \
@@ -500,25 +492,102 @@ fn validate_consent_decision(decision: &ConsentDecision) -> ExternResult<Validat
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Preserve cheap shape failures before asking the host to resolve a
+/// dependency, then enforce the decision against the exact valid payload
+/// record named by its action hash.
+fn validate_consent_decision_entry(
+    decision: &ConsentDecision,
+) -> ExternResult<ValidateCallbackResult> {
+    let shape_result = validate_consent_decision(decision)?;
+    if !matches!(&shape_result, ValidateCallbackResult::Valid) {
+        return Ok(shape_result);
+    }
+
+    // `?` is intentional: HDI converts an unavailable valid record into
+    // UnresolvedDependencies so peers retry validation when it becomes known.
+    let payload_record = must_get_valid_record(decision.payload_action_hash.clone())?;
+    let payload = match decode_referenced_consent_payload(&payload_record) {
+        Ok(payload) => payload,
+        Err(detail) => {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "E_CONSENT_PAYLOAD_REFERENCE_INVALID: {detail}"
+            )))
+        }
+    };
+
+    Ok(validate_consent_scope_relation(decision, &payload))
+}
+
+/// Decode by the action's scoped app-entry indices so a record containing a
+/// different app type cannot masquerade as ConsentPayload-compatible bytes.
+fn decode_referenced_consent_payload(record: &Record) -> Result<ConsentPayload, String> {
+    let app_entry_def = match record.action().entry_type() {
+        Some(EntryType::App(app_entry_def)) => app_entry_def,
+        _ => return Err("referenced record is not an app entry".into()),
+    };
+    let entry = record
+        .entry()
+        .as_option()
+        .ok_or_else(|| "referenced app entry is hidden or unavailable".to_string())?;
+
+    match EntryTypes::deserialize_from_type(
+        app_entry_def.zome_index,
+        app_entry_def.entry_index,
+        entry,
+    ) {
+        Ok(Some(EntryTypes::ConsentPayload(payload))) => Ok(payload),
+        Ok(Some(_)) => Err("referenced app entry is not ConsentPayload".into()),
+        Ok(None) => Err("referenced app entry type is outside this integrity zome".into()),
+        Err(error) => Err(format!(
+            "referenced ConsentPayload could not be decoded: {error}"
+        )),
+    }
+}
+
+/// Enforce set relations independently of record resolution so every outcome
+/// shares the same fail-closed subset boundary.
+fn validate_consent_scope_relation(
+    decision: &ConsentDecision,
+    payload: &ConsentPayload,
+) -> ValidateCallbackResult {
+    if let Some(unrequested_scope) = decision
+        .scope_granted
+        .iter()
+        .find(|scope| !payload.consent_scope.contains(scope))
+    {
+        return ValidateCallbackResult::Invalid(format!(
+            "E_SCOPE_NOT_REQUESTED: scope_granted contains {unrequested_scope:?}, but the \
+             referenced ConsentPayload did not request it"
+        ));
+    }
+
+    let grants_every_requested_scope = payload
+        .consent_scope
+        .iter()
+        .all(|scope| decision.scope_granted.contains(scope));
+
+    if matches!(decision.outcome, Outcome::Accepted) && !grants_every_requested_scope {
+        return ValidateCallbackResult::Invalid(
+            "E_ACCEPTED_SCOPE_INCOMPLETE: outcome=Accepted MUST grant every requested scope; \
+             use BoundedAccept to grant a narrower scope"
+                .into(),
+        );
+    }
+
+    if matches!(decision.outcome, Outcome::BoundedAccept) && grants_every_requested_scope {
+        return ValidateCallbackResult::Invalid(
+            "E_BOUNDED_NOT_NARROWED: outcome=BoundedAccept MUST grant fewer scopes than \
+             requested; use Accepted to grant the full requested scope"
+                .into(),
+        );
+    }
+
+    ValidateCallbackResult::Valid
+}
+
 // =============================================================================
-// SECTION 5: Deferred validations (documented, not yet enforced here)
+// SECTION 5: Remaining deferred validation
 // =============================================================================
-//
-// These rules from consent-payload.spec.md §"Validation rules and current
-// enforcement status" require chain
-// reads or action-header inspection beyond what the integrity zome can do
-// in a single validate() call:
-//
-// - Rule 4 (`ConsentDecision.payload_action_hash` references an existing
-//   ConsentPayload on the recipient's source chain). This requires
-//   `must_get_action()`, which IS allowed in validate() per HDI 0.5+, but
-//   adds complexity + cross-action dependency. Deferred to v0.2.
-//
-// - Rule 5 full subset check (`scope_granted ⊆ consent_scope`) — same
-//   reason: requires resolving the referenced ConsentPayload to compare
-//   scope sets. Coordinator-zome enforcement on the action-call path is
-//   the right shape; the integrity zome here catches the contradiction
-//   patterns (Rule 6, Rule 5-side, Rule 7, Rule 8).
 //
 // - Rule 10 (action-time enforcement: no action that acts on a pattern
 //   with `blast_radius ∈ {System, Substrate}` may proceed without a
@@ -691,5 +760,60 @@ mod tests {
         let reason = invalid_reason(validate_consent_decision(&decision).unwrap());
 
         assert!(reason.contains("E_NONACCEPT_NO_RATIONALE"));
+    }
+
+    #[test]
+    fn decision_scope_relation_rejects_incomplete_accepted_scope() {
+        let payload = valid_payload();
+        let decision = valid_decision();
+
+        let reason = invalid_reason(validate_consent_scope_relation(&decision, &payload));
+
+        assert!(reason.contains("E_ACCEPTED_SCOPE_INCOMPLETE"));
+    }
+
+    #[test]
+    fn decision_scope_relation_rejects_complete_bounded_accept() {
+        let payload = valid_payload();
+        let mut decision = valid_decision();
+        decision.outcome = Outcome::BoundedAccept;
+        decision.scope_granted = vec![ConsentScope::ReadOnly, ConsentScope::Integrate];
+
+        let reason = invalid_reason(validate_consent_scope_relation(&decision, &payload));
+
+        assert!(reason.contains("E_BOUNDED_NOT_NARROWED"));
+    }
+
+    #[test]
+    fn decision_scope_relation_rejects_scope_absent_from_request() {
+        let payload = valid_payload();
+        let mut decision = valid_decision();
+        decision.scope_granted = vec![ConsentScope::ReadOnly, ConsentScope::Bind];
+
+        let reason = invalid_reason(validate_consent_scope_relation(&decision, &payload));
+
+        assert!(reason.contains("E_SCOPE_NOT_REQUESTED"));
+    }
+
+    #[test]
+    fn decision_scope_relation_allows_full_accepted_scope() {
+        let payload = valid_payload();
+        let mut decision = valid_decision();
+        decision.scope_granted = vec![ConsentScope::ReadOnly, ConsentScope::Integrate];
+
+        let result = validate_consent_scope_relation(&decision, &payload);
+
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn decision_scope_relation_allows_strict_subset_bounded_accept() {
+        let payload = valid_payload();
+        let mut decision = valid_decision();
+        decision.outcome = Outcome::BoundedAccept;
+
+        let result = validate_consent_scope_relation(&decision, &payload);
+
+        assert!(matches!(result, ValidateCallbackResult::Valid));
     }
 }

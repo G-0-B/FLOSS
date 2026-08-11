@@ -150,11 +150,10 @@ pub fn create_consent_decision(input: CreateConsentDecisionInput) -> ExternResul
                 .into()
         ))
     })?;
+    // Keep coordinator preflight as defense in depth for immediate caller
+    // feedback; the integrity zome independently enforces the same relation
+    // against the dependency-tracked valid payload record.
     ensure_scope_subset(&input.scope_granted, &payload.consent_scope)?;
-    // Accepted must grant the full requested set; BoundedAccept must narrow it.
-    // These cross-entry rules require the resolved payload and therefore live
-    // on the coordinator path. Intra-entry outcome↔scope rules remain enforced
-    // by the integrity zome.
     ensure_outcome_scope_relation(&input.outcome, &input.scope_granted, &payload.consent_scope)?;
 
     let payload_action_hash = input.payload_action_hash.clone();
