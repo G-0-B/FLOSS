@@ -60,9 +60,17 @@ Schema of record: `docs/specs/yumeichan-watch-capabilities.schema.json` (OCapN, 
 ### Negative / Risks
 - Requires a reliable always-available Local Agent Node; an offline Watch is analytical-only by design (accepted trade-off).
 - Biometric→analog resonance mapping is unvalidated; the `[-1,+1]` mapping is a target, not a measured calibration.
-- ⚠️ Depends on the integrity zome actually enforcing provenance on `ThoughtCredential` — see the open Semgrep finding on missing authorship validation (`integrity/src/lib.rs`). **This ADR's security claims are only as strong as that fix.**
+- ✅ `ThoughtCredential.provenance` is bound to the action author by
+  `validate_thought_credential` in
+  `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs`; unit tests
+  `thought_rejects_provenance_mismatch` and `thought_accepts_self_authored`
+  verify the rule.
+- ⚠️ Conductor-level two-agent enforcement remains Specified: unit tests do
+  not yet demonstrate through a running conductor that agent A cannot publish
+  a `ThoughtCredential` attributed to agent B.
 
 ## References
 - `docs/specs/yumeichan-watch-architecture.spec.md`
 - `docs/specs/yumeichan-watch-capabilities.schema.json`
+- `docs/specs/integrity-provenance-validation.spec.md`
 - ADR-5 (Cognitive Virology / SRP), ADR-10 (Local Agent Node), ADR-12 (Consent Gate)

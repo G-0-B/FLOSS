@@ -30,6 +30,20 @@ def test_adr_13_substrate_bridge_matches_live_ternary_model() -> None:
     assert "carries continuous `[-1.0,+1.0]` attestation" not in text
 
 
+def test_adr_13_records_provenance_binding_evidence_and_pending_conductor_proof() -> None:
+    text = ADR_13_PATH.read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+
+    assert "open Semgrep finding on missing authorship validation" not in text
+    assert "✅ `ThoughtCredential.provenance` is bound to the action author" in normalized
+    assert "`validate_thought_credential`" in normalized
+    assert "`thought_rejects_provenance_mismatch`" in normalized
+    assert "`thought_accepts_self_authored`" in normalized
+    assert (
+        "⚠️ Conductor-level two-agent enforcement remains Specified" in normalized
+    )
+
+
 def valid_capability() -> dict[str, object]:
     return {
         "capability_id": "uhCAk",
