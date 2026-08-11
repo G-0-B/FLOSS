@@ -87,6 +87,33 @@ def test_artifact_mismatch_goldens_exactly_match_false_facts() -> None:
         ), row["id"]
 
 
+def test_chain_pointer_and_sequence_goldens_match_context() -> None:
+    """Keep pointer and sequence defects explicit and isolated."""
+    pointer_defects = {"E-P-MISSING-PRIOR", "E-P-CROSS-AGENT"}
+
+    for row in load_rows():
+        packet = row["input"]["packet"]
+        prior_by_agent = row["input"]["chain_context"]["prior_packets_by_agent"]
+        own_prior = prior_by_agent.get(packet["i"], [])
+
+        if not own_prior:
+            continue
+
+        latest_prior = max(own_prior, key=lambda prior: int(prior["s"]))
+        golden_defects = set(row["golden"]["defects"])
+
+        if pointer_defects.intersection(golden_defects):
+            assert packet["p"] is not None, row["id"]
+            assert packet["p"] not in {prior["d"] for prior in own_prior}, row["id"]
+        else:
+            assert packet["p"] == latest_prior["d"], row["id"]
+
+        sequence_is_nonmonotonic = int(packet["s"]) != int(latest_prior["s"]) + 1
+        assert ("E-SEQ-NONMONOTONIC" in golden_defects) is sequence_is_nonmonotonic, (
+            row["id"]
+        )
+
+
 def test_ppv_dev_007_accepts_a_nontransferable_signing_aid() -> None:
     row = next(row for row in load_rows() if row["id"] == "ppv-dev-007")
     aid = row["input"]["packet"]["i"]

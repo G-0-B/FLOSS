@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+
+import pytest
+
 from packages.source_chain.cell import CellDirectory
 from packages.orchestrator.claim_schema import (
     Claim,
@@ -9,6 +11,7 @@ from packages.orchestrator.claim_schema import (
     Outcome,
 )
 from packages.orchestrator.consensus_gate import decide
+from packages.orchestrator.serialization import entry_hash
 
 
 @pytest.fixture
@@ -27,13 +30,15 @@ def openhuman_2_cell(tmp_path: Path) -> CellDirectory:
     return CellDirectory(d, "dna_openhuman_commons")
 
 
-def test_openhuman_claim_and_verify_bridge(
+def test_openhuman_claim_and_vote_content_address_bridge(
     openhuman_1_cell: CellDirectory, openhuman_2_cell: CellDirectory
 ) -> None:
     """
-    Simulates the integration seam between OpenHuman and FLOSSI0ULLK.
-    Agent 1 (OpenHuman 1) crafts a memory and submits it as a Claim.
-    Agent 2 (OpenHuman 2) retrieves the claim and issues a verifying Vote.
+    Exercise the bounded file-precursor seam between OpenHuman and FLOSSI0ULLK.
+
+    Agent 1 crafts a Claim, two agent fixtures separately construct Votes, and the
+    gateway aggregates them. Peer retrieval, gossip, signatures, and read-time
+    tamper rejection are outside this test.
     """
 
     # 1. OpenHuman 1 extracts a local memory and crafts a FLOSSI0ULLK Claim
@@ -55,14 +60,17 @@ def test_openhuman_claim_and_verify_bridge(
         content=oh_claim.to_dict(),
     )
 
-    # Verify the claim was stored and cryptographically hashed
+    # Verify local storage and content-address generation. This is not a
+    # signature check or a production read-time tamper-verification path.
     assert claim_hash is not None
     chain_1 = openhuman_1_cell.read_chain()
     assert len(chain_1) == 1
+    assert openhuman_1_cell.head_hash() == claim_hash
+    assert entry_hash(chain_1[0]) == claim_hash
     assert chain_1[0]["content"]["proposer"] == agent_1_did
     assert chain_1[0]["content"]["summary"] == "Learned new Rust workflow pattern"
 
-    # --- Gossip occurs here (simulated by passing the claim_id) ---
+    # No gossip or peer retrieval occurs: the claim ID is passed in memory.
     claim_id_for_vote = chain_1[0]["content"]["id"]
 
     # 3. OpenHuman 1 records its independent supporting evaluation locally.
@@ -87,7 +95,7 @@ def test_openhuman_claim_and_verify_bridge(
     assert chain_1[0]["content"]["vote"]["voter"] == agent_1_vote.voter
     assert chain_1[0]["content"]["vote"]["weight"] == agent_1_vote.weight
 
-    # 4. OpenHuman 2 receives the claim, evaluates it against its own memory, and votes.
+    # 4. OpenHuman 2 is given the claim reference and authors its own vote.
     agent_2_did = "did:key:zOpenHuman2"
 
     oh_vote = Vote(
@@ -125,4 +133,4 @@ def test_openhuman_claim_and_verify_bridge(
     assert decision.tally_mean == pytest.approx(0.90)
     assert decision.tally_variance == pytest.approx(0.0025)
 
-    # Success! Two isolated personal AIs just formed a verifiable knowledge commons.
+    # Bounded result: local content addressing plus schema/decision aggregation.

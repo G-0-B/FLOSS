@@ -1,12 +1,26 @@
 # OpenHuman ↔ FLOSSI0ULLK Bridge Experiment
 
-**Status:** ⚠️ Specified (Proof of Concept)
+**Status:** ⚠️ Specified (bounded file-precursor experiment)
 **Target:** OpenHuman Core Architecture & FLOSSI0ULLK Layer 4.5 (Consensus Gateway)
 
-## 1. Abstract
-OpenHuman provides a sovereign, local-first intelligence and memory tree for the *individual*. FLOSSI0ULLK provides a cryptographic, agent-centric coordination layer for the *commons*.
+**Observed scope:** ✅ Verified by
+`packages/metacoordinator_mcp/tests/test_openhuman_bridge.py` — Claim/Vote schema
+mapping, local content-address generation, two separately constructed Votes, and
+gateway Decision aggregation.
 
-This experiment proves the integration seam between the two: allowing an OpenHuman agent to publish a specific memory claim to a shared Holochain-backed DHT, and allowing a separate OpenHuman agent to independently retrieve, evaluate, and verify that claim without relying on a centralized server.
+**Unproven scope:** ⚠️ Specified — Holochain publication, peer gossip or retrieval,
+entry signatures, read-time hash verification, tamper rejection, and decentralized
+transport are not exercised by this experiment.
+
+## 1. Abstract
+OpenHuman provides a sovereign, local-first intelligence and memory tree for the
+*individual*. FLOSSI0ULLK is designed to provide an agent-centric coordination
+layer for the *commons*.
+
+This experiment exercises a narrower precursor seam: one OpenHuman-shaped agent
+maps a memory into a FLOSSI0ULLK `Claim`; two agents author valid `Vote` objects;
+and the gateway aggregates those votes. It does not publish to a shared DHT or
+exercise independent retrieval or cryptographic verification.
 
 ## 2. The Seam (Data Mapping)
 
@@ -23,30 +37,45 @@ The claim is submitted to the FLOSSI0ULLK `CellDirectory` (the file-based precur
 
 ## 3. The Channel (CellDirectory)
 
-Instead of sending the claim to a central server (e.g., a Discord bot or a central database), the OpenHuman agent appends it to its own local `CellDirectory` source chain. 
+Instead of sending the claim to a central server, the OpenHuman agent appends it
+to its own local `CellDirectory` source chain.
 
-Holochain's gossip protocol (simulated in Layer 4.5 via file synchronization and the passive-router consensus gateway) broadcasts this claim to peers.
+The current test then passes the Claim ID in memory to the second fixture. It does
+not perform file synchronization, Holochain gossip, or peer retrieval.
 
-**Cryptographic Provenance:**
-The claim is saved as a JSON file named by the `SHA256` hash of its canonical serialization. This guarantees that no other agent can modify the OpenHuman's memory without breaking the cryptographic signature.
+**Content addressing:**
+`CellDirectory.append_entry()` saves the Claim as canonical JSON under a filename
+derived from its `SHA256` digest. The experiment independently recomputes that
+digest after reading the entry and confirms it matches the returned address.
+`CellDirectory.read_chain()` does not currently enforce that check, and entries
+are not signed here, so this experiment makes no tamper-rejection or signature
+guarantee.
 
 ## 4. The Validation (Yumeichan / Consensus)
 
-A second OpenHuman node (Agent B) receives the claim. 
-Instead of blindly accepting it, Agent B uses its own local LLM model to evaluate the claim against its own memories.
+A second OpenHuman-shaped fixture (Agent B) is given the Claim ID and constructs
+its own Vote. The experiment does not invoke an LLM or inspect an external memory
+store; the rationale is deterministic test data.
 
 Agent B generates a `Vote`:
 - **Weight**: Float between `[-0.999, +0.999]` representing support, opposition, or abstention.
 - **Rationale**: The reasoning behind the vote.
 - **Voter Identity**: `did:key:zOpenHuman2...`
 
-This vote is appended to Agent B's source chain and gossiped back. The FLOSSI0ULLK gateway aggregates the votes into a `Decision`.
+This Vote is appended to Agent B's local source chain. The test passes both voter
+functions directly to the FLOSSI0ULLK gateway, which aggregates them into a
+`Decision`; no gossip path is exercised.
 
 ## 5. Experiment Objectives
 
 1. **Serialize**: Successfully convert an OpenHuman memory into a valid FLOSSI0ULLK `Claim`.
-2. **Store**: Persist the claim in a `CellDirectory` without schema errors.
-3. **Validate**: Have a secondary agent generate a valid `Vote` against the claim.
+2. **Store**: Persist the claim in a `CellDirectory` and recompute its local
+   content address.
+3. **Validate**: Have two agent fixtures generate valid `Vote` objects against
+   the Claim ID.
 4. **Resolve**: Aggregate the interaction into a terminal `Decision` (e.g., `Outcome.APPROVED`).
 
-This proves that isolated personal AIs can form a verifiable, secure knowledge commons.
+✅ Verified by the cited test: the file precursor supports schema mapping, local
+content-address generation, separately constructed Vote records, and Decision
+aggregation. ⚠️ Specified, not proven here: a verifiable shared commons requires
+peer transport/retrieval plus enforced signatures and read-time integrity checks.
