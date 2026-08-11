@@ -491,6 +491,70 @@ def test_same_agent_same_prior_and_sequence_fork_is_rejected(tmp_path, monkeypat
     ]
 
 
+def test_same_position_fork_rejects_sibling_that_cites_other_as_evidence(
+    tmp_path, monkeypatch
+):
+    """Sibling evidence cannot make one side of a valid fork pass."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "id"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-11T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "prior",
+    }
+    prior, _prior_path = provenance.create_packet(
+        [entry],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    first, first_path = provenance.create_packet(
+        [{**entry, "created_at": "2026-08-11T00:00:01Z", "next_action": "first"}],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    second = json.loads(json.dumps(first))
+    second["a"][0]["next_action"] = "second"
+    first_ref = first_path.resolve().relative_to(tmp_path.resolve()).as_posix()
+    second["a"][0]["evidence_refs"].append(
+        {
+            "type": "provenance_packet",
+            "ref": first_ref,
+            "sha256": provenance.sha256_file(first_path),
+        }
+    )
+    second_bytes = _resign_packet(second, identity_dir=identity_dir)
+    second_path = first_path.with_name(f"{second['d']}.json")
+    second_path.write_bytes(second_bytes)
+
+    assert first["i"] == second["i"] == prior["i"]
+    assert first["p"] == second["p"] == prior["d"]
+    assert first["s"] == second["s"] == "1"
+    assert first["d"] != second["d"]
+
+    results = [
+        provenance.validate_packet(
+            path, workspace_root=tmp_path, provenance_root=output_root
+        )
+        for path in (first_path, second_path)
+    ]
+
+    assert [(result.ok, result.errors) for result in results] == [
+        (False, ["E_PROVENANCE_CHAIN_FORK"]),
+        (False, ["E_PROVENANCE_CHAIN_FORK"]),
+    ]
+
+
 @pytest.mark.parametrize(
     "sibling_kind",
     [

@@ -393,7 +393,7 @@ def _has_valid_same_position_competitor(
             provenance_root=provenance_root,
             max_depth=max_depth,
             _depth=depth,
-            _skip_same_position_fork_check=True,
+            _ignored_chain_position=chain_position,
         )
         if competitor.ok:
             return True
@@ -528,6 +528,7 @@ def _recursive_evidence_errors(
     seen: set[str],
     depth: int,
     max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
 ) -> list[str]:
     errors: list[str] = []
     if depth > max_depth:
@@ -554,6 +555,7 @@ def _recursive_evidence_errors(
                 _seen=seen,
                 _depth=depth + 1,
                 max_depth=max_depth,
+                _ignored_chain_position=ignored_chain_position,
             )
             if child.ok:
                 subtree_has_root = True
@@ -572,7 +574,7 @@ def validate_packet(
     max_depth: int = 8,
     _seen: set[str] | None = None,
     _depth: int = 0,
-    _skip_same_position_fork_check: bool = False,
+    _ignored_chain_position: tuple[Any, Any, Any] | None = None,
 ) -> PacketValidation:
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
@@ -668,6 +670,7 @@ def validate_packet(
                 _seen=seen,
                 _depth=_depth,
                 max_depth=max_depth,
+                _ignored_chain_position=_ignored_chain_position,
             )
             if not prior_result.ok:
                 errors.extend(prior_result.errors)
@@ -692,12 +695,14 @@ def validate_packet(
             seen=seen,
             depth=_depth,
             max_depth=max_depth,
+            ignored_chain_position=_ignored_chain_position,
         )
     )
 
+    chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
     if (
         not errors
-        and not _skip_same_position_fork_check
+        and chain_position != _ignored_chain_position
         and _has_valid_same_position_competitor(
             packet,
             packet_path=packet_path,
