@@ -462,3 +462,70 @@ def test_payload_entry_malformed_artifact_ref_is_invalid(tmp_path, monkeypatch):
     )
     assert result.ok is False
     assert "E_PROVENANCE_ARTIFACT_REF_INVALID" in result.errors
+
+
+def test_deleted_ancestor_artifact_warns_but_does_not_fail_descendant(
+    tmp_path, monkeypatch
+):
+    """A packet attests to a past state; deleting that artifact later must not
+    poison every descendant on the chain.
+
+    Regression for the 2026-08-10 finding: a throwaway probe file
+    (`packages/_hook_live_probe.py`) was hook-touched, packeted, then deleted.
+    Because ancestor artifact-existence was re-checked on every descendant
+    validation, `submit_claim` failed with
+    E_PROVENANCE_INVALID/E_PROVENANCE_ARTIFACT_MISSING for every later edit —
+    the hook generated packets that could never be accepted.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    identity_dir = tmp_path / "identity"
+    output_root = tmp_path / "packets"
+
+    def entry(artifact):
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": "2026-08-10T00:00:00Z",
+            "human_collision_node": "anthony",
+            "artifact_refs": [
+                provenance.artifact_ref(artifact, workspace_root=tmp_path)
+            ],
+            "evidence_refs": [{"type": "test", "ref": "unit"}],
+            "risks": [],
+            "benefits": [],
+            "next_action": "none",
+        }
+
+    doomed = tmp_path / "scratch_probe.py"
+    doomed.write_text("# temporary probe\n", encoding="utf-8")
+    provenance.create_packet(
+        [entry(doomed)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    survivor = tmp_path / "real_module.py"
+    survivor.write_text("VALUE = 1\n", encoding="utf-8")
+    _child, child_path = provenance.create_packet(
+        [entry(survivor)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    # The ancestor's artifact goes away, as scratch files do.
+    doomed.unlink()
+
+    result = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is True, f"descendant must stay valid, got {result.errors}"
+    assert "E_PROVENANCE_ARTIFACT_MISSING" not in result.errors
+    assert "E_PROVENANCE_ARTIFACT_MISSING" in result.warnings
+
+    # The descendant's OWN missing artifact is still fatal.
+    survivor.unlink()
+    own = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+    assert own.ok is False
+    assert "E_PROVENANCE_ARTIFACT_MISSING" in own.errors

@@ -53,6 +53,17 @@ class PacketValidation:
     packet_digest: str | None = None
     narrative_lines: list[str] = field(default_factory=list)
     packet: dict[str, Any] | None = None
+    warnings: list[str] = field(default_factory=list)
+    """Non-fatal findings, chiefly from ANCESTOR packets.
+
+    A packet attests to a state that was true when it was signed. Requiring an
+    ancestor's artifact to still exist conflates history with current state: it
+    means deleting or renaming any file that was ever hook-touched permanently
+    poisons every later packet in that agent's chain. Ancestor artifact-absence
+    and unreachable ancestors are therefore recorded here rather than in
+    `errors`. A HASH MISMATCH stays fatal at any depth — a file that still
+    exists but differs is a real tamper signal, not history.
+    """
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -506,6 +517,7 @@ def validate_packet(
     max_depth: int = 8,
     _seen: set[str] | None = None,
     _depth: int = 0,
+    _is_ancestor: bool = False,
 ) -> PacketValidation:
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
@@ -523,6 +535,7 @@ def validate_packet(
             )
 
     errors: list[str] = []
+    warnings: list[str] = []
     digest = packet.get("d")
     # Branch-local copy of the traversal path: cycle detection must reject only
     # cycles on the CURRENT path, not shared evidence reached via sibling
@@ -572,7 +585,13 @@ def validate_packet(
     else:
         errors.extend(_payload_entry_errors(packet["a"]))
 
-    errors.extend(_artifact_errors(packet, root))
+    # Ancestor artifacts may legitimately be gone (scratch probes, renames,
+    # relocated intake). Only absence is downgraded; hash mismatch stays fatal.
+    for problem in _artifact_errors(packet, root):
+        if _is_ancestor and problem == "E_PROVENANCE_ARTIFACT_MISSING":
+            warnings.append(problem)
+        else:
+            errors.append(problem)
 
     prov_root = (
         Path(provenance_root)
@@ -583,8 +602,19 @@ def validate_packet(
     if prior_digest is not None:
         prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
         if prior_path is None:
-            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+            # Depth 0 = the packet under submission; its own immediate prior
+            # missing is a real break and stays fatal. Deeper in, an unreachable
+            # ancestor truncates the walk instead of failing the descendant —
+            # otherwise one pruned packet kills every future claim on the chain.
+            if not _is_ancestor:
+                errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+            else:
+                warnings.append("E_PROVENANCE_PRIOR_UNAVAILABLE")
         else:
+            # NOTE: _depth is deliberately NOT incremented here. `max_depth`
+            # bounds the evidence DAG; a linear prior chain is bounded by cycle
+            # detection instead, so a long honest chain must not trip the depth
+            # guard. See test_long_linear_prior_chain_is_not_evidence_recursion.
             prior_result = validate_packet(
                 prior_path,
                 workspace_root=root,
@@ -592,9 +622,11 @@ def validate_packet(
                 _seen=seen,
                 _depth=_depth,
                 max_depth=max_depth,
+                _is_ancestor=True,
             )
             if not prior_result.ok:
                 errors.extend(prior_result.errors)
+            warnings.extend(prior_result.warnings)
             # Per-agent chain continuity: the prior must belong to the same
             # author and its sequence must directly precede this one. Without
             # this, a signed packet could point at another agent's packet or
@@ -622,6 +654,7 @@ def validate_packet(
     return PacketValidation(
         ok=not errors,
         errors=sorted(set(errors)),
+        warnings=sorted(set(warnings)),
         packet_digest=digest if isinstance(digest, str) else None,
         narrative_lines=narrative_lines(packet) if not errors else [],
         packet=packet,

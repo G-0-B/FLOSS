@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-08-10 (Root-drop consolidation pass — see A.000000)
+**Last refreshed:** 2026-08-10 (Process-surface audit — see A.0000000; root-drop consolidation — see A.000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -9,6 +9,29 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 ---
 
 ## Section A — Immediate threads (this session or next)
+
+### A.0000000 Process-surface audit: skills, hooks, agentmemory (2026-08-10)
+
+**Trigger:** operator asked whether this workspace's own skills were being used and whether the hooks actually remind anyone to use them. Audit answer: **no, and the reminder infrastructure did not exist.** The 8-phase consolidation pass immediately preceding this entry ran with **0 Skill invocations, 0 consensus claims, 0 agentmemory writes** — while making System/Substrate-class changes.
+
+**Root causes found (not assumed) and fixed the same day:**
+
+| # | Finding | Evidence | Fix |
+|---|---|---|---|
+| 1 | **No skills reminder existed anywhere.** | `grep -riE 'skill\|superpower' FLOSS/hooks/*.py` → empty; `STARTUP_CONTRACT.md` never named a skill | New **Skills** section in `.agent-surface/STARTUP_CONTRACT.md` — situation→skill table, the 1%-chance rule, and an explicit "persist what you learn" clause |
+| 2 | **Provenance spine silently dead.** Every `submit_claim` failed `E_PROVENANCE_ARTIFACT_MISSING;E_PROVENANCE_PRIOR_NOT_FOUND` | Reproduced deterministically against `.agent-surface/provenance/2026-08-11/Eu_HxHK…json` | Ancestor artifact-**absence** → warning (new `PacketValidation.warnings`); hash **mismatch** stays fatal at any depth. Regression test added |
+| 3 | **Canon edits invisible to the hook.** Fired once in the whole pass | `hook_post_write.py` gated on `/packages/` + `.py/.rs/.toml` only | Added canon rule set: `.md`/`.json` under `docs/adr`, `docs/specs`, `docs/governance` — same surfaces `spec_gate` gates. Research/intake_raw deliberately still excluded |
+| 4 | **agentmemory recall failed silently.** | `hook.log`: `memory_recall timed out after 0.8s, killing child` | Default 0.8 s → **2.5 s**, overridable via `FLOSS_MEMORY_RECALL_TIMEOUT`; failure now renders a visible ⚠️ block instead of looking like "no memories exist" |
+
+**Verified after:** 162 tests pass · `session_start_inject.py` dry run emits the Skills section and a populated memory block · filter behaviour table 11/11 correct · `spec_gate --check` green.
+
+**Still open from this audit:**
+
+- **`test_concurrent_first_packet_creation_converges_on_one_identity` is flaky** — 12 threads racing on identity creation with a 0.02 s sleep; failed once, passed on two immediate re-runs. Pre-existing, not caused by the provenance change. Needs a deterministic barrier or a retry marker.
+- **`E_PROVENANCE_PRIOR_UNAVAILABLE` warnings are now expected on this machine's chain** — packet `Eg-62YdKOGORtcko0_lyJ4YPavKrcNZiXRivoH_sD3Zs` is referenced as a prior but absent from `.agent-surface/provenance/`. Decide whether to backfill it or accept the truncation.
+- **Nothing consumes `PacketValidation.warnings` yet.** The gateway logs errors only; warnings are collected and dropped. Surface them in `submit_claim` output so a truncated chain is visible rather than silent.
+- **Consensus claims still aren't being submitted for canon edits** — fix 3 makes them *eligible*; whether the gateway is reachable and voters respond is untested since the MCP surface dropped mid-session.
+- **Per-harness parity:** the Skills section lives in `STARTUP_CONTRACT.md`, which Codex/Gemini/OpenCode reference by path. Confirm each harness actually loads it rather than only Claude Code.
 
 ### A.000000 Root-drop consolidation backlog (2026-08-10)
 

@@ -46,8 +46,22 @@ PRE_WRITE_CHECKPOINT_DIR = AGENT_DIR / "checkpoints" / "pre_write"
 EMIT_STDOUT_JSON = "--stdout-json" in sys.argv[1:]
 
 # Substantive = worth burning a consensus round on. Intentionally narrow.
+#
+# Two rule sets, because code and canon are substantive for different reasons.
+# CODE: implementation under packages/. CANON: the three surfaces where a
+# markdown/JSON edit changes what the project claims to be true — the same
+# surfaces spec_gate gates. Prose elsewhere (docs/research, intake_raw, notes)
+# stays out: it is pre-spec by definition and would drown the gateway.
+#
+# Added 2026-08-10. Before this, the 2026-08-10 root-consolidation pass made
+# ~40 edits to the kernel, INDEX, ADRs, specs and manifests and fired the hook
+# exactly ONCE, on the single .py file it touched. Canon drift was structurally
+# invisible to the provenance spine.
 SUBSTANTIVE_PATH_SEGMENTS = ("/packages/",)
 SUBSTANTIVE_EXTENSIONS = (".py", ".rs", ".toml")
+
+CANON_PATH_SEGMENTS = ("/docs/adr/", "/docs/specs/", "/docs/governance/")
+CANON_EXTENSIONS = (".md", ".json")
 
 # Even within substantive paths, skip these — they're routine noise.
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
@@ -98,15 +112,27 @@ def finish() -> int:
 
 
 def is_substantive(path_str: str) -> bool:
-    """True if this edit is worth submitting as a Claim."""
+    """True if this edit is worth submitting as a Claim.
+
+    Either it is implementation code under packages/, or it is a markdown/JSON
+    edit on one of the three canon surfaces (adr, specs, governance). Anything
+    on an intake mouth — docs/research, intake_raw, agent-memory — is excluded
+    by SKIP_SEGMENTS and by not matching either rule set.
+    """
     if not path_str:
         return False
     norm = "/" + path_str.replace("\\", "/").lstrip("/").lower()
     if any(skip in norm for skip in SKIP_SEGMENTS):
         return False
-    if not norm.endswith(SUBSTANTIVE_EXTENSIONS):
-        return False
-    return any(part in norm for part in SUBSTANTIVE_PATH_SEGMENTS)
+    if norm.endswith(SUBSTANTIVE_EXTENSIONS) and any(
+        part in norm for part in SUBSTANTIVE_PATH_SEGMENTS
+    ):
+        return True
+    if norm.endswith(CANON_EXTENSIONS) and any(
+        part in norm for part in CANON_PATH_SEGMENTS
+    ):
+        return True
+    return False
 
 
 def is_mutating_tool(tool_name: str) -> bool:
