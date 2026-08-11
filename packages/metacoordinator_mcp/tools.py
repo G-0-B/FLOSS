@@ -387,6 +387,9 @@ class GatewayTools:
         rendered_count = 0
         truncated = False
         per_value_overflow = "[packet metadata exceeds per-value voter context limit]"
+        mandatory_exactness_failure = (
+            "[packet mandatory metadata cannot be represented exactly in voter context]"
+        )
 
         def sanitize(value: object) -> str:
             return re.sub(
@@ -399,7 +402,14 @@ class GatewayTools:
             ).strip()
 
         for packet, packet_path in packets:
-            digest = sanitize(packet.get("d") or "(no-digest)")
+            raw_digest = packet.get("d") or "(no-digest)"
+            digest = sanitize(raw_digest)
+            if (
+                not isinstance(raw_digest, str)
+                or not raw_digest.isprintable()
+                or digest != raw_digest
+            ):
+                return mandatory_exactness_failure
             if len(digest) > 96:
                 return per_value_overflow
             consent_hash: Optional[str] = None
@@ -408,7 +418,7 @@ class GatewayTools:
                     consent_ref = entry.get("consent_ref") or {}
                     decision = consent_ref.get("decision_action_hash")
                     if isinstance(decision, str) and decision.strip():
-                        consent_hash = consent_hash or decision.strip()
+                        consent_hash = consent_hash or decision
             nested_refs: list[str] = []
             try:
                 metadata_refs, packet_truncated = (
@@ -441,6 +451,10 @@ class GatewayTools:
                 # changed or otherwise invalid child DAG contributes no context.
                 nested_refs = []
             consent_str = sanitize(consent_hash) if consent_hash else "(none)"
+            if consent_hash is not None and (
+                not consent_hash.isprintable() or consent_str != consent_hash
+            ):
+                return mandatory_exactness_failure
             if len(consent_str) > 160:
                 return per_value_overflow
             packet_contexts.append(

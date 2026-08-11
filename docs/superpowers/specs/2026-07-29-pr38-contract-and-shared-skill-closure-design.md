@@ -1,7 +1,7 @@
 # PR #38 Contract and Shared-Skill Closure Design
 
 **Date:** 2026-07-29
-**Status:** ⚠️ Specified — implementation and verification have not yet landed
+**Status:** ⚠️ Specified design; branch implementation is evidenced by the tests named below, while merge and deployment status remain external
 **Approved scope:** Human approval in the current task for closure items 1, 2, 3, and 5; Cloudflare explicitly excluded
 **Frozen starting head:** `705f555977e118c075ec0cccc2910bd2f5fe134a`
 
@@ -117,7 +117,11 @@ For each top-level `provenance_packet` evidence reference:
    derived context rather than weakening the submission gate.
 
 The existing packet digest and consent-decision hash remain visible. Direct
-non-packet evidence behavior remains unchanged.
+non-packet evidence behavior remains unchanged. Because the digest and consent
+decision hash are signed identity-bearing metadata, rendering fails closed with
+a deterministic whole-context sentinel if whitespace sanitization would change
+either exact value or if either value contains non-printable characters; it
+never substitutes a normalized or transport-unsafe identity.
 
 ### Deferred voter retries
 
@@ -171,6 +175,10 @@ distribution path and is not silently marked materialized.
 - A child cycle or depth overflow never produces voter-visible derived evidence.
 - More than 32 roots or 4,096 characters produces a deterministic truncation
   marker and stays within the bound.
+- A schema-valid signed consent hash containing whitespace that sanitization
+  would change produces the exactness sentinel and no partial metadata.
+- A schema-valid signed consent hash containing non-printable control characters
+  produces the same sentinel and no partial metadata.
 - Existing direct-root rendering remains unchanged.
 - A persisted OMO Critic vote prevents a second provider invocation.
 - A persisted OMO Momus vote prevents a second provider invocation.

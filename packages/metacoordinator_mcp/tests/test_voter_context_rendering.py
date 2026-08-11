@@ -391,6 +391,64 @@ def test_render_voter_context_fails_closed_on_oversized_consent_hash(tmp_path):
     assert consent_hash[:160] not in context
 
 
+def test_render_voter_context_fails_closed_when_consent_hash_changes_on_sanitize(
+    tmp_path,
+):
+    """Mandatory signed metadata must never be normalized into a new identity."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        consent_hash = "consent-part-1\n\tconsent-part-2"
+        _packet, packet_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "exact-consent.md"}],
+                    consent_hash=consent_hash,
+                )
+            ],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert context == (
+        "[packet mandatory metadata cannot be represented exactly in voter context]"
+    )
+    assert "consent-part-1" not in context
+    assert "consent-part-2" not in context
+
+
+def test_render_voter_context_fails_closed_on_non_printable_consent_hash(tmp_path):
+    """Schema-valid control characters cannot enter the voter prompt unchanged."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        consent_hash = "consent-part-1\x00consent-part-2"
+        _packet, packet_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[{"type": "spec", "ref": "control-consent.md"}],
+                    consent_hash=consent_hash,
+                )
+            ],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert context == (
+        "[packet mandatory metadata cannot be represented exactly in voter context]"
+    )
+    assert "consent-part-1" not in context
+    assert "consent-part-2" not in context
+
+
 def test_render_voter_context_deduplicates_before_unique_ref_budget(tmp_path):
     """Repeated metadata cannot crowd out a later unique evidence ref."""
     with tempfile.TemporaryDirectory() as tmp:

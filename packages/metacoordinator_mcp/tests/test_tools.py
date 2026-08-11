@@ -482,8 +482,9 @@ def _assert_persisted_omo_voter_is_not_invoked(prefix: str, voter_id: str):
         calls.append(claim.id)
         return Vote(voter=voter_id, weight=0.7, rationale="must not run")
 
-    assert voter_id.startswith(prefix)
-    omo_voter.__name__ = voter_id
+    wrapper_name = f"{prefix}{voter_id}"
+    assert not voter_id.startswith(prefix)
+    omo_voter.__name__ = wrapper_name
 
     with tempfile.TemporaryDirectory() as tmp:
         gw = make_gateway(tmp, voter_factory=lambda: [omo_voter])
@@ -512,15 +513,11 @@ def _assert_persisted_omo_voter_is_not_invoked(prefix: str, voter_id: str):
 
 
 def test_run_consensus_round_skips_persisted_omo_critic_voter():
-    _assert_persisted_omo_voter_is_not_invoked(
-        "omo_critic_voter_", "omo_critic_voter_critic-probe"
-    )
+    _assert_persisted_omo_voter_is_not_invoked("omo_critic_voter_", "critic-probe")
 
 
 def test_run_consensus_round_skips_persisted_omo_momus_voter():
-    _assert_persisted_omo_voter_is_not_invoked(
-        "omo_momus_voter_", "omo_momus_voter_momus-probe"
-    )
+    _assert_persisted_omo_voter_is_not_invoked("omo_momus_voter_", "momus-probe")
 
 
 # ---------------------------------------------------------------------------
