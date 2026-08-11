@@ -10,6 +10,7 @@ calibrated checklist item 4).
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -170,6 +171,69 @@ def test_render_voter_context_exposes_digest_consent_and_nested_evidence(tmp_pat
     assert "consent_ref=uhCAk" in context
     assert "nested_evidence=" in context
     assert "[spec] docs/specs/provenance-packet.spec.md" in context
+
+
+def test_render_voter_context_distinguishes_nested_evidence_by_sha256(tmp_path):
+    """Content-addressed versions of the same ref stay distinct to voters."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        hashes = ["a" * 64, "b" * 64]
+        _packet, packet_path = provenance.create_packet(
+            [
+                _packet_entry(
+                    tmp_path,
+                    evidence_refs=[
+                        {
+                            "type": "spec",
+                            "ref": "versioned-evidence.md",
+                            "sha256": evidence_hash,
+                        }
+                        for evidence_hash in hashes
+                    ],
+                )
+            ],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    for evidence_hash in hashes:
+        assert (
+            f"[spec] versioned-evidence.md sha256={evidence_hash}" in context
+        )
+    assert context.count("[spec] versioned-evidence.md") == 2
+
+
+def test_render_voter_context_never_partially_renders_nested_sha256(tmp_path):
+    """Bounded context includes each optional hash in full or omits its ref."""
+    with tempfile.TemporaryDirectory() as tmp:
+        output_root = tmp_path / ".agent-surface" / "provenance"
+        refs = [
+            {
+                "type": "spec",
+                "ref": f"doc-{index}-{'x' * 220}.md",
+                "sha256": f"{index:064x}",
+            }
+            for index in range(32)
+        ]
+        _packet, packet_path = provenance.create_packet(
+            [_packet_entry(tmp_path, evidence_refs=refs)],
+            identity_dir=tmp_path / "identity",
+            output_root=output_root,
+            prior_digest=None,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(_packet_ref(packet_path, tmp_path))
+        )
+
+    assert len(context) <= 4096
+    assert "[truncated]" in context
+    rendered_hashes = re.findall(r"sha256=([a-f0-9]+)", context)
+    assert rendered_hashes
+    assert all(len(evidence_hash) == 64 for evidence_hash in rendered_hashes)
 
 
 def test_render_voter_context_traverses_real_signed_child_packet(tmp_path):
