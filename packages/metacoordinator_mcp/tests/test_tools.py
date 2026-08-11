@@ -548,6 +548,8 @@ def _run_all():
         test_run_consensus_round_retallies_manual_votes_after_deferred,
         test_get_decision_finds_buried_decision,
         test_run_consensus_round_returns_json_error_on_write_failure,
+        test_run_consensus_round_skips_persisted_omo_critic_voter,
+        test_run_consensus_round_skips_persisted_omo_momus_voter,
     ]
     passed = failed = 0
     for t in tests:

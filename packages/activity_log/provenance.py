@@ -361,10 +361,24 @@ def _signature_bytes(signature: str) -> bytes:
     return _b64url_decode(signature[2:])
 
 
+def _payload_entries(packet: dict[str, Any]) -> list[Any]:
+    """Return payload entries only when the signed field has the required shape."""
+    entries = packet.get("a")
+    return entries if isinstance(entries, list) else []
+
+
+def _entry_list_field(entry: Any, field_name: str) -> list[Any]:
+    """Return a list field without iterating malformed signed payload values."""
+    if not isinstance(entry, dict):
+        return []
+    value = entry.get(field_name)
+    return value if isinstance(value, list) else []
+
+
 def _artifact_errors(packet: dict[str, Any], workspace_root: Path) -> list[str]:
     errors: list[str] = []
-    for entry in packet.get("a", []):
-        for ref in entry.get("artifact_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "artifact_refs"):
             if not isinstance(ref, dict):
                 errors.append("E_PROVENANCE_ARTIFACT_REF_INVALID")
                 continue
@@ -383,8 +397,8 @@ def _artifact_errors(packet: dict[str, Any], workspace_root: Path) -> list[str]:
 
 
 def _has_non_packet_evidence(packet: dict[str, Any]) -> bool:
-    for entry in packet.get("a", []):
-        for ref in entry.get("evidence_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if isinstance(ref, dict) and ref.get("type") != "provenance_packet":
                 return True
     return False
@@ -427,7 +441,7 @@ def _payload_entry_errors(entries: list[Any]) -> list[str]:
             if not isinstance(entry.get(field_name), list):
                 errors.append(f"E_PROVENANCE_ENTRY_FIELD_MISSING:{field_name}")
         # artifactRef shape: {path: non-empty str, sha256: 64-hex}
-        for ref in entry.get("artifact_refs") or []:
+        for ref in _entry_list_field(entry, "artifact_refs"):
             if (
                 not isinstance(ref, dict)
                 or not isinstance(ref.get("path"), str)
@@ -437,7 +451,7 @@ def _payload_entry_errors(entries: list[Any]) -> list[str]:
             ):
                 errors.append("E_PROVENANCE_ARTIFACT_REF_INVALID")
         # evidenceRef shape: {type ∈ enum, ref: non-empty str, sha256?: 64-hex}
-        for ref in entry.get("evidence_refs") or []:
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if (
                 not isinstance(ref, dict)
                 or ref.get("type") not in _EVIDENCE_REF_TYPES
@@ -472,8 +486,8 @@ def _recursive_evidence_errors(
     # carries a non-packet root in its own subtree (this same check runs for it),
     # so chained/cross-agent handoffs (derived -> prior -> test/spec) are valid.
     subtree_has_root = _has_non_packet_evidence(packet)
-    for entry in packet.get("a", []):
-        for ref in entry.get("evidence_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if not isinstance(ref, dict) or ref.get("type") != "provenance_packet":
                 continue
             ref_value = ref.get("ref")

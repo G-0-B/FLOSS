@@ -6,6 +6,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 FLOSS_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE_ROOT = FLOSS_ROOT.parent
 if str(FLOSS_ROOT) not in sys.path:
@@ -462,3 +464,46 @@ def test_payload_entry_malformed_artifact_ref_is_invalid(tmp_path, monkeypatch):
     )
     assert result.ok is False
     assert "E_PROVENANCE_ARTIFACT_REF_INVALID" in result.errors
+
+
+@pytest.mark.parametrize(
+    ("field_name", "expected_error"),
+    [
+        ("artifact_refs", "E_PROVENANCE_ENTRY_FIELD_MISSING:artifact_refs"),
+        ("evidence_refs", "E_PROVENANCE_ENTRY_FIELD_MISSING:evidence_refs"),
+    ],
+)
+def test_signed_packet_with_non_list_reference_field_returns_structured_invalid(
+    tmp_path, monkeypatch, field_name, expected_error
+):
+    """A signed malformed list field is invalid without escaping as TypeError."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    out = tmp_path / ".agent-surface" / "provenance"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-06-13T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "x"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "noop",
+    }
+    entry[field_name] = 1
+    _packet, path = provenance.create_packet(
+        [entry],
+        identity_dir=tmp_path / "id",
+        output_root=out,
+        prior_digest=None,
+    )
+
+    result = provenance.validate_packet(
+        path, workspace_root=tmp_path, provenance_root=out
+    )
+
+    assert result.ok is False
+    assert expected_error in result.errors
