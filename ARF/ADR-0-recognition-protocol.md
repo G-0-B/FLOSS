@@ -102,7 +102,7 @@ The "walking skeleton" is:
 **How we know this works**:
 
 1. **Transmission test**: PASSED. New AI systems read kernel + ADRs and are productive within minutes. Demonstrated across Claude, ChatGPT, Grok, DeepSeek, Gemini.
-   **Evidence**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (canonical kernel), `docs/adr/INDEX.md` (ADR index), `CLAUDE.md` (session onboarding doc).
+   **Evidence**: `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` (canonical kernel), `docs/adr/INDEX.md` (ADR index), `CLAUDE.md` (session onboarding doc).
 2. **Composition test**: PASSED. 118+ conversations across 5 AI systems composed into unified architecture consensus (2026-03-20). Zero unresolved contradictions after reconciliation.
    **Evidence**: `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md` (reconciliation synthesis), `docs/adr/ADR-6-four-system-integration.md` (integration decision), `docs/research/` conversation-export corpus (repo-tracked).
 3. **Persistence test**: PASSED. Understanding survives via: CLAUDE.md, ADR system, Serena memories, Master Metaprompt kernel, conversation exports.
@@ -116,7 +116,7 @@ The "walking skeleton" is:
 
 ## Related Documents
 
-- `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
+- `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — Canonical kernel
 - `SDD-Master-Spec-0.22.md` — Specification-Driven Development spec
 - `docs/adr/INDEX.md` — ADR index
 - `docs/specs/harvest-protocol.spec.md` — HARVEST self-observation loop specification (supports ADR-5)

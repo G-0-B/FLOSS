@@ -127,7 +127,7 @@ Phase 0: Substrate Viability Spike    ← CURRENT TARGET
 
 ## Governance Stack (precedence order)
 
-1. Kernel → `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (repo root)
+1. Kernel → `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` (repo root)
 2. UOP v2.1 → `docs/governance/uop-v2.1.md` (nine-gate execution loop)
 3. Spine v0.5 → `docs/governance/spine-v0.5.md`
 4. ADRs → `docs/adr/INDEX.md`

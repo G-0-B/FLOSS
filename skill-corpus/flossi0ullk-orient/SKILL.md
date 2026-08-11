@@ -94,7 +94,7 @@ In order, read only what the probe marked present and fresh:
 1. `.agent-surface/context/CONTEXT_L0.md` — cheap re-orientation.
 2. `INDEX.md` — authoritative map of the repo.
 3. `FLOSS/CLAUDE.md` — agent-facing operating notes.
-4. `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — **only** if the task touches governing principles.
+4. `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — **only** if the task touches governing principles.
 
 ### Step 2 — Route (T1 → T2)
 
@@ -176,7 +176,7 @@ for f in \
   .agent-surface/context/CONTEXT_L1.md \
   INDEX.md \
   FLOSS/CLAUDE.md \
-  FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md \
+  FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md \
   FLOSS/scripts/context_router.py \
   FLOSS/scripts/orient_probe.py; do
   if [ -f "$f" ]; then

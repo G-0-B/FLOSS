@@ -10,13 +10,13 @@ FLOSS is the project home for **FLOSSI0ULLK** (Free Libre Open Source Singularit
 
 **Prime directive**: Logic validates, neural assists — never the reverse. LLMs are formatting engines; truth is established by symbolic validation in Holochain integrity zomes, which cannot be bypassed.
 
-**North star** (from the Master Metaprompt v1.3.1): create the conditions for intelligence itself — human, artificial, synthetic, hybrid — to coordinate toward good, without contradiction, across a sovereign commons that neither state nor platform can enclose.
+**North star** (from the Master Metaprompt v1.4.0): create the conditions for intelligence itself — human, artificial, synthetic, hybrid — to coordinate toward good, without contradiction, across a sovereign commons that neither state nor platform can enclose.
 
 ## Directory Map
 
 ```
 FLOSS/
-├── FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md  # CANONICAL kernel — start here for context
+├── FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md  # CANONICAL kernel — start here for context
 ├── SDD-Master-Spec-0.22.md                          # Specification-Driven Development spec
 ├── README.md, LICENSE, MVP_PLAN.md, INSTRUCTIONS_FOR_CODE.md
 │
@@ -61,7 +61,7 @@ For the workspace root (`C:\~shit\`) and the intake-mouth convention, see `C:\~s
 
 **Sibling project:** `C:\~shit\FLOSSI_U/` is the Free YOU-niversity — a separate FLOSS educational/sovereignty project that shares the FLOSSI0ULLK family but has its own ADR-001..019 namespace and canon. Relocated 2026-05-11 from the prior co-located path `FLOSS/FLOSSI_U_Founding_Kit_v1.6/`. The two projects do not share ADR numbering.
 
-## Layer Stack (from Master Metaprompt v1.3.1)
+## Layer Stack (from Master Metaprompt v1.4.0)
 
 | Layer | Technology | Location |
 |-------|-----------|----------|
@@ -158,7 +158,7 @@ ruff check .
 ## Key Entry Points
 
 - **Master index**: `../INDEX.md` (workspace root)
-- **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`
+- **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`
 - **Architecture (teleological axis)**: `docs/architecture/HOLISTIC_ARCHITECTURE.md` — CCES 8-layer + Foundation Stack (what flourishing is being served)
 - **Architecture (operational axis)**: `docs/architecture/META_COORDINATION_KERNEL_v4.0.md` — 9-layer agent-centric stack + RICE overlay + Superalignment Triad + 10 named roles (what agents do, where authority sits). See §21 for the orthogonal-axis composition with CCES. Landed 2026-05-13 via consensus claim `019e2293` APPROVED mean +0.717.
 - **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`

@@ -10,7 +10,7 @@ status: "Active"
 updated: "2026-05-12"
 truth_status: "Specified"
 evidence_sources:
-  - "Master Metaprompt v1.3.1 (canonical kernel)"
+  - "Master Metaprompt v1.4.0 (canonical kernel)"
   - "docs/governance/spine-v0.5.md"
   - "docs/adr/ADR-8-radicle-dev-substrate.md"
   - "docs/architecture/AGENTIC_OPERATING_MODEL.md"
@@ -245,7 +245,7 @@ This document **references** the canonical sources — it does not duplicate the
 
 | What | Where |
 |------|-------|
-| Coordination kernel | `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` |
+| Coordination kernel | `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` |
 | SDD requirements | `FLOSS/SDD-Master-Spec-0.22.md` |
 | Symbolic-first Rust code | `FLOSS/ARF/SYMBOLIC_FIRST_CORE.md` |
 | Ontologies + migration | `FLOSS/ARF/ONTOLOGIES_AND_INTEGRATION.md` |

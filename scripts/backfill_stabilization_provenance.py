@@ -275,7 +275,7 @@ COMMITS = [
         "proposal_type": "spec_change",
         "evidence_refs": [
             {"type": "spec", "ref": ".agent-surface/STARTUP_CONTRACT.md"},
-            {"type": "adr", "ref": "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md"},
+            {"type": "adr", "ref": "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md"},
             {"type": "adr", "ref": "docs/adr/ADR-12-consent-gate-protocol.md"},
             {"type": "commit", "ref": "f6b88d4"},
         ],

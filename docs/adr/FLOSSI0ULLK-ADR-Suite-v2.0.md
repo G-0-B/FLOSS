@@ -94,7 +94,7 @@ Recognize that the system is already operational. The walking skeleton is:
 
 | Criterion | Evidence artifact | Status |
 |-----------|-----------------|--------|
-| Transmission (<1 hr onboarding) | `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` | ✅ PASS |
+| Transmission (<1 hr onboarding) | `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` | ✅ PASS |
 | Composition (multi-AI without contradiction) | `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md` | ✅ PASS |
 | Persistence (survives conversation boundaries) | `CLAUDE.md`, `.serena/memories/`, ADR system | ✅ PASS |
 | Coherence (human feels understood, not re-explaining) | Session logs, harvest logs | ✅ PASS |
@@ -121,7 +121,7 @@ The original ADR is accurate and validated. The only meaningful upgrade: **norma
 ### Related
 
 - ADR-0.1 (Cross-AI validation)
-- `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`
+- `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`
 - `docs/adr/INDEX.md`
 
 ---

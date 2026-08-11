@@ -2,9 +2,9 @@
 
 When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load documents in this order:
 
-## 1. Kernel v1.3.1 (Mandatory Rules)
+## 1. Kernel v1.4.0 (Mandatory Rules)
 
-**File:** `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (root level)
+**File:** `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` (root level)
 **Purpose:** Always-on coordination rules. Non-negotiable constraints.
 **Key content:** Identity, prime directive, response modes, evidence gate (Now/Later/Never), symbolic-first validation, provenance packet schema.
 

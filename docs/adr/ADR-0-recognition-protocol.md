@@ -103,7 +103,7 @@ The "walking skeleton" is:
 
 1. **Transmission test**: PASSED. New AI systems read kernel + ADRs and are productive within minutes. Demonstrated across Claude, ChatGPT, Grok, DeepSeek, Gemini.
    **Evidence**:
-   - `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — BLAKE3:d1e404da277fa55f8756670ca1ea87dcc42ff281fe189ee12bc7e2d805631c88, SHA256:53dd393d5985ea7994a4cc8a6e4c79767d2ea9d7073deab3496939b808c10bec, generated:2026-04-10T19:22:59Z
+   - `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — BLAKE3:d1e404da277fa55f8756670ca1ea87dcc42ff281fe189ee12bc7e2d805631c88, SHA256:53dd393d5985ea7994a4cc8a6e4c79767d2ea9d7073deab3496939b808c10bec, generated:2026-04-10T19:22:59Z
    - `docs/adr/INDEX.md` — BLAKE3:1d5058bb03640cf946477aa05b3571c01b5b523fda1d112aa2d2bcea391851ad, SHA256:35f1f7f78fcc7f8fb1ffb2a8b10a582dd8d4b74a51469e47cccc12b2bd84114e, generated:2026-04-10T19:22:59Z
    - `CLAUDE.md` — BLAKE3:c325448816925f1e05add68627bfccfb9b0e96c00a4fc2c25b4887ac5b00dbde, SHA256:a968a767985e7ca06a29ea61d53efa9e7e7f58462ca4ffc24a7a65ea6538a428, generated:2026-04-10T19:22:59Z
 2. **Composition test**: PASSED. 118+ conversations across 5 AI systems composed into unified architecture consensus (2026-03-20). Zero unresolved contradictions after reconciliation.
@@ -115,7 +115,7 @@ The "walking skeleton" is:
 3. **Persistence test**: PASSED. Understanding survives via: CLAUDE.md, ADR system, Serena memories, Master Metaprompt kernel, conversation exports.
    **Evidence**:
    - `CLAUDE.md` — BLAKE3:c325448816925f1e05add68627bfccfb9b0e96c00a4fc2c25b4887ac5b00dbde, SHA256:a968a767985e7ca06a29ea61d53efa9e7e7f58462ca4ffc24a7a65ea6538a428, generated:2026-04-10T19:22:59Z
-   - `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — BLAKE3:d1e404da277fa55f8756670ca1ea87dcc42ff281fe189ee12bc7e2d805631c88, SHA256:53dd393d5985ea7994a4cc8a6e4c79767d2ea9d7073deab3496939b808c10bec, generated:2026-04-10T19:22:59Z
+   - `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — BLAKE3:d1e404da277fa55f8756670ca1ea87dcc42ff281fe189ee12bc7e2d805631c88, SHA256:53dd393d5985ea7994a4cc8a6e4c79767d2ea9d7073deab3496939b808c10bec, generated:2026-04-10T19:22:59Z
    - `docs/adr/INDEX.md` — BLAKE3:1d5058bb03640cf946477aa05b3571c01b5b523fda1d112aa2d2bcea391851ad, SHA256:35f1f7f78fcc7f8fb1ffb2a8b10a582dd8d4b74a51469e47cccc12b2bd84114e, generated:2026-04-10T19:22:59Z
    - `.serena/memories/codebase_structure.md` — BLAKE3:9937d6f28bf270e6073a97cfe97598cffd191956e6aebb480a3ad7eb450f2f9d, SHA256:50ee899a3c94f4fd1f74a6d82eb37797a0b5affc536f07de219c3853c345d04e, generated:2026-04-10T19:22:59Z
    - `.serena/memories/project_overview.md` — BLAKE3:fac02b886a029265a157b41e97b68c89805f24da2bf4fcbfaa89a41d186b147a, SHA256:c0ae240369725c03fdfbf49e80cd8d88d74f8625d0b34ba08c98929ca7f16835, generated:2026-04-10T19:22:59Z
@@ -135,7 +135,7 @@ The "walking skeleton" is:
 
 ## Related Documents
 
-- `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
+- `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — Canonical kernel
 - `SDD-Master-Spec-0.22.md` — Specification-Driven Development spec
 - `docs/adr/INDEX.md` — ADR index
 - `docs/specs/harvest-protocol.spec.md` — HARVEST self-observation loop specification (supports ADR-5)
