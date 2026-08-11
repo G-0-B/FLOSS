@@ -14,6 +14,20 @@ if str(FLOSS_ROOT) not in sys.path:
     sys.path.insert(0, str(FLOSS_ROOT))
 
 
+def _resign_packet(packet, *, identity_dir: Path) -> bytes:
+    from packages.activity_log import provenance
+
+    identity = provenance.load_or_create_identity(identity_dir)
+    packet["d"] = provenance._said_digest(packet)
+    packet["sigs"] = [provenance.SIGNATURE_PLACEHOLDER]
+    packet["v"] = provenance._version_with_size(packet)
+    packet["sigs"] = []
+    packet["d"] = provenance._said_digest(packet)
+    signature = identity.signing_key.sign(provenance._signing_bytes(packet)).signature
+    packet["sigs"] = ["0B" + provenance._b64url_encode(signature)]
+    return provenance.canonical_bytes(packet) + b"\n"
+
+
 def test_payload_entry_rejects_sha256_with_trailing_newline():
     from packages.activity_log import provenance
 
@@ -421,6 +435,52 @@ def test_discontinuous_prior_sequence_is_rejected(tmp_path, monkeypatch):
     )
     assert result.ok is False
     assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in result.errors
+
+
+@pytest.mark.parametrize(
+    ("sequence", "expected_error"),
+    [
+        ("4", "E_PROVENANCE_SEQUENCE_DISCONTINUOUS"),
+        ("not-decimal", "E_PROVENANCE_SEQUENCE_INVALID"),
+    ],
+)
+def test_genesis_packet_requires_zero_decimal_sequence(
+    tmp_path, monkeypatch, sequence, expected_error
+):
+    """A signed packet with no prior must be canonical genesis sequence zero."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "id"
+    packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-11T00:00:00Z",
+                "human_collision_node": "unit-test",
+                "artifact_refs": [],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    packet["s"] = sequence
+    packet_path.write_bytes(_resign_packet(packet, identity_dir=identity_dir))
+
+    result = provenance.validate_packet(
+        packet_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is False
+    assert expected_error in result.errors
 
 
 def test_payload_entry_missing_required_field_is_invalid(tmp_path, monkeypatch):

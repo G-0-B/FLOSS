@@ -424,6 +424,7 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
     "benefits",
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
+_SEQUENCE_RE = re.compile(r"^[0-9]+\Z")
 _EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
 
 
@@ -594,6 +595,15 @@ def validate_packet(
         else _infer_provenance_root(packet_path)
     )
     prior_digest = packet.get("p")
+    sequence = packet.get("s")
+    sequence_valid = (
+        isinstance(sequence, str) and _SEQUENCE_RE.fullmatch(sequence) is not None
+    )
+    if not sequence_valid:
+        errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+    elif prior_digest is None and sequence != "0":
+        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+
     if prior_digest is not None:
         prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
         if prior_path is None:
@@ -617,7 +627,7 @@ def validate_packet(
             if prior_packet.get("i") != packet.get("i"):
                 errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
             try:
-                if int(prior_packet.get("s")) != int(packet.get("s")) - 1:
+                if int(prior_packet.get("s")) != int(sequence) - 1:
                     errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
             except (TypeError, ValueError):
                 errors.append("E_PROVENANCE_SEQUENCE_INVALID")
