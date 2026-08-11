@@ -555,6 +555,133 @@ def test_same_position_fork_rejects_sibling_that_cites_other_as_evidence(
     ]
 
 
+def test_public_eight_wrapper_root_uses_independent_competitor_depth(
+    tmp_path, monkeypatch
+):
+    """A deep caller cannot spend an independently valid competitor's budget."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "fork-id"
+
+    def entry(created_at, next_action, evidence_refs):
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": created_at,
+            "human_collision_node": "unit-test",
+            "artifact_refs": [],
+            "evidence_refs": evidence_refs,
+            "risks": [],
+            "benefits": [],
+            "next_action": next_action,
+        }
+
+    direct_root = [{"type": "test", "ref": "unit"}]
+    _child, child_path = provenance.create_packet(
+        [entry("2026-08-11T00:00:00Z", "child", direct_root)],
+        identity_dir=tmp_path / "child-id",
+        output_root=output_root,
+        prior_digest=None,
+    )
+    prior, _prior_path = provenance.create_packet(
+        [entry("2026-08-11T00:00:01Z", "prior", direct_root)],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    first, first_path = provenance.create_packet(
+        [entry("2026-08-11T00:00:02Z", "first", direct_root)],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    second = json.loads(json.dumps(first))
+    second["a"][0]["next_action"] = "second"
+    child_ref = child_path.resolve().relative_to(tmp_path.resolve()).as_posix()
+    second["a"][0]["evidence_refs"].append(
+        {
+            "type": "provenance_packet",
+            "ref": child_ref,
+            "sha256": provenance.sha256_file(child_path),
+        }
+    )
+    second_bytes = _resign_packet(second, identity_dir=identity_dir)
+    second_path = first_path.with_name(f"{second['d']}.json")
+    second_path.write_bytes(second_bytes)
+    chain_position = (first["i"], first["p"], first["s"])
+
+    wrapped_path = first_path
+    for index in range(8):
+        wrapped_ref = (
+            wrapped_path.resolve().relative_to(tmp_path.resolve()).as_posix()
+        )
+        _wrapper, wrapped_path = provenance.create_packet(
+            [
+                entry(
+                    f"2026-08-11T00:01:{index:02d}Z",
+                    f"wrapper-{index}",
+                    [
+                        {
+                            "type": "provenance_packet",
+                            "ref": wrapped_ref,
+                            "sha256": provenance.sha256_file(wrapped_path),
+                        }
+                    ],
+                )
+            ],
+            identity_dir=tmp_path / f"wrapper-{index}-id",
+            output_root=output_root,
+            prior_digest=None,
+        )
+
+    top_level = [
+        provenance.validate_packet(
+            path, workspace_root=tmp_path, provenance_root=output_root
+        )
+        for path in (first_path, second_path)
+    ]
+    competitor_depth0 = provenance.validate_packet(
+        second_path,
+        workspace_root=tmp_path,
+        provenance_root=output_root,
+        _ignored_chain_position=chain_position,
+    )
+    competitor_depth8 = provenance.validate_packet(
+        second_path,
+        workspace_root=tmp_path,
+        provenance_root=output_root,
+        _depth=8,
+        _ignored_chain_position=chain_position,
+    )
+    wrapper_root = provenance.validate_packet(
+        wrapped_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    observed = {
+        "top_level": [(result.ok, result.errors) for result in top_level],
+        "competitor_depth0": (competitor_depth0.ok, competitor_depth0.errors),
+        "competitor_depth8": (competitor_depth8.ok, competitor_depth8.errors),
+        "wrapper_root": (wrapper_root.ok, wrapper_root.errors),
+    }
+    assert observed == {
+        "top_level": [
+            (False, ["E_PROVENANCE_CHAIN_FORK"]),
+            (False, ["E_PROVENANCE_CHAIN_FORK"]),
+        ],
+        "competitor_depth0": (True, []),
+        "competitor_depth8": (
+            False,
+            ["E_PROVENANCE_RECURSION_DEPTH_EXCEEDED"],
+        ),
+        "wrapper_root": (
+            False,
+            ["E_PROVENANCE_CHAIN_FORK", "E_PROVENANCE_ROOT_REQUIRED"],
+        ),
+    }, observed
+
+
 @pytest.mark.parametrize(
     "sibling_kind",
     [

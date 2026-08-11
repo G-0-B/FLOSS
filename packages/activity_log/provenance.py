@@ -356,7 +356,6 @@ def _has_valid_same_position_competitor(
     workspace_root: Path,
     provenance_root: Path | None,
     max_depth: int,
-    depth: int,
 ) -> bool:
     """Return whether another independently valid packet occupies this position."""
 
@@ -392,7 +391,6 @@ def _has_valid_same_position_competitor(
             workspace_root=workspace_root,
             provenance_root=provenance_root,
             max_depth=max_depth,
-            _depth=depth,
             _ignored_chain_position=chain_position,
         )
         if competitor.ok:
@@ -709,7 +707,6 @@ def validate_packet(
             workspace_root=root,
             provenance_root=prov_root,
             max_depth=max_depth,
-            depth=_depth,
         )
     ):
         errors.append("E_PROVENANCE_CHAIN_FORK")
