@@ -228,6 +228,25 @@ def test_capability_schema_rejects_malformed_issued_at() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "field",
+    ["capability_id", "grantor_pubkey", "grantee_pubkey"],
+)
+@pytest.mark.parametrize("value", ["", " \t "])
+def test_capability_schema_rejects_empty_identity_fields(
+    field: str, value: str
+) -> None:
+    capability = valid_capability()
+    capability[field] = value
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            capability,
+            json.loads(SCHEMA_PATH.read_text(encoding="utf-8")),
+            format_checker=jsonschema.FormatChecker(),
+        )
+
+
 def test_smoke_fixture_rejects_unsupported_executable_ast() -> None:
     with pytest.raises(AssertionError, match="Unsupported AST node"):
         _ast_to_data(ast.parse("read_credentials()").body[0].value)
