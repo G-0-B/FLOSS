@@ -180,8 +180,25 @@ def test_capability_schema_callers_enable_format_checking(script_path: Path) -> 
 
     assert validation_calls, f"No jsonschema.validate call found in {script_path}"
     for validation_call in validation_calls:
-        assert any(
-            keyword.arg == "format_checker" for keyword in validation_call.keywords
+        format_checker = next(
+            (
+                keyword.value
+                for keyword in validation_call.keywords
+                if keyword.arg == "format_checker"
+            ),
+            None,
+        )
+        assert format_checker is not None, (
+            f"{script_path} validates schema formats without a FormatChecker"
+        )
+        assert (
+            isinstance(format_checker, ast.Call)
+            and isinstance(format_checker.func, ast.Attribute)
+            and isinstance(format_checker.func.value, ast.Name)
+            and format_checker.func.value.id == "jsonschema"
+            and format_checker.func.attr == "FormatChecker"
+            and not format_checker.args
+            and not format_checker.keywords
         ), f"{script_path} validates schema formats without a FormatChecker"
 
 
