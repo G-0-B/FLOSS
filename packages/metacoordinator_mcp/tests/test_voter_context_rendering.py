@@ -325,6 +325,30 @@ def test_render_voter_context_bounds_and_sanitizes_many_refs(tmp_path):
     assert len(context) <= 4096
 
 
+def test_render_voter_context_marks_sanitized_signed_nested_ref_as_truncated(
+    tmp_path,
+):
+    """Sanitizing a signed nested ref is visible as an identity alteration."""
+    raw_ref = "docs/part-one\n\tpart-two.md"
+    with tempfile.TemporaryDirectory() as tmp:
+        ref, packet = _make_governed_packet(
+            tmp_path,
+            tmp_path / ".agent-surface" / "provenance",
+            nested_evidence_ref=raw_ref,
+        )
+        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+            _claim_with_packet_ref(ref)
+        )
+
+    assert packet["d"] in context
+    assert "[spec] docs/part-one part-two.md" in context
+    assert "\n" not in context
+    assert "\r" not in context
+    assert "\t" not in context
+    assert len(context) <= 4096
+    assert "[truncated]" in context
+
+
 def test_render_voter_context_preserves_packet_metadata_when_evidence_is_oversized(
     tmp_path,
 ):

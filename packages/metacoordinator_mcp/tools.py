@@ -446,6 +446,11 @@ class GatewayTools:
                     rendered_count += 1
                     metadata_type = sanitize(metadata["type"])
                     metadata_ref = sanitize(metadata["ref"])
+                    if (
+                        metadata_type != metadata["type"]
+                        or metadata_ref != metadata["ref"]
+                    ):
+                        truncated = True
                     metadata_hash = metadata.get("sha256")
                     hash_suffix = (
                         f" sha256={metadata_hash}" if metadata_hash is not None else ""
