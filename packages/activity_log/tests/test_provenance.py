@@ -586,7 +586,7 @@ def test_public_eight_wrapper_root_uses_independent_competitor_depth(
         output_root=output_root,
         prior_digest=None,
     )
-    prior, _prior_path = provenance.create_packet(
+    provenance.create_packet(
         [entry("2026-08-11T00:00:01Z", "prior", direct_root)],
         identity_dir=identity_dir,
         output_root=output_root,
