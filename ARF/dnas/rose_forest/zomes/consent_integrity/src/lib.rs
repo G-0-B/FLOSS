@@ -13,8 +13,8 @@
 //! - **Schema:** `FLOSS/docs/specs/consent-payload.schema.json` (draft-2020-12)
 //! - **Spec:** `FLOSS/docs/specs/consent-payload.spec.md` (§"Validation rules
 //!   and current enforcement status" — this file implements deterministic
-//!   single-entry shape rules; cross-entry enforcement is documented below as
-//!   coordinator / must-get follow-up work)
+//!   single-entry shape rules plus dependency-tracked payload relation checks;
+//!   downstream action-time enforcement remains coordinator / bridge work)
 //! - **ADR:** `FLOSS/docs/adr/ADR-12-consent-gate-protocol.md`
 //! - **Citation anchor (philosophical):** Laukkonen et al. 2026 §"The Paternalism
 //!   Problem" — consented guidance vs technocratic imposition distinction
