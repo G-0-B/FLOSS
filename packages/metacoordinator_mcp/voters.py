@@ -121,7 +121,11 @@ def render_voter_prompt(claim: "Claim", context: str = "(none)") -> str:
     in sync with the template's field set.
     """
     if claim.evidence:
-        evidence = "; ".join(f"[{e.type}] {e.ref}" for e in claim.evidence)
+        evidence = "; ".join(
+            f"[{e.type}] {e.ref}"
+            + (f" sha256={e.sha256}" if e.sha256 is not None else "")
+            for e in claim.evidence
+        )
     else:
         evidence = "(none provided)"
     return VOTER_PROMPT.format(

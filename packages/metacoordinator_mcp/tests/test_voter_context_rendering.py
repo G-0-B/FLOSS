@@ -154,6 +154,66 @@ def test_render_voter_context_returns_none_when_no_packet_evidence(tmp_path):
         assert gw._render_voter_context(claim) == "(none)"
 
 
+def test_render_voter_prompt_distinguishes_top_level_evidence_by_sha256():
+    claims = [
+        Claim(
+            proposer="claude",
+            proposal_type=ProposalType.CODE_CHANGE,
+            summary="versioned evidence",
+            body="body",
+            blast_radius=BlastRadius.LOCAL,
+            evidence=[
+                EvidenceRef(
+                    type="spec",
+                    ref="same-evidence.md",
+                    sha256=evidence_hash,
+                )
+            ],
+        )
+        for evidence_hash in ("a" * 64, "b" * 64)
+    ]
+
+    prompts = [render_voter_prompt(claim) for claim in claims]
+
+    assert prompts[0] != prompts[1]
+    assert "[spec] same-evidence.md sha256=" + ("a" * 64) in prompts[0]
+    assert "[spec] same-evidence.md sha256=" + ("b" * 64) in prompts[1]
+
+
+def test_render_voter_prompt_preserves_complete_top_level_sha256():
+    evidence_hash = "0123456789abcdef" * 4
+    claim = Claim(
+        proposer="claude",
+        proposal_type=ProposalType.CODE_CHANGE,
+        summary="complete evidence hash",
+        body="body",
+        blast_radius=BlastRadius.LOCAL,
+        evidence=[
+            EvidenceRef(type="test", ref="evidence.txt", sha256=evidence_hash)
+        ],
+    )
+
+    prompt = render_voter_prompt(claim)
+
+    assert f"[test] evidence.txt sha256={evidence_hash}" in prompt
+
+
+def test_render_voter_prompt_omits_top_level_sha256_when_absent():
+    claim = Claim(
+        proposer="claude",
+        proposal_type=ProposalType.CODE_CHANGE,
+        summary="unhashed evidence",
+        body="body",
+        blast_radius=BlastRadius.LOCAL,
+        evidence=[EvidenceRef(type="test", ref="evidence.txt")],
+    )
+
+    prompt = render_voter_prompt(claim)
+
+    assert "[test] evidence.txt" in prompt
+    assert "[test] evidence.txt sha256=" not in prompt
+
+
 def test_render_voter_context_exposes_digest_consent_and_nested_evidence(tmp_path):
     with tempfile.TemporaryDirectory() as tmp:
         ref, packet = _make_governed_packet(
