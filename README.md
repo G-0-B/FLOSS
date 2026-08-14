@@ -75,7 +75,8 @@ See `MVP_PLAN.md`, `docs/specs/phase0-substrate-bridge.spec.md`, and `docs/archi
 - **ADR Index:** `docs/adr/INDEX.md`
 - **Governance Loading Order:** `docs/governance/LOADING_ORDER.md`
 - **Entry Type Specs:** `docs/specs/`
-- **Implementation Plan:** `.claude/plans/immutable-gliding-reddy.md`
+- **Working Todo (live operational state):** `docs/research/2026-05-15-working-todo-list.md`
+- **Current execution spine (Proposed):** `docs/governance/FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md`
 
 ---
 
@@ -88,6 +89,13 @@ software over a network must share those modifications back. ADR-7 §3 reserves 
 dual-licensing carve-out, grantable by formal Steward Vote, for humanitarian,
 medical and educational use where strict open-sourcing cannot work.
 
-*(Superseded: this section previously read "Compassion Clause + Apache-2.0/GPL-compatible
-(per Kernel v1.2)". Kernel v1.2 was retired 2026-08-10; the Compassion Clause moved to
-`CODE_OF_CONDUCT.md` because it is an ethical commitment, not an OSI-approved licence term.)*
+⚠️ **The Compassion Clause has no home yet.** `RESEARCH-REGISTER.md` records it as "moved to
+CODE_OF_CONDUCT.md" — **that file does not exist**, in this repo or at workspace root, and the
+build spine independently observed "no Compassion Clause rider present as a file". The clause
+survives only as prose inside `docs/architecture/flossi_0_ullk_unified_reference_design_v_0.5.md`
+§10. It needs to land somewhere real, scoped as non-binding on licence terms per the
+`docs/governance/LEGAL_DEFINITIONS.md` pattern so OSI/FSF compatibility is preserved. Tracked in
+the working todo.
+
+*(This section previously read "Compassion Clause + Apache-2.0/GPL-compatible (per Kernel v1.2)".
+Kernel v1.2 was retired 2026-08-10.)*
