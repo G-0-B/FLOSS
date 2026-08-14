@@ -2,6 +2,7 @@ use hdi::prelude::*;
 use std::{collections::BTreeMap, time::Duration};
 
 const BUDGET_ENTRY_FUTURE_SKEW_SECONDS: u64 = 300;
+const MAX_BUDGET_ALLOCATION_RU: f32 = 200.0;
 
 /// Represents a node in the Rose-Forest knowledge graph.
 ///
@@ -305,6 +306,11 @@ fn validate_budget_entry(
             "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into(),
         ));
     }
+    if budget.remaining_ru > MAX_BUDGET_ALLOCATION_RU {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into(),
+        ));
+    }
     let Some(latest_permitted_window_start) =
         action_timestamp.checked_add(&Duration::from_secs(BUDGET_ENTRY_FUTURE_SKEW_SECONDS))
     else {
@@ -390,6 +396,49 @@ mod tests {
         assert_eq!(
             validate_budget_entry(&b, &agent(1), &ts()).unwrap(),
             ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_accepts_maximum_allocated_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 200.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_rejects_next_representable_balance_above_maximum() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::from_bits(200.0f32.to_bits() + 1),
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_very_large_finite_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 1_000_000.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into()
+            )
         );
     }
 

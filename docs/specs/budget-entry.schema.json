@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flossioullk.org/specs/budget-entry/1.0.0",
   "title": "BudgetEntry",
-  "description": "Agent-local cognitive budget tracking entry. Enforces the bio-aware 100 RU/24h resource budget.",
+  "description": "Agent-local cognitive budget tracking entry. Uses a 100 RU ordinary per-window base and permits at most 200 RU of allocated balance.",
   "type": "object",
   "required": ["agent", "remaining_ru", "window_start"],
   "properties": {
@@ -13,8 +13,8 @@
     "remaining_ru": {
       "type": "number",
       "minimum": 0.0,
-      "maximum": 100.0,
-      "description": "Remaining Resource Units in the current window (max 100 RU)"
+      "maximum": 200.0,
+      "description": "Remaining Resource Units in the current window (100 RU ordinary base; 200 RU maximum allocated balance)"
     },
     "window_start": {
       "description": "Holochain Timestamp marking the start of the current 24-hour budget window",
