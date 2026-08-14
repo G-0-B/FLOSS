@@ -120,14 +120,13 @@ def render_voter_prompt(claim: "Claim", context: str = "(none)") -> str:
     to ground their votes. Single shared renderer so all voter backends stay
     in sync with the template's field set.
     """
-    if claim.evidence:
-        evidence = "; ".join(
-            f"[{e.type}] {e.ref}"
-            + (f" sha256={e.sha256}" if e.sha256 is not None else "")
-            for e in claim.evidence
-        )
-    else:
-        evidence = "(none provided)"
+    evidence = json.dumps(
+        [entry.to_dict() for entry in claim.evidence],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
     return VOTER_PROMPT.format(
         proposer=claim.proposer,
         proposal_type=claim.proposal_type.value,

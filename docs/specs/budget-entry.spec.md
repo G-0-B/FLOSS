@@ -1,9 +1,9 @@
 # BudgetEntry Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Specified
 **Truth Status:** Specified (code exists in integrity/coordinator zomes; not yet compiled/validated)
-**Last Updated:** 2026-03-05
+**Last Updated:** 2026-08-13
 
 ---
 
@@ -71,4 +71,5 @@ CONSUME_BUDGET(agent, cost):
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-08-13 | Reconciled the 100 RU ordinary per-window base with the 200 RU maximum allocated balance |
 | 1.0.0 | 2026-03-05 | Initial specification extracted from coordinator zome code |
