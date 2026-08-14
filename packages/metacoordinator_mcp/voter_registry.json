@@ -75,10 +75,10 @@
       "mistral-open-mistral-nemo": "mistral/open-mistral-nemo",
       "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
       "flowith-deepseek-chat": "flowith/deepseek-chat",
-      "omo-momus-gpt-oss-120b": "groq/openai/gpt-oss-120b",
-      "omo-momus-llama-3.3-70b": "groq/llama-3.3-70b-versatile",
       "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
-      "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat"
+      "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat",
+      "exec-review-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "exec-review-llama-3.3-70b": "groq/llama-3.3-70b-versatile"
     },
     "post-window": {
       "omo-critic-gpt-oss-120b": "cerebras/gpt-oss-120b",

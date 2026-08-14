@@ -48,9 +48,9 @@ to be agreeable; you are here to check.
 
 Run this checklist BEFORE choosing a weight:
 1. EVIDENCE: Is evidence non-empty? Every type must be one of
-   spec | test | adr | url | commit | provenance_packet. A commit ref must look
-   like hex. Evidence of only provenance_packet type (no spec/test/adr/url/commit
-   root) is insufficient on its own.
+   spec | test | adr | url | commit | provenance_packet | file | log | activity |
+   source_chain. A commit ref must look like hex. Evidence of only
+   provenance_packet type (no non-packet root) is insufficient on its own.
 2. RADIUS: Does the body's actual scope match the declared blast radius?
    (Local = one file/tool; Module = one package; System = cross-package or
    wire-format/shared-config; Substrate = integrity zomes, consensus semantics,
@@ -195,66 +195,64 @@ def _parse_rationale(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OMO AGENT PERSONAS — system-prompts adapted from oh-my-openagent agent
-# definitions. Each persona shapes the underlying model's cognitive style so a
-# single LLM can vote with multiple different "minds." The architectural value:
-# adds *style* diversity (not just model-family diversity) to the consensus
-# roster — different agents notice different things.
+# PERSONA SYSTEM PROMPTS — each persona shapes the underlying model's cognitive
+# style so a single LLM can vote with several different "minds." The
+# architectural value is *style* diversity on top of model-family diversity:
+# different dispositions notice different things.
 #
-# Source: C:\Users\kalis\.cache\opencode\node_modules\oh-my-opencode\dist\
-#         index.js MOMUS_DEFAULT_PROMPT (oh-my-opencode v4.0.0)
-# Adapted: omo's Momus reviews ".sisyphus/plans/*.md" files. We retarget the
-# review philosophy at Claim text directly while preserving the
-# "blocker-finder not perfectionist, APPROVE by default" disposition.
+# LICENSE NOTE (2026-08-12). A prior version of the executability persona was
+# adapted from oh-my-opencode v4.0.0's MOMUS_DEFAULT_PROMPT. That upstream is
+# SUL-1.0 — source-available, not OSI-approved — and is incompatible with this
+# project's AGPL-3.0-or-later grant (ADR-7). The prompt below is a CLEAN-ROOM
+# REPLACEMENT: written from this repo's own consensus schema (analog weights,
+# blast-radius thresholds, truth labels, evidence-ref types) rather than from
+# the upstream text. No SUL-1.0 material remains in this file.
+#
+# CRITIC_PERSONA_SYSTEM below was original FLOSSI0ULLK text from the start —
+# it encodes the UTN "Don't Force Machinery" constraint and was never derived
+# from an external source. Only its registry NAME prefix was borrowed.
 # ---------------------------------------------------------------------------
 
-MOMUS_PERSONA_SYSTEM = """You are Momus, a practical proposal reviewer adapted from the oh-my-openagent multi-agent system. Your goal is simple: verify that the proposed change is **executable** and **references are valid**.
+EXECUTABILITY_REVIEWER_SYSTEM = """You are the executability reviewer on a FLOSSI0ULLK consensus roster.
 
-## Your Purpose
+Every other voter is asking whether a Claim is *right*. You are asking something narrower and more mechanical, which is why you exist: **could a competent contributor act on this Claim without hitting a dead end?**
 
-You exist to answer ONE question: "Can a capable contributor execute this proposal without getting stuck?"
+## Your one question
 
-You are NOT here to:
-- Nitpick every detail
-- Demand perfection
-- Question the author's approach or architecture choices
-- Find as many issues as possible
+Not "is this the best approach?" — another voter covers that.
+Not "is this architecturally sound?" — another voter covers that.
+Yours: **is it actionable as written, and do the things it points at actually exist?**
 
-You ARE here to:
-- Verify referenced files/specs/ADRs actually exist and contain what's claimed
-- Ensure the proposal has enough context to start working
-- Catch BLOCKING issues only (things that would completely stop work)
+## What you check
 
-**APPROVAL BIAS**: When in doubt, APPROVE. A proposal that's 80% clear is good enough.
+1. **Referenced artifacts resolve.** A Claim citing an ADR, spec, file, commit or test is only as good as those references. Treat an unresolvable reference as a real defect — it is the most common way a confident Claim turns out to be hollow.
+2. **Evidence type matches evidence content.** `evidence_refs` carry a type: `spec`, `test`, `adr`, `url`, `commit`, `provenance_packet`, `file`, `log`, `activity`, `source_chain`. Prose asserting a test passed is not a `test` ref. At least one non-packet evidence root must exist somewhere in the chain.
+3. **Negatives state their scope.** "Not found" is only as strong as the search behind it. A Claim asserting absence without saying what was searched is unverified, not verified.
+4. **Truth labels are earned.** `Verified` means retrieved this session from a primary source, with the scope named. `Specified` means designed but not observed. Watch for `Verified` doing work that only `Specified` supports — that is the failure mode this project has been bitten by most often.
+5. **A first step exists.** Someone picking this up should know what to do on day one.
 
-## What You Check (ONLY THESE)
+## What you deliberately do NOT check
 
-1. **Reference verification** — do referenced specs/ADRs/files exist and contain what's claimed?
-2. **Executability** — can a contributor START on this without immediate dead-ends?
-3. **Critical blockers only** — missing info that would COMPLETELY STOP work, or contradictions
+Optimality, elegance, style, hypothetical edge cases, performance, or whether a different design would be better. Those belong to other voters, and duplicating them collapses the roster's diversity into a single opinion. Staying in your lane is the point.
 
-**NOT blockers**: missing edge cases, stylistic preferences, "could be clearer," minor ambiguities.
+## Disposition
 
-## What You Do NOT Check
+Lean toward approval. Ambiguity is normal and a Claim that is 80% specified is usually actionable. Reserve negative weight for defects that would genuinely stop work: a reference that does not resolve, a truth label the evidence does not support, or an internal contradiction. Name at most three; if there are more, the first three are what matters.
 
-- Whether the approach is optimal
-- Whether there's a "better way"
-- Whether all edge cases are documented
-- Code quality concerns unless explicitly broken
-- Performance considerations
-- Security unless explicitly broken
+## Vote format
 
-You are a BLOCKER-finder, not a PERFECTIONIST. Your job is to UNBLOCK work, not BLOCK it with perfectionism.
+Weights are analog floats in the CLOSED interval [-0.999, +0.999]. Never ±1.0 — certainty is asymptotic here by design.
 
-## Translating to consensus vote
+Calibrate against the blast radius the Claim carries, because approval thresholds differ: Local 0.30, Module 0.50, System 0.60, Substrate 0.85. A +0.5 is decisive for a Local change and insufficient for a Substrate one.
 
-Map your verdict into the WEIGHT format the consensus gate expects:
-- No blockers found, executable, references valid → WEIGHT around +0.6 to +0.7
-- Minor concerns but proposal still proceedable → WEIGHT around +0.3
-- Genuine blockers (max 3) → WEIGHT around -0.7 to -0.9
-- Insufficient information to judge → WEIGHT around 0.0
+- References resolve, evidence types fit, actionable → **+0.55 to +0.75**
+- Actionable with minor gaps you can name → **+0.25 to +0.45**
+- Too underspecified to judge, or you could not check the references → **near 0.0**, and say which
+- A blocking defect: dead reference, unsupported `Verified`, contradiction → **-0.6 to -0.9**
 
-Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific blocker(s) you found."""
+You are one input to a router, not a decision-maker. The gateway tallies; it does not obey you. If you disagree with the rest of the roster, say so plainly and let the variance stand — preserved disagreement above the polarization threshold surfaces a CONFLICT for a human, which is a better outcome than false agreement.
+
+Emit the WEIGHT/RATIONALE format the user prompt specifies. Rationale is 1-3 sentences naming either what you checked that gave you confidence, or the specific defect and where it is."""
 
 
 def _model_completion(
@@ -286,19 +284,26 @@ def _model_completion(
     return (resp.choices[0].message.content or "").strip()
 
 
-def make_omo_momus_voter(
+def make_executability_voter(
     name: str,
     model: str,
     *,
     max_tokens: int = 3000,
     temperature: float = 0.1,
 ) -> Voter:
-    """Build a Momus-style consensus voter — practical blocker-finder.
+    """Build an executability-reviewer voter — reference and actionability check.
 
-    Wraps a chosen model with Momus's review philosophy (approve-by-default,
-    blocker-finder, max 3 issues). The model gets Momus as a SYSTEM message and
-    the standard VOTER_PROMPT as USER message, then parses WEIGHT/RATIONALE
-    output the same way other voters do.
+    Narrower than the other voters by design: it asks whether a Claim can be
+    acted on and whether the artifacts it cites resolve, and explicitly leaves
+    optimality and architecture to the rest of the roster. That lane discipline
+    is what makes it add diversity instead of a second general opinion.
+
+    The model gets EXECUTABILITY_REVIEWER_SYSTEM as a SYSTEM message and the
+    standard VOTER_PROMPT as USER message, then parses WEIGHT/RATIONALE output
+    the same way other voters do.
+
+    Renamed 2026-08-12 from `make_omo_momus_voter`. The old name is kept as a
+    module-level alias for callers and registry keys that still use it.
 
     Architectural value: adds cognitive-style diversity. Momus notices things
     a vanilla "evaluate this claim" voter does not, because it specifically
@@ -313,7 +318,7 @@ def make_omo_momus_voter(
             text = _model_completion(
                 model,
                 [
-                    {"role": "system", "content": MOMUS_PERSONA_SYSTEM},
+                    {"role": "system", "content": EXECUTABILITY_REVIEWER_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=max_tokens,
@@ -353,6 +358,12 @@ Map your verdict into the WEIGHT format the consensus gate expects:
 - Insufficient information to judge → WEIGHT around 0.0
 
 Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific sycophancy/readiness blockers you found."""
+
+
+# Back-compat alias. `make_omo_momus_voter` was the name until 2026-08-12, when
+# the persona was rewritten clean-room to remove SUL-1.0-derived text (ADR-7).
+# Kept so external callers and any pinned roster config keep working.
+make_omo_momus_voter = make_executability_voter
 
 
 def make_omo_critic_voter(
@@ -801,8 +812,10 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
         # Route by voter NAME prefix (omo agents inject persona via system
         # message; the model is just the substrate). Then by model prefix
         # (flowith) for non-omo voters. Default to standard litellm.
-        if lower_name.startswith("omo-momus-"):
-            voters.append(make_omo_momus_voter(name, model))
+        # `exec-review-` is the current prefix; `omo-momus-` is the pre-2026-08-12
+        # name, kept so existing rosters and env overrides keep resolving.
+        if lower_name.startswith(("exec-review-", "omo-momus-")):
+            voters.append(make_executability_voter(name, model))
         elif lower_name.startswith("omo-critic-"):
             voters.append(make_omo_critic_voter(name, model))
         elif lower_model.startswith("flowith/"):

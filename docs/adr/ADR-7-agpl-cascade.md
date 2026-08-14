@@ -42,4 +42,10 @@ Superseded GPL-3.0 text archived at `archive/LICENSE_GPL-3.0_superseded-by-ADR-7
 
 **Still open under §3:** the dual-licensing / Steward Vote carve-out has no procedure yet. AGPL is now the default grant; there is no defined path for a hospital or school to request an exception. That is a governance gap, not a licensing one.
 
-**Not covered by this record:** `packages/metacoordinator_mcp/voters.py:198–211` carries `MOMUS_PERSONA_SYSTEM`, adapted from oh-my-opencode v4.0.0 (**SUL-1.0**, source-available, not OSI). SUL-1.0 is incompatible with AGPL-3.0 exactly as it was with GPL-3.0, so this ADR does not resolve it. Tracked as working-todo `A.000000` item 12b.
+**SUL-1.0 contamination — RESOLVED 2026-08-12.** `packages/metacoordinator_mcp/voters.py` carried `MOMUS_PERSONA_SYSTEM`, adapted from oh-my-opencode v4.0.0 (**SUL-1.0**, source-available, not OSI). SUL-1.0 is incompatible with AGPL-3.0 exactly as it was with GPL-3.0, so executing this ADR did not by itself resolve it.
+
+Fixed by clean-room rewrite, operator-directed: the prompt is now `EXECUTABILITY_REVIEWER_SYSTEM`, written from this repo's own consensus schema rather than the upstream text. `make_omo_momus_voter` → `make_executability_voter` (old name aliased), registry keys `omo-momus-*` → `exec-review-*` (old prefix still routes). No SUL-1.0-derived text remains under `packages/`; the only surviving mention is the comment recording that it was removed. 162 tests pass.
+
+`CRITIC_PERSONA_SYSTEM` was never affected — original FLOSSI0ULLK text encoding the UTN constraint; only its `omo-critic-` name prefix was borrowed, which carries no licence implication.
+
+Per ADR-12, voter persona prompts are *Governed* and a change requires explicit binding; the operator instruction of 2026-08-12 is that binding. The replacement persona is ⚠️ **Specified** — consensus round `019e1d61` validated the persona it replaces, not this one.
