@@ -2414,6 +2414,16 @@
       applies_to: "already how FLOSS/scripts/materialize_shared_*.py works — this is independent convergence, recorded as validation, not as a change"
       cost: trivial
       note: "Useful as evidence the existing design is not idiosyncratic. allagents itself is rejected: src/core/claude-mcp.ts writes root .mcp.json, colliding with our manifest ownership."
+    - idea: "A well-formed implementation request carries four artifacts — decision/boundary, contract, mechanism, evidence — and the diagnostic is to ask why any omitted layer is unnecessary."
+      source: "Codex repository atlas, DOMAINS.md 'cross-domain request rule' (self-generated, .toilet/2026-08-11-flossi0ullk-repo-atlas/)"
+      applies_to: "LANDED 2026-08-12 as docs/governance/uop-v2.1.md section 4b"
+      cost: trivial
+      note: "Compresses UOP gates 3-7 into one pass. Stated the shape more compactly than our own gates did; idea only, no material copied."
+    - idea: "Assign every tracked file exactly one primary domain and one read-priority tier, derived from the immutable commit object rather than the dirty worktree."
+      source: "Codex repository atlas, FILE_INVENTORY.tsv method"
+      applies_to: "shared-context-surface.json corpora[] already does the domain half; the per-file tier and the git-object-as-source discipline are the new parts"
+      cost: medium
+      note: "Recorded at medium and therefore NOT actionable from this field. Listed because the census it produced — 57% of the repo is research/archive/lab-history, under 10% is active implementation — is the durable fact, independent of whether we ever regenerate it."
   notes: |
     Standing rules this harvest respects: installation is not adoption
     (docs/agent-memory/project/installation-not-adoption.md, consensus claim

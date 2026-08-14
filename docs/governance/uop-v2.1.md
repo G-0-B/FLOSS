@@ -52,6 +52,27 @@ Run at least three: **Practical** (does it work mechanically), **Critical** (who
 
 ---
 
+## 4b. The Four-Artifact Request Rule (Gates 3–7, compressed to one check)
+
+Gates PLAN → VERIFY are correct but slow to apply mid-flight. This is the same discipline as a single pass over any request for implementation work, incoming or outgoing.
+
+**A well-formed request carries four artifacts. Name all four, or say why one is unnecessary.**
+
+| # | Artifact | The question it answers |
+|---|---|---|
+| 1 | **Decision / boundary** | Which ADR, canon doc, or operator instruction governs this? |
+| 2 | **Contract** | What spec, schema, or explicitly-stated current behaviour defines correct? |
+| 3 | **Mechanism** | What is the *smallest* code neighbourhood that implements it? |
+| 4 | **Evidence** | Which focused test or eval exercises it, and what is the exact command? |
+
+**The diagnostic, which is the useful half:** if a request asks only for architecture prose before changing code, or only for code without its contract and test, ask why the omitted layer is unnecessary. A request missing artifact 1 tends to relitigate settled decisions. Missing 2 produces work that cannot be judged correct. Missing 3 produces sprawl. Missing 4 produces claims that cannot graduate past `Specified`.
+
+This composes with, and does not replace, the truth model in §2 and the cross-verification protocol in §3 — artifact 4 is what lets a claim be labelled `Verified` rather than asserted.
+
+> **Provenance:** adapted 2026-08-12 from the "cross-domain request rule" in the Codex-generated repository atlas (`.toilet/2026-08-11-flossi0ullk-repo-atlas/DOMAINS.md`), which stated the shape more compactly than our own gates did. Idea only — no material was copied. Logged in `docs/research/reuse-ledger-seed.yaml` entry `0073`.
+
+---
+
 ## 5. Refusal Rules (the actual enforcement layer)
 
 - No Execute step without an existing plan-file path.
