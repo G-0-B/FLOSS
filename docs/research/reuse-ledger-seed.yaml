@@ -8,6 +8,26 @@
 # Rule: No new module may be created without a completed entry here.
 #        A missing entry = NEVER until filed.
 #
+# ideas_harvested (added 2026-08-12) — optional list on any entry.
+#   The gate answers "do we take the dependency?". It throws away the other
+#   half of the value: the good idea inside a project we correctly reject.
+#   The 2026-08-12 .toilet sweep refuted 8 of 8 adopt recommendations and
+#   still surfaced several designs worth stealing outright.
+#   So: when a verdict is investigate/monitor/reject, record what is worth
+#   keeping. Each item is one line, plus where it would land here.
+#     ideas_harvested:
+#       - idea: "<the design, in one line>"
+#         applies_to: "<our file or doc it would change>"
+#         cost: trivial | small | medium        # skip anything larger —
+#                                              # this field is for cheap wins,
+#                                              # not a second roadmap
+#   Rules that keep this from becoming its own backlog:
+#     - An idea with cost > small does NOT go here. It goes to the working
+#       todo as a normal item, or nowhere.
+#     - No idea is an obligation. This is a shelf, not a queue.
+#     - Reading a rejected project's design is legitimate. Copying its code
+#       is governed by license_status, not by this field.
+#
 # Accumulation discipline (corrected 2026-05-19):
 #   - Investigate-tier entries (decision: investigate / monitor): ACCUMULATE FREELY.
 #     The user-named pressure mechanism depends on backlog visibility. Treating
@@ -2344,3 +2364,61 @@
   next_action_owner: "Gemini CLI delegate"
   next_action_deadline: "2026-05-24"
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Harvest from the 2026-08-12 .toilet sweep. 21 third-party artifacts assessed;
+# 8 of 8 adopt recommendations refuted under adversarial review. Zero adopted.
+# These are the ideas worth keeping anyway. Sources are read, not vendored.
+# Full assessment: docs/research/2026-08-12-toilet-digestion.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+- id: reuse-ledger-0073
+  domain: agent-harness-patterns
+  candidate_project: "2026-08-12 .toilet sweep — cross-project harvest"
+  url: "docs/research/2026-08-12-toilet-digestion.md"
+  function_needed: |
+    Not a dependency evaluation. A shelf for designs found while rejecting
+    dependencies, so the reading is not wasted the next time the same problem
+    comes up.
+  reuse_level: idea-only
+  license_status: "n/a — no code taken from any source below"
+  maturity: n/a
+  integration_risk: none
+  decision: monitor
+  ideas_harvested:
+    - idea: "Persist task_plan.md / findings.md / progress.md to disk and re-inject them every turn, so a plan survives /clear, crash and compaction."
+      source: "planning-with-files (MIT)"
+      applies_to: "docs/research/2026-05-15-working-todo-list.md already does the durable half; the re-injection half maps to .agent-surface/context/RESUMPTION.md"
+      cost: small
+      note: "Closest match in the set to the UOP v2.1 prime rule — no artifact survives compaction unless written to a file that outlives the context window."
+    - idea: "Ask N models the same question, then have each rank the others' answers, rather than pooling a single score."
+      source: "llm-council (NO LICENSE FILE — idea only, nothing is takeable)"
+      applies_to: "flossiullk-reasoning-ensemble; today it preserves disagreement but does not have models score each other"
+      cost: small
+    - idea: "Ship EVALS.md alongside a behavioural skill so the skill has a falsifiable pass condition instead of prose."
+      source: "quantitative-grounding (QG-01)"
+      applies_to: "FLOSS/skill-corpus/* — none currently carry evals; pairs with .toilet/anti_sycophancy_metrics.md"
+      cost: small
+    - idea: "Package skills and MCP servers together under one manifest, with the skill format delegated to the upstream Agent Skills spec rather than redefined."
+      source: "agent-plugins-spec 1.0.0 (spec §7.1 makes Agent Skills normative)"
+      applies_to: "FLOSS/shared-skill-surface.json + shared-agent-surface.json, which define both independently"
+      cost: medium
+      note: "Recorded at medium and therefore NOT actionable from this field — listed because the superset relationship between the two specs is the durable fact."
+    - idea: "Guard against empty or non-answer model output with an explicit floor before the response enters consensus."
+      source: "deliberation (GEMINI_MIN_ANSWER_CHARS=80)"
+      applies_to: "FLOSS/packages/metacoordinator_mcp/voters.py"
+      cost: trivial
+      note: "The mechanism is crude — a stdout character count — but the failure it guards is real and we have no equivalent."
+    - idea: "Author skills once in a canonical directory, then project to every client, treating per-client dirs as generated output."
+      source: "allagents / dotagents"
+      applies_to: "already how FLOSS/scripts/materialize_shared_*.py works — this is independent convergence, recorded as validation, not as a change"
+      cost: trivial
+      note: "Useful as evidence the existing design is not idiosyncratic. allagents itself is rejected: src/core/claude-mcp.ts writes root .mcp.json, colliding with our manifest ownership."
+  notes: |
+    Standing rules this harvest respects: installation is not adoption
+    (docs/agent-memory/project/installation-not-adoption.md, consensus claim
+    019e412d, mean +0.90); and ADR-18's requirement of >=1 direct probe before
+    any compose/build verdict. Nothing here is a verdict — reading a design is
+    not adopting it.
+  next_action: "None. This entry is a shelf. Pull from it when the matching problem is already on the table."
+  next_action_owner: "n/a"

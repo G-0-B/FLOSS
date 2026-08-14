@@ -140,15 +140,21 @@ None extracted; metadata read directly from the archives.
 
 ---
 
-## Cross-cutting finding: the project license is GPL-3.0, not AGPL-3.0
+## Cross-cutting finding: ADR-7 adopted AGPL-3.0; only `FLOSS/LICENSE` lags
 
-Surfaced by an adversarial reviewer testing a license-compatibility claim, then verified directly.
+**Corrected 2026-08-12.** An earlier revision of this map said the project "is GPL-3.0, not AGPL" and concluded the April AIngram port plan was license-blocked. Both halves were wrong, and the second was backwards.
 
-`FLOSS/LICENSE` is **GPL-3.0** — 674 lines, header "GNU GENERAL PUBLIC LICENSE / Version 3, 29 June 2007", zero AFFERO mentions in the title. The only three AFFERO occurrences are lines 552/556/559: GPLv3 §13, the GPL→AGPL *combination* clause. There is no `LICENSE` at workspace root at all.
+**The decision exists.** `docs/adr/ADR-7-agpl-cascade.md` — "Embracing AGPL-3.0 Copyleft Cascade", **Accepted 2026-04-15**, `docs/adr/INDEX.md:34`, Truth Status **Specified**. Committed as `9ef2b70` with operator approval. It names AIngram and Agorai as the motivating case and explicitly removes the MCP-boundary constraint so their code *may* be ported directly.
 
-`RESEARCH-REGISTER.md:49` nonetheless records *"**Resolved 2026-08-04** | Project relicensed **AGPL-3.0-or-later**"*, and its own front-matter carries `license: "AGPL-3.0-or-later"`. **That resolution never landed on disk.** The register itself notes at line 157 that there are "conflicting completion claims", and at line 161 that a relicense "requires all copyright holders to agree" — non-trivial with bot and multi-model contributions.
+**What actually lags is one file.** `FLOSSI_U/LICENSE` carries the AGPL SPDX line as ADR-7 describes; `FLOSS/LICENSE` still holds the 674-line GPL-3.0 text. Truth Status "Specified" was the correct label all along — I read the register and the LICENSE file, and failed to read the ADR that governs both.
 
-Tracked as working-todo **A.000000 item 12** (corrected) and **12b**.
+**So the AIngram/Agorai port is *unblocked*, not blocked** — that is ADR-7's stated purpose, and `reuse-ledger-seed.yaml:0068` already recorded it correctly (`"compatible with AGPL-3 cascade per ADR-7"`). The C2 table above is corrected accordingly.
+
+**12b still stands and is unaffected:** SUL-1.0 is incompatible with AGPL-3.0 just as it is with GPL-3.0, so `voters.py`'s adapted `MOMUS_PERSONA_SYSTEM` still needs a decision.
+
+Tracked as working-todo **A.000000 item 12** (corrected twice) and **12b**.
+
+**Method lesson worth keeping:** two independent surfaces (a register entry and a LICENSE file) disagreed, and I resolved the conflict by trusting the artifact I had personally opened. The kernel's own §11b source-authority ladder puts *repo docs* above *conversation and memory*, and ADR-7 is a repo doc that settles it. **Check for a governing ADR before declaring a documentation conflict unresolved.**
 
 **12b — SUL-1.0 text in a GPL-3.0 tree.** `packages/metacoordinator_mcp/voters.py:198–211` carries `MOMUS_PERSONA_SYSTEM`, documented in-file as adapted from `oh-my-opencode v4.0.0`'s `MOMUS_DEFAULT_PROMPT`. oh-my-openagent is **SUL-1.0** (`package.json:149`) — source-available, not OSI open-source. Provenance was recorded honestly in `docs/agent-memory/project/omo-momus-voter.md`, and the text is adapted rather than copied, so this is a license question and not a lift. It is still shipped code in a GPL-3.0 tree and needs a decision: keep with permission, clean-room rewrite, or drop.
 
