@@ -81,4 +81,13 @@ See `MVP_PLAN.md`, `docs/specs/phase0-substrate-bridge.spec.md`, and `docs/archi
 
 ## License
 
-Compassion Clause + Apache-2.0/GPL-compatible (per Kernel v1.2)
+**AGPL-3.0-or-later** — see `LICENSE`, and `docs/adr/ADR-7-agpl-cascade.md` for why.
+
+The copyleft cascade is deliberate: anyone running a modified version of this
+software over a network must share those modifications back. ADR-7 §3 reserves a
+dual-licensing carve-out, grantable by formal Steward Vote, for humanitarian,
+medical and educational use where strict open-sourcing cannot work.
+
+*(Superseded: this section previously read "Compassion Clause + Apache-2.0/GPL-compatible
+(per Kernel v1.2)". Kernel v1.2 was retired 2026-08-10; the Compassion Clause moved to
+`CODE_OF_CONDUCT.md` because it is an ethical commitment, not an OSI-approved licence term.)*

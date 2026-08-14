@@ -30,7 +30,7 @@ evidence_sources:
   - "2+ months production use across multi-AI collective"
 upgrade_path: "Propose via ADR -> test 1 week -> promote or rollback"
 rollback_plan: "Revert to v1.2.0 kernel in project instructions"
-license: "Compassion Clause + Apache-2.0/GPL-compatible"
+license: "AGPL-3.0-or-later"  # per ADR-7, executed 2026-08-12
 friction_tier: "high"  # Changes require simulate + pilot + rollback
 ```
 

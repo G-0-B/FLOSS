@@ -31,7 +31,7 @@ Permanent numbers assigned in v2.0:
 | **ADR-4** | Specification-Driven Development | Accepted | Specified (CI pending) | Low | 2025-12-15 | `ADR-4-spec-driven-development.md` |
 | **ADR-5** | Cognitive Virology as Architectural Pattern | Accepted | Specified (consent gate now backed by ADR-12) | High | 2026-03-21 | `ADR-5-cognitive-virology-pattern.md` |
 | **ADR-6** | Four-System Meta-Orchestration Integration | Accepted | Specified (Seam 1 partial) | Medium | 2026-04-04 | `ADR-6-four-system-integration.md` |
-| **ADR-7** | Embracing AGPL-3.0 Copyleft Cascade | Accepted | Specified | Low | 2026-04-15 | `ADR-7-agpl-cascade.md` |
+| **ADR-7** | Embracing AGPL-3.0 Copyleft Cascade | Accepted | Verified | Low | 2026-04-15 | `ADR-7-agpl-cascade.md` |
 | **ADR-8** | Radicle as Dev-Plane Code Substrate | Accepted | Specified (bridge unproven) | Medium | 2026-04-16 | `ADR-8-radicle-dev-substrate.md` |
 | **ADR-9** | Self-Perceptual Evolution (n+1) | Accepted | Specified | Medium | 2026-04-17 | `ADR-9-self-perceptual-evolution.md` |
 | **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-10-local-agent-node.md` |
