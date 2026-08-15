@@ -125,7 +125,10 @@ def _action_sha256(claim: Claim) -> str:
 
 
 def _render_prior_decision_context(
-    claim: Claim, entries: list[dict[str, Any]]
+    claim: Claim,
+    entries: list[dict[str, Any]],
+    *,
+    context_limit: int = _PRIOR_DECISION_CONTEXT_LIMIT,
 ) -> Optional[str]:
     """Render bounded terminal decisions for byte-identical prior actions."""
     latest_decisions: dict[str, dict[str, Any]] = {}
@@ -193,10 +196,12 @@ def _render_prior_decision_context(
             "truncated": truncated,
         }
         context = f"prior_decisions={_canonical_json(payload)}"
-        if len(context) <= _PRIOR_DECISION_CONTEXT_LIMIT:
+        if len(context) <= context_limit:
             return context
         matches.pop()
         truncated = True
+        if not matches:
+            return None
 
 
 def _known_voter_name(voter: Callable[..., Vote]) -> Optional[str]:
@@ -485,26 +490,58 @@ class GatewayTools:
         entries: Optional[list[dict[str, Any]]] = None,
     ) -> str:
         """Compose packet metadata with bounded prior terminal decisions."""
+        packet_context, packet_minimum = self._render_packet_context_sized(
+            claim, context_limit=_VOTER_CONTEXT_LIMIT
+        )
+        prior_limit = _PRIOR_DECISION_CONTEXT_LIMIT
+        if packet_minimum is not None:
+            prior_limit = min(
+                prior_limit,
+                max(
+                    0,
+                    _VOTER_CONTEXT_LIMIT
+                    - len(_CONTEXT_SEPARATOR)
+                    - packet_minimum,
+                ),
+            )
         prior_context = (
-            _render_prior_decision_context(claim, entries)
+            _render_prior_decision_context(
+                claim,
+                entries,
+                context_limit=prior_limit,
+            )
             if entries is not None
             else None
-        )
-        packet_limit = _VOTER_CONTEXT_LIMIT
-        if prior_context is not None:
-            packet_limit -= len(_CONTEXT_SEPARATOR) + len(prior_context)
-        packet_context = self._render_packet_context(
-            claim, context_limit=packet_limit
         )
         if packet_context == "(none)":
             return prior_context or "(none)"
         if prior_context is None:
             return packet_context
+        if packet_minimum is None:
+            combined = f"{packet_context}{_CONTEXT_SEPARATOR}{prior_context}"
+            return combined if len(combined) <= _VOTER_CONTEXT_LIMIT else packet_context
+        packet_limit = (
+            _VOTER_CONTEXT_LIMIT
+            - len(_CONTEXT_SEPARATOR)
+            - len(prior_context)
+        )
+        packet_context = self._render_packet_context(
+            claim, context_limit=packet_limit
+        )
         return f"{packet_context}{_CONTEXT_SEPARATOR}{prior_context}"
 
     def _render_packet_context(
         self, claim: Claim, *, context_limit: int = _VOTER_CONTEXT_LIMIT
     ) -> str:
+        """Render packet context while hiding composition sizing metadata."""
+        context, _minimum_length = self._render_packet_context_sized(
+            claim, context_limit=context_limit
+        )
+        return context
+
+    def _render_packet_context_sized(
+        self, claim: Claim, *, context_limit: int = _VOTER_CONTEXT_LIMIT
+    ) -> tuple[str, Optional[int]]:
         """Compose the voter-visible context string from validated packet metadata.
 
         PR38 review thread PRRT_kwDOPkAi3s6UUuKj: the hard gate on
@@ -524,7 +561,7 @@ class GatewayTools:
         goes here.
         """
         if not any(ref.type == "provenance_packet" for ref in claim.evidence):
-            return "(none)"
+            return "(none)", None
         from packages.activity_log import provenance
 
         try:
@@ -534,9 +571,9 @@ class GatewayTools:
         except Exception:  # noqa: BLE001
             # Never let context rendering block a round; voters will see the
             # default "(none)" and reason from the top-level Evidence field.
-            return "(none)"
+            return "(none)", None
         if not packets:
-            return "(none)"
+            return "(none)", None
         packet_contexts: list[tuple[str, list[str]]] = []
         rendered_refs: set[tuple[str, str, str]] = set()
         rendered_count = 0
@@ -564,9 +601,9 @@ class GatewayTools:
                 or not raw_digest.isprintable()
                 or digest != raw_digest
             ):
-                return mandatory_exactness_failure
+                return mandatory_exactness_failure, None
             if len(digest) > 96:
-                return per_value_overflow
+                return per_value_overflow, None
             consent_hash: Optional[str] = None
             for entry in packet.get("a", []) or []:
                 if provenance.entry_has_consent(entry):
@@ -622,9 +659,9 @@ class GatewayTools:
             if consent_hash is not None and (
                 not consent_hash.isprintable() or consent_str != consent_hash
             ):
-                return mandatory_exactness_failure
+                return mandatory_exactness_failure, None
             if len(consent_str) > 160:
-                return per_value_overflow
+                return per_value_overflow, None
             packet_contexts.append(
                 (
                     f"packet digest={digest} consent_ref={consent_str} "
@@ -638,13 +675,22 @@ class GatewayTools:
             for header, nested_refs in packet_contexts
         ]
         full_context = " | ".join(full_lines)
-        if not truncated and len(full_context) <= context_limit:
-            return full_context
-
         mandatory_length = sum(len(header) for header, _refs in packet_contexts)
         mandatory_length += len(" | ") * (len(packet_contexts) - 1)
+        truncated_minimum = mandatory_length + len(truncated_marker)
+        minimum_length = (
+            truncated_minimum
+            if truncated
+            else min(len(full_context), truncated_minimum)
+        )
+        if not truncated and len(full_context) <= context_limit:
+            return full_context, minimum_length
+
         if mandatory_length + len(truncated_marker) > context_limit:
-            return "[packet metadata exceeds 4096-character voter context limit]"
+            return (
+                "[packet metadata exceeds 4096-character voter context limit]",
+                minimum_length,
+            )
 
         optional_budget = context_limit - mandatory_length - len(truncated_marker)
         bounded_lines: list[str] = []
@@ -662,7 +708,7 @@ class GatewayTools:
                     line += segment
                     optional_budget -= len(segment)
             bounded_lines.append(line)
-        return f"{' | '.join(bounded_lines)}{truncated_marker}"
+        return f"{' | '.join(bounded_lines)}{truncated_marker}", minimum_length
 
     # ------------------------------------------------------------------
     # Tool 1 — submit_claim

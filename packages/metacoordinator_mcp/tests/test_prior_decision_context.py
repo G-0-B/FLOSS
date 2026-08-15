@@ -79,14 +79,16 @@ def _prior_payload(context: str) -> tuple[str, dict]:
 
 
 def _packet_evidence(
-    workspace_root: Path, nested_refs: list[dict]
+    workspace_root: Path,
+    nested_refs: list[dict],
+    *,
+    consent_hash: str = "uhCAk" + ("c" * 32),
 ) -> tuple[EvidenceRef, dict, str]:
     from packages.activity_log import provenance
 
     artifact = workspace_root / "FLOSS" / "docs" / "specs" / "packet-artifact.md"
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text("packet artifact", encoding="utf-8")
-    consent_hash = "uhCAk" + ("c" * 32)
     packet_entry = {
         "claim_type": "proposal",
         "truth_status": "specified",
@@ -104,8 +106,13 @@ def _packet_evidence(
     }
     packet, packet_path = provenance.create_packet(
         [packet_entry],
-        identity_dir=workspace_root / "identity",
+        identity_dir=(
+            workspace_root
+            / "identity"
+            / hashlib.sha256(consent_hash.encode("utf-8")).hexdigest()
+        ),
         output_root=workspace_root / ".agent-surface" / "provenance",
+        prior_digest=None,
     )
     evidence = EvidenceRef(
         type="provenance_packet",
@@ -113,6 +120,25 @@ def _packet_evidence(
         sha256=provenance.sha256_file(packet_path),
     )
     return evidence, packet, consent_hash
+
+
+def _near_limit_packet_evidence(
+    workspace_root: Path, count: int
+) -> tuple[list[EvidenceRef], list[dict], list[str]]:
+    evidence: list[EvidenceRef] = []
+    packets: list[dict] = []
+    consent_hashes: list[str] = []
+    for index in range(count):
+        consent_hash = "uhCAk" + f"{index:02d}" + ("x" * 153)
+        packet_evidence, packet, accepted_consent_hash = _packet_evidence(
+            workspace_root,
+            [{"type": "spec", "ref": f"packet-root-{index}.md"}],
+            consent_hash=consent_hash,
+        )
+        evidence.append(packet_evidence)
+        packets.append(packet)
+        consent_hashes.append(accepted_consent_hash)
+    return evidence, packets, consent_hashes
 
 
 def test_exact_action_resubmission_receives_prior_approved_decision(tmp_path):
@@ -449,6 +475,98 @@ def test_packet_and_prior_context_preserve_mandatory_metadata_with_total_bound(
         "prior_decisions=" + context.rsplit("prior_decisions=", 1)[1]
     )
     assert [match["claim_id"] for match in payload["matches"]] == [prior.id]
+
+
+def test_mixed_context_drops_oldest_priors_before_packet_mandatory_metadata(
+    tmp_path,
+):
+    evidence, packets, consent_hashes = _near_limit_packet_evidence(tmp_path, 13)
+    summary = "Near-limit packet context with bounded prior history"
+    body = "Mandatory packet metadata must be sized before prior decisions."
+    current = _claim(
+        summary,
+        body,
+        proposer="current",
+        proposal_type=ProposalType.SPEC_CHANGE,
+        blast_radius=BlastRadius.SYSTEM,
+        evidence=evidence,
+    )
+    priors_oldest_first = [
+        _claim(summary, body, proposer=f"prior-{index}") for index in range(6)
+    ]
+    newest_first = list(reversed(priors_oldest_first))
+    entries = [_claim_entry(current)]
+    for prior in newest_first:
+        entries.extend([_decision_entry(prior.id, "APPROVED"), _claim_entry(prior)])
+    gateway = GatewayTools(
+        base_dir=tmp_path / "cell",
+        dna_hash=DNA_HASH,
+        workspace_root=tmp_path,
+    )
+
+    packet_only = gateway._render_voter_context(current)
+    assert len(packet_only) <= 4096
+    for packet, consent_hash in zip(packets, consent_hashes, strict=True):
+        assert f"packet digest={packet['d']}" in packet_only
+        assert f"consent_ref={consent_hash}" in packet_only
+
+    context = gateway._render_voter_context(current, entries=entries)
+
+    assert len(context) <= 4096
+    for packet, consent_hash in zip(packets, consent_hashes, strict=True):
+        assert f"packet digest={packet['d']}" in context
+        assert f"consent_ref={consent_hash}" in context
+    assert "prior_decisions=" in context
+    _serialized, payload = _prior_payload(
+        "prior_decisions=" + context.rsplit("prior_decisions=", 1)[1]
+    )
+    rendered_ids = [match["claim_id"] for match in payload["matches"]]
+    assert 0 < len(rendered_ids) < len(newest_first)
+    assert rendered_ids == [prior.id for prior in newest_first[: len(rendered_ids)]]
+    assert payload["truncated"] is True
+    assert "[truncated]" in context
+
+
+def test_mixed_context_omits_prior_when_one_match_cannot_fit_mandatory_packet_data(
+    tmp_path,
+):
+    evidence, packets, consent_hashes = _near_limit_packet_evidence(tmp_path, 16)
+    summary = "Irreducible packet context fills the voter budget"
+    body = "One prior match cannot displace mandatory packet metadata."
+    current = _claim(
+        summary,
+        body,
+        proposer="current",
+        proposal_type=ProposalType.SPEC_CHANGE,
+        blast_radius=BlastRadius.SYSTEM,
+        evidence=evidence,
+    )
+    prior = _claim(summary, body, proposer="prior")
+    entries = [
+        _claim_entry(current),
+        _decision_entry(prior.id, "APPROVED"),
+        _claim_entry(prior),
+    ]
+    gateway = GatewayTools(
+        base_dir=tmp_path / "cell",
+        dna_hash=DNA_HASH,
+        workspace_root=tmp_path,
+    )
+
+    packet_only = gateway._render_voter_context(current)
+    assert len(packet_only) <= 4096
+    for packet, consent_hash in zip(packets, consent_hashes, strict=True):
+        assert f"packet digest={packet['d']}" in packet_only
+        assert f"consent_ref={consent_hash}" in packet_only
+
+    context = gateway._render_voter_context(current, entries=entries)
+
+    assert len(context) <= 4096
+    assert "prior_decisions=" not in context
+    assert "[truncated]" in context
+    for packet, consent_hash in zip(packets, consent_hashes, strict=True):
+        assert f"packet digest={packet['d']}" in context
+        assert f"consent_ref={consent_hash}" in context
 
 
 def test_ordinary_history_context_does_not_import_optional_provenance(tmp_path):
