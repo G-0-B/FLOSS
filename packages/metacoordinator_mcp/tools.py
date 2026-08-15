@@ -13,6 +13,7 @@ Errors are returned as {"error": "<message>"} rather than raised, so callers
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import re
@@ -41,6 +42,19 @@ from packages.source_chain.cell import CellDirectory  # noqa: E402
 # Deferred type — avoids importing voters.py (and LiteLLM) at module load.
 # Tests that never call run_consensus_round should never touch the network.
 VoterFactory = Callable[[], list[Callable[..., Vote]]]
+
+_TERMINAL_PRIOR_OUTCOMES = frozenset(
+    {
+        Outcome.APPROVED,
+        Outcome.REJECTED,
+        Outcome.CONFLICT,
+        Outcome.OVERRIDDEN,
+    }
+)
+_PRIOR_DECISION_MATCH_LIMIT = 8
+_PRIOR_DECISION_CONTEXT_LIMIT = 1024
+_VOTER_CONTEXT_LIMIT = 4096
+_CONTEXT_SEPARATOR = " | "
 
 
 def _claim_from_chain_entry(entry_content: dict[str, Any]) -> Claim:
@@ -91,6 +105,98 @@ def _vote_from_chain_entry(entry_content: dict[str, Any]) -> Vote:
 def _decision_outcome(entry_content: dict[str, Any]) -> Outcome:
     """Parse the Outcome enum from a persisted Decision payload."""
     return Outcome(entry_content["outcome"])
+
+
+def _canonical_json(value: Any) -> str:
+    """Serialize deterministic voter-context metadata."""
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
+
+
+def _action_sha256(claim: Claim) -> str:
+    """Return the exact-action digest for raw summary/body equality."""
+    action = _canonical_json({"body": claim.body, "summary": claim.summary})
+    return hashlib.sha256(action.encode("utf-8")).hexdigest()
+
+
+def _render_prior_decision_context(
+    claim: Claim, entries: list[dict[str, Any]]
+) -> Optional[str]:
+    """Render bounded terminal decisions for byte-identical prior actions."""
+    latest_decisions: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        if entry.get("type") != "decision":
+            continue
+        content = entry.get("content")
+        if not isinstance(content, dict):
+            continue
+        prior_claim_id = content.get("claim_id")
+        if isinstance(prior_claim_id, str):
+            latest_decisions.setdefault(prior_claim_id, content)
+
+    matches: list[dict[str, str]] = []
+    seen_claim_ids: set[str] = set()
+    count_truncated = False
+    for entry in entries:
+        if entry.get("type") != "claim":
+            continue
+        content = entry.get("content")
+        if not isinstance(content, dict):
+            continue
+        prior_claim_id = content.get("id")
+        if (
+            not isinstance(prior_claim_id, str)
+            or prior_claim_id == claim.id
+            or prior_claim_id in seen_claim_ids
+        ):
+            continue
+        seen_claim_ids.add(prior_claim_id)
+        latest_decision = latest_decisions.get(prior_claim_id)
+        if latest_decision is None:
+            continue
+        try:
+            outcome = _decision_outcome(latest_decision)
+            prior_claim = _claim_from_chain_entry(content)
+            prior_claim.validate()
+        except (KeyError, TypeError, ValueError):
+            continue
+        if outcome not in _TERMINAL_PRIOR_OUTCOMES:
+            continue
+        if prior_claim.summary != claim.summary or prior_claim.body != claim.body:
+            continue
+        if len(matches) == _PRIOR_DECISION_MATCH_LIMIT:
+            count_truncated = True
+            break
+        matches.append(
+            {
+                "claim_id": prior_claim.id,
+                "outcome": outcome.value,
+                "proposal_type": prior_claim.proposal_type.value,
+                "blast_radius": prior_claim.blast_radius.value,
+                "submitted_at": prior_claim.submitted_at,
+            }
+        )
+
+    if not matches:
+        return None
+
+    truncated = count_truncated
+    while True:
+        payload = {
+            "action_sha256": _action_sha256(claim),
+            "matches": matches,
+            "truncated": truncated,
+        }
+        context = f"prior_decisions={_canonical_json(payload)}"
+        if len(context) <= _PRIOR_DECISION_CONTEXT_LIMIT:
+            return context
+        matches.pop()
+        truncated = True
 
 
 def _known_voter_name(voter: Callable[..., Vote]) -> Optional[str]:
@@ -372,7 +478,33 @@ class GatewayTools:
                 validated_packets.append((packet, packet_path))
         return has_valid_packet, has_consent, errors, validated_packets
 
-    def _render_voter_context(self, claim: Claim) -> str:
+    def _render_voter_context(
+        self,
+        claim: Claim,
+        *,
+        entries: Optional[list[dict[str, Any]]] = None,
+    ) -> str:
+        """Compose packet metadata with bounded prior terminal decisions."""
+        prior_context = (
+            _render_prior_decision_context(claim, entries)
+            if entries is not None
+            else None
+        )
+        packet_limit = _VOTER_CONTEXT_LIMIT
+        if prior_context is not None:
+            packet_limit -= len(_CONTEXT_SEPARATOR) + len(prior_context)
+        packet_context = self._render_packet_context(
+            claim, context_limit=packet_limit
+        )
+        if packet_context == "(none)":
+            return prior_context or "(none)"
+        if prior_context is None:
+            return packet_context
+        return f"{packet_context}{_CONTEXT_SEPARATOR}{prior_context}"
+
+    def _render_packet_context(
+        self, claim: Claim, *, context_limit: int = _VOTER_CONTEXT_LIMIT
+    ) -> str:
         """Compose the voter-visible context string from validated packet metadata.
 
         PR38 review thread PRRT_kwDOPkAi3s6UUuKj: the hard gate on
@@ -500,7 +632,6 @@ class GatewayTools:
                     nested_refs,
                 )
             )
-        context_limit = 4096
         truncated_marker = " [truncated]"
         full_lines = [
             f"{header}{'; '.join(nested_refs) if nested_refs else '(none)'}"
@@ -778,7 +909,7 @@ class GatewayTools:
                 voters,
                 claim,
                 existing_votes_by_voter,
-                context=self._render_voter_context(claim),
+                context=self._render_voter_context(claim, entries=entries),
             )
         except Exception as exc:  # noqa: BLE001
             return _err(f"E_CONSENSUS_FAILED: {type(exc).__name__}: {exc}")
