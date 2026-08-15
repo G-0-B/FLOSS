@@ -152,7 +152,7 @@ L2 has been in the holding area since 2026-06-08 and was never promoted; only it
 3. **Any NANDA/Omnigent recommendation from #24** not already independently landed as ADR-16 or ADR-19.
 4. **The external provenance draft's SAID algorithm** (#2) — it computes `v` with `sigs=[]` and is wrong. Do not resurrect.
 5. **`ADR-CONTEXT-DAEMON-ROI` ROI percentages** (88.7 %, 70–90 %) — unsourced vendor-style claims; carry as claims, never as measurements.
-6. **`FLOSS/docs/ADRs/` shadow directory** — contains `ADR-2-Holochain-Integration-Stack.md` and `ADR-3-Documentation-Consolidation.md`, which **collide by number** with the real ADR-2/ADR-3 in `docs/adr/`. A future agent reading the shadow dir will assert wrong facts. Unindexed, ungated. Resolution is likely `archive/` — these *are* superseded canonical docs, so archive is correct here, unlike root drops.
+6. ~~**`FLOSS/docs/ADRs/` shadow directory**~~ — **RESOLVED 2026-08-12.** Both colliding ADRs and the stray `docs/specifications/keri-identity-bridge.yaml` archived; both shadow directories removed. Numbering history recorded in `docs/adr/INDEX.md`. Kept on this list as a pattern to watch for: a document outside a `spec_gate` gated surface is invisible to `--check` and drifts silently.
 7. **Retroactive edits to dated verification records** (#17) — a rename applied inside a "verified on date X" block turns a true observation false.
 
 ---

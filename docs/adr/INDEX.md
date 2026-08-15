@@ -57,6 +57,12 @@ Previous documents used inconsistent numbering. This index resolves conflicts:
 | `ADR-N` (SDD) | ADR-4 | Assigned permanent number |
 | `ADR-N` (IPFS) | **ADR-11** | Promoted to permanent in v2.0 suite |
 | `ADR-MCP-ORCHESTRATOR` | **ADR-10** | Promoted to permanent in v2.0 suite |
+| `docs/ADRs/ADR-2-Holochain-Integration-Stack.md` | *(none — archived)* | **Shadow-directory collision, resolved 2026-08-12.** Self-declared SUPERSEDED by `ADR-2-holochain-substrate.md`; retained only as a record of a methodology violation. Archived to `archive/adr-versions/…_shadow-collision_2025-11-17.md`. |
+| `docs/ADRs/ADR-3-Documentation-Consolidation.md` | *(none — archived)* | **Shadow-directory collision, resolved 2026-08-12.** Number already held by `ADR-3-metaprompt-kernelization.md`. Its subject (doc consolidation, 2025-12-11) has been superseded by the 2026-05 doc-cull triage and the 2026-08 consolidation passes. Archived to `archive/adr-versions/…_shadow-collision_2025-12-11.md`. |
+
+**`docs/ADRs/` and `docs/specifications/` no longer exist.** They were unindexed, ungated shadows of `docs/adr/` and `docs/specs/`. The Codex repository atlas classified both shadow ADRs as `canon-governance` at read-priority **L1**, meaning any agent trusting that map would have loaded them as governance material without any signal that both numbers were already taken. `docs/specifications/keri-identity-bridge.yaml` (marked RETROACTIVE, no `docs/specs/` counterpart) was archived alongside them to `archive/spec-versions/`.
+
+**Rule going forward:** ADRs live in `docs/adr/` and specs in `docs/specs/` — the two surfaces `spec_gate.py` actually walks. A document outside a gated surface is invisible to `--check` and will drift silently, which is exactly how these two survived a numbering reconciliation.
 
 Pending file renames (cosmetic, follow-up):
 - `ADR-10-local-agent-node.md` → `ADR-10-local-agent-node.md` (with inbound-link redirects)
