@@ -34,11 +34,17 @@ from packages.orchestrator.claim_schema import (  # noqa: E402
 DNA_HASH = "c" * 64
 
 
-def _make_gateway(base_dir: str, workspace_root: Path) -> GatewayTools:
+def _make_gateway(
+    base_dir: str,
+    workspace_root: Path,
+    *,
+    provenance_root: Path | None = None,
+) -> GatewayTools:
     return GatewayTools(
         base_dir=Path(base_dir),
         dna_hash=DNA_HASH,
         workspace_root=workspace_root,
+        provenance_root=provenance_root,
     )
 
 
@@ -759,7 +765,9 @@ def test_cyclic_packet_traversal_returns_and_renders_no_evidence(
         )
 
     with tempfile.TemporaryDirectory() as tmp:
-        context = _make_gateway(tmp, tmp_path)._render_voter_context(
+        context = _make_gateway(
+            tmp, tmp_path, provenance_root=tmp_path
+        )._render_voter_context(
             _claim_with_packet_ref(
                 {"type": "provenance_packet", "ref": root_path.name}
             )

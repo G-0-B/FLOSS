@@ -437,6 +437,57 @@ def test_discontinuous_prior_sequence_is_rejected(tmp_path, monkeypatch):
     assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in result.errors
 
 
+def test_zero_padded_signed_successor_sequence_is_rejected(tmp_path, monkeypatch):
+    """A signed successor cannot alias canonical sequence 1 as string 01."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / ".agent-surface" / "provenance"
+    identity_dir = tmp_path / "identity"
+    entry = {
+        "claim_type": "proposal",
+        "truth_status": "specified",
+        "source_systems": ["unit-test"],
+        "created_at": "2026-08-15T00:00:00Z",
+        "human_collision_node": "unit-test",
+        "artifact_refs": [],
+        "evidence_refs": [{"type": "test", "ref": "unit"}],
+        "risks": [],
+        "benefits": [],
+        "next_action": "prior",
+    }
+    provenance.create_packet(
+        [entry],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=None,
+    )
+    successor, successor_path = provenance.create_packet(
+        [{**entry, "created_at": "2026-08-15T00:00:01Z", "next_action": "next"}],
+        identity_dir=identity_dir,
+        output_root=output_root,
+    )
+    assert successor["s"] == "1"
+    successor["s"] = "01"
+    successor_path.write_bytes(_resign_packet(successor, identity_dir=identity_dir))
+
+    result = provenance.validate_packet(
+        successor_path,
+        workspace_root=tmp_path,
+        provenance_root=output_root,
+    )
+
+    assert result.ok is False
+    assert result.errors == ["E_PROVENANCE_SEQUENCE_INVALID"]
+
+
+@pytest.mark.parametrize("sequence", ["0", "1", "10", "99999999999999999999"])
+def test_canonical_decimal_sequence_forms_are_accepted(sequence):
+    from packages.activity_log import provenance
+
+    assert provenance._SEQUENCE_RE.fullmatch(sequence) is not None
+
+
 def test_same_agent_same_prior_and_sequence_fork_is_rejected(tmp_path, monkeypatch):
     """Two valid signed successors at one chain position are both rejected."""
     from packages.activity_log import provenance

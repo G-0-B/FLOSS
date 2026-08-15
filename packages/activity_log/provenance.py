@@ -473,7 +473,7 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
     "benefits",
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
-_SEQUENCE_RE = re.compile(r"^[0-9]+\Z")
+_SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
 _EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
 
 
@@ -577,11 +577,22 @@ def validate_packet(
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
     root = Path(workspace_root or WORKSPACE_ROOT).resolve()
+    explicit_provenance_root = (
+        Path(provenance_root).resolve() if provenance_root is not None else None
+    )
     packet_path: Path | None = None
     if isinstance(packet_or_path, dict):
         packet = packet_or_path
     else:
-        packet_path = Path(packet_or_path)
+        packet_path = Path(packet_or_path).resolve()
+        if explicit_provenance_root is not None:
+            try:
+                packet_path.relative_to(explicit_provenance_root)
+            except ValueError:
+                return PacketValidation(
+                    ok=False,
+                    errors=["E_PROVENANCE_PACKET_OUTSIDE_ROOT"],
+                )
         try:
             packet = json.loads(packet_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -641,11 +652,7 @@ def validate_packet(
 
     errors.extend(_artifact_errors(packet, root))
 
-    prov_root = (
-        Path(provenance_root)
-        if provenance_root is not None
-        else _infer_provenance_root(packet_path)
-    )
+    prov_root = explicit_provenance_root or _infer_provenance_root(packet_path)
     prior_digest = packet.get("p")
     sequence = packet.get("s")
     sequence_valid = (

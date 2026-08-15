@@ -278,7 +278,7 @@ def _write_round_results(
 
 
 class GatewayTools:
-    """Stateless tool handlers. All state lives in the cell directory on disk."""
+    """Tool handlers bound to one cell and one local provenance trust domain."""
 
     def __init__(
         self,
@@ -287,6 +287,7 @@ class GatewayTools:
         *,
         voter_factory: Optional[VoterFactory] = None,
         workspace_root: Path | str | None = None,
+        provenance_root: Path | str | None = None,
     ) -> None:
         self._cell = CellDirectory(base_dir=base_dir, dna_hash=dna_hash)
         # voter_factory is lazy: default stays None so test harnesses that
@@ -294,7 +295,20 @@ class GatewayTools:
         self._voter_factory: Optional[VoterFactory] = voter_factory
         self._workspace_root = (
             Path(workspace_root) if workspace_root is not None else _REPO_ROOT.parent
+        ).resolve()
+        configured_provenance_root = (
+            Path(provenance_root)
+            if provenance_root is not None
+            else Path(".agent-surface") / "provenance"
         )
+        if not configured_provenance_root.is_absolute():
+            configured_provenance_root = (
+                self._workspace_root / configured_provenance_root
+            )
+        # Plane A adapter boundary only. A future Holochain-backed gateway maps
+        # provenance to DNA + agent source-chain identity instead of promoting
+        # this filesystem root into a global-history abstraction.
+        self._provenance_root = configured_provenance_root.resolve()
 
     def _validate_provenance_evidence(
         self, evidence: list[EvidenceRef]
@@ -328,6 +342,12 @@ class GatewayTools:
             packet_path = Path(ref.ref)
             if not packet_path.is_absolute():
                 packet_path = self._workspace_root / ref.ref
+            try:
+                packet_path = packet_path.resolve()
+                packet_path.relative_to(self._provenance_root)
+            except (OSError, RuntimeError, ValueError):
+                errors.append("E_PROVENANCE_PACKET_OUTSIDE_ROOT")
+                continue
             if not packet_path.exists():
                 errors.append("E_PROVENANCE_PACKET_NOT_FOUND")
                 continue
@@ -340,6 +360,7 @@ class GatewayTools:
             result = provenance.validate_packet(
                 packet_path,
                 workspace_root=self._workspace_root,
+                provenance_root=self._provenance_root,
             )
             if not result.ok:
                 errors.extend(result.errors)
@@ -427,6 +448,7 @@ class GatewayTools:
                     provenance.validated_non_packet_evidence_refs(
                         packet_path,
                         workspace_root=self._workspace_root,
+                        provenance_root=self._provenance_root,
                         max_refs=32,
                     )
                 )
