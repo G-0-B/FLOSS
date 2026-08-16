@@ -66,6 +66,33 @@ RESERVED_AGENT_SURFACE_SUBTREES = {
     ".agent-surface/events",
     ".agent-surface/shadows",
 }
+# Dependency and build trees. These are vendored or regenerable, never intake,
+# and they are enormous: the `shared-surface` spec watches all of FLOSS/
+# recursively, so a single unexcluded node_modules dominates the queue. The
+# 2026-07-07 QUEUE_SUMMARY showed 99 of the last 100 processed events coming
+# from FLOSS/workers/commons-gateway/node_modules/** alone. The 2026-06-16/17
+# flood (1.23M events) had a different root cause — overlapping watch specs,
+# fixed by first-spec-wins dedup — but this would have produced its own storm
+# on the next run regardless. Directory-name match, so it prunes at any depth.
+EXCLUDED_DIR_NAMES = {
+    ".mypy_cache",
+    ".next",
+    ".nuxt",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svelte-kit",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "bower_components",
+    "dist",
+    "htmlcov",
+    "node_modules",
+    "site-packages",
+    "target",
+    "vendor",
+    "venv",
+}
 EXCLUDED_FILE_SUFFIXES = {
     ".jsonl",
     ".pyc",
@@ -255,6 +282,10 @@ def should_include(path: Path, workspace_root: Path) -> bool:
         return False
     if ".git" in path.parts:
         return False
+    # Prune dependency/build trees at any depth. Checked against the parent
+    # parts only, so a file legitimately *named* e.g. "dist" is still watched.
+    if EXCLUDED_DIR_NAMES.intersection(path.parts[:-1]):
+        return False
     if path.suffix.lower() in EXCLUDED_FILE_SUFFIXES:
         return False
     if path.name.startswith("deepsource-"):
@@ -389,6 +420,13 @@ def scan_once(
 
     for abs_path, prior in previous.items():
         if abs_path in current:
+            continue
+        # Deletions are inferred from stored state, not from a directory walk,
+        # so they never pass through should_include(). A state file written
+        # before an exclusion rule existed will therefore emit a `deleted`
+        # event for every now-excluded path — 2157 of 2487 on the first run
+        # after EXCLUDED_DIR_NAMES landed, all node_modules. Filter here too.
+        if not should_include(Path(abs_path), workspace_root):
             continue
         emit_event(
             incoming_dir,
