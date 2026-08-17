@@ -9,12 +9,12 @@ import sys
 
 import pytest
 
-from packages.salvage_spine import cli as cli_module
-from packages.salvage_spine.cli import main
-from packages.salvage_spine.checkpoint import load_latest_checkpoint
-from packages.salvage_spine.models import ResultStatus, canonical_json_bytes
-from packages.salvage_spine.tests.test_github_projection import _verification
-from packages.salvage_spine.tests.test_seal_restore import git
+from packages.preservation_spine import cli as cli_module
+from packages.preservation_spine.cli import main
+from packages.preservation_spine.checkpoint import load_latest_checkpoint
+from packages.preservation_spine.models import ResultStatus, canonical_json_bytes
+from packages.preservation_spine.tests.test_github_projection import _verification
+from packages.preservation_spine.tests.test_seal_restore import git
 
 
 def _write_and_commit(repo: Path, name: str, content: bytes, message: str) -> str:
@@ -180,13 +180,13 @@ def test_cli_flow_capture_verify_stops_before_inventory_when_blocked(
     assert checkpoint.phase == "capture-complete"
     assert checkpoint.verification_digest is None
     assert checkpoint.next_safe_command.startswith(
-        "python scripts/pr38_salvage.py verify"
+        "python scripts/preservation_spine.py verify"
     )
 
     assert main(["status", "--capsule", str(state_dir)]) == 1
     status_after_capture = json.loads(capsys.readouterr().out)
     assert status_after_capture["next_safe_command"].startswith(
-        "python scripts/pr38_salvage.py verify"
+        "python scripts/preservation_spine.py verify"
     )
     assert status_after_capture["phase"] == "capture-complete"
     assert status_after_capture["blockers"] == ["verification-pending"]
@@ -237,7 +237,7 @@ def test_cli_flow_capture_verify_stops_before_inventory_when_blocked(
     final_status = json.loads(capsys.readouterr().out)
     assert final_status["phase"] == "verification-complete"
     assert final_status["next_safe_command"].startswith(
-        "python scripts/pr38_salvage.py status"
+        "python scripts/preservation_spine.py status"
     )
 
 
@@ -428,7 +428,7 @@ def test_pass_flow_inventory_render_and_overlap_guards(
         == 0
     )
     assert json.loads(capsys.readouterr().out) == {
-        "next_safe_command": "python scripts/pr38_salvage.py status --capsule STATE_DIR",
+        "next_safe_command": "python scripts/preservation_spine.py status --capsule STATE_DIR",
         "phase": "projection-rendered",
         "status": ResultStatus.BLOCKED.value,
     }
@@ -503,13 +503,13 @@ def test_pass_flow_inventory_render_and_overlap_guards(
     assert projection_checkpoint.verification_digest == checkpoint.verification_digest
     assert projection_checkpoint.blockers == checkpoint.blockers
     assert projection_checkpoint.next_safe_command == (
-        "python scripts/pr38_salvage.py status --capsule STATE_DIR"
+        "python scripts/preservation_spine.py status --capsule STATE_DIR"
     )
 
 
 def test_script_help_matches_main_surface(tmp_path: Path) -> None:
     result = subprocess.run(
-        [sys.executable, "scripts/pr38_salvage.py", "--help"],
+        [sys.executable, "scripts/preservation_spine.py", "--help"],
         cwd=Path(__file__).parents[3],
         check=False,
         capture_output=True,

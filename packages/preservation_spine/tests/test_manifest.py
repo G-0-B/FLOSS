@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
-from packages.salvage_spine.manifest import (
+from packages.preservation_spine.manifest import (
     inventory_change_universe,
     manifest_digest,
     validate_manifest,
 )
-from packages.salvage_spine.models import PlaneId, ResultStatus, canonical_json_bytes
-from packages.salvage_spine.seal import CapsuleVerificationError, seal_capsule
+from packages.preservation_spine.models import PlaneId, ResultStatus, canonical_json_bytes
+from packages.preservation_spine.seal import CapsuleVerificationError, seal_capsule
 
 
 def _atom(atom_id: str = "atom-a") -> dict[str, object]:
@@ -346,7 +346,7 @@ def test_inventory_is_deterministic_complete_and_defaults_to_captured(
         / "docs"
         / "superpowers"
         / "specs"
-        / "pr38-salvage-manifest.schema.json"
+        / "preservation-manifest.schema.json"
     )
     Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8"))).validate(
         first
@@ -464,7 +464,7 @@ def test_inventory_rejects_tamper_and_unsafe_manifest_path(tmp_path: Path) -> No
 
 
 def test_inventory_accepts_real_capture_and_seal(tmp_path: Path) -> None:
-    from packages.salvage_spine.tests.test_seal_restore import captured_capsule
+    from packages.preservation_spine.tests.test_seal_restore import captured_capsule
 
     capsule, _, _ = captured_capsule(tmp_path)
     seal_capsule(capsule)
@@ -594,7 +594,7 @@ def test_inventory_and_task4_accept_the_same_inclusion_states(
     entry: dict[str, object],
     expected_blocker: str | None,
 ) -> None:
-    from packages.salvage_spine.restore import _validate_artifact_plane
+    from packages.preservation_spine.restore import _validate_artifact_plane
 
     kwargs = (
         {"tracked_manifest": [entry]}
@@ -692,7 +692,7 @@ def test_inventory_and_task4_both_reject_unsupported_inclusion_semantics(
     plane: PlaneId,
     entry: dict[str, object],
 ) -> None:
-    from packages.salvage_spine.restore import _validate_artifact_plane
+    from packages.preservation_spine.restore import _validate_artifact_plane
 
     kwargs = (
         {"tracked_manifest": [entry]}

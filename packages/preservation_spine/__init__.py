@@ -1,4 +1,10 @@
-"""Preserve-first contracts for the PR #38 salvage spine."""
+"""Preserve-first contracts for the repository preservation spine.
+
+Six-plane capture (remote base, remote PR head, local commits, index,
+tracked worktree, untracked/ignored inventory), sealed capsules, clean-room
+restore, and scoped evidence rendering. Originated in the 2026-07 PR38
+salvage; the contract is general to any risky repository operation.
+"""
 
 from .models import (
     CapsuleRecord,
