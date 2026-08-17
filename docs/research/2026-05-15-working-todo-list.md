@@ -90,6 +90,15 @@ Provenance: `docs/research/2026-08-10-root-intake-digestion.md`, ledger `.agent-
 19. **27 unreviewed drafts** in `docs/knowledge_log/staging/`, all untracked. Review or expire.
 20. **PR #25 vs PR #36 discrepancy** — the v1.4 verification report cites #25 as merged 2026-06-16; the merged 2026-08-04 correction attributes that date to #36. One is wrong; needs authenticated repo access. Flagged in-place in the report.
 
+**P2b — openwork rebuild (new 2026-08-17)**
+
+18b. **Openwork was massively misconfigured; all its configs were deliberately wiped 2026-08-17.** Rebuild from scratch. Three things to get right on the way back in:
+   - **`opworkers/` is the wrong home.** It was a workspace-setup mistake; the intended root is `C:\~shit` itself, whose openwork surface is the root `.openwork` folder. The roster manifest still points at three `opworkers/` paths (`shared-ai-roster-surface.json` provider_sources ×2, agent_sources ×1) — repoint them during the rebuild, don't preserve the mistake.
+   - **Suspected propagator duplication bug.** One config file was observed carrying nearly the entire config *and* the agent instructions duplicated back-to-back in the same file. Not the MCP config and not skills — the agent-instruction surface. Most plausibly openwork-side rather than ours. A scan of all 29 current instruction surfaces on 2026-08-17 found **zero** duplicated blocks, so the artifact is likely gone with the wipe; re-check after the rebuild, when a fresh propagation has actually run.
+   - Absent openwork configs no longer break the toolchain — see below.
+
+18c. ✅ **DONE 2026-08-17.** `materialize_shared_ai_roster.py` now honours an `optional: true` flag on manifest sources: absent-and-optional is skipped with a `SKIP` line, present-but-malformed still fails loudly. The three openwork sources are marked optional. Before this, one wiped provider config raised `AIRosterError` and took the `agent-surface` and `ai-roster` steps down with it — turning routine third-party cleanup into a broken toolchain.
+
 **P3 — runtime**
 
 21. **Fix `watch_intake.py`** — it does not exclude `node_modules`, so any run re-floods the queue (the 1.23M-event incident). Also decide the no-PDF gap. **Do this before item 22.**
