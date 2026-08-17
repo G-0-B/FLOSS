@@ -10,10 +10,10 @@ import subprocess
 
 import pytest
 
-from packages.salvage_spine.git_capture import SecretPolicy, capture_planes
-from packages.salvage_spine.models import PlaneId, ResultStatus, canonical_json_bytes
-from packages.salvage_spine.restore import restore_and_verify
-from packages.salvage_spine.seal import (
+from packages.preservation_spine.git_capture import SecretPolicy, capture_planes
+from packages.preservation_spine.models import PlaneId, ResultStatus, canonical_json_bytes
+from packages.preservation_spine.restore import restore_and_verify
+from packages.preservation_spine.seal import (
     CapsuleVerificationError,
     seal_capsule,
     verify_checksums,
@@ -196,7 +196,7 @@ def test_windows_executable_hash_read_and_seal_use_stable_identity(
     payload = capsule / "build-script.exe"
     content = b"disposable executable evidence\n"
     payload.write_bytes(content)
-    seal_module = importlib.import_module("packages.salvage_spine.seal")
+    seal_module = importlib.import_module("packages.preservation_spine.seal")
 
     path_state = payload.lstat()
     with seal_module._open_regular_nofollow(payload) as stream:
@@ -239,7 +239,7 @@ def test_posix_identity_retains_permission_bits(tmp_path: Path) -> None:
     before = payload.lstat()
     payload.chmod(stat.S_IMODE(before.st_mode) ^ stat.S_IXUSR)
     after = payload.lstat()
-    seal_module = importlib.import_module("packages.salvage_spine.seal")
+    seal_module = importlib.import_module("packages.preservation_spine.seal")
 
     assert stat.S_IFMT(before.st_mode) == stat.S_IFMT(after.st_mode)
     assert before.st_mode != after.st_mode
@@ -390,7 +390,7 @@ def test_seal_fails_closed_when_payload_path_is_substituted_before_hash(
     preserved = tmp_path / "preserved-refs.txt"
     outside = tmp_path / "substitution-target.txt"
     outside.write_bytes(b"outside-substitution-bytes\n")
-    seal_module = importlib.import_module("packages.salvage_spine.seal")
+    seal_module = importlib.import_module("packages.preservation_spine.seal")
     original_hash = seal_module._hash_regular_file
     substituted = False
 
@@ -424,7 +424,7 @@ def test_seal_parent_swap_cannot_redirect_pending_output(
     external = tmp_path / "seal-swap-external"
     external.mkdir()
     preserved = tmp_path / "seal-swap-preserved"
-    seal_module = importlib.import_module("packages.salvage_spine.seal")
+    seal_module = importlib.import_module("packages.preservation_spine.seal")
     original_open = seal_module.os.open
     attempted = False
 
@@ -736,7 +736,7 @@ def test_restore_repository_swap_before_git_init_creates_no_external_entry(
     preserved = tmp_path / "restore-repository-init-swap-preserved"
     external = tmp_path / "restore-repository-init-swap-external"
     external.mkdir()
-    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    restore_module = importlib.import_module("packages.preservation_spine.restore")
     original_run = restore_module.subprocess.run
     attempted = False
 
@@ -776,7 +776,7 @@ def test_restore_repository_swap_before_fetch_cannot_write_external_git_dir(
     external = tmp_path / "restore-repository-fetch-swap-external.git"
     git(tmp_path, "init", "--bare", str(external))
     before = filesystem_snapshot(external)
-    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    restore_module = importlib.import_module("packages.preservation_spine.restore")
     original_run = restore_module.subprocess.run
     attempted = False
 
@@ -902,7 +902,7 @@ def test_bundle_head_inspection_isolated_from_callers_linked_worktree(
     )
     before = filesystem_snapshot(common_git)
     before_mtime = common_git.stat().st_mtime_ns
-    restore_module = importlib.import_module("packages.salvage_spine.restore")
+    restore_module = importlib.import_module("packages.preservation_spine.restore")
     original_run = restore_module.subprocess.run
     invocation: dict[str, object] = {}
 

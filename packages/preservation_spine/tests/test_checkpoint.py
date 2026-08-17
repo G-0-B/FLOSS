@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pytest
 
-import packages.salvage_spine.checkpoint as checkpoint_module
-from packages.salvage_spine.checkpoint import (
+import packages.preservation_spine.checkpoint as checkpoint_module
+from packages.preservation_spine.checkpoint import (
     Checkpoint,
     CheckpointIntegrityError,
     append_checkpoint,
     load_latest_checkpoint,
 )
-from packages.salvage_spine.models import canonical_json_bytes
+from packages.preservation_spine.models import canonical_json_bytes
 
 
 def _checkpoint(**overrides: object) -> Checkpoint:
@@ -35,7 +35,7 @@ def _checkpoint(**overrides: object) -> Checkpoint:
         "completed_actions": ("captured-six-planes", "sealed-capsule"),
         "blockers": ("restore-pending", "human-review-pending"),
         "human_decisions": ("preserve-read-only-first", "stop-before-github"),
-        "next_safe_command": "python -m pytest packages/salvage_spine/tests -q",
+        "next_safe_command": "python -m pytest packages/preservation_spine/tests -q",
         "recovery_command": "python scripts/rebuild_capsule.py --state capsule-state-1",
         "digest": None,
     }
@@ -60,7 +60,7 @@ def _next_checkpoint(previous: Checkpoint, **overrides: object) -> Checkpoint:
                 "preserve-read-only-first",
                 "clean-room-restore-complete",
             ),
-            "next_safe_command": "python -m pytest packages/salvage_spine/tests/test_restore.py -q",
+            "next_safe_command": "python -m pytest packages/preservation_spine/tests/test_restore.py -q",
             "recovery_command": "python scripts/replay_checkpoint.py --latest",
             "digest": None,
         }
@@ -682,7 +682,7 @@ def test_checkpoint_rejects_invalid_verification_and_operator_strings(
         "completed_actions": ("captured-six-planes",),
         "blockers": ("restore-pending",),
         "human_decisions": ("preserve-read-only-first",),
-        "next_safe_command": "python -m pytest packages/salvage_spine/tests -q",
+        "next_safe_command": "python -m pytest packages/preservation_spine/tests -q",
         "recovery_command": "python scripts/rebuild_capsule.py --state capsule-state-1",
         "digest": None,
     }
