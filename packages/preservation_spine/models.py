@@ -1,4 +1,4 @@
-"""Immutable data contracts shared by salvage-spine components."""
+"""Immutable data contracts shared by preservation-spine components."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class PlaneId(StrEnum):
     """The six independently preserved source-state planes."""
 
     REMOTE_MAIN = "remote-main"
-    REMOTE_PR = "remote-pr38"
+    REMOTE_PR = "remote-pr"
     LOCAL_HISTORY = "local-history"
     LOCAL_INDEX = "local-index"
     LOCAL_TRACKED = "local-tracked"

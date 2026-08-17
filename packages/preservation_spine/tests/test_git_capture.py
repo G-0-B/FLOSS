@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import packages.salvage_spine.git_capture as git_capture_module
-from packages.salvage_spine.git_capture import (
+import packages.preservation_spine.git_capture as git_capture_module
+from packages.preservation_spine.git_capture import (
     CaptureDrift,
     CaptureEvidenceError,
     CaptureUnverifiable,
@@ -19,7 +19,7 @@ from packages.salvage_spine.git_capture import (
     run_git,
     snapshot_subject,
 )
-from packages.salvage_spine.models import (
+from packages.preservation_spine.models import (
     PlaneEligibility,
     PlaneId,
     PlaneSensitivity,
@@ -437,7 +437,7 @@ def test_capture_writes_six_exact_source_planes(tmp_path: Path) -> None:
         assert (destination / record.plane_id.value).is_dir()
         assert len(record.digest) == 64
     assert (destination / "remote-main" / "repository.bundle").is_file()
-    assert (destination / "remote-pr38" / "repository.bundle").is_file()
+    assert (destination / "remote-pr" / "repository.bundle").is_file()
     assert (destination / "local-history" / "repository.bundle").is_file()
     assert (destination / "local-index" / "index.raw").read_bytes() == index_before
     assert (
@@ -508,7 +508,7 @@ def test_history_bundles_do_not_expose_unrelated_divergent_refs(tmp_path: Path) 
         repo,
         "bundle",
         "list-heads",
-        str(destination / "remote-pr38" / "repository.bundle"),
+        str(destination / "remote-pr" / "repository.bundle"),
     ).stdout.splitlines()
     history_heads = git(
         repo,
@@ -695,7 +695,7 @@ def test_exact_ancestor_capture_preserves_source_object_format_deterministically
     )
     assert (
         git(
-            tmp_path / f"restored-{object_format}-remote-pr38",
+            tmp_path / f"restored-{object_format}-remote-pr",
             "cat-file",
             "-e",
             f"{local_sha}^{{commit}}",
@@ -743,7 +743,7 @@ def test_sha256_partial_capture_remains_without_source_mutation(tmp_path: Path) 
         ).stdout.strip()
         == b"sha256"
     )
-    assert not (destination / "remote-pr38").exists()
+    assert not (destination / "remote-pr").exists()
     assert git(repo, "show-ref", "--head").stdout == refs_before
     assert index_path.read_bytes() == index_before
     assert_unchanged(before, snapshot_subject(repo))

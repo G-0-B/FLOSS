@@ -10,10 +10,10 @@ import subprocess
 
 import pytest
 
-from packages.salvage_spine.checkpoint import load_latest_checkpoint
-from packages.salvage_spine.cli import main
-from packages.salvage_spine.models import PlaneId, ResultStatus
-from packages.salvage_spine.seal import provenance_root
+from packages.preservation_spine.checkpoint import load_latest_checkpoint
+from packages.preservation_spine.cli import main
+from packages.preservation_spine.models import PlaneId, ResultStatus
+from packages.preservation_spine.seal import provenance_root
 
 
 @dataclass(frozen=True)
@@ -458,7 +458,7 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
     assert verify.stderr == ""
     assert verify.stdout == {
         "inventory_eligible": False,
-        "next_safe_command": "python scripts/pr38_salvage.py status --capsule STATE_DIR",
+        "next_safe_command": "python scripts/preservation_spine.py status --capsule STATE_DIR",
         "phase": "verification-complete",
         "status": ResultStatus.BLOCKED.value,
         "verification_digest": verification_digest,
@@ -479,7 +479,7 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
             "opaque-preservation-ineligible",
             "redacted-evidence-ineligible",
         ],
-        "next_safe_command": "python scripts/pr38_salvage.py status --capsule STATE_DIR",
+        "next_safe_command": "python scripts/preservation_spine.py status --capsule STATE_DIR",
         "phase": "verification-complete",
         "sequence": 1,
     }
