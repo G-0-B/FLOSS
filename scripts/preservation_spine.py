@@ -9,7 +9,7 @@ import sys
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from packages.salvage_spine.cli import main
+from packages.preservation_spine.cli import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

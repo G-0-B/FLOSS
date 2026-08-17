@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://flossi0ullk.local/superpowers/pr38-capsule.schema.json",
+  "$id": "https://flossi0ullk.local/superpowers/preservation-capsule.schema.json",
   "title": "PR 38 Preservation Capsule Metadata",
   "type": "object",
   "additionalProperties": false,
@@ -36,7 +36,7 @@
       "maxItems": 6,
       "allOf": [
         {"contains": {"properties": {"plane_id": {"const": "remote-main"}}, "required": ["plane_id"]}},
-        {"contains": {"properties": {"plane_id": {"const": "remote-pr38"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "remote-pr"}}, "required": ["plane_id"]}},
         {"contains": {"properties": {"plane_id": {"const": "local-history"}}, "required": ["plane_id"]}},
         {"contains": {"properties": {"plane_id": {"const": "local-index"}}, "required": ["plane_id"]}},
         {"contains": {"properties": {"plane_id": {"const": "local-tracked"}}, "required": ["plane_id"]}},
@@ -99,7 +99,7 @@
         "plane_id": {
           "enum": [
             "remote-main",
-            "remote-pr38",
+            "remote-pr",
             "local-history",
             "local-index",
             "local-tracked",
@@ -138,7 +138,7 @@
               "plane_id": {
                 "enum": [
                   "remote-main",
-                  "remote-pr38",
+                  "remote-pr",
                   "local-history",
                   "local-index"
                 ]

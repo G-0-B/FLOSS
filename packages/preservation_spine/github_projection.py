@@ -1,4 +1,4 @@
-"""Sanitized GitHub-facing projections for PR38 preservation evidence."""
+"""Sanitized GitHub-facing projections for preservation evidence."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _TEMPLATE_PATH = (
     / "docs"
     / "superpowers"
     / "templates"
-    / "pr38-stop-merge-comment.md"
+    / "stop-merge-comment.md"
 )
 _TEMPLATE_KEYS = frozenset(
     {
