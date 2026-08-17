@@ -89,14 +89,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
       "grandfathered": true
     },
-    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (Status)",
-      "grandfathered": true
-    },
-    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
-      "grandfathered": true
-    },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
       "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF \u2014 Upgraded ADR Suite v2.0)",
       "grandfathered": true
@@ -290,6 +282,12 @@
       "spec": "Capability schema for Yumeichan watch node",
       "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
     },
+    "FLOSS/docs/superpowers/specs/preservation-capsule.schema.json": {
+      "spec": "Sealed preservation-capsule contract (six planes, digests, restore-test evidence)"
+    },
+    "FLOSS/docs/superpowers/specs/preservation-manifest.schema.json": {
+      "spec": "Preservation salvage-manifest contract: change atoms with source-plane provenance"
+    },
     "FLOSS/hooks/README.md": {
       "spec": "Operator note describing what each hook fires on and how to disable one"
     },
@@ -343,15 +341,6 @@
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
     },
-    "FLOSS/scripts/hook_bg_round.py": {
-      "spec": "Detached background consensus-round runner spawned by hook_post_write"
-    },
-    "FLOSS/scripts/hook_post_write.py": {
-      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
-    },
-    "FLOSS/scripts/hook_pre_write.py": {
-      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
-    },
     "FLOSS/scripts/major_consolidation_sweep.py": {
       "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub \u2014 needs owner review)"
     },
@@ -387,8 +376,68 @@
     "FLOSS/scripts/poll_high_roi_actions.py": {
       "spec": "Durable high-ROI action poll through the consensus gateway (default profile: diverse)"
     },
-    "FLOSS/scripts/pr38_salvage.py": {
-      "spec": "Local-only preserve-first capture, verification, inventory, and evidence rendering for PR #38 salvage."
+    "FLOSS/scripts/preservation_spine.py": {
+      "spec": "CLI entry point for the six-plane preservation spine (capture/verify/inventory/render/status)",
+      "spec_ref": "docs/superpowers/specs/2026-07-13-pr38-salvage-and-verification-spine-design.md",
+      "tier": 2,
+      "reuse": {
+        "capability": "Six-plane repository preservation: capture remote base, remote PR head, local commits, index, tracked worktree and untracked/ignored inventory into a sealed capsule that can be restore-tested in a clean room before any risky operation.",
+        "search_date": "2026-08-17",
+        "verdict": "build",
+        "candidates": [
+          {
+            "name": "git bundle --all",
+            "version": "git 2.x",
+            "license": "GPL-2.0",
+            "maintenance": "upstream git",
+            "platform_fit": "native, already used in this workspace",
+            "probe": "PROBED 2026-08-17: init repo, stage a change, leave an unstaged change, add an untracked file, bundle --all, clone. Result \u2014 committed content YES; index change NO; unstaged worktree change NO; untracked file NO. Covers plane C only of six. This is the exact gap that lost the cleaned opencode.jsonc during the 2026-08-09 root pass.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "git stash -u",
+            "version": "git 2.x",
+            "license": "GPL-2.0",
+            "maintenance": "upstream git",
+            "platform_fit": "native",
+            "probe": "PROBED 2026-08-17: created a real merge conflict, staged a resolution, ran git stash -u. Result \u2014 MERGE_HEAD destroyed, staged resolution destroyed, stash pop did not restore either. Reproduces the failure that forced a full redo of the pr/38 reconciliation on the same day. Actively unsafe mid-operation; not a preservation mechanism.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "restic / borgbackup",
+            "license": "BSD-2-Clause / BSD-3-Clause",
+            "maintenance": "active",
+            "platform_fit": "general file-tree backup; no git-plane semantics",
+            "probe": "not_probed: backs up file trees, has no concept of index vs worktree vs remote ref, and cannot express 'restore-tested in a clean room against an exact remote SHA'. Would preserve bytes without preserving the six-plane distinction that is the whole point.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "BagIt (RFC 8493)",
+            "license": "public spec",
+            "maintenance": "stable",
+            "platform_fit": "payload + manifest + checksums packaging",
+            "probe": "not_probed: genuinely relevant for the sealed-capsule half (payload manifest with checksums) and worth revisiting if the capsule format is ever externalised. Does not address capture or clean-room restore-test, which is where the risk lives.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "OCFL",
+            "license": "public spec",
+            "maintenance": "active",
+            "platform_fit": "versioned object storage for preservation repositories",
+            "probe": "not_probed: designed for long-term archival object storage, not point-in-time operational snapshots of a live working tree. Heavier than the problem.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "in-toto attestations",
+            "license": "Apache-2.0",
+            "maintenance": "active",
+            "platform_fit": "supply-chain step attestation",
+            "probe": "not_probed: attests that a step ran with given materials/products; it does not capture or restore repository state. Complementary to, not a substitute for, capture. Already named in RESEARCH-REGISTER as the preferred provenance format over anything bespoke.",
+            "truth_status": "Specified"
+          }
+        ],
+        "irreducible_delta": "No candidate captures planes D (index), E (tracked worktree) and F (untracked/ignored) alongside C (commits) as one restore-testable unit anchored to an exact remote SHA. git bundle covers C only (probed); git stash is destructive mid-merge (probed); restic/borg preserve bytes without git-plane semantics; BagIt/OCFL address packaging and archival storage, not capture or clean-room verification; in-toto attests steps rather than state. The irreducible delta is the six-plane contract plus fail-closed restore-testing \u2014 'if preservation cannot be proved, salvage stops'. BagIt remains the strongest partial and should be reconsidered if the capsule format is ever published beyond this workspace."
+      }
     },
     "FLOSS/scripts/process_intake_events.py": {
       "spec": "Intake event consolidator over the claim-by-rename queue",
@@ -397,14 +446,8 @@
     "FLOSS/scripts/refresh_agent_surfaces.py": {
       "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
     },
-    "FLOSS/scripts/research_log.py": {
-      "spec": "Appends dated research-log entries to the shared research register"
-    },
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
-    },
-    "FLOSS/scripts/session_start_inject.py": {
-      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/smoke_test_gateway.py": {
       "spec": "Smoke test: consensus gateway end-to-end"
