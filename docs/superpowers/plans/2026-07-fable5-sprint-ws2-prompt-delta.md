@@ -8,7 +8,7 @@ kind: "experiment_report"
 status: "Accepted"
 updated: "2026-07-03"
 supersedes: []
-truth_status: "Verified"   # A/B numbers reproduce from the saved harness; prompt landed with 147/147 tests green
+truth_status: "Specified"   # Prompt landing/tests are separately evidenced; scratch-only A/B numbers are not reproducible
 evidence_sources:
   - "A/B run 2026-07-03, mistral/open-mistral-nemo, temperature 0, evals/claim_verification/dev.jsonl (20 items)"
   - "Source-chain vote audit: 12,869 votes across 27 voter identities (~/.floss_agent cell 0000…)"
@@ -93,5 +93,8 @@ not fixed here — it is a gateway-semantics decision, not a prompt.
   repo; upload/external-tier) — deferred with no loss, the roster voter prompt
   was demonstrably the weakest module. Momus/Critic personas now compose with
   v2 automatically via the shared renderer; their persona texts were not edited.
-- A/B harness + raw results: session scratchpad (`ws2_ab_test.py`,
-  `ws2_ab_results.json`) — reproducible from the dev split + this doc's settings.
+- A/B harness + raw results were session-scratchpad files (`ws2_ab_test.py`,
+  `ws2_ab_results.json`) and are not tracked or currently available. The
+  reported 20% → 65% numbers are preserved as a historical observation, not an
+  independently reproducible result. Re-validation requires a new committed
+  harness, raw outputs, exact invocation, model revision, and content hashes.

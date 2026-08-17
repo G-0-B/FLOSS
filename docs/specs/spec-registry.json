@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-10",
+  "updated": "2026-08-17",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
@@ -8,7 +8,7 @@
     "FLOSS/docs/specs",
     "FLOSS/docs/adr"
   ],
-  "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated — continuation/seed artifacts are pre-spec by definition.",
+  "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated \u2014 continuation/seed artifacts are pre-spec by definition.",
   "entries": {
     "FLOSS/docs/adr/ADR-0-recognition-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-0: Recognition Protocol - First Coherent Transmission)",
@@ -31,7 +31,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-12 \u2014 Consent Gate Protocol)",
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
@@ -47,7 +47,7 @@
       "spec": "ADR-16: Omnigent as Execution/Governance Surface"
     },
     "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
-      "spec": "ADR-17: KnowledgeTriple Contract Reconciliation"
+      "spec": "ADR-17: KnowledgeTriple contract reconciliation"
     },
     "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
       "spec": "ADR-18: enforce adopt/extend/compose/build evidence via spec_gate + reuse-review voters",
@@ -89,8 +89,16 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
       "grandfathered": true
     },
+    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Status)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
+      "grandfathered": true
+    },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF — Upgraded ADR Suite v2.0)",
+      "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF \u2014 Upgraded ADR Suite v2.0)",
       "grandfathered": true
     },
     "FLOSS/docs/specs/TERNARY_COMPATIBILITY.md": {
@@ -162,7 +170,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
-      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)"
+      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 \u2014 needs owner review)"
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
@@ -212,7 +220,7 @@
           },
           {
             "name": "documentation checklist only",
-            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "probe": "not_probed: rejected by design analysis \u2014 trivially gameable, repo history shows principles without enforcement failed (PR38)",
             "truth_status": "Specified"
           },
           {
@@ -335,8 +343,17 @@
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
     },
+    "FLOSS/scripts/hook_bg_round.py": {
+      "spec": "Detached background consensus-round runner spawned by hook_post_write"
+    },
+    "FLOSS/scripts/hook_post_write.py": {
+      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
+    },
+    "FLOSS/scripts/hook_pre_write.py": {
+      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    },
     "FLOSS/scripts/major_consolidation_sweep.py": {
-      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
+      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub \u2014 needs owner review)"
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
@@ -383,6 +400,9 @@
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
     },
+    "FLOSS/scripts/session_start_inject.py": {
+      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
+    },
     "FLOSS/scripts/smoke_test_gateway.py": {
       "spec": "Smoke test: consensus gateway end-to-end"
     },
@@ -411,6 +431,9 @@
     "FLOSS/scripts/watch_intake.py": {
       "spec": "Polling intake watcher: root drops -> IntakeEvents",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    },
+    "FLOSS/scripts/yumeichan_watch_capabilities.py": {
+      "spec": "Semantic validation for Yumeichan Watch capability-token bounds"
     }
   }
 }

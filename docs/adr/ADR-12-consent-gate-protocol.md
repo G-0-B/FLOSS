@@ -130,7 +130,7 @@ Per Positive Alignment §"The Paternalism Problem", refusal must be a first-clas
 | ADR-9 (Self-Perceptual Evolution / ContinuityPayload) | Continuity claims must reference the consent under which the continuity is being requested |
 | ADR-10 (Local Agent Node / MCP Orchestrator) | Gateway routes consent payloads same as claims/votes — append-only, hash-linked |
 | ADR-11 (IPFS Integration) | Cross-substrate consent: how does an agent on one substrate consent to a pattern from another? |
-| ADR-13 (Steward Vote Protocol — proposed parallel sub-ADR) | Steward Vote is a collective consent mechanism; structurally a special case of ADR-12 with collective `decider_did` |
+| Future companion ADR (unassigned — Steward Vote Protocol) | Steward Vote is a collective consent mechanism; structurally a special case of ADR-12 with collective `decider_did` |
 
 ---
 

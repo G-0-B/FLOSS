@@ -32,7 +32,13 @@ from packages.orchestrator.claim_schema import (  # noqa: E402
     Vote,
 )  # noqa: E402
 
-Voter = Callable[[Claim], Vote]
+# Voter callables were originally 1-arg (Claim). PR38 review thread
+# PRRT_kwDOPkAi3s6UUuKj adds a 2nd context arg so voters can see the
+# validated provenance_packet metadata (digest, consent decision hash,
+# nested non-packet evidence roots) that submit_claim already verified.
+# Legacy 1-arg voters remain valid — GatewayTools._call_voter falls back
+# via arity inspection when a caller doesn't accept the context arg.
+Voter = Callable[..., Vote]
 
 # VOTER_PROMPT v2 (WS2 meta-prompting sweep, 2026-07-03).
 # v1 hid `evidence` and `truth_status` from voters, producing the measured
@@ -114,10 +120,13 @@ def render_voter_prompt(claim: "Claim", context: str = "(none)") -> str:
     to ground their votes. Single shared renderer so all voter backends stay
     in sync with the template's field set.
     """
-    if claim.evidence:
-        evidence = "; ".join(f"[{e.type}] {e.ref}" for e in claim.evidence)
-    else:
-        evidence = "(none provided)"
+    evidence = json.dumps(
+        [entry.to_dict() for entry in claim.evidence],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
     return VOTER_PROMPT.format(
         proposer=claim.proposer,
         proposal_type=claim.proposal_type.value,
@@ -213,8 +222,21 @@ def _parse_rationale(text: str) -> str:
 # from an external source. Only its registry NAME prefix was borrowed.
 # ---------------------------------------------------------------------------
 
-EXECUTABILITY_REVIEWER_SYSTEM = """You are the executability reviewer on a FLOSSI0ULLK consensus roster.
+# PR38 invariant, verbatim: a persona may sharpen the shared checklist
+# but never waive or narrow it. Prefixed onto every persona below.
+_PERSONA_SHARED_GATE_SYSTEM = (
+    "The shared seven-item checklist is mandatory for every consensus voter. "
+    "Evaluate all seven checklist items in the user message before applying this "
+    "persona's specialist lens. If ANY shared checklist item fails, your weight "
+    "must not be positive. Only after every shared checklist item passes may "
+    "persona-specific positive calibration apply. The persona may add stricter "
+    "objections, but it may never waive or narrow the shared checklist."
+)
 
+
+EXECUTABILITY_REVIEWER_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+
+You are the executability reviewer on a FLOSSI0ULLK consensus roster.
 Every other voter is asking whether a Claim is *right*. You are asking something narrower and more mechanical, which is why you exist: **could a competent contributor act on this Claim without hitting a dead end?**
 
 ## Your one question
@@ -233,7 +255,10 @@ Yours: **is it actionable as written, and do the things it points at actually ex
 
 ## What you deliberately do NOT check
 
-Optimality, elegance, style, hypothetical edge cases, performance, or whether a different design would be better. Those belong to other voters, and duplicating them collapses the roster's diversity into a single opinion. Staying in your lane is the point.
+This narrows your *specialist lens only* — never the shared checklist above,
+which you evaluate in full first, on every claim.
+
+Beyond that checklist, leave these to other voters: optimality, elegance, style, hypothetical edge cases, performance, or whether a different design would be better. Those belong to other voters, and duplicating them collapses the roster's diversity into a single opinion. Staying in your lane is the point.
 
 ## Disposition
 
@@ -311,9 +336,9 @@ def make_executability_voter(
     rather than generally vibing on the proposal.
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call the underlying model with Momus persona + standard voter prompt."""
-        user_prompt = render_voter_prompt(claim)
+        user_prompt = render_voter_prompt(claim, context)
         try:
             text = _model_completion(
                 model,
@@ -340,7 +365,9 @@ def make_executability_voter(
     return voter
 
 
-CRITIC_PERSONA_SYSTEM = """You are the anti-sycophancy critic, a practical plan reviewer for the FLOSSI0ULLK project. Your goal is to review the supervisor's proposed claim or plan to ensure it adheres to the "Don't Force Machinery" (UTN) constraint.
+CRITIC_PERSONA_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+
+You are the anti-sycophancy critic, a practical plan reviewer for the FLOSSI0ULLK project. Your goal is to review the supervisor's proposed claim or plan to ensure it adheres to the "Don't Force Machinery" (UTN) constraint.
 
 ## Your Purpose
 You exist to answer ONE question: "Is this plan sycophantic or forcing machinery?"
@@ -380,9 +407,9 @@ def make_omo_critic_voter(
     the standard VOTER_PROMPT as USER message.
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call the underlying model with Critic persona + standard voter prompt."""
-        user_prompt = render_voter_prompt(claim)
+        user_prompt = render_voter_prompt(claim, context)
         try:
             text = _model_completion(
                 model,
@@ -429,9 +456,9 @@ def make_litellm_voter(
     temperature: low by default; consensus prefers determinism
     """
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call the model backend for one claim and normalize the output into a Vote."""
-        prompt = render_voter_prompt(claim)
+        prompt = render_voter_prompt(claim, context)
         try:
             text = _model_completion(
                 model,
@@ -543,9 +570,9 @@ def make_flowith_voter(
     """Build a sync Voter that queries Flowith's multi-model endpoint."""
     models = _parse_flowith_models(model)
 
-    def voter(claim: Claim) -> Vote:
+    def voter(claim: Claim, context: str = "(none)") -> Vote:
         """Call Flowith for one claim and normalize the provider output into a Vote."""
-        prompt = render_voter_prompt(claim)
+        prompt = render_voter_prompt(claim, context)
         try:
             import requests
 

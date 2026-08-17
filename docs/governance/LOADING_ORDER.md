@@ -29,21 +29,23 @@ Landed 2026-08-10 from workspace-root intake. Status: Specified.
 **Purpose:** Invariants, truth labels, upgrade mechanics, enforcement expectations.
 **Key content:** Canonical source precedence, prime directive, upgrade-everything policy, claim truth model (labels), two-plane architecture, voluntary convergence, provenance packets, substrate-first gating, agent orchestration.
 
-## 4. Relevant ADRs (Decisions)
+## 4. Canonical Build Spine v0.3 (Current Execution Synthesis)
+
+**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md`
+**Purpose:** Current build order and contradiction-resolving execution spine — what is being built next and which conflicts between documents have been resolved which way. Does not override the Kernel, Spine, or SDD spec; it translates them into the present repo state.
+**Key content:** 10 tracked issues with phase gates, source register, evidence classes, contradiction log, NOW/LATER/NEVER backlog.
+**Status:** **Proposed**, not Accepted. Landed 2026-08-10 from workspace-root intake; promotion is a separate decision.
+
+> `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.2.md` is retained in this directory but **superseded** — v0.3 declares supersession of v0.2 and of two prior "merged upgradeable artifact" documents. Read v0.3; consult v0.2 only for historical contradiction-log context.
+
+## 5. Relevant ADRs (Decisions)
 
 **Directory:** `../adr/`
 **Index:** `../adr/INDEX.md`
 **Purpose:** Specific architectural decisions with rationale and supersession chains.
 **Load order within ADRs:** Start with ADR-0 (Recognition Protocol), then ADR-1 (Carrier Equivalence), then task-relevant ADRs.
 
-## 4b. Canonical Build Spine v0.3 (Current Execution Spine)
-
-**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md`
-**Purpose:** The contradiction-resolving execution spine — what is actually being built next and which conflicts between documents have been resolved which way.
-**Key content:** 10 tracked issues with phase gates. Self-declares supersession of v0.2 and two prior "merged upgradeable artifact" documents.
-**Status:** **Proposed**, not Accepted. Landed 2026-08-10 from workspace-root intake; promotion is a separate decision.
-
-## 5. Seed Packet v1.0.0 (Bootstrapping)
+## 6. Seed Packet v1.0.0 (Bootstrapping)
 
 **File:** `seed-packet-v1.0.0.md`
 **Purpose:** Complete system genesis kit. How to bootstrap a new instance.
@@ -59,8 +61,9 @@ When artifacts disagree, resolve in this order:
 3. SDD Master Spec (architecture)
 4. UpgradableArtifact schema + lints
 5. Governance protocols
-6. ADRs / RFCs
-7. Contracts / Schemas
-8. Tests + signed results
-9. Code
-10. Synthesis / analysis docs
+6. Current Build Spine (execution synthesis; contradiction resolver)
+7. ADRs / RFCs
+8. Contracts / Schemas
+9. Tests + signed results
+10. Code
+11. Synthesis / analysis docs

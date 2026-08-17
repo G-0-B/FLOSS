@@ -360,6 +360,55 @@ def _find_packet_by_digest(provenance_root: Path | None, digest: str) -> Path | 
     return matches[0] if matches else None
 
 
+def _has_valid_same_position_competitor(
+    packet: dict[str, Any],
+    *,
+    packet_path: Path | None,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    max_depth: int,
+) -> bool:
+    """Return whether another independently valid packet occupies this position."""
+
+    if provenance_root is None or not provenance_root.exists():
+        return False
+
+    current_path = packet_path.resolve() if packet_path is not None else None
+    chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
+    packet_digest = packet.get("d")
+    candidates = sorted(
+        provenance_root.rglob("*.json"), key=lambda path: path.as_posix()
+    )
+    for candidate_path in candidates:
+        try:
+            if current_path is not None and candidate_path.resolve() == current_path:
+                continue
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("d") == packet_digest:
+            # Exact-digest copies are duplicate evidence, not competing successors.
+            continue
+        if (
+            candidate.get("i"),
+            candidate.get("p"),
+            candidate.get("s"),
+        ) != chain_position:
+            continue
+        competitor = validate_packet(
+            candidate_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            max_depth=max_depth,
+            _ignored_chain_position=chain_position,
+        )
+        if competitor.ok:
+            return True
+    return False
+
+
 def _public_key_from_aid(aid: str) -> VerifyKey:
     if not isinstance(aid, str) or not aid.startswith(("D", "B")):
         raise ValueError("E_PROVENANCE_BAD_AID")
@@ -372,10 +421,24 @@ def _signature_bytes(signature: str) -> bytes:
     return _b64url_decode(signature[2:])
 
 
+def _payload_entries(packet: dict[str, Any]) -> list[Any]:
+    """Return payload entries only when the signed field has the required shape."""
+    entries = packet.get("a")
+    return entries if isinstance(entries, list) else []
+
+
+def _entry_list_field(entry: Any, field_name: str) -> list[Any]:
+    """Return a list field without iterating malformed signed payload values."""
+    if not isinstance(entry, dict):
+        return []
+    value = entry.get(field_name)
+    return value if isinstance(value, list) else []
+
+
 def _artifact_errors(packet: dict[str, Any], workspace_root: Path) -> list[str]:
     errors: list[str] = []
-    for entry in packet.get("a", []):
-        for ref in entry.get("artifact_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "artifact_refs"):
             if not isinstance(ref, dict):
                 errors.append("E_PROVENANCE_ARTIFACT_REF_INVALID")
                 continue
@@ -394,8 +457,8 @@ def _artifact_errors(packet: dict[str, Any], workspace_root: Path) -> list[str]:
 
 
 def _has_non_packet_evidence(packet: dict[str, Any]) -> bool:
-    for entry in packet.get("a", []):
-        for ref in entry.get("evidence_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if isinstance(ref, dict) and ref.get("type") != "provenance_packet":
                 return True
     return False
@@ -420,7 +483,8 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
     "risks",
     "benefits",
 )
-_SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+_SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
+_SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
 _EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
 
 
@@ -438,7 +502,7 @@ def _payload_entry_errors(entries: list[Any]) -> list[str]:
             if not isinstance(entry.get(field_name), list):
                 errors.append(f"E_PROVENANCE_ENTRY_FIELD_MISSING:{field_name}")
         # artifactRef shape: {path: non-empty str, sha256: 64-hex}
-        for ref in entry.get("artifact_refs") or []:
+        for ref in _entry_list_field(entry, "artifact_refs"):
             if (
                 not isinstance(ref, dict)
                 or not isinstance(ref.get("path"), str)
@@ -448,7 +512,7 @@ def _payload_entry_errors(entries: list[Any]) -> list[str]:
             ):
                 errors.append("E_PROVENANCE_ARTIFACT_REF_INVALID")
         # evidenceRef shape: {type ∈ enum, ref: non-empty str, sha256?: 64-hex}
-        for ref in entry.get("evidence_refs") or []:
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if (
                 not isinstance(ref, dict)
                 or ref.get("type") not in _EVIDENCE_REF_TYPES
@@ -473,6 +537,7 @@ def _recursive_evidence_errors(
     seen: set[str],
     depth: int,
     max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
 ) -> list[str]:
     errors: list[str] = []
     if depth > max_depth:
@@ -483,8 +548,8 @@ def _recursive_evidence_errors(
     # carries a non-packet root in its own subtree (this same check runs for it),
     # so chained/cross-agent handoffs (derived -> prior -> test/spec) are valid.
     subtree_has_root = _has_non_packet_evidence(packet)
-    for entry in packet.get("a", []):
-        for ref in entry.get("evidence_refs", []) or []:
+    for entry in _payload_entries(packet):
+        for ref in _entry_list_field(entry, "evidence_refs"):
             if not isinstance(ref, dict) or ref.get("type") != "provenance_packet":
                 continue
             ref_value = ref.get("ref")
@@ -499,6 +564,7 @@ def _recursive_evidence_errors(
                 _seen=seen,
                 _depth=depth + 1,
                 max_depth=max_depth,
+                _ignored_chain_position=ignored_chain_position,
             )
             if child.ok:
                 subtree_has_root = True
@@ -517,16 +583,33 @@ def validate_packet(
     max_depth: int = 8,
     _seen: set[str] | None = None,
     _depth: int = 0,
+    # Two independent recursion flags kept side by side (merge 2026-08-17):
+    #   _is_ancestor            — ours: suppress E_PROVENANCE_ARTIFACT_MISSING for
+    #                             historical ancestor packets whose artifacts moved.
+    #   _ignored_chain_position — PR38's: exclude one chain position from the
+    #                             duplicate-position check.
     _is_ancestor: bool = False,
+    _ignored_chain_position: tuple[Any, Any, Any] | None = None,
 ) -> PacketValidation:
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
     root = Path(workspace_root or WORKSPACE_ROOT).resolve()
+    explicit_provenance_root = (
+        Path(provenance_root).resolve() if provenance_root is not None else None
+    )
     packet_path: Path | None = None
     if isinstance(packet_or_path, dict):
         packet = packet_or_path
     else:
-        packet_path = Path(packet_or_path)
+        packet_path = Path(packet_or_path).resolve()
+        if explicit_provenance_root is not None:
+            try:
+                packet_path.relative_to(explicit_provenance_root)
+            except ValueError:
+                return PacketValidation(
+                    ok=False,
+                    errors=["E_PROVENANCE_PACKET_OUTSIDE_ROOT"],
+                )
         try:
             packet = json.loads(packet_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -593,12 +676,17 @@ def validate_packet(
         else:
             errors.append(problem)
 
-    prov_root = (
-        Path(provenance_root)
-        if provenance_root is not None
-        else _infer_provenance_root(packet_path)
-    )
+    prov_root = explicit_provenance_root or _infer_provenance_root(packet_path)
     prior_digest = packet.get("p")
+    sequence = packet.get("s")
+    sequence_valid = (
+        isinstance(sequence, str) and _SEQUENCE_RE.fullmatch(sequence) is not None
+    )
+    if not sequence_valid:
+        errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+    elif prior_digest is None and sequence != "0":
+        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+
     if prior_digest is not None:
         prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
         if prior_path is None:
@@ -623,6 +711,7 @@ def validate_packet(
                 _depth=_depth,
                 max_depth=max_depth,
                 _is_ancestor=True,
+                _ignored_chain_position=_ignored_chain_position,
             )
             if not prior_result.ok:
                 errors.extend(prior_result.errors)
@@ -635,7 +724,7 @@ def validate_packet(
             if prior_packet.get("i") != packet.get("i"):
                 errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
             try:
-                if int(prior_packet.get("s")) != int(packet.get("s")) - 1:
+                if int(prior_packet.get("s")) != int(sequence) - 1:
                     errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
             except (TypeError, ValueError):
                 errors.append("E_PROVENANCE_SEQUENCE_INVALID")
@@ -648,8 +737,23 @@ def validate_packet(
             seen=seen,
             depth=_depth,
             max_depth=max_depth,
+            ignored_chain_position=_ignored_chain_position,
         )
     )
+
+    chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
+    if (
+        not errors
+        and chain_position != _ignored_chain_position
+        and _has_valid_same_position_competitor(
+            packet,
+            packet_path=packet_path,
+            workspace_root=root,
+            provenance_root=prov_root,
+            max_depth=max_depth,
+        )
+    ):
+        errors.append("E_PROVENANCE_CHAIN_FORK")
 
     return PacketValidation(
         ok=not errors,
@@ -659,6 +763,97 @@ def validate_packet(
         narrative_lines=narrative_lines(packet) if not errors else [],
         packet=packet,
     )
+
+
+def validated_non_packet_evidence_refs(
+    packet_or_path: Path | str | dict[str, Any],
+    *,
+    workspace_root: Path | str | None = None,
+    provenance_root: Path | str | None = None,
+    max_depth: int = 8,
+    max_refs: int = 32,
+) -> tuple[list[dict[str, str]], bool]:
+    """Return stable validated non-packet metadata and whether it was truncated."""
+
+    root = Path(workspace_root or WORKSPACE_ROOT).resolve()
+    root_path = None if isinstance(packet_or_path, dict) else Path(packet_or_path)
+    result = validate_packet(
+        packet_or_path,
+        workspace_root=root,
+        provenance_root=provenance_root,
+        max_depth=max_depth,
+    )
+    if not result.ok:
+        raise ValueError("; ".join(result.errors))
+
+    packet = result.packet or {}
+    resolved_provenance_root = (
+        Path(provenance_root)
+        if provenance_root is not None
+        else _infer_provenance_root(root_path)
+    )
+    refs: list[dict[str, str]] = []
+    seen_refs: set[tuple[str, str, str]] = set()
+    truncated = False
+    active_digests: set[str] = set()
+    visited_packets: set[str] = set()
+    ref_limit = max(0, max_refs)
+
+    def walk(current: dict[str, Any], current_path: Path | None, depth: int) -> None:
+        nonlocal truncated
+        if depth > max_depth:
+            raise ValueError("E_PROVENANCE_RECURSION_DEPTH_EXCEEDED")
+        digest = current.get("d")
+        if not isinstance(digest, str):
+            raise ValueError("E_PROVENANCE_DIGEST_MISMATCH")
+        if digest in active_digests:
+            raise ValueError("E_PROVENANCE_CYCLE_DETECTED")
+        if digest in visited_packets:
+            return
+
+        active_digests.add(digest)
+        visited_packets.add(digest)
+        try:
+            for entry in current.get("a", []) or []:
+                for evidence_ref in entry.get("evidence_refs", []) or []:
+                    if not isinstance(evidence_ref, dict):
+                        continue
+                    if evidence_ref.get("type") != "provenance_packet":
+                        metadata = {
+                            "type": str(evidence_ref["type"]),
+                            "ref": str(evidence_ref["ref"]),
+                        }
+                        if isinstance(evidence_ref.get("sha256"), str):
+                            metadata["sha256"] = evidence_ref["sha256"]
+                        metadata_key = (
+                            metadata["type"],
+                            metadata["ref"],
+                            metadata.get("sha256", ""),
+                        )
+                        if metadata_key in seen_refs:
+                            continue
+                        seen_refs.add(metadata_key)
+                        if len(refs) >= ref_limit:
+                            truncated = True
+                            continue
+                        refs.append(metadata)
+                        continue
+
+                    child_path = _resolve_workspace_ref(str(evidence_ref["ref"]), root)
+                    child_result = validate_packet(
+                        child_path,
+                        workspace_root=root,
+                        provenance_root=resolved_provenance_root,
+                        max_depth=max_depth,
+                    )
+                    if not child_result.ok:
+                        raise ValueError("; ".join(child_result.errors))
+                    walk(child_result.packet or {}, child_path, depth + 1)
+        finally:
+            active_digests.remove(digest)
+
+    walk(packet, root_path, 0)
+    return refs, truncated
 
 
 def entry_has_consent(entry: dict[str, Any]) -> bool:

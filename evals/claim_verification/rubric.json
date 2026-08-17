@@ -1,6 +1,6 @@
 {
   "module": "claim_verification",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "spec": [
     "FLOSS/packages/orchestrator/claim_schema.py (EVIDENCE_TYPES, BlastRadius, OVERRIDE_ALLOWED, TruthStatus, CERTAINTY_LIMIT)",
     "FLOSS/docs/specs/provenance-packet.spec.md (governed boundary)"
@@ -10,6 +10,11 @@
     "date": "2026-07-03",
     "source": "synthetic"
   },
+  "revision": {
+    "date": "2026-08-11",
+    "source": "PR38 review follow-up",
+    "changes": "Align truth-status submission language with Claim.validate() and name CERTAINTY_LIMIT as a standing consensus invariant."
+  },
   "division_of_labor": "The symbolic tally (conflict -> quorum -> direction) is computed by consensus_gate.tally() in code. The LLM voter task evaluated here is upstream: defect detection + vote direction. Logic validates, neural assists.",
   "defect_codes": {
     "D-NONE": "No material defect; claim is votable on its merits.",
@@ -18,13 +23,13 @@
     "D-EVIDENCE-REF-MALFORMED": "An evidence ref is structurally invalid for its type (e.g. commit ref not 7-40 hex chars).",
     "D-EVIDENCE-NO-ROOT": "All evidence is of type provenance_packet with no non-packet root (provenance spec: DAG needs a non-packet evidence root).",
     "D-BLAST-UNDERSTATED": "Body implies wider scope (System/Substrate) than the declared blast_radius.",
-    "D-TRUTH-OVERCLAIM": "truth_status Verified/Validated without test or commit evidence to back it.",
+    "D-TRUTH-OVERCLAIM": "Claim truth_status is not Unverified on submission. Submitted Claims cannot begin as Specified, Verified, or Validated; post-submission truth promotion is outside this eval.",
     "D-GOVERNED-NO-PACKET": "AdrChange/SpecChange/ConfigChange at System/Substrate without provenance_packet evidence + consent reference (governed boundary).",
     "D-OVERRIDE-FORBIDDEN": "Claim requests human override at Substrate blast radius (OVERRIDE_ALLOWED[Substrate]=False).",
     "D-SCOPE-VAGUE": "Summary/body do not state a bounded, actionable change.",
     "D-SCOPE-MIXED": "Claim bundles unrelated actions that need independent votes.",
     "D-TYPE-MISMATCH": "proposal_type inconsistent with what the body actually proposes.",
-    "D-INVARIANT-VIOLATION": "Body asks to bypass or weaken symbolic validation / integrity guarantees (prime directive: logic validates, neural assists).",
+    "D-INVARIANT-VIOLATION": "Body asks to bypass or weaken symbolic validation, integrity guarantees, or standing consensus invariants such as CERTAINTY_LIMIT and provider/model diversity (prime directive: logic validates, neural assists).",
     "D-DUPLICATE": "Context shows an already-decided claim covering the same action."
   },
   "vote_buckets": {

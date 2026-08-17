@@ -1,20 +1,27 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Yumeichan Watch Capabilities Schema",
-  "description": "OCapN-compliant capability tokens for the Yumeichan Watch Interface, regulating affective disclosure, haptic engagement, and biometric telemetry on a continuous analog scale.",
+  "description": "OCapN-compliant capability tokens for the Yumeichan Watch Interface, regulating affective disclosure, haptic engagement, and biometric telemetry on a continuous analog scale. Shape validation does not perform cryptographic signature verification.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "capability_id": {
       "type": "string",
-      "description": "Unique identifier for the capability grant (must map to a Holochain ActionHash)."
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Non-empty identifier for the capability grant. It must map to a Holochain ActionHash, but the concrete ActionHash wire encoding and DHT binding are outside this shape-only schema."
     },
     "grantor_pubkey": {
       "type": "string",
-      "description": "Ed25519 public key of the human user granting the capability."
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Non-empty Ed25519 public-key identifier for the human user granting the capability. Concrete key encoding and cryptographic verification are outside this shape-only schema."
     },
     "grantee_pubkey": {
       "type": "string",
-      "description": "Ed25519 public key of the Local Agent Node (Layer 4.5) receiving the capability."
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Non-empty Ed25519 public-key identifier for the Local Agent Node (Layer 4.5) receiving the capability. Concrete key encoding and cryptographic verification are outside this shape-only schema."
     },
     "capability_type": {
       "type": "string",
@@ -49,6 +56,35 @@
     "locale_context": {
       "type": "string",
       "description": "Cultural-locale context string dictating the baseline communication posture (e.g., 'direct-analytical', 'warm-prosocial')."
+    },
+    "proof": {
+      "type": "object",
+      "description": "Required Ed25519 proof binding this grant to the RFC 8785 canonical-payload digest. Shape validation does not perform cryptographic signature verification.",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "canonicalization": {
+          "const": "RFC8785"
+        },
+        "payload_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 digest of the RFC 8785 canonical capability payload."
+        },
+        "signature": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Ed25519 signature over the canonical payload digest; verification is outside schema shape validation."
+        }
+      },
+      "required": [
+        "algorithm",
+        "canonicalization",
+        "payload_digest",
+        "signature"
+      ]
     }
   },
   "required": [
@@ -58,6 +94,7 @@
     "capability_type",
     "analog_threshold_bounds",
     "ttl_seconds",
-    "issued_at"
+    "issued_at",
+    "proof"
   ]
 }

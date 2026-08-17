@@ -18,8 +18,10 @@ knowledge commons architecture.
      status.
 2. Prioritize primary sources.
    - Papers: arXiv, OpenReview, conference pages, DOI/publisher pages.
-     - **CRITICAL**: Invoke the `literature-search-arxiv` skill scripts (e.g., `search_arxiv.py`) to safely query and retrieve paper metadata instead of writing raw curl commands.
-     - Note: `literature-search-biorxiv` can be used when researching biological and biomimetic multi-agent systems.
+     - If the `literature-search-arxiv` skill or its scripts are installed, use them to query and retrieve paper metadata.
+     - Otherwise, use the harness's configured live web/search/browser tools against primary-source arXiv, OpenReview, conference, or DOI pages.
+     - Never claim an unavailable helper ran. Do not write ad hoc raw curl commands when a configured lookup tool is available.
+     - The optional `literature-search-biorxiv` skill can support biological and biomimetic multi-agent research when installed.
    - Projects: official docs, GitHub/GitLab repositories, release notes.
    - Protocols: official specifications, standards pages, or maintainer docs.
 3. Cover the core lanes.

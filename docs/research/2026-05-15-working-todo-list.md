@@ -143,14 +143,18 @@ Provenance: `docs/research/2026-08-10-root-intake-digestion.md`, ledger `.agent-
 
 ### A.000 Fable 5 sprint WS0 — repo-state verification (2026-07-03)
 
-**Status:** ✅ SPRINT COMPLETE 2026-07-04 — all five workstreams landed (WS0 stop condition acked by Anthony same-day; WS1→WS5 executed in order WS0→WS1→WS4→WS2→WS5→WS3). Generator: `claude-fable-5`. Sprint packet: `FLOSS/docs/superpowers/plans/2026-07-03-fable5-sprint-handoff.md`.
+**Status:** ⚠️ WORKING-TREE IMPLEMENTATION COMPLETED 2026-07-04; HUMAN GATES
+PENDING in this preserved snapshot. All five workstreams produced working-tree
+artifacts, but the rubric spot-check, budget approval, commit/review, and policy
+gates below were not all closed. Generator: `claude-fable-5`. Sprint packet:
+`FLOSS/docs/superpowers/plans/2026-07-03-fable5-sprint-handoff.md`.
 
 **Sprint deliverables (all working-tree, uncommitted — human gate):**
 - **WS1:** `FLOSS/evals/` — 3 modules × (20 dev + 10 heldout) + rubric.json each + README (doc 1/6). 90 items machine-validated, 2 derived-from-repo claims included. ≥80% rubric spot-check still pending.
 - **WS4:** `2026-07-fable5-adversarial-review.md` (doc 2/6) — 9 findings (F1 SDD-precedence, F2 dual packet contracts, F3 M14-vs-Sweettest, F4 truth-label misquote, F5-F9), zero new architecture.
 - **WS2:** VOTER_PROMPT v2 + `render_voter_prompt()` in `voters.py` — A/B on nemo: **20% → 65%** bucket accuracy (temp 0, cv dev). 147/147 green. Delta doc (3/6). Chain audit: 12,869 votes, 3 dead voters, error-votes-count-toward-quorum flagged.
 - **WS5:** `post-window` voter profile (4 surfaces/5 families, omo-critic verifier on cerebras/gpt-oss-120b) + dead-id remediation in all 7 profiles + live smoke round (6/6 votes, 0 errors, 0 Fable calls, APPROVED +0.642). Policy doc (4/6) — **`FABLE5_WEEKLY_CREDIT_BUDGET` awaits Anthony.**
-- **WS3:** 52-item `pioneer_seed.jsonl` (train split, zero eval contamination) + annotation guidelines/Pioneer contract doc (5/6). Pro tier + per-call learn-flag confirmed by Anthony 2026-07-04; adaptive-inference hold lifted conditionally on flag discipline.
+- **WS3:** 52-item `pioneer_seed.jsonl` (train split, zero eval contamination) + annotation guidelines/Pioneer contract doc (5/6). Pro tier + per-call learn-flag were operator-reported 2026-07-04. **Correction 2026-08-11:** repository metadata is not machine enforcement, and current Anthropic Commercial Terms do not show the claimed classifier/extractor carve-out; the adaptive-inference hold remains in force pending express approval and a fail-closed ingestion boundary.
 - **Doc budget: 5/6.** Ops directive recorded: Tryorama→Sweettest (agent-memory patched; M14 Gate 5 revision = WS4 F3).
 
 **WS0 verification table (2026-07-03, preserved below):**
@@ -305,7 +309,7 @@ commit `94dc3de`).
 
 **Status:** ⚠️ Specified — full plan + 7 sequential gates + rollback at [`docs/superpowers/plans/2026-05-26-holochain-0.7-migration.md`](../superpowers/plans/2026-05-26-holochain-0.7-migration.md). Branch reserved: `working/2026-05-26-holochain-0.7-migration` off current stabilization-canon. Operator chose option (a) of M13's three-option fork ([memory](../agent-memory/project/holochain-0-7-migration-pending.md)).
 
-**Why now:** `hc 0.6.1` is EOL upstream (`crates.io` latest `holochain_cli` is `0.7.0-dev.26` per 2026-05-26 check). No `@holochain/tryorama` version pairs cleanly with 0.6.1 — three attempted version pairs documented in [`tryorama-tooling-gap-2026-05-26`](../agent-memory/project/tryorama-tooling-gap-2026-05-26.md). Tryorama end-to-end is the unblocker for the ADR-12 + MVP Phase 0 truth-status claims (corrected to NOT-verified in commits `f4a70cf` + `5969d09`).
+**Historical rationale (superseded by the Sweettest direction recorded in A.000):** `hc 0.6.1` was EOL upstream (`crates.io` latest `holochain_cli` was `0.7.0-dev.26` per 2026-05-26 check). No `@holochain/tryorama` version paired cleanly with 0.6.1 — three attempted version pairs are documented in [`tryorama-tooling-gap-2026-05-26`](../agent-memory/project/tryorama-tooling-gap-2026-05-26.md). Tryorama was then described as the e2e unblocker; the active replacement direction is Rust Sweettest, as recorded in A.000 row 2.
 
 **Substrate blast radius — substrate-class commits require provenance packets per ADR-12 INV-015 + consent-gate APPROVE ≥ 0.85.** ADR-13 ("Holochain 0.7-dev migration") drafted alongside the work, not after.
 
@@ -375,10 +379,12 @@ Next: `npx -y socraticode` to install and start indexing. Expected indexing time
 
 ### A.9 Cross-agent Status Drift — Phase 0 terminology reconciliation
 
-**Status:** Active correction 2026-05-18. User flagged Codex drift: MVP Phase 0 Tryorama tests passed months ago. Confirmed by `MVP_PLAN.md` and `pprevious_working_task.md`. The stale surfaces were `FLOSS/CLAUDE.md`, workspace `CLAUDE.md`/`AGENTS.md`, `README.md`, and several architecture summaries.
+**Status:** Historical correction from 2026-05-18, superseded operationally by
+A.000 row 2. The older evidence records that MVP Phase 0 Tryorama tests passed
+in the PR #21 era; it is not a claim that the suite is currently rerunnable.
 
 **Resolved distinction:**
-- **MVP Phase 0 / Rose Forest substrate viability:** ✅ complete — DNA compiles to WASM, hApp/Tryorama tests pass, ontology integrity unit tests pass.
+- **MVP Phase 0 / Rose Forest substrate viability (historical acceptance evidence):** ✅ complete — DNA compiled to WASM, the PR #21-era hApp/Tryorama tests passed, and ontology integrity unit tests passed. Current e2e replacement direction: Rust Sweettest; see A.000 row 2.
 - **Orchestration Phase 0 / substrate bridge validation:** ⚠️ still specified — publish/provenance/independent verify/query/fork-visible/no privileged verifier per `docs/specs/phase0-substrate-bridge.spec.md`.
 - **ADR-2 evidence drift:** ⚠️ ADR-Suite v2.0 still carries the older "full round-trip unvalidated" note. Do not treat that stale note as current operational status; update ADR evidence formally before relying on ADR-2 as fully reconciled.
 

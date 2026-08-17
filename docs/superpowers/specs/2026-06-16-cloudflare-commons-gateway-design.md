@@ -44,10 +44,11 @@ Holochain/source-chain validation.
 
 ## 3. Scope
 
-Add a new Worker package at:
+Add a new Worker package at this repository-relative path (workspace-relative:
+`FLOSS/workers/commons-gateway/`):
 
 ```text
-FLOSS/workers/commons-gateway/
+workers/commons-gateway/
 ```
 
 Initial endpoints:
@@ -58,12 +59,12 @@ Initial endpoints:
 | `GET` / `HEAD` | `/manifest` | JSON | Machine-readable project gateway manifest. |
 | `GET` / `HEAD` | `/health` | JSON | Runtime health check for Cloudflare and local dev. |
 | `GET` / `HEAD` | `/robots.txt` | text | Minimal crawler policy for public discovery. |
-| Any | unknown path | JSON or HTML 404 | Explicit not-found response. |
+| `GET` / `HEAD` | unknown path | JSON `404` with `{"error":"not_found"}` | Deterministic not-found response. |
 
 First-pass files:
 
 ```text
-FLOSS/workers/commons-gateway/
+workers/commons-gateway/
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts
@@ -157,8 +158,31 @@ docs before finalizing dependency versions or deploy commands.
   },
   "links": [
     {
-      "label": "Project index",
-      "path": "INDEX.md",
+      "label": "Project README",
+      "description": "Repository introduction and project orientation.",
+      "path": "README.md",
+      "href": "https://github.com/G-0-B/FLOSS/blob/main/README.md",
+      "truth_status": "verified"
+    },
+    {
+      "label": "Project orientation",
+      "description": "Current agent-facing operating notes for FLOSS.",
+      "path": "CLAUDE.md",
+      "href": "https://github.com/G-0-B/FLOSS/blob/main/CLAUDE.md",
+      "truth_status": "verified"
+    },
+    {
+      "label": "Provenance packet spec",
+      "description": "Repository specification for provenance packet evidence.",
+      "path": "docs/specs/provenance-packet.spec.md",
+      "href": "https://github.com/G-0-B/FLOSS/blob/main/docs/specs/provenance-packet.spec.md",
+      "truth_status": "verified"
+    },
+    {
+      "label": "Gateway design spec",
+      "description": "Design boundary for this first Worker slice.",
+      "path": "docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
+      "href": "https://github.com/G-0-B/FLOSS/blob/main/docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
       "truth_status": "verified"
     }
   ],
@@ -221,8 +245,9 @@ and Holochain validation boundaries.
 
 - Unsupported methods return `405 Method Not Allowed` and an `Allow: GET, HEAD`
   header.
-- Unknown paths return `404 Not Found` with the same security headers as normal
-  responses.
+- Unknown paths return `404 Not Found` as JSON
+  `{"error":"not_found"}` with `Content-Type: application/json; charset=utf-8`
+  and the same security headers as normal responses.
 - Invalid content negotiation should still return a useful default response;
   the gateway should not fail merely because a client sends a broad `Accept`
   header.
@@ -242,7 +267,8 @@ Required tests before production code:
 - Unsupported method returns `405` and `Allow: GET, HEAD`.
 - Security headers are present on success and error responses.
 
-Verification commands from `FLOSS/workers/commons-gateway/`:
+Verification commands from repository-relative `workers/commons-gateway/`
+(workspace-relative `FLOSS/workers/commons-gateway/`):
 
 ```bash
 npm test

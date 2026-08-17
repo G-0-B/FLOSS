@@ -65,7 +65,8 @@ sha256sum FLOSS/docs/research/intake_raw/2026-06-17-arxiv/*.pdf > FLOSS/docs/res
 Verified / Specified / Aspirational against the paper's own evidence, not our hopes for it.
 
 **Step 2 — submit as Claims** through `metacoordinator_mcp` with provenance packets citing
-the arXiv DOI as the non-packet evidence root; let the source chain + (eventually) the
+the typed arXiv identifier and canonical URL as the non-packet evidence root (add a DOI only
+when independently verified); let the source chain + (eventually) the
 Holochain integrity zome validate. No claim enters canon on LLM consensus alone — one
 primary-source check outweighs model agreement.
 

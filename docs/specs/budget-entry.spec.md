@@ -1,9 +1,9 @@
 # BudgetEntry Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Specified
 **Truth Status:** Specified (code exists in integrity/coordinator zomes; not yet compiled/validated)
-**Last Updated:** 2026-03-05
+**Last Updated:** 2026-08-13
 
 ---
 
@@ -27,7 +27,8 @@ A `BudgetEntry` tracks an agent's resource usage within a time window. It implem
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `BUDGET_PER_WINDOW` | 100.0 RU | Total budget per window |
+| `BUDGET_PER_WINDOW` | 100.0 RU | Ordinary per-window base budget |
+| `MAX_BUDGET_ALLOCATION_RU` | 200.0 RU | Maximum allocated balance accepted at the integrity boundary |
 | `BUDGET_WINDOW_SECS` | 86400 (24h) | Window duration in seconds |
 | `COST_ADD_KNOWLEDGE` | 33.0 RU | Cost to create a RoseNode |
 | `COST_LINK_EDGE` | 3.0 RU | Cost to create a KnowledgeEdge |
@@ -37,7 +38,7 @@ A `BudgetEntry` tracks an agent's resource usage within a time window. It implem
 
 ## 4. Invariants
 
-1. **INV-BE-001:** `remaining_ru` MUST be >= 0.0
+1. **INV-BE-001:** `remaining_ru` MUST be finite and within `[0.0, 200.0]` RU
 2. **INV-BE-002:** An operation MUST be rejected if its cost exceeds `remaining_ru`
 3. **INV-BE-003:** Budget resets to `BUDGET_PER_WINDOW` when current time exceeds `window_start + BUDGET_WINDOW_SECS`
 
@@ -70,4 +71,5 @@ CONSUME_BUDGET(agent, cost):
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-08-13 | Reconciled the 100 RU ordinary per-window base with the 200 RU maximum allocated balance |
 | 1.0.0 | 2026-03-05 | Initial specification extracted from coordinator zome code |

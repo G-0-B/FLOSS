@@ -53,10 +53,13 @@ export const commonsManifest: CommonsManifest = {
     principle: "Logic validates, neural assists.",
     principle_truth_status: "verified",
     evidence: [
-      { path: "INDEX.md", truth_status: "verified" },
-      { path: "FLOSS/CLAUDE.md", truth_status: "verified" },
+      { path: "CLAUDE.md", truth_status: "verified" },
       {
-        path: "FLOSS/docs/specs/provenance-packet.spec.md",
+        path: "docs/specs/provenance-packet.spec.md",
+        truth_status: "verified"
+      },
+      {
+        path: "docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
         truth_status: "verified"
       }
     ],
@@ -72,24 +75,31 @@ export const commonsManifest: CommonsManifest = {
   },
   links: [
     {
-      label: "Project index",
-      description: "Repository map and canonical document registry.",
-      href: "https://github.com/G-0-B/FLOSS/blob/main/INDEX.md",
-      path: "INDEX.md",
+      label: "Project README",
+      description: "Repository introduction and project orientation.",
+      href: "https://github.com/G-0-B/FLOSS/blob/main/README.md",
+      path: "README.md",
       truth_status: "verified"
     },
     {
       label: "Project orientation",
       description: "Current agent-facing operating notes for FLOSS.",
-      href: "https://github.com/G-0-B/FLOSS/blob/main/FLOSS/CLAUDE.md",
-      path: "FLOSS/CLAUDE.md",
+      href: "https://github.com/G-0-B/FLOSS/blob/main/CLAUDE.md",
+      path: "CLAUDE.md",
+      truth_status: "verified"
+    },
+    {
+      label: "Provenance packet spec",
+      description: "Repository specification for provenance packet evidence.",
+      href: "https://github.com/G-0-B/FLOSS/blob/main/docs/specs/provenance-packet.spec.md",
+      path: "docs/specs/provenance-packet.spec.md",
       truth_status: "verified"
     },
     {
       label: "Gateway design spec",
       description: "Design boundary for this first Worker slice.",
-      href: "https://github.com/G-0-B/FLOSS/blob/main/FLOSS/docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
-      path: "FLOSS/docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
+      href: "https://github.com/G-0-B/FLOSS/blob/main/docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
+      path: "docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
       truth_status: "verified"
     }
   ],

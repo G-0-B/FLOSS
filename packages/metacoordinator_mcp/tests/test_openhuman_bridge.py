@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+
+import pytest
+
 from packages.source_chain.cell import CellDirectory
 from packages.orchestrator.claim_schema import (
     Claim,
@@ -7,8 +9,9 @@ from packages.orchestrator.claim_schema import (
     ProposalType,
     BlastRadius,
     Outcome,
-    Decision,
 )
+from packages.orchestrator.consensus_gate import decide
+from packages.orchestrator.serialization import entry_hash
 
 
 @pytest.fixture
@@ -27,13 +30,15 @@ def openhuman_2_cell(tmp_path: Path) -> CellDirectory:
     return CellDirectory(d, "dna_openhuman_commons")
 
 
-def test_openhuman_claim_and_verify_bridge(
+def test_openhuman_claim_and_vote_content_address_bridge(
     openhuman_1_cell: CellDirectory, openhuman_2_cell: CellDirectory
 ) -> None:
     """
-    Simulates the integration seam between OpenHuman and FLOSSI0ULLK.
-    Agent 1 (OpenHuman 1) crafts a memory and submits it as a Claim.
-    Agent 2 (OpenHuman 2) retrieves the claim and issues a verifying Vote.
+    Exercise the bounded file-precursor seam between OpenHuman and FLOSSI0ULLK.
+
+    Agent 1 crafts a Claim, two agent fixtures separately construct Votes, and the
+    gateway aggregates them. Peer retrieval, gossip, signatures, and read-time
+    tamper rejection are outside this test.
     """
 
     # 1. OpenHuman 1 extracts a local memory and crafts a FLOSSI0ULLK Claim
@@ -55,17 +60,42 @@ def test_openhuman_claim_and_verify_bridge(
         content=oh_claim.to_dict(),
     )
 
-    # Verify the claim was stored and cryptographically hashed
+    # Verify local storage and content-address generation. This is not a
+    # signature check or a production read-time tamper-verification path.
     assert claim_hash is not None
     chain_1 = openhuman_1_cell.read_chain()
     assert len(chain_1) == 1
+    assert openhuman_1_cell.head_hash() == claim_hash
+    assert entry_hash(chain_1[0]) == claim_hash
     assert chain_1[0]["content"]["proposer"] == agent_1_did
     assert chain_1[0]["content"]["summary"] == "Learned new Rust workflow pattern"
 
-    # --- Gossip occurs here (simulated by passing the claim_id) ---
+    # No gossip or peer retrieval occurs: the claim ID is passed in memory.
     claim_id_for_vote = chain_1[0]["content"]["id"]
 
-    # 3. OpenHuman 2 receives the claim, evaluates it against its own memory, and votes
+    # 3. OpenHuman 1 records its independent supporting evaluation locally.
+    agent_1_vote = Vote(
+        voter=agent_1_did,
+        weight=0.85,
+        rationale="My local Tauri traces observed the same parallel-sync starvation.",
+    )
+    agent_1_vote.validate()
+    agent_1_vote_hash = openhuman_1_cell.append_entry(
+        entry_type="vote",
+        author_did=agent_1_did,
+        content={"claim_id": claim_id_for_vote, "vote": agent_1_vote.to_dict()},
+    )
+
+    assert agent_1_vote_hash is not None
+    chain_1 = openhuman_1_cell.read_chain()
+    assert len(chain_1) == 2
+    assert chain_1[0]["type"] == "vote"
+    assert chain_1[0]["author_did"] == agent_1_did
+    assert chain_1[0]["content"]["claim_id"] == claim_id_for_vote
+    assert chain_1[0]["content"]["vote"]["voter"] == agent_1_vote.voter
+    assert chain_1[0]["content"]["vote"]["weight"] == agent_1_vote.weight
+
+    # 4. OpenHuman 2 is given the claim reference and authors its own vote.
     agent_2_did = "did:key:zOpenHuman2"
 
     oh_vote = Vote(
@@ -75,7 +105,7 @@ def test_openhuman_claim_and_verify_bridge(
     )
     oh_vote.validate()
 
-    # 4. OpenHuman 2 appends the vote to its own local source chain
+    # 5. OpenHuman 2 appends the vote to its own local source chain.
     vote_hash = openhuman_2_cell.append_entry(
         entry_type="vote",
         author_did=agent_2_did,
@@ -88,18 +118,19 @@ def test_openhuman_claim_and_verify_bridge(
     assert chain_2[0]["content"]["vote"]["voter"] == agent_2_did
     assert chain_2[0]["content"]["vote"]["weight"] == 0.95
 
-    # 5. The FLOSSI0ULLK Consensus Gateway resolves the decision
-    # Simulated resolution based on BlastRadius.MODULE threshold (0.50)
-    decision = Decision(
-        claim_id=claim_id_for_vote,
-        blast_radius=BlastRadius.MODULE,
-        outcome=Outcome.APPROVED,
-        votes=[oh_vote],
-        tally_mean=0.95,
-        tally_variance=0.0,
-    )
-    decision.validate()
+    # 6. The FLOSSI0ULLK Consensus Gateway resolves the two-vote Module ballot.
+    def agent_1_voter(_: Claim) -> Vote:
+        return agent_1_vote
+
+    def agent_2_voter(_: Claim) -> Vote:
+        return oh_vote
+
+    decision = decide(oh_claim, [agent_1_voter, agent_2_voter])
 
     assert decision.outcome == Outcome.APPROVED
+    assert len(decision.votes) == 2
+    assert [vote.voter for vote in decision.votes] == [agent_1_did, agent_2_did]
+    assert decision.tally_mean == pytest.approx(0.90)
+    assert decision.tally_variance == pytest.approx(0.0025)
 
-    # Success! Two isolated personal AIs just formed a verifiable knowledge commons.
+    # Bounded result: local content addressing plus schema/decision aggregation.

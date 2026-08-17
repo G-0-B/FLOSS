@@ -39,12 +39,11 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
-import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WORKSPACE_ROOT = REPO_ROOT.parent
 REGISTRY_PATH = REPO_ROOT / "docs" / "specs" / "spec-registry.json"
+CANONICAL_REPO_PREFIX = "FLOSS"
 
 # Keep in sync with `gated_surfaces` in FLOSS/docs/specs/spec-registry.json.
 # That field is documentation; THIS tuple is what --check actually walks. They
@@ -79,15 +78,32 @@ REUSE_VERDICTS = ("adopt", "extend", "compose", "build")
 
 
 def _normalize(path_str: str | Path) -> str | None:
-    """Workspace-relative forward-slash path, or None if outside workspace."""
+    """Return a canonical FLOSS-prefixed path for a file inside this worktree."""
+    canonical_parts = PurePosixPath(str(path_str).replace("\\", "/")).parts
     try:
-        resolved = Path(path_str).resolve()
+        if canonical_parts and canonical_parts[0] == CANONICAL_REPO_PREFIX:
+            physical_path = _physical_path("/".join(canonical_parts))
+            if physical_path is None:
+                return None
+            resolved = physical_path.resolve()
+        else:
+            candidate = Path(path_str)
+            resolved = (candidate if candidate.is_absolute() else REPO_ROOT / candidate).resolve()
     except OSError:
         return None
     try:
-        return resolved.relative_to(WORKSPACE_ROOT.resolve()).as_posix()
+        relative = resolved.relative_to(REPO_ROOT.resolve()).as_posix()
     except ValueError:
         return None
+    return f"{CANONICAL_REPO_PREFIX}/{relative}"
+
+
+def _physical_path(canonical_path: str) -> Path | None:
+    """Resolve a canonical registry key inside the current physical worktree."""
+    parts = PurePosixPath(canonical_path).parts
+    if not parts or parts[0] != CANONICAL_REPO_PREFIX:
+        return None
+    return REPO_ROOT.joinpath(*parts[1:])
 
 
 def is_gated(path_str: str | Path) -> bool:
@@ -130,10 +146,11 @@ def advisory_note(path_str: str | Path) -> str | None:
                     f"spec-registry.json (schema: docs/specs/reuse-gate.schema.json)"
                 )
             return None
+        script_path = Path(__file__).resolve()
         return (
             f"spec-gate: `{rel}` is on a gated surface but has no spec stub in "
             f"docs/specs/spec-registry.json — register it before it ossifies: "
-            f'python FLOSS/scripts/spec_gate.py --add "{rel}" --spec "<one-line intent>"'
+            f'python "{script_path}" --add "{rel}" --spec "<one-line intent>"'
         )
     except Exception:  # noqa: BLE001 — advisory must never break a hook
         return None
@@ -142,7 +159,9 @@ def advisory_note(path_str: str | Path) -> str | None:
 def _gated_artifacts() -> list[str]:
     found: list[str] = []
     for surface in GATED_SURFACES:
-        root = WORKSPACE_ROOT / surface
+        root = _physical_path(surface)
+        if root is None:
+            continue
         if not root.exists():
             continue
         for path in sorted(root.rglob("*")):
@@ -209,7 +228,9 @@ def run_check() -> int:
         return 1
     entries = registry.get("entries", {})
     missing = [rel for rel in _gated_artifacts() if rel not in entries]
-    stale = [rel for rel in entries if not (WORKSPACE_ROOT / rel).exists()]
+    # PR38's worktree-aware resolution: _physical_path handles registry keys that
+    # do not map into this checkout, which WORKSPACE_ROOT / rel mis-resolved.
+    stale = [rel for rel in entries if (path := _physical_path(rel)) is None or not path.exists()]
     reuse_fails: list[str] = []
     reuse_warns: list[str] = []
     for rel, entry in entries.items():

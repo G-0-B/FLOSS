@@ -6,8 +6,28 @@ import {
 import { describe, expect, it } from "vitest";
 
 import worker from "../src/index";
+import { commonsManifest } from "../src/manifest";
 
 const IncomingRequest = Request;
+
+const expectedPublicLinks = [
+  {
+    path: "README.md",
+    href: "https://github.com/G-0-B/FLOSS/blob/main/README.md"
+  },
+  {
+    path: "CLAUDE.md",
+    href: "https://github.com/G-0-B/FLOSS/blob/main/CLAUDE.md"
+  },
+  {
+    path: "docs/specs/provenance-packet.spec.md",
+    href: "https://github.com/G-0-B/FLOSS/blob/main/docs/specs/provenance-packet.spec.md"
+  },
+  {
+    path: "docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md",
+    href: "https://github.com/G-0-B/FLOSS/blob/main/docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md"
+  }
+] as const;
 
 async function fetchGateway(path: string, init?: RequestInit): Promise<Response> {
   const request = new IncomingRequest(`https://commons.example${path}`, init);
@@ -62,11 +82,28 @@ describe("commons gateway worker", () => {
     });
     expect(manifest.authority.not_authority).toContain("canonical truth");
     expect(manifest.authority.truth_status).toBe("specified");
-    expect(manifest.links[0]).toMatchObject({
-      label: "Project index",
-      path: "INDEX.md",
-      truth_status: "verified"
-    });
+    expect(manifest.authority.evidence.map((entry: { path: string }) => entry.path)).toEqual([
+      "CLAUDE.md",
+      "docs/specs/provenance-packet.spec.md",
+      "docs/superpowers/specs/2026-06-16-cloudflare-commons-gateway-design.md"
+    ]);
+  });
+
+  it.each(expectedPublicLinks)(
+    "publishes the repository path and URL for $path",
+    ({ path, href }) => {
+      const link = commonsManifest.links.find((entry) => entry.path === path);
+
+      expect(link).toBeDefined();
+      expect(link).toMatchObject({ path, href, truth_status: "verified" });
+    }
+  );
+
+  it("publishes exactly the expected public repository links", () => {
+    expect(commonsManifest.links).toHaveLength(expectedPublicLinks.length);
+    expect(commonsManifest.links.map(({ path, href }) => ({ path, href }))).toEqual(
+      expectedPublicLinks
+    );
   });
 
   it("renders the public HTML entrypoint without requiring JavaScript", async () => {

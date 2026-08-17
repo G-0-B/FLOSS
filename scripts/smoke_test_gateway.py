@@ -89,10 +89,20 @@ def main() -> int:
             "analog_threshold_bounds": [-0.5, 0.8],
             "ttl_seconds": 3600,
             "issued_at": datetime.now(timezone.utc).isoformat(),
+            "proof": {
+                "algorithm": "Ed25519",
+                "canonicalization": "RFC8785",
+                "payload_digest": "a" * 64,
+                "signature": "base64-ed25519-signature",
+            },
         }
 
         try:
-            jsonschema.validate(instance=valid_capability, schema=schema)
+            jsonschema.validate(
+                instance=valid_capability,
+                schema=schema,
+                format_checker=jsonschema.FormatChecker(),
+            )
             print("  → Valid capability token passed schema enforcement.")
         except jsonschema.ValidationError as e:
             print(f"FAIL: Valid capability failed schema: {e}", file=sys.stderr)
@@ -102,7 +112,11 @@ def main() -> int:
         invalid_capability["ttl_seconds"] = 10000  # Exceeds 2 hour limit
 
         try:
-            jsonschema.validate(instance=invalid_capability, schema=schema)
+            jsonschema.validate(
+                instance=invalid_capability,
+                schema=schema,
+                format_checker=jsonschema.FormatChecker(),
+            )
             print("FAIL: Schema failed to reject invalid ttl_seconds", file=sys.stderr)
             return 1
         except jsonschema.ValidationError:

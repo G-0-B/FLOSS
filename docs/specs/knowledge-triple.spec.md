@@ -286,9 +286,9 @@ authoritative, (b) AD4M's model layer, and (c) any standard RDF validator.
 - **Atomic Data** requires typed values; `object` here is an untyped string.
   If the atomic-data hold (seed pack file 03) ever lifts, add an optional
   `object_datatype` field — do not retrofit typing before then.
-- **Agent-key encodings**: Holochain raw keys, provenance-packet `D`+43
-  base64url, and DIDs coexist across the stack. §2.2's DID preference is the
-  convergence direction; existing raw-key records remain valid.
+- **Agent-key encodings**: Holochain raw keys, provenance-packet `D` or `B` + 43
+  base64url characters, and DIDs coexist across the stack. §2.2's DID preference
+  is the convergence direction; existing raw-key records remain valid.
 
 ## 7. Related Specifications
 
