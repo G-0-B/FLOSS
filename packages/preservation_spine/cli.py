@@ -39,13 +39,13 @@ _SAFE_STATE_CHARS = frozenset(
 _RENDER_PHASES = {"projection-rendered"}
 _INVENTORY_PHASES = {"inventory-complete", *_RENDER_PHASES}
 _VERIFY_PHASES = {"verification-complete", *_INVENTORY_PHASES}
-_STATUS_COMMAND = "python scripts/pr38_salvage.py status --capsule STATE_DIR"
+_STATUS_COMMAND = "python scripts/preservation_spine.py status --capsule STATE_DIR"
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pr38_salvage",
-        description="Local-only PR #38 preservation capsule commands.",
+        prog="preservation_spine",
+        description="Local-only repository preservation-capsule commands.",
     )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.required = True
@@ -169,7 +169,7 @@ def _handle_capture(args: argparse.Namespace) -> int:
         blockers=("verification-pending",),
         human_decisions=("preserve-read-only-first",),
         next_safe_command=(
-            "python scripts/pr38_salvage.py verify --capsule STATE_DIR "
+            "python scripts/preservation_spine.py verify --capsule STATE_DIR "
             "--restore CLEAN_ROOM_DIR --forbid-root SOURCE_ROOT"
         ),
         recovery_command=_STATUS_COMMAND,
@@ -225,7 +225,7 @@ def _handle_verify(args: argparse.Namespace) -> int:
     verification_digest = hashlib.sha256(canonical_json_bytes(result)).hexdigest()
     inventory_eligible = _verification_inventory_eligible(result)
     if inventory_eligible:
-        next_safe = "python scripts/pr38_salvage.py inventory --capsule STATE_DIR"
+        next_safe = "python scripts/preservation_spine.py inventory --capsule STATE_DIR"
         blockers: tuple[str, ...] = ()
     else:
         next_safe = _STATUS_COMMAND
@@ -310,7 +310,7 @@ def _handle_inventory(args: argparse.Namespace) -> int:
         blockers=(),
         human_decisions=tuple(latest.human_decisions),
         next_safe_command=(
-            "python scripts/pr38_salvage.py render-github --capsule STATE_DIR "
+            "python scripts/preservation_spine.py render-github --capsule STATE_DIR "
             "--output RENDER_DIR"
         ),
         recovery_command=_STATUS_COMMAND,

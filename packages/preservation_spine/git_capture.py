@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from pathlib import PureWindowsPath
 from typing import Callable
 
-from packages.salvage_spine.models import (
+from packages.preservation_spine.models import (
     PlaneEligibility,
     PlaneId,
     PlaneRecord,

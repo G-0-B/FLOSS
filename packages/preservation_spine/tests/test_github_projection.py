@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from packages.salvage_spine.checkpoint import Checkpoint
-from packages.salvage_spine.manifest import manifest_digest
-from packages.salvage_spine.models import PlaneId, ResultStatus, canonical_json_bytes
-from packages.salvage_spine.restore import PlaneRestoreResult, VerificationRecord
-from packages.salvage_spine.github_projection import (
+from packages.preservation_spine.checkpoint import Checkpoint
+from packages.preservation_spine.manifest import manifest_digest
+from packages.preservation_spine.models import PlaneId, ResultStatus, canonical_json_bytes
+from packages.preservation_spine.restore import PlaneRestoreResult, VerificationRecord
+from packages.preservation_spine.github_projection import (
     Evidence,
     render_check_summary,
     render_stop_merge_comment,
@@ -148,7 +148,7 @@ def _checkpoint(
     manifest: dict[str, object],
     *,
     verification_digest: str | None = None,
-    next_safe_command: str = "python -m pytest packages/salvage_spine/tests -q",
+    next_safe_command: str = "python -m pytest packages/preservation_spine/tests -q",
     blockers: tuple[str, ...] = (),
     remote_main_sha: str = "1" * 40,
     pr_head_sha: str = "2" * 40,
@@ -175,7 +175,7 @@ def _checkpoint(
         blockers=blockers,
         human_decisions=("preserve-read-only-first",),
         next_safe_command=next_safe_command,
-        recovery_command="python scripts/pr38_salvage.py status --latest",
+        recovery_command="python scripts/preservation_spine.py status --latest",
         digest=None,
     )
 
@@ -189,7 +189,7 @@ def _evidence(
     primary_lane: str = "preservation-admin",
     checkpoint_blockers: tuple[str, ...] = (),
     verification_blockers: tuple[str, ...] = (),
-    next_safe_command: str = "python -m pytest packages/salvage_spine/tests -q",
+    next_safe_command: str = "python -m pytest packages/preservation_spine/tests -q",
     evidence_locations: dict[str, str] | None = None,
     planes: tuple[PlaneRestoreResult, ...] | None = None,
     commit_match: bool = True,
@@ -722,7 +722,7 @@ def test_hostile_renderable_field_content_does_not_survive_output(
         "gh pr comment 38 --body nope",
         "curl -X POST https://example.invalid",
         r"C:\temp\run.ps1",
-        "python scripts/pr38_salvage.py status#frag",
+        "python scripts/preservation_spine.py status#frag",
     ],
 )
 def test_mutating_or_unsafe_next_safe_commands_are_rejected(
@@ -738,7 +738,7 @@ def test_template_is_proposed_noncanonical_and_has_no_remote_api_command() -> No
         / "docs"
         / "superpowers"
         / "templates"
-        / "pr38-stop-merge-comment.md"
+        / "stop-merge-comment.md"
     ).read_text(encoding="utf-8")
     assert template.splitlines()[0] == (
         "PROPOSED STOP-MERGE NOTICE — DO NOT POST BEFORE PRESERVATION PASSES"

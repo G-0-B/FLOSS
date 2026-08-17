@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
-from packages.salvage_spine.models import (
+from packages.preservation_spine.models import (
     CapsuleRecord,
     PlaneEligibility,
     PlaneId,
@@ -92,7 +92,7 @@ def valid_planes() -> tuple[PlaneRecord, ...]:
 def capsule_schema() -> dict[str, object]:
     spec_root = Path(__file__).resolve().parents[3] / "docs" / "superpowers" / "specs"
     return json.loads(
-        (spec_root / "pr38-capsule.schema.json").read_text(encoding="utf-8")
+        (spec_root / "preservation-capsule.schema.json").read_text(encoding="utf-8")
     )
 
 
@@ -121,7 +121,7 @@ def test_contract_enums_cover_scoped_values():
     ]
     assert [plane.value for plane in PlaneId] == [
         "remote-main",
-        "remote-pr38",
+        "remote-pr",
         "local-history",
         "local-index",
         "local-tracked",
@@ -429,7 +429,7 @@ def test_contract_schemas_are_strict_and_encode_state_rules():
     spec_root = Path(__file__).resolve().parents[3] / "docs" / "superpowers" / "specs"
     capsule = capsule_schema()
     manifest = json.loads(
-        (spec_root / "pr38-salvage-manifest.schema.json").read_text(encoding="utf-8")
+        (spec_root / "preservation-manifest.schema.json").read_text(encoding="utf-8")
     )
     checkpoint = json.loads(
         (spec_root / "pr38-checkpoint.schema.json").read_text(encoding="utf-8")
@@ -488,7 +488,7 @@ def test_checkpoint_schema_requires_explicit_verification_digest_field() -> None
         "completed_actions": ["captured-six-planes"],
         "blockers": ["restore-pending"],
         "human_decisions": ["preserve-read-only-first"],
-        "next_safe_command": "python -m pytest packages/salvage_spine/tests -q",
+        "next_safe_command": "python -m pytest packages/preservation_spine/tests -q",
         "recovery_command": "python scripts/rebuild_capsule.py --state capsule-state-1",
     }
 

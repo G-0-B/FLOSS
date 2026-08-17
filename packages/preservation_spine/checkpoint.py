@@ -1,4 +1,8 @@
-"""Append-only continuation checkpoints for PR38 salvage capsules."""
+"""Append-only continuation checkpoints for preservation capsules.
+
+Built for the PR38 salvage in 2026-07, but nothing here is PR-specific:
+the six-plane contract applies to any risky repository operation.
+"""
 
 from __future__ import annotations
 
