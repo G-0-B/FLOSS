@@ -1,9 +1,9 @@
 # ADR Index — FLOSSI0ULLK / ARF Ecosystem
 
-**Version:** 2.0.0
-**Updated:** 2026-05-25
+**Version:** 2.1.0
+**Updated:** 2026-07-04
 **Truth Status:** Specified
-**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12).
+**Canonical reference:** `FLOSSI0ULLK-ADR-Suite-v2.0.md` (compiled 2026-04-26) is the consolidated narrative source. This index is the pointer surface kept in sync with the suite plus any post-suite additions (ADR-12..17).
 
 ---
 
@@ -14,6 +14,8 @@ ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without r
 Permanent numbers assigned in v2.0:
 - `ADR-MCP-ORCHESTRATOR` → **ADR-10** (file kept under historical name to avoid breaking inbound links; cross-reference both).
 - `ADR-N` (IPFS) → **ADR-11** (file kept under historical name pending a rename pass; cross-reference both).
+
+**Namespace separation — FLOSSI U curriculum ADRs:** the FLOSSI U Founding Kit defines a *separate* curriculum-ADR series using the zero-padded `001`–`019` namespace (containing-scope / curriculum layer). These do **not** share numbering with the repo's integer `ADR-0 … ADR-N` engineering ADRs indexed below; the two series are intentionally distinct and must not be cross-numbered.
 
 ---
 
@@ -35,6 +37,11 @@ Permanent numbers assigned in v2.0:
 | **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-MCP-ORCHESTRATOR.md` |
 | **ADR-11** | IPFS Large File Integration for VVS-Compliant Git | Accepted | Specified | Medium | 2025-11-11 | `ADR-N-IPFS-Integration-VVS.md` |
 | **ADR-12** | Consent Gate Protocol | Draft (implementation-backed) | Specified (substrate verified locally; action-time gating + DID hardening + cross-frame validation pending) | High (OVERRIDE FORBIDDEN; APPROVE ≥ 0.85) | 2026-05-19 | `ADR-12-consent-gate-protocol.md` |
+| **ADR-13** | Yumeichan Watch Architecture (Affective Edge Node) | Accepted | Specified | High | 2026-06-13 | `ADR-13-yumeichan-watch-architecture.md` |
+| **ADR-14** | ObjectGraph Projection over Corpus | Accepted | Specified → Verified on landing | Low | 2026-06-13 | `ADR-14-objectgraph-projection.md` |
+| **ADR-15** | Enforce Author–Provenance Binding in Integrity Zome | Accepted (impl P1) | Specified | High (security / core invariant) | 2026-06-13 | `ADR-15-provenance-validation-enforcement.md` |
+| **ADR-16** | Omnigent as Execution/Governance Surface; Gateway + Holochain as Validation Substrate | Proposed | Specified (upstream capability + fork state Verified; integration seam Specified; validation fit Blocked) | High (execution/governance seam) | 2026-06-17 | `ADR-16-omnigent-execution-surface.md` |
+| **ADR-17** | KnowledgeTriple Contract Reconciliation (signed-gradient confidence; enum-now/URI-later predicates) | Proposed | Specified (divergence Verified; D1/D2 pending gate acceptance) | High (Phase 1 primary-deliverable contract) | 2026-07-04 | `ADR-17-knowledge-triple-contract-reconciliation.md` |
 
 ---
 

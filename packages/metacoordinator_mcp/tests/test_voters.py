@@ -6,6 +6,8 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
+from unittest.mock import Mock, patch
 
 _THIS_DIR = Path(__file__).parent
 _REPO_ROOT = _THIS_DIR.parent.parent.parent
@@ -16,7 +18,14 @@ from packages.metacoordinator_mcp.voters import (  # noqa: E402
     _parse_weight,
     build_default_voters,
     describe_default_roster,
+    make_omo_critic_voter,
+    make_omo_momus_voter,
     resolve_default_voter_specs,
+)
+from packages.orchestrator.claim_schema import (  # noqa: E402
+    BlastRadius,
+    Claim,
+    ProposalType,
 )
 
 ENV_KEYS = (
@@ -67,6 +76,60 @@ def test_parse_weight_accepts_leading_dot_float():
     """Parse weights like `.8` and `-.4` instead of silently zeroing them out."""
     assert _parse_weight("WEIGHT: .8\nRATIONALE: yes") == 0.8
     assert _parse_weight("WEIGHT: -.4\nRATIONALE: no") == -0.4
+
+
+def _assert_persona_system_keeps_shared_checklist_mandatory(factory):
+    """Exercise a persona wrapper and inspect its higher-priority system contract."""
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="WEIGHT: -0.4\nRATIONALE: Evidence is missing."
+                )
+            )
+        ]
+    )
+    voter = factory("persona-probe", "test/model")
+    claim = Claim(
+        proposer="unit-test",
+        proposal_type=ProposalType.CODE_CHANGE,
+        summary="missing evidence",
+        body="body",
+        blast_radius=BlastRadius.LOCAL,
+        evidence=[],
+    )
+
+    litellm = ModuleType("litellm")
+    completion = Mock(return_value=response)
+    litellm.completion = completion
+
+    with patch.dict(sys.modules, {"litellm": litellm}):
+        voter(claim)
+
+    messages = completion.call_args.kwargs["messages"]
+    assert [message["role"] for message in messages] == ["system", "user"]
+    system_message = messages[0]["content"]
+    user_message = messages[1]["content"]
+    assert "shared seven-item checklist is mandatory" in system_message
+    assert (
+        "If ANY shared checklist item fails, your weight must not be positive"
+        in system_message
+    )
+    assert "Only after every shared checklist item passes" in system_message
+    assert "Run this checklist BEFORE choosing a weight" in user_message
+    assert (
+        "If ANY checklist item fails, your weight must not be positive" in user_message
+    )
+
+
+def test_omo_critic_system_keeps_shared_checklist_mandatory():
+    """The critic lens must not override the shared gate."""
+    _assert_persona_system_keeps_shared_checklist_mandatory(make_omo_critic_voter)
+
+
+def test_omo_momus_system_keeps_shared_checklist_mandatory():
+    """The Momus approval bias must not override the shared gate."""
+    _assert_persona_system_keeps_shared_checklist_mandatory(make_omo_momus_voter)
 
 
 def test_resolve_default_voter_specs_honors_profile_and_credentials():
@@ -163,7 +226,7 @@ def test_heartbeat_alias_uses_budget_safe_balanced_profile():
     ):
         resolved = resolve_default_voter_specs(profile="heartbeat")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
     }
@@ -191,7 +254,7 @@ def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exi
     ):
         resolved = resolve_default_voter_specs(profile="roi")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
         "mistral-devstral-small": "mistral/devstral-small-2507",
@@ -212,7 +275,7 @@ def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
     ):
         resolved = resolve_default_voter_specs(profile="roi-plus")
     assert resolved == {
-        "cerebras-llama3.1-8b": "cerebras/llama3.1-8b",
+        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "groq-qwen3-32b": "groq/qwen/qwen3-32b",
         "mistral-devstral-small": "mistral/devstral-small-2507",
@@ -226,6 +289,8 @@ def _run_all() -> int:
     """Run the standalone test module without requiring pytest."""
     tests = [
         test_parse_weight_accepts_leading_dot_float,
+        test_omo_critic_system_keeps_shared_checklist_mandatory,
+        test_omo_momus_system_keeps_shared_checklist_mandatory,
         test_resolve_default_voter_specs_filters_missing_provider_keys,
         test_resolve_default_voter_specs_honors_profile_and_credentials,
         test_roster_override_takes_precedence_over_profile_and_extra,

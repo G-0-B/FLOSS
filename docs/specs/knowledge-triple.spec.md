@@ -1,9 +1,29 @@
 # Knowledge Triple Specification
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Status:** Draft  
-**Last Updated:** 2025-12-15  
+**Last Updated:** 2026-07-04  
 **Authors:** Anthony (Human), Claude (AI)  
+**Canonical copy:** `FLOSS/docs/specs/knowledge-triple.spec.md` (the former `docs/architecture/` duplicate is now a pointer stub)  
+
+> ⚠️ **KNOWN DIVERGENCE (2026-07-04, unresolved — ADR-tier decision pending).**
+> This spec.md and its siblings disagree on the core contract:
+>
+> | Aspect | This spec.md | `knowledge-triple.schema.json` + live integrity zome (`rose_forest/zomes/integrity/src/lib.rs`) |
+> |---|---|---|
+> | `confidence` domain | `[0.0, 1.0]` (INV-003) | **`[-1.0, +1.0]` signed gradient** (zome-validated; aligned with the analog vote model, ADR-10 v2.0, and the Yumeichan ternary framework) |
+> | `predicate` form | registered ontology **URIs** (foaf/dcterms/…) | **short-name enum** (`is_a`, `part_of`, `trained_on`, …) |
+> | provenance | structured object (§2.2) | flat `source` AgentPubKey string |
+> | `created_at` | ISO 8601 | Holochain Timestamp `[secs, nanos]` |
+>
+> The implementation + schema represent the *decided* analog-model direction for
+> confidence; the predicate form (URI registry vs enum seed vocabulary) is genuinely
+> open. Until an ADR reconciles this, treat the **zome as authoritative for the
+> confidence domain** and this spec.md as authoritative for extraction semantics
+> (what to extract; hedging/negation/dedup rules). Do **not** launch the Pioneer
+> fine-tune (WS3) until the predicate-form decision lands — the seed data's URI
+> predicates remap mechanically to the enum if that side wins, but the trained
+> model's output vocabulary must match the final contract.
 
 ---
 
@@ -39,7 +59,7 @@ A `KnowledgeTriple` represents a single atomic fact in the FLOSSI0ULLK knowledge
 |-------|------|----------|-------------|
 | `source_type` | Enum | Yes | One of: `LlmExtraction`, `ManualEntry`, `Inference`, `Import` |
 | `source_id` | String | Yes | Identifier of source (model name, user ID, rule ID, import batch) |
-| `agent` | String | Yes | Agent public key who created this triple |
+| `agent` | String | Yes | Creating agent's identifier: a raw agent public key (e.g. Holochain `uhCAk…`) **or a DID URI** (e.g. `did:key:…`). DID form is preferred for new writers — it is the normal form shared with AD4M link authorship and the ADR-12 DID-hardening path; `did:key` wraps the same Ed25519 material as a raw key |
 | `timestamp` | Timestamp | Yes | When source generated this knowledge |
 | `parent_triples` | Vec<UUID> | No | For inferred triples: IDs of premise triples |
 
@@ -133,6 +153,17 @@ Stored as `hdk_entry_helper` struct with:
 - Linked to source chain of creating agent
 - DHT-replicated with validation by random peers
 
+### 5.3 Identity: content address vs `id` (normative clarification, v1.1)
+
+The **content address is the truth identity** of a triple wherever a
+content-addressed substrate holds it (Holochain entry hash; AD4M expression
+address). The `id` field (UUID v7) is a **client-side handle**: time-sortable,
+assigned at creation, useful for `parent_triples` references, dedup checks
+(INV-010), and pre-publication workflows where no content hash exists yet.
+On conflict, the content address wins; two records with different UUIDs but
+identical (subject, predicate, object, provenance) content violate INV-010
+regardless of their handles.
+
 ---
 
 ## 6. Examples
@@ -200,6 +231,65 @@ Stored as `hdk_entry_helper` struct with:
 
 ---
 
+## 6b. Interop Mappings (non-normative, v1.1)
+
+How a `KnowledgeTriple` projects onto plausible integration targets. These are
+documentation of compatibility, **not** integration commitments — the
+anti-duplication gate (2026-05-09 AD4M/coasys audit delta) still governs any
+build decision.
+
+### 6b.1 AD4M
+
+The natural AD4M shape is **not** a bare link but an `Ad4mModel`/SHACL
+**subject class** `KnowledgeTriple` with properties for all core fields —
+the same pattern the audit delta recommends for Claim/Vote/Decision. Rationale:
+bare `LinkExpression`s (`{source, predicate, target}` + author DID + timestamp
++ proof) have no native slot for `confidence` or structured provenance.
+
+| KT field | AD4M slot |
+|---|---|
+| `subject` / `predicate` / entity `object` | link `source` / `predicate` / `target` (URIs pass through) |
+| literal `object` | `literal://` expression, or a typed property on the subject class |
+| `confidence`, `provenance.*` | properties on the subject class |
+| `provenance.agent` | link/expression `author` (DID — see §2.2) |
+| signature | LinkExpression `proof` (AD4M signs at the link layer; FLOSSI0ULLK signs at the provenance-packet layer — same guarantee, different layer) |
+| `parent_triples` + INV-007/008 | links + Social-DNA (SHACL preferred, Prolog fallback) inference rules |
+
+### 6b.2 RDF / RDF-star / SPARQL
+
+Core fields serialize directly to an RDF triple (predicates in this spec are
+already foaf/dcterms/schema.org URIs). `confidence` and `provenance` are
+triple-level metadata: use **RDF-star quoted triples** (or named graphs where
+RDF-star is unavailable). Blank-node subjects (`_:`) carry over unchanged.
+
+### 6b.3 W3C PROV-O
+
+| KT provenance | PROV-O |
+|---|---|
+| `agent` | `prov:wasAttributedTo` |
+| `parent_triples` | `prov:wasDerivedFrom` |
+| `timestamp` | `prov:generatedAtTime` |
+| `source_type`/`source_id` | `prov:Activity` typing + identifier |
+
+(The provenance-packet spec v1.4 already reserves `prov_o_activity_id`;
+these two mappings are intentionally aligned.)
+
+### 6b.4 SHACL as the convergence representation
+
+INV-002 (registered predicates) and INV-009 (domain/range) are shape
+constraints. The ontology registry SHOULD be compilable to SHACL shapes,
+yielding one constraint source enforceable by (a) the Rust integrity zome —
+authoritative, (b) AD4M's model layer, and (c) any standard RDF validator.
+
+### 6b.5 Known frictions (accepted for now)
+
+- **Atomic Data** requires typed values; `object` here is an untyped string.
+  If the atomic-data hold (seed pack file 03) ever lifts, add an optional
+  `object_datatype` field — do not retrofit typing before then.
+- **Agent-key encodings**: Holochain raw keys, provenance-packet `D` or `B` + 43
+  base64url characters, and DIDs coexist across the stack. §2.2's DID preference
+  is the convergence direction; existing raw-key records remain valid.
+
 ## 7. Related Specifications
 
 - `provenance.spec.md` - Detailed provenance types
@@ -213,6 +303,7 @@ Stored as `hdk_entry_helper` struct with:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-07-04 | Interop patch (generator: claude-fable-5, Fable 5 sprint follow-up): `agent` MAY be a DID URI (§2.2); content-address-vs-UUID identity clarified (§5.3); non-normative interop mappings for AD4M/RDF-star/PROV-O/SHACL + known frictions (§6b); `docs/architecture/` duplicate replaced with pointer stub. No changes to core fields, invariants, or the extraction contract — WS1 evals and WS3 seed data unaffected. |
 | 1.0.0 | 2025-12-15 | Initial specification |
 
 ---
