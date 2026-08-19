@@ -1,30 +1,124 @@
 {
-  "manifest_version": "0.1.0",
+  "manifest_version": "0.2.0",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
   "rules": [
     "Keep hook policy canonical in-repo and project it outward.",
     "Preserve unrelated agent-native settings; only managed hook events are rewritten.",
     "Use one shared checkpoint + post-write consensus path before inventing per-client variants.",
-    "Prefer non-blocking observability and cheap background consensus over prompt-time token burn."
+    "Prefer non-blocking observability and cheap background consensus over prompt-time token burn.",
+    "Reference interpreters and out-of-tree script roots through `variables`, never as inline absolute paths -- an inline path makes a relocated or upgraded install a SILENT breakage.",
+    "A given hook must fire exactly once per event. Claude Code merges user-scope and project-scope settings, so the same hook declared in both fires TWICE -- and hook_post_write submits a consensus Claim on every fire, so a double-fire writes duplicate Claims into the durable source chain.",
+    "Never enable agentmemory's bundled plugin (`/plugin install agentmemory`) at the same time as these managed agentmemory hooks: the plugin registers the same 12 hooks itself, producing double capture from two uncoordinated config sources.",
+    "Variables carry `default_by_platform` (sys.platform: win32/linux/darwin) so a manifest authored on one OS does not hard-break a checkout on another; `env` still overrides everything. FLOSS_HOOKS has no per-platform default on purpose -- it points at this clone, so a different machine must set FLOSS_HOOKS_DIR rather than inherit someone else's absolute path."
   ],
+  "variables": {
+    "PYTHON": {
+      "env": "FLOSS_PYTHON",
+      "default_by_platform": {
+        "win32": "C:/Python313/python.exe",
+        "linux": "python3",
+        "darwin": "python3"
+      },
+      "default": "python3"
+    },
+    "NODE": {
+      "env": "AGENTMEMORY_NODE_PATH",
+      "default_by_platform": {
+        "win32": "C:/Program Files/nodejs/node.exe",
+        "linux": "node",
+        "darwin": "node"
+      },
+      "default": "node"
+    },
+    "FLOSS_HOOKS": {
+      "env": "FLOSS_HOOKS_DIR",
+      "default": "C:/~shit/FLOSS/hooks"
+    },
+    "AGENTMEMORY_PLUGIN": {
+      "env": "AGENTMEMORY_PLUGIN_ROOT",
+      "default_by_platform": {
+        "win32": "%APPDATA%/npm/node_modules/@agentmemory/agentmemory/plugin",
+        "linux": "~/.npm-global/lib/node_modules/@agentmemory/agentmemory/plugin",
+        "darwin": "/usr/local/lib/node_modules/@agentmemory/agentmemory/plugin"
+      },
+      "default": "~/.npm-global/lib/node_modules/@agentmemory/agentmemory/plugin"
+    }
+  },
   "hook_scripts": [
     "FLOSS/hooks/hook_pre_write.py",
     "FLOSS/hooks/hook_post_write.py",
-    "FLOSS/hooks/hook_bg_round.py"
+    "FLOSS/hooks/hook_bg_round.py",
+    "FLOSS/hooks/session_start_inject.py",
+    "${AGENTMEMORY_PLUGIN}/scripts/session-start.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/prompt-submit.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/pre-tool-use.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/post-tool-use.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/post-tool-failure.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/pre-compact.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/subagent-start.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/subagent-stop.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/notification.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/task-completed.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/stop.mjs",
+    "${AGENTMEMORY_PLUGIN}/scripts/session-end.mjs"
   ],
   "targets": {
     "claude": {
       "enabled": true,
       "settings_path": ".claude/settings.json",
+      "reason": "Project-scope Claude settings. Its hook events are DELIBERATELY EMPTY and every FLOSS/agentmemory hook now lives in the `claude_user` target instead. Two reasons, both load-bearing. (1) The Claude Code DESKTOP app does not pick up project-scoped `.claude/settings.json`, which is the bug that started this -- only user scope reaches both desktop and terminal. (2) Claude Code MERGES user-scope and project-scope hooks rather than letting the more specific one win, so declaring the same hook in both makes it fire twice; `hook_post_write` calls `submit_claim` unconditionally on every fire (no dedupe guard), so a double-fire appends duplicate Claims to the durable source chain -- provenance corruption, not just noise. The events are written as explicit empty arrays rather than simply deleted from this manifest because `merge_hook_payload` only overwrites same-named events and never removes them: dropping the keys would leave the old hooks sitting in the generated file forever, invisible to `--check`. An empty array is the only gate-visible way to express 'this target intentionally has no hooks'. SessionStart is emptied here too: an UNMANAGED SessionStart hook running session_start_inject.py was found sitting in the generated file on 2026-08-18 (it predated this manifest, so no materializer run had ever owned or removed it) and would have double-fired against the user-scope copy. Any event this target must not carry has to be listed as an explicit empty array, precisely because unlisted events are left untouched.",
       "hooks": {
+        "PreToolUse": [],
+        "PostToolUse": [],
+        "SessionStart": []
+      }
+    },
+    "claude_user": {
+      "enabled": true,
+      "settings_path": "~/.claude/settings.json",
+      "reason": "User-scope Claude settings -- the single home for every Claude-side hook, carrying both the FLOSS consensus hooks and agentmemory's 12 lifecycle hooks. Mirrors the existing `hermes_user` precedent of managing a user-scope config outside the workspace tree (`resolve_manifest_path` already expands `~` and `%VAR%`, and `--check` already covers such paths). Chosen over `agentmemory connect claude-code --with-hooks`, which is the upstream-recommended path but HARD-REFUSES on native Windows (verified by dry-run 2026-08-18, agentmemory 0.9.29). Also chosen over `/plugin install agentmemory`, which resolves ${CLAUDE_PLUGIN_ROOT} and is upgrade-safe but covers only Claude Code + Codex, leaves gemini/hermes/opencode unserved, and bypasses this materializer entirely -- a second uncoordinated config source is precisely the drift this manifest exists to prevent. Script paths route through the ${AGENTMEMORY_PLUGIN} variable so a relocated npm prefix is a loud `--check` failure (every script is existence-checked via `hook_scripts`) instead of a hook that silently stops firing.",
+      "hooks": {
+        "SessionStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/session_start_inject.py\""
+              },
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/session-start.mjs\""
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/prompt-submit.mjs\""
+              }
+            ]
+          }
+        ],
         "PreToolUse": [
           {
             "matcher": "Write|Edit|MultiEdit",
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\""
+              }
+            ]
+          },
+          {
+            "matcher": "Edit|Write|Read|Glob|Grep",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/pre-tool-use.mjs\""
               }
             ]
           }
@@ -35,7 +129,95 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
+              }
+            ]
+          },
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/post-tool-use.mjs\""
+              }
+            ]
+          }
+        ],
+        "PostToolUseFailure": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/post-tool-failure.mjs\""
+              }
+            ]
+          }
+        ],
+        "PreCompact": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/pre-compact.mjs\""
+              }
+            ]
+          }
+        ],
+        "SubagentStart": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/subagent-start.mjs\""
+              }
+            ]
+          }
+        ],
+        "SubagentStop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/subagent-stop.mjs\""
+              }
+            ]
+          }
+        ],
+        "Notification": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/notification.mjs\""
+              }
+            ]
+          }
+        ],
+        "TaskCompleted": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/task-completed.mjs\""
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/stop.mjs\""
+              }
+            ]
+          }
+        ],
+        "SessionEnd": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/session-end.mjs\""
               }
             ]
           }
@@ -59,7 +241,7 @@
               {
                 "name": "flossi0ullk-pre-write",
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py --stdout-json",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\" --stdout-json",
                 "timeout": 60000,
                 "description": "Checkpoint substantive code edits before the tool mutates the file."
               }
@@ -74,14 +256,15 @@
               {
                 "name": "flossi0ullk-post-write",
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py --stdout-json",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --stdout-json",
                 "timeout": 60000,
                 "description": "Submit substantive code edits into the FLOSSI0ULLK local consensus gateway."
               }
             ]
           }
         ]
-      }
+      },
+      "reason": "Gemini CLI hook surface. Its event vocabulary is BeforeTool/AfterTool only, so agentmemory's 12 Claude-Code lifecycle events have no honest mapping here and are deliberately NOT registered -- inventing a mapping would produce hooks that never fire. agentmemory ships no gemini hook variant either (only claude, codex, copilot, antigravity, devin, droid as of 0.9.29). Revisit if agentmemory adds one, or wire agentmemory to Gemini through its MCP surface instead of hooks."
     },
     "codex": {
       "enabled": true,
@@ -94,7 +277,16 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\""
+              }
+            ]
+          },
+          {
+            "matcher": "Edit|Write|Read|Glob|Grep",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/pre-tool-use.mjs\""
               }
             ]
           }
@@ -105,7 +297,15 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
+              }
+            ]
+          },
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/post-tool-use.mjs\""
               }
             ]
           }
@@ -116,12 +316,47 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/session_start_inject.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/session_start_inject.py\""
+              },
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/session-start.mjs\""
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/prompt-submit.mjs\""
+              }
+            ]
+          }
+        ],
+        "PreCompact": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/pre-compact.mjs\""
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${NODE}\" \"${AGENTMEMORY_PLUGIN}/scripts/stop.mjs\""
               }
             ]
           }
         ]
-      }
+      },
+      "reason": "Codex hooks file, pinned by content hash (payload_shape hooks_only, so the payload is rebuilt from the manifest only and never carries incidental keys forward). Carries the FLOSS consensus hooks plus the SIX agentmemory events that agentmemory's own plugin/hooks/hooks.codex.json declares -- SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact, Stop. The Claude-only events (Subagent*, SessionEnd, Notification, TaskCompleted, PostToolUseFailure) are deliberately NOT registered here because Codex does not emit them. Absolute ${AGENTMEMORY_PLUGIN} paths are used rather than ${CLAUDE_PLUGIN_ROOT}: agentmemory's README documents that Codex Desktop currently does not dispatch plugin-local hooks.json at all (openai/codex#16430) and recommends mirroring the same commands into the global hooks file, which is what this target is."
     },
     "hermes_user": {
       "enabled": true,
@@ -132,7 +367,7 @@
         "PreToolUse": "pre_tool_call",
         "PostToolUse": "post_tool_call"
       },
-      "reason": "This is the REAL Hermes home -- where the gateway actually runs and where Hermes reads its config -- not `.toilet/hermes/`, which is the operator's scratch document dump (gitignored) and was never the live gateway. The former `hermes_workspace` target (pointing at `.toilet/hermes/config.yaml`) has been removed entirely; this manifest no longer manages anything under `.toilet`. SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`. This hook block matches, byte-for-byte, the hooks already present and allowlisted (`hermes hooks list` reports both ✓ allowed) in the live AppData config -- adopted as-is, not rewritten.",
+      "reason": "This is the REAL Hermes home -- where the gateway actually runs and where Hermes reads its config -- not `.toilet/hermes/`, which is the operator's scratch document dump (gitignored) and was never the live gateway. The former `hermes_workspace` target (pointing at `.toilet/hermes/config.yaml`) has been removed entirely; this manifest no longer manages anything under `.toilet`. SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`. This hook block matches, byte-for-byte, the hooks already present and allowlisted (`hermes hooks list` reports both ✓ allowed) in the live AppData config -- adopted as-is, not rewritten. NOTE (2026-08-18): agentmemory's 12 events are deliberately NOT registered here for the same reason SessionStart is not -- the event_map exposes only pre_tool_call/post_tool_call, and any manifest event absent from the map is dropped rather than emitted, so registering them would be silently inert. agentmemory ships no hermes hook variant as of 0.9.29.",
       "hooks": {
         "PreToolUse": [
           {
@@ -140,7 +375,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_pre_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\""
               }
             ]
           }
@@ -151,7 +386,7 @@
             "hooks": [
               {
                 "type": "command",
-                "command": "C:/Python313/python.exe C:/~shit/FLOSS/hooks/hook_post_write.py"
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
               }
             ]
           }

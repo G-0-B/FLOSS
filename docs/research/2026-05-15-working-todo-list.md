@@ -1,10 +1,122 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-08-10 (Process-surface audit — see A.0000000; root-drop consolidation — see A.000000)
+**Last refreshed:** 2026-08-19 (PR41 review triage — see Section 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
 This is NOT canon; it is operational working-memory. Items here get promoted to ADRs or research docs as they're worked. Items completed get pruned with a brief outcome marker.
+
+---
+
+## Section 0 — Active Work Board (who / where / domain / state)
+
+**Refreshed:** 2026-08-18 by Claude Code (Opus 5) session, all rows verified against live `git`,
+`gh`, and running services this session — not carried forward from recall.
+
+**Why this section exists:** the operator works across several harnesses (Claude Code, Codex,
+Gemini/Antigravity, OpenCode, Hermes) and loses track of what is mid-flight, where it lives, and
+which agent touched it. Sections A–I below say *what* is open; they do not say *where the work
+physically is* or *whether a branch/PR is carrying it*. This section is that missing index.
+Update the row, not just the prose, when work lands.
+
+### Branch & PR topology (verified 2026-08-18)
+
+Containment is a clean ladder — each contains the one before it, nothing is behind:
+
+```
+main  ──  origin/main  ──  PR38 branch  ──  PR41 branch  ──  feat/preservation-spine (HEAD)
+                            (+120 to HEAD)  (+32 to HEAD)     == origin/  (0 ahead, 0 behind)
+```
+
+| Ref | Ahead of HEAD | PR | Files | State |
+|---|---|---|---|---|
+| `main` (local) | HEAD is +344 | — | — | far behind the work line |
+| `origin/main` | HEAD is +207 | — | — | the merge target |
+| `working/2026-06-16-adr-cleanup-reconverge` | HEAD is +120 | **PR38** OPEN | 99 (+13089/-805) | `MERGEABLE` / `CLEAN`, **no review decision recorded** |
+| `reconcile/pr38-salvage-20260817` | HEAD is +32 | **PR41** OPEN | 368 (+42743/-3172) | the big reconciliation |
+| `feat/preservation-spine` | — (HEAD) | **none** | — | in sync with origin; **carries everything, has no PR** |
+
+**The structural fact worth acting on:** `feat/preservation-spine` is a strict superset of both PR
+branches and is fully pushed, yet has no PR of its own. PR38 and PR41 are therefore reviewing
+*subsets* of a line that has already moved past them. Confirmed via
+`git merge-base --is-ancestor` for both.
+
+Also open and unrelated to the reconciliation: PR37 (dependabot npm), PR32 + PR30 (deepsource
+autofix). These are small and independent — they do not need to wait on the reconciliation.
+
+### 0.1a PR41 review triage (27 inline comments, verified 2026-08-19)
+
+**Conflict-safety question answered first**, because it drove the merge decision: merging PR38
+into `main` did **not** resurrect any content that PR41 had manually conflict-fixed. Verified by
+test-merging `origin/main` into the PR41 branch in a throwaway worktree: **0 conflicts**, and of
+PR38's 99 changed files the merge alters **none**. The only files `main` now brings in are
+`package-lock.json` ×2, `ARF/tests/tryorama/package.json`, and `ARF/validation/models.py` — all
+from the dependabot/deepsource PRs, none from PR38. PR41's branch already carried a merge of the
+reconciled line (`31bcad0`, then `c96b2a2`), so its manual fixes sit on top. **PR41 wins on every
+PR38 file.** Re-verify with the same worktree test if `main` moves again before PR41 lands.
+
+CI: one failing check only — `Workers Builds: floss` (Cloudflare). CodeQL, Semgrep, Vercel,
+CodeRabbit all pass.
+
+| Sev | Where | Finding | Verified? |
+|---|---|---|---|
+| **Critical** | `scripts/stop_mcp_daemons.ps1:19` | `$pid = ...` assigns to PowerShell's **read-only automatic variable** `$PID` → terminating error *before* `Stop-Process` runs, so the script never actually stops the daemons | ✅ **confirmed by reading the file** — one-line rename to `$daemonPid` |
+| **P1** | `packages/reasoning_ensemble/synthesizer.py:326` | Provider exceptions outside the four caught types (`httpx.ConnectError`, LiteLLM errors) propagate out of `dispatch_parallel()` and abort the whole synthesis instead of degrading to an errored `VoterResponse` | ⚠️ plausible, and the failure mode is *live* — this session saw provider 404s/timeouts constantly |
+| **P1** | `scripts/autonomous_synthesis_loop.py:100` | Files >20 chunks return `SKIPPED` as if extracted; caller stages it and `--commit` records a completed `knowledge_distillation`, so ~240 KB+ files are permanently marked processed with nothing extracted. Suggested `--force-full` flag does not exist | ⚠️ not yet reproduced |
+| **P1** | `packages/activity_log/provenance.py:706` | `validate_packet()` recurses per prior; the depth increment was deliberately removed to allow long honest chains, so a long acyclic chain raises `RecursionError` instead of returning `PacketValidation` | ⚠️ not yet reproduced |
+| **P2** | `packages/metacoordinator_mcp/server.py:149` | `_AUDIT_SINK` is never read and `audit_appender()` has no production caller → **every consensus MCP invocation bypasses the audit trail** the JanuScope migration claims to replace. Same omission in the reasoning-ensemble server | ⚠️ matches the `_AUDIT_SINK` unused-global CodeQL hit (#17/#19) — two independent tools agreeing |
+| **P2** | `hooks/session_start_inject.py:70` | `agentmemory_client.recall()` catches everything and returns `[]`, so a timeout/dead-server looks identical to a genuine empty recall and the `RECALL_FAILED` warning never fires — omitted precisely during the outage it exists to expose | ✅ **confirmed twice**: by reading both modules, and empirically — the wedged agentmemory server on 2026-08-18 produced exactly this silent-empty case |
+| **P2** | `scripts/autonomous_synthesis_loop.py:129` | With `FLOSS_MODEL_BACKEND=omniroute`, `stage_draft()` still writes `provider: "litellm"`, misattributing every run in the durable activity log | ✅ **confirmed relevant** — `FLOSS/.env` sets `omniroute` as the default, so this misattributes *all current runs* |
+| **P2** | `scripts/mcp_daemon.py:76` | PID file not claimed atomically; two concurrent launchers both write it, and the loser's `atexit` can unlink the survivor's file | ⚠️ not yet reproduced |
+| Low | 19 × CodeQL | 4 genuine security findings in `skill-corpus/superpowers-brainstorming/scripts/server.cjs` (remote property injection, reflected XSS, insecure temp file, indirect uncontrolled command line); rest are empty-except ×5, cyclic-import ×2, unused import/var ×6 | The empty-excepts in `hooks/agentmemory_client.py` and the cyclic imports in `scripts/materialize_shared_hook_surface.py` are **deliberate and documented in their docstrings** — they need explanatory comments to satisfy CodeQL, not behaviour changes |
+
+**Cheapest real wins:** the PowerShell `$pid` rename (Critical, one line, confirmed) and the
+omniroute provider attribution (P2, confirmed, small). The audit-sink gap (P2) is the most
+*consequential* — it silently voids the audit trail the migration was justified by.
+
+### Working-tree state (uncommitted, verified 2026-08-18)
+
+| Repo | Branch | Tracked-modified | Untracked | Note |
+|---|---|---|---|---|
+| `C:\~shit` (workspace) | `codex/improve_gates` | 20 + 1 deleted | 17 | mostly generated surfaces + skill projections |
+| `C:\~shit\FLOSS` | `feat/preservation-spine` | 7 | 17 | the 7 are this session's hook/voter work, listed below |
+
+Nothing from this session is committed in either repo.
+
+### Rows
+
+| # | Item | Domain | Where it lives | Who/what | State |
+|---|---|---|---|---|---|
+| 0.1 | PR41 reconciliation review backlog (~2 months of work) | canon + repo reconciliation | `reconcile/pr38-salvage-20260817`, now 288 files | Codex sessions (`_codex_pr38_*`, `_pr38_*` scratch dirs at workspace root) | **OPEN — the dominant blocker**; 27 inline review comments triaged 2026-08-19, see Section 0.1a |
+| 0.2 | PR38 ADR cleanup / INDEX drift | governance / ADR | merged to `main` 2026-08-19 (`873cc0c`) | operator | **MERGED** — verified harmless to PR41, see conflict note in 0.1a. PR37/PR32/PR30 also merged |
+| 0.3 | `feat/preservation-spine` has no PR | repo topology | FLOSS, HEAD | — | **UNTRACKED BY REVIEW** — superset of PR38+PR41, fully pushed, invisible to review |
+| 0.4 | Hook surface: variables + `claude_user` + agentmemory 12 hooks | harness / metaharness | `shared-hook-surface.json` v0.2.0, `scripts/materialize_shared_hook_surface.py` | Claude Code, 2026-08-18 | **DONE, uncommitted** — 46 tests pass, drift gate clean, reviewed 3-family (unanimous `extend`, mean -0.61) |
+| 0.5 | Voter registry repaired to probed-working models | consensus gateway | `packages/metacoordinator_mcp/voter_registry.json`, `voters.py`, `tests/test_voters.py` | Claude Code, 2026-08-18 | **DONE, uncommitted** — 112 tests pass; see `[[project-omniroute-voter-probe-log]]` |
+| 0.6 | Independence is policy, not enforcement | consensus gateway | `voters.py` roster build | unassigned | **OPEN** — degraded `balanced` (2 voters, 1 surface) voted normally and nothing detected it |
+| 0.7 | agentmemory project scope on 115/119 memories | memory substrate | `~/.agentmemory` state store | Claude Code attempted 2026-08-18 | **BLOCKED — not fixable via supported API**; see note below |
+| 0.8 | `mem::compress` failing 100% | memory substrate | agentmemory `mem::compress` | unassigned | **OPEN** — 192 calls, 192 failures, 0 successes (from `/agentmemory/health`) |
+| 0.9 | Session `project` identifiers inconsistent | memory substrate | agentmemory sessions | unassigned | **OPEN** — 18 sessions use three different ids: `C:\~shit`, `~shit`, `kalis` |
+| 0.10 | Workspace + FLOSS both dirty, nothing committed | repo hygiene | both repos | — | **OPEN** — 38 and 24 entries respectively |
+| 0.11 | `context` + `agent-surface` materializer steps drifting | harness surfaces | `.agent-surface/context/CONTEXT_L1.md`, `context-view-registry.json` | pre-existing, predates 2026-08-18 | **OPEN** — `--check` reports DRIFT on 2 of 6 steps |
+
+**On row 0.7 (recorded so nobody retries it blind):** the documented fix
+`POST /agentmemory/migrate {"step":"infer-memory-projects"}` was run and returned
+`{updated: 0, ambiguous: 117, skipped: 4}`. Reading the implementation, it infers a memory's
+project *from its sessions'* project field. All 18 sessions **do** have a project, so `ambiguous`
+here means those memories carry **no `sessionIds` at all** — they were written by direct
+`memory_save` calls with no session linkage, so there is nothing to infer from. agentmemory
+exposes no update/PATCH endpoint for a memory's project (only create, export, and
+governance-delete), so backfilling is not reachable without editing the state store directly.
+Getting this to zero means either accepting the 115 as legacy and scoping all *new* writes with an
+explicit stable `project`, or an upstream feature request. **Do not just re-run the migrate — it
+is a no-op for these records.**
+
+**Also fixed in passing 2026-08-18:** the agentmemory REST server was wedged — PID holding
+`127.0.0.1:3111` LISTENING with sockets in `CLOSE_WAIT`, serving nothing (every HTTP path returned
+`000`), because the engine was started before the 0.9.28→0.9.29 upgrade replaced its files
+underneath it. Only the MCP stdio path worked, which reads the store directly and so masked the
+outage. Restarted; `/agentmemory/health` now responds. **If agentmemory tools time out, check for
+this exact shape before assuming the data is gone.**
 
 ---
 
