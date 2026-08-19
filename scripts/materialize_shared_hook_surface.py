@@ -15,6 +15,8 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -188,14 +190,175 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return manifest
 
 
+TEMPLATE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def resolve_variables(manifest: dict[str, Any]) -> dict[str, str]:
+    """Resolve the manifest's `variables` block into concrete strings.
+
+    Hook commands are plain strings handed to a shell, so before this existed
+    every command had to spell out a machine-specific absolute path
+    (`C:/Python313/python.exe`, the npm-global `@agentmemory` plugin root,
+    ...). That made the manifest non-portable and, worse, made an upgrade or a
+    relocated install a *silent* breakage: the generated settings still parse,
+    the hook still "runs", and the harness just gets a nonzero exit nobody
+    reads.
+
+    Each entry is either a bare default string::
+
+        "PYTHON": "C:/Python313/python.exe"
+
+    or an object naming an environment variable that overrides that default::
+
+        "AGENTMEMORY_PLUGIN_ROOT": {
+            "env": "AGENTMEMORY_PLUGIN_ROOT",
+            "default": "%APPDATA%/npm/node_modules/@agentmemory/agentmemory/plugin"
+        }
+
+    The resolved value additionally goes through `os.path.expandvars` +
+    `~` expansion, so a default may itself reference `%APPDATA%`/`$HOME`.
+    An undefined `%VAR%`/`$VAR` inside a resolved value is a loud error for
+    exactly the reason `resolve_manifest_path` documents in the sibling
+    agent-surface module: `expandvars` leaves an unknown variable as a literal
+    rather than raising, which would bake a bogus path into every generated
+    harness config.
+    """
+    raw = manifest.get("variables", {})
+    if not isinstance(raw, dict):
+        raise HookSurfaceError("Manifest `variables` field must be an object if present")
+
+    resolved: dict[str, str] = {}
+    for name, spec in raw.items():
+        if isinstance(spec, str):
+            value = spec
+        elif isinstance(spec, dict):
+            env_name = spec.get("env")
+            default = spec.get("default")
+            by_platform = spec.get("default_by_platform")
+            value = None
+            if isinstance(env_name, str) and env_name.strip():
+                value = os.environ.get(env_name)
+            # Platform-specific default beats the generic one, so a manifest
+            # written on Windows does not hard-break a Linux/macOS checkout.
+            # `sys.platform` keys: "win32", "linux", "darwin". Falls through to
+            # `default` when the running platform is not listed, and `env`
+            # still overrides everything above.
+            if (value is None or not str(value).strip()) and isinstance(
+                by_platform, dict
+            ):
+                candidate = by_platform.get(sys.platform)
+                if isinstance(candidate, str) and candidate.strip():
+                    value = candidate
+            if value is None or not str(value).strip():
+                value = default
+            if not isinstance(value, str) or not value.strip():
+                raise HookSurfaceError(
+                    f"Variable {name!r} resolved to no value on platform "
+                    f"{sys.platform!r} (env {env_name!r} unset, no matching "
+                    "`default_by_platform` entry, and no usable `default`)"
+                )
+        else:
+            raise HookSurfaceError(
+                f"Variable {name!r} must be a string or an object with "
+                "`env`/`default`"
+            )
+
+        expanded = os.path.expandvars(value)
+        leftover = re.search(r"%[^%]+%|\$[A-Za-z_][A-Za-z0-9_]*", expanded)
+        if leftover is not None:
+            raise HookSurfaceError(
+                f"Variable {name!r} references undefined environment variable "
+                f"{leftover.group()!r} (expands to {expanded!r}); set it or fix "
+                "the manifest"
+            )
+        resolved[name] = str(Path(expanded).expanduser().as_posix())
+    return resolved
+
+
+def expand_template(value: str, variables: dict[str, str], context: str) -> str:
+    """Substitute `${NAME}` references in one string, failing loudly on unknowns.
+
+    An unresolved `${NAME}` is never passed through: a command string carrying a
+    literal `${AGENTMEMORY_PLUGIN_ROOT}` would be written into a real harness
+    config and fail at hook-fire time, far from the edit that caused it.
+    """
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in variables:
+            raise HookSurfaceError(
+                f"{context} references undefined manifest variable "
+                f"${{{name}}}; declare it under `variables` in the manifest"
+            )
+        return variables[name]
+
+    return TEMPLATE_RE.sub(replace, value)
+
+
+def expand_hook_commands(
+    mapped_hooks: dict[str, Any], variables: dict[str, str]
+) -> dict[str, Any]:
+    """Return `mapped_hooks` with `${NAME}` expanded in every command string.
+
+    Walks the nested Claude-Code-shaped structure
+    (`{event: [{matcher, hooks: [{type, command}]}]}`) and rewrites only the
+    `command` fields, leaving matchers, timeouts, descriptions, and any
+    harness-specific keys untouched. Runs BEFORE `apply_entry_shape` so both
+    the nested and flat writers see already-resolved commands.
+    """
+    if not variables:
+        return mapped_hooks
+
+    expanded: dict[str, Any] = {}
+    for event_name, definitions in mapped_hooks.items():
+        if not isinstance(definitions, list):
+            expanded[event_name] = definitions
+            continue
+        new_definitions: list[Any] = []
+        for definition in definitions:
+            if not isinstance(definition, dict):
+                new_definitions.append(definition)
+                continue
+            new_definition = dict(definition)
+            inner_hooks = new_definition.get("hooks")
+            if isinstance(inner_hooks, list):
+                new_inner: list[Any] = []
+                for inner in inner_hooks:
+                    if isinstance(inner, dict) and isinstance(inner.get("command"), str):
+                        inner = dict(inner)
+                        inner["command"] = expand_template(
+                            inner["command"],
+                            variables,
+                            f"Hook event {event_name!r} command",
+                        )
+                    new_inner.append(inner)
+                new_definition["hooks"] = new_inner
+            new_definitions.append(new_definition)
+        expanded[event_name] = new_definitions
+    return expanded
+
+
 def validate_hook_scripts(
-    manifest: dict[str, Any], workspace_root: Path
+    manifest: dict[str, Any], workspace_root: Path, variables: dict[str, str]
 ) -> list[dict[str, str]]:
+    """Resolve and existence-check every declared hook script.
+
+    Entries may use `${NAME}` templates and may be absolute (an out-of-tree
+    script such as the npm-global agentmemory plugin) or workspace-relative.
+    A missing script is a hard error: this is the check that turns "an upgrade
+    silently removed a hook script" from a runtime mystery into a failed
+    `--check`.
+    """
     scripts: list[dict[str, str]] = []
     for raw_path in manifest.get("hook_scripts", []):
         if not isinstance(raw_path, str) or not raw_path.strip():
             raise HookSurfaceError("Each hook script path must be a non-empty string")
-        resolved = (workspace_root / raw_path).resolve()
+        expanded = expand_template(raw_path, variables, "Hook script path")
+        candidate = Path(expanded).expanduser()
+        resolved = (
+            candidate.resolve()
+            if candidate.is_absolute()
+            else (workspace_root / candidate).resolve()
+        )
         if not resolved.exists():
             raise HookSurfaceError(f"Hook script missing: {resolved}")
         scripts.append(
@@ -365,7 +528,9 @@ def merge_hook_payload(
 
 
 def build_target_payload(
-    existing: dict[str, Any], target_cfg: dict[str, Any]
+    existing: dict[str, Any],
+    target_cfg: dict[str, Any],
+    variables: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build the on-disk payload for a hook target.
 
@@ -380,6 +545,7 @@ def build_target_payload(
     incidental keys ever get carried forward into a file Codex re-hashes.
     """
     mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = expand_hook_commands(mapped_hooks, variables or {})
     mapped_hooks = apply_entry_shape(
         mapped_hooks, target_cfg.get("entry_shape", "nested")
     )
@@ -508,6 +674,7 @@ def apply_yaml_target(
     *,
     check: bool,
     dry_run: bool,
+    variables: dict[str, str] | None = None,
 ) -> tuple[str, bool]:
     """Materialize a `format: "yaml"` hook target.
 
@@ -569,6 +736,7 @@ def apply_yaml_target(
         )
 
     mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = expand_hook_commands(mapped_hooks, variables or {})
     mapped_hooks = apply_entry_shape(
         mapped_hooks, target_cfg.get("entry_shape", "nested")
     )
@@ -581,7 +749,9 @@ def apply_yaml_target(
     )
 
 
-def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+def build_registry(
+    manifest: dict[str, Any], workspace_root: Path, variables: dict[str, str]
+) -> dict[str, Any]:
     registry_targets: dict[str, Any] = {}
     for target_name, target_cfg in manifest["targets"].items():
         if not isinstance(target_cfg, dict):
@@ -592,6 +762,9 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
             resolved_cfg["resolved_settings_path"] = str(
                 resolve_target_path(workspace_root, settings_path)
             )
+        hooks = resolved_cfg.get("hooks")
+        if isinstance(hooks, dict):
+            resolved_cfg["hooks"] = expand_hook_commands(hooks, variables)
         registry_targets[target_name] = resolved_cfg
 
     return {
@@ -599,7 +772,8 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
         "workspace_id": manifest.get("workspace_id", "workspace"),
         "workspace_name": manifest.get("workspace_name", "workspace"),
         "rules": manifest.get("rules", []),
-        "hook_scripts": validate_hook_scripts(manifest, workspace_root),
+        "variables": variables,
+        "hook_scripts": validate_hook_scripts(manifest, workspace_root, variables),
         "targets": registry_targets,
     }
 
@@ -617,6 +791,21 @@ def build_index(registry: dict[str, Any]) -> str:
     ]
     for rule in registry.get("rules", []):
         lines.append(f"- {rule}")
+
+    variables = registry.get("variables", {})
+    if isinstance(variables, dict) and variables:
+        lines.extend(
+            [
+                "",
+                "## Resolved Variables",
+                "",
+                "Referenced from hook commands as `${NAME}`. Each may be "
+                "overridden by its declared environment variable.",
+                "",
+            ]
+        )
+        for name in sorted(variables):
+            lines.append(f"- `${{{name}}}` -> `{variables[name]}`")
 
     lines.extend(
         [
@@ -674,7 +863,8 @@ def materialize(
     dry_run: bool,
 ) -> tuple[list[str], bool]:
     manifest = load_manifest(manifest_path)
-    registry = build_registry(manifest, workspace_root)
+    variables = resolve_variables(manifest)
+    registry = build_registry(manifest, workspace_root, variables)
     index = build_index(registry)
 
     results: list[str] = []
@@ -715,7 +905,11 @@ def materialize(
 
         if target_format == "yaml":
             message, changed = apply_yaml_target(
-                target_path, target_cfg, check=check, dry_run=dry_run
+                target_path,
+                target_cfg,
+                check=check,
+                dry_run=dry_run,
+                variables=variables,
             )
             results.append(message)
             drift_found = drift_found or changed
@@ -726,7 +920,7 @@ def materialize(
             if target_path.exists() and target_path.suffix == ".jsonc"
             else (load_json(target_path) if target_path.exists() else {})
         )
-        payload = build_target_payload(existing, target_cfg)
+        payload = build_target_payload(existing, target_cfg, variables)
         message, changed = check_or_write_json(
             target_path, payload, check=check, dry_run=dry_run
         )
