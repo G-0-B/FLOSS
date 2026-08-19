@@ -176,3 +176,62 @@ def test_registered_consensus_tools_are_audited():
     tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
     props = set((tools["submit_claim"].inputSchema or {}).get("properties", {}))
     assert {"proposer", "summary", "blast_radius"} <= props
+
+
+def test_claim_singleton_blocks_while_a_live_holder_exists(tmp_path, monkeypatch):
+    """A live PID in the file must block a second claimant."""
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    monkeypatch.setattr(mcp_daemon.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(mcp_daemon.atexit, "register", lambda *a, **k: None)
+    # Anything other than us, reported alive.
+    monkeypatch.setattr(mcp_daemon, "_pid_alive", lambda pid: pid != os.getpid())
+
+    (tmp_path / "slot.pid").write_text("999999", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("slot.pid") is False
+    # The live holder's claim must be left intact.
+    assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == "999999"
+
+
+def test_claim_singleton_reclaims_a_dead_holder(tmp_path, monkeypatch):
+    """A stale PID file must not permanently block the slot."""
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    monkeypatch.setattr(mcp_daemon.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(mcp_daemon.atexit, "register", lambda *a, **k: None)
+    monkeypatch.setattr(mcp_daemon, "_pid_alive", lambda pid: False)
+
+    (tmp_path / "slot.pid").write_text("999999", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("slot.pid") is True
+    assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_release_does_not_delete_another_process_claim(tmp_path, monkeypatch):
+    """Cleanup must be ownership-checked.
+
+    The original handler unlinked unconditionally, so a launcher that lost the
+    port bind deleted the SURVIVING daemon's pid file on its way out, defeating
+    duplicate prevention for every later start.
+    """
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    monkeypatch.setattr(mcp_daemon.signal, "signal", lambda *a, **k: None)
+    monkeypatch.setattr(mcp_daemon, "_pid_alive", lambda pid: False)
+
+    registered = []
+    monkeypatch.setattr(mcp_daemon.atexit, "register", lambda fn: registered.append(fn))
+
+    assert mcp_daemon.claim_singleton("slot.pid") is True
+    assert registered, "cleanup handler was never registered"
+
+    # Another process takes over the slot, then our handler runs.
+    (tmp_path / "slot.pid").write_text("424242", encoding="utf-8")
+    registered[0]()
+
+    assert (tmp_path / "slot.pid").exists(), "released a claim we no longer owned"
+    assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == "424242"

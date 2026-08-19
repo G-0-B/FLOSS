@@ -68,17 +68,67 @@ def claim_singleton(pid_filename: str) -> bool:
     pid_dir = Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() / ".floss_agent"))
     pid_dir.mkdir(parents=True, exist_ok=True)
     pid_path = pid_dir / pid_filename
-    if pid_path.exists():
+    me = os.getpid()
+
+    # Claimed with O_CREAT|O_EXCL rather than exists()-then-write. The old
+    # check-then-write left a window where two launchers both saw no live PID,
+    # both wrote, and both proceeded; one then lost the port bind and its
+    # atexit handler deleted the SURVIVOR's pid file, so duplicate prevention
+    # was defeated for every later start too. O_EXCL makes exactly one creator
+    # win at the filesystem level.
+    claimed = False
+    for _ in range(5):
         try:
-            existing = int(pid_path.read_text().strip())
+            fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                existing = int(pid_path.read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                existing = -1
+            # A live holder blocks us even when that holder is THIS process: a
+            # second claim on one slot means a double-start, and reporting
+            # success for it would defeat the very guarantee this function
+            # exists to provide (see test_live_pid_blocks_second_claim).
             if _pid_alive(existing):
                 return False
-        except ValueError:
-            pass  # stale/corrupt -> overwrite
-    pid_path.write_text(str(os.getpid()))
-    atexit.register(lambda: pid_path.unlink(missing_ok=True))
+            # Stale holder: drop it and race for the exclusive create again
+            # rather than overwriting, so a concurrent launcher that wins the
+            # retry still blocks us instead of both proceeding.
+            try:
+                pid_path.unlink(missing_ok=True)
+            except OSError:
+                return False
+            continue
+        else:
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(str(me))
+            except OSError:
+                try:
+                    pid_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                return False
+            claimed = True
+            break
+    if not claimed:
+        return False
+
+    def _release() -> None:
+        """Remove the pid file only while it still names this process.
+
+        Unconditional unlink is what let a losing racer delete the winner's
+        claim.
+        """
+        try:
+            if pid_path.read_text(encoding="utf-8").strip() == str(me):
+                pid_path.unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
+
+    atexit.register(_release)
     for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda *_: (pid_path.unlink(missing_ok=True), sys.exit(0)))
+        signal.signal(sig, lambda *_: (_release(), sys.exit(0)))
     return True
 
 
