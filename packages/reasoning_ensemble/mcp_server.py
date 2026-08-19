@@ -320,13 +320,21 @@ def _create_mcp():
         "FLOSSI0ULLK Reasoning Ensemble (Inline CFIS Router + Synthesizer)",
         instructions=_SERVER_INSTRUCTIONS,
     )
-    for tool in (
-        route_prompt,
-        deliberate,
-        get_recent_decisions,
-        get_ensemble_drafts,
-    ):
-        app.tool()(tool)
+    # See the matching note in metacoordinator_mcp/server.py: registering the
+    # bare functions left _AUDIT_SINK dead config, so no ensemble tool call
+    # reached the JSONL audit trail.
+    from packages.mcp_daemon import register_audited_tools
+
+    register_audited_tools(
+        app,
+        (
+            route_prompt,
+            deliberate,
+            get_recent_decisions,
+            get_ensemble_drafts,
+        ),
+        _AUDIT_SINK,
+    )
     return app
 
 

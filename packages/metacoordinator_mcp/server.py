@@ -144,15 +144,24 @@ def _create_mcp():
         return None
 
     app = FastMCP("FLOSSIØULLK Consensus Gateway", instructions=_SERVER_INSTRUCTIONS)
-    for tool in (
-        submit_claim,
-        cast_vote,
-        get_chain_context,
-        get_decision,
-        list_pending,
-        run_consensus_round,
-    ):
-        app.tool()(tool)
+    # Registered through register_audited_tools so each invocation lands in
+    # _AUDIT_SINK. Registering the bare functions (the previous behaviour) left
+    # audit_appender with no production caller and _AUDIT_SINK never read, so
+    # every consensus tool call bypassed the audit trail entirely.
+    from packages.mcp_daemon import register_audited_tools
+
+    register_audited_tools(
+        app,
+        (
+            submit_claim,
+            cast_vote,
+            get_chain_context,
+            get_decision,
+            list_pending,
+            run_consensus_round,
+        ),
+        _AUDIT_SINK,
+    )
     return app
 
 

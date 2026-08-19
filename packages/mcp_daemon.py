@@ -10,6 +10,8 @@ This module is transport-only — it does not touch consensus/ensemble domain lo
 from __future__ import annotations
 
 import atexit
+import functools
+import inspect
 import json
 import os
 import signal
@@ -101,6 +103,79 @@ def audit_appender(sink: str):
             pass  # audit is best-effort, never fatal
 
     return _append
+
+
+_AUDIT_VALUE_MAX_CHARS = 500
+
+
+def _safe_payload(func, args: tuple, kwargs: dict) -> dict:
+    """Render one call's arguments as a bounded, JSON-safe dict.
+
+    Binds positional args to their parameter names so the audit row is readable
+    regardless of how the caller invoked the tool, and truncates every value so
+    a large Claim body cannot turn the audit sink into a copy of the source
+    chain. Never raises: an unbindable signature or an unrepresentable value
+    degrades to a marker rather than losing the audit line entirely.
+    """
+    def clip(v):
+        try:
+            s = v if isinstance(v, (str, int, float, bool, type(None))) else repr(v)
+        except Exception:  # noqa: BLE001 - a hostile __repr__ must not break audit
+            return "<unrepresentable>"
+        if isinstance(s, str) and len(s) > _AUDIT_VALUE_MAX_CHARS:
+            return s[:_AUDIT_VALUE_MAX_CHARS] + "…<truncated>"
+        return s
+
+    try:
+        bound = inspect.signature(func).bind_partial(*args, **kwargs)
+        return {k: clip(v) for k, v in bound.arguments.items()}
+    except Exception:  # noqa: BLE001 - fall back rather than drop the row
+        return {
+            "args": [clip(a) for a in args],
+            "kwargs": {k: clip(v) for k, v in kwargs.items()},
+        }
+
+
+def audited(tool, append):
+    """Wrap one MCP tool so every invocation appends an audit row.
+
+    `functools.wraps` copies `__name__`/`__doc__`/annotations and sets
+    `__wrapped__`, which `inspect.signature` follows by default — so FastMCP
+    still derives the same tool schema from the wrapper as it did from the bare
+    function. Without that the wrapper would register as `(*args, **kwargs)`
+    and silently destroy every tool's parameter schema.
+
+    Async and sync tools are wrapped separately: returning a coroutine from a
+    sync wrapper (or awaiting a sync function) would break registration.
+    """
+    if inspect.iscoroutinefunction(tool):
+        @functools.wraps(tool)
+        async def _async_wrapper(*args, **kwargs):
+            append(tool.__name__, _safe_payload(tool, args, kwargs))
+            return await tool(*args, **kwargs)
+
+        return _async_wrapper
+
+    @functools.wraps(tool)
+    def _sync_wrapper(*args, **kwargs):
+        append(tool.__name__, _safe_payload(tool, args, kwargs))
+        return tool(*args, **kwargs)
+
+    return _sync_wrapper
+
+
+def register_audited_tools(app, tools, sink: str) -> None:
+    """Register each tool on `app` with audit instrumentation attached.
+
+    This is the production caller `audit_appender` previously lacked. Before
+    this existed the appender was defined, unit-tested, and never invoked
+    outside tests, so `_AUDIT_SINK` was dead config and every consensus /
+    ensemble MCP invocation bypassed the JSONL audit trail that replacing
+    JanuScope was justified by.
+    """
+    append = audit_appender(sink)
+    for tool in tools:
+        app.tool()(audited(tool, append))
 
 
 def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
