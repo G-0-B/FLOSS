@@ -1088,3 +1088,95 @@ def test_signed_packet_with_non_list_reference_field_returns_structured_invalid(
 
     assert result.ok is False
     assert expected_error in result.errors
+
+
+def _build_chain(provenance, tmp_path, length):
+    """Create `length` linked packets and return the tip's path."""
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    packet_path = None
+    for index in range(length):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-05-24T10:00:{index % 60:02d}Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+    return packet_path
+
+
+def test_prior_chain_longer_than_recursion_limit_still_validates(tmp_path, monkeypatch):
+    """A chain longer than Python's recursion limit must validate, not crash.
+
+    The prior walk deliberately does not increment `_depth` (max_depth bounds
+    the evidence DAG, not a linear chain), which left the chain bounded only by
+    the interpreter stack: measured ~1.1 frames per link, so a ~900-link chain
+    exhausted the default 1000 limit and a 1000-link honest chain raised
+    RecursionError instead of returning a PacketValidation. Provenance
+    validation gates substrate claims, so past that length the gate stopped
+    producing verdicts at all rather than producing a negative one.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    limit = sys.getrecursionlimit()
+    packet_path = _build_chain(provenance, tmp_path, limit + 200)
+
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+
+    assert result.ok is True, result.errors
+    assert "E_PROVENANCE_RECURSION_DEPTH_EXCEEDED" not in result.errors
+
+
+def test_chain_validation_cost_stays_roughly_linear(tmp_path, monkeypatch):
+    """Guard the fork check against going quadratic again.
+
+    _has_valid_same_position_competitor used to read EVERY packet on EVERY
+    validated packet, so an n-link walk performed n^2 file reads: profiling a
+    300-link chain showed 90k reads and 97% of runtime there, and wall time went
+    10s -> 90s -> 365s for 200 -> 600 -> 1200 links. Sharing one chain-position
+    index across the walk made it linear. Asserting a generous ratio rather than
+    absolute timings so this does not turn into a flaky benchmark.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+
+    short_dir = tmp_path / "short"
+    short_dir.mkdir()
+    long_dir = tmp_path / "long"
+    long_dir.mkdir()
+
+    short_tip = _build_chain(provenance, short_dir, 60)
+    long_tip = _build_chain(provenance, long_dir, 240)
+
+    start = time.perf_counter()
+    assert provenance.validate_packet(short_tip, workspace_root=short_dir).ok
+    short_elapsed = max(time.perf_counter() - start, 1e-4)
+
+    start = time.perf_counter()
+    assert provenance.validate_packet(long_tip, workspace_root=long_dir).ok
+    long_elapsed = time.perf_counter() - start
+
+    # 4x the links. Linear would be ~4x; quadratic would be ~16x. Allow a wide
+    # margin for CI noise while still catching a return to quadratic behaviour.
+    assert long_elapsed < short_elapsed * 10, (
+        f"chain validation looks superlinear: {short_elapsed:.3f}s for 60 links "
+        f"vs {long_elapsed:.3f}s for 240"
+    )
