@@ -9,12 +9,30 @@ $pidFiles = @("consensus.pid", "reasoning_ensemble.pid")
 foreach ($pidFile in $pidFiles) {
     $pidPath = Join-Path $flossAgent $pidFile
     if (Test-Path $pidPath) {
-        $pid = [int](Get-Content $pidPath -Raw).Trim()
+        # MUST NOT be named $pid: PowerShell's $PID is a read-only automatic
+        # variable holding THIS process's id, and the name is case-insensitive.
+        # Assigning to it fails with "Cannot overwrite variable PID because it
+        # is read-only or constant" -- and that error is NOT terminating at
+        # script scope, so the old code carried straight on with $pid still
+        # holding the running shell's own id. Stop-Process then targeted this
+        # script's process, and Remove-Item deleted the pid file regardless,
+        # leaving the real daemon alive and now unfindable. Strictly worse than
+        # a no-op.
+        $raw = (Get-Content $pidPath -Raw).Trim()
+        $daemonPid = 0
+        if (-not [int]::TryParse($raw, [ref]$daemonPid) -or $daemonPid -le 0) {
+            Write-Host "[FLOSS MCP] $pidFile unreadable (contents: '$raw') - leaving it in place"
+            continue
+        }
+        if ($daemonPid -eq $PID) {
+            Write-Host "[FLOSS MCP] $pidFile names this very process ($PID) - refusing to self-terminate"
+            continue
+        }
         try {
-            Stop-Process -Id $pid -Force -ErrorAction Stop
-            Write-Host "[FLOSS MCP] Killed $pidFile (PID $pid)"
+            Stop-Process -Id $daemonPid -Force -ErrorAction Stop
+            Write-Host "[FLOSS MCP] Killed $pidFile (PID $daemonPid)"
         } catch {
-            Write-Host "[FLOSS MCP] $pidFile stale (PID $pid not running)"
+            Write-Host "[FLOSS MCP] $pidFile stale (PID $daemonPid not running)"
         }
         Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
     }
