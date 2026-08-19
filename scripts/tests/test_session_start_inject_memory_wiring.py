@@ -51,7 +51,11 @@ def fake_agentmemory_client(monkeypatch):
         calls.append({"query": query, "limit": limit, "timeout": timeout})
         return ["recent decision one", "recent decision two"]
 
+    def fake_recall_status(query, limit=3, timeout=5.0):
+        return True, fake_recall(query, limit=limit, timeout=timeout)
+
     fake_module.recall = fake_recall
+    fake_module.recall_status = fake_recall_status
     monkeypatch.setitem(sys.modules, "agentmemory_client", fake_module)
     return calls
 
@@ -66,7 +70,11 @@ def test_recall_recent_memories_calls_client_with_bounded_timeout(
     assert items == ["recent decision one", "recent decision two"]
     assert len(fake_agentmemory_client) == 1
     call = fake_agentmemory_client[0]
-    assert call["timeout"] <= 1.0
+    # Budget is the module constant, not a hardcoded 1.0. The default was
+    # deliberately raised 0.8s -> 2.5s on 2026-08-10 because 0.8s was timing out
+    # against a cold server and degrading SILENTLY; this assertion kept claiming
+    # a 1.0s ceiling the code had already, intentionally, stopped honouring.
+    assert call["timeout"] <= module.MEMORY_RECALL_TIMEOUT_SECONDS
     assert call["limit"] <= 5
 
 
@@ -93,6 +101,7 @@ def test_memory_outage_degrades_silently_to_original_contract_only(
         raise RuntimeError("agentmemory down")
 
     broken_module.recall = broken_recall
+    broken_module.recall_status = broken_recall
     monkeypatch.setitem(sys.modules, "agentmemory_client", broken_module)
 
     module = load_session_start_module(tmp_path, monkeypatch)
@@ -122,6 +131,7 @@ def test_memory_timeout_degrades_silently_within_latency_budget(
 
     slow_module = types.ModuleType("agentmemory_client")
     slow_module.recall = slow_recall
+    slow_module.recall_status = lambda *a, **k: (True, slow_recall(*a, **k))
     monkeypatch.setitem(sys.modules, "agentmemory_client", slow_module)
 
     module = load_session_start_module(tmp_path, monkeypatch)
@@ -137,9 +147,20 @@ def test_memory_timeout_degrades_silently_within_latency_budget(
     assert "# Startup Contract" in payload["additionalContext"]
 
 
-def test_recall_timeout_constant_is_within_one_second_budget(tmp_path, monkeypatch):
+def test_recall_timeout_constant_stays_within_session_start_budget(
+    tmp_path, monkeypatch
+):
+    """Session start must stay snappy, but the ceiling is 3s and not 1s.
+
+    Raised from an asserted 1.0s after the 2026-08-10 process-surface audit
+    deliberately moved the default to 2.5s: at 0.8s recall was timing out
+    against a cold agentmemory server and the failure was invisible. The point
+    of the assertion is to stop the constant drifting to something that would
+    stall every session start, so it tracks a real ceiling rather than a value
+    the code already knowingly exceeded.
+    """
     module = load_session_start_module(tmp_path, monkeypatch)
-    assert module.MEMORY_RECALL_TIMEOUT_SECONDS <= 1.0
+    assert module.MEMORY_RECALL_TIMEOUT_SECONDS <= 3.0
 
 
 def test_memory_section_is_small_and_bounded(tmp_path, monkeypatch):
@@ -174,6 +195,7 @@ def test_contract_missing_still_exits_cleanly_without_touching_memory(
         return []
 
     fake_module.recall = fake_recall
+    fake_module.recall_status = lambda *a, **k: (True, fake_recall(*a, **k))
     monkeypatch.setitem(sys.modules, "agentmemory_client", fake_module)
 
     module = load_session_start_module(tmp_path, monkeypatch)
