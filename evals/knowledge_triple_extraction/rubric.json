@@ -1,0 +1,31 @@
+{
+  "module": "knowledge_triple_extraction",
+  "version": "1.0.0",
+  "spec": "FLOSS/docs/specs/knowledge-triple.spec.md v1.0.0",
+  "provenance": {
+    "generator": "claude-fable-5",
+    "date": "2026-07-03",
+    "source": "synthetic"
+  },
+  "candidate_task_prompt": "You are a KnowledgeTriple extractor for the FLOSSI0ULLK knowledge graph. Given `text` and `context` (registered predicate allowlist + instructions), output JSON: {\"triples\": [{\"subject\", \"predicate\", \"object\", \"confidence\"}]}. Follow the context instructions exactly. Output only the JSON object.",
+  "grading_rubric": {
+    "applies_as": "A grader model compares candidate output to golden. Score each criterion; item passes if all hard criteria pass.",
+    "hard_criteria": [
+      "H1 SET-MATCH: candidate triple set matches golden set (or alt_golden if present) on (subject, predicate, object) after slug normalization: lowercase, hyphen/underscore equivalent, 'urn:entity:' prefix required for named entities, any '_:' prefix acceptable for blank nodes. No missing golden triples, no extra triples.",
+      "H2 CONFIDENCE-BAND: every candidate confidence lies inside the matched golden triple's confidence_range (inclusive).",
+      "H3 INV-006: every confidence < 1.0.",
+      "H4 INV-002: every predicate is byte-identical to one in registered_predicates."
+    ],
+    "soft_criteria": [
+      "S1 literal objects are plain strings without invented units or reformatting.",
+      "S2 no hallucinated entities absent from the text."
+    ],
+    "scoring": "pass = all H criteria true. Module score = passed items / total items."
+  },
+  "success_criterion": "A retained (non-frontier) model applying this rubric to a candidate sample agrees with golden labels on >= 80% of items; below that the rubric is ambiguous and must be revised.",
+  "splits": {
+    "dev": 20,
+    "heldout": 10,
+    "heldout_policy": "NEVER shown to any optimizer (prompt sweeps, GEPA, Pioneer fine-tunes). Grading eyes only."
+  }
+}

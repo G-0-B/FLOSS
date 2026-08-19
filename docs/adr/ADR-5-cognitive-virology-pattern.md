@@ -1,8 +1,8 @@
 # ADR-5: Cognitive Virology as Architectural Pattern
 
-**Status:** Specified
+**Status:** Accepted
 **Date:** 2026-03-21
-**Truth Status:** Specified (pattern identified, not yet implemented)
+**Truth Status:** Specified (pattern identified, not yet implemented; consent gate now backed by ADR-12)
 **Friction Tier:** High (self-modification capability, safety implications)
 
 ---
@@ -61,7 +61,7 @@ Hughes explicitly shows that the most effective memetic systems bypass evaluatio
 1. **HARVEST Protocol** (`docs/specs/harvest-protocol.spec.md`) — formalize the existing manual consolidation practice as a 5-stage self-observation loop (OBSERVE → EVALUATE → PROPOSE → VALIDATE → COMMIT). Run manually first.
 2. **ADR fitness metric** — for each ADR, track cross-system absorption rate (how quickly new AI sessions reference it, how many sessions absorb it without re-explanation).
 3. **OpenClaw validation spike** — determine if OpenClaw can orchestrate a simple observe-evaluate-modify cycle, which would enable semi-automated HARVEST.
-4. **Consent gate design** — the mechanism distinguishing beneficial from parasitic memetics. Deferred until HARVEST has run at least 3 cycles and produced data.
+4. **Consent gate design** — the mechanism distinguishing beneficial from parasitic memetics. Now specified in **ADR-12 (Consent Gate Protocol)** — `Draft (implementation-backed)`, substrate verified locally, OVERRIDE FORBIDDEN / APPROVE ≥ 0.85. Earlier deferral (until HARVEST ran ≥3 cycles) is superseded by ADR-12; remaining work there is action-time gating + DID hardening + cross-frame validation.
 
 ## Validation Criteria
 
@@ -71,7 +71,7 @@ This ADR moves from Specified → Accepted when:
 2. HARVEST Protocol has completed at least 3 cycles with measurable output logged in `docs/governance/HARVEST_LOG.md`
 3. ADR fitness metrics show quantifiable cross-system absorption rates for at least 3 ADRs
 
-Note: ADR-0 human coherence test was previously listed as a blocker. It has been passed since 2025-11 (all 4 validation criteria met). No longer a gate.
+Note: ADR-0 human coherence test was previously listed as a blocker. The Recognition Protocol was initially validated 2025-11; the final (4th) criterion — human coherence — passed 2026-03-20, at which point all 4 validation criteria were met. No longer a gate.
 
 ## Consequences
 

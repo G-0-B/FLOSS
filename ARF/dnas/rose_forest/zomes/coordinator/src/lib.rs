@@ -230,9 +230,21 @@ pub struct PredicateInfo {
 
 /// Retrieve a triple's full Record (entry + signed action with provenance).
 /// Used by substrate bridge validation to verify author pubkey and timestamp.
+///
+/// This is a triple provenance verifier, so it returns the Record ONLY when the
+/// fetched entry actually deserializes as a `KnowledgeTriple`. Passing the
+/// ActionHash of an unrelated entry (e.g. a `RoseNode` from `add_knowledge`)
+/// returns `None` rather than a raw Record a caller might wrongly decode/treat
+/// as a verified triple.
 #[hdk_extern]
 pub fn get_triple_record(hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(hash, GetOptions::default())
+    let Some(record) = get(hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match record.entry().to_app_option::<KnowledgeTriple>() {
+        Ok(Some(_)) => Ok(Some(record)),
+        _ => Ok(None),
+    }
 }
 
 #[hdk_extern]

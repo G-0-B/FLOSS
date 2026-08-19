@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-06-12",
+  "updated": "2026-07-26",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
@@ -24,6 +24,21 @@
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
+      "spec": "ADR-13: Yumeichan Watch architecture"
+    },
+    "FLOSS/docs/adr/ADR-14-objectgraph-projection.md": {
+      "spec": "ADR-14: Objectgraph projection"
+    },
+    "FLOSS/docs/adr/ADR-15-provenance-validation-enforcement.md": {
+      "spec": "ADR-15: Provenance validation enforcement"
+    },
+    "FLOSS/docs/adr/ADR-16-omnigent-execution-surface.md": {
+      "spec": "ADR-16: Omnigent execution surface"
+    },
+    "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
+      "spec": "ADR-17: KnowledgeTriple contract reconciliation"
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -109,6 +124,9 @@
       "spec": "GRANDFATHERED 2026-06-12 (Heartbeat Runtime Budget Spec)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
+      "spec": "Specified integrity-zome provenance and authorization validation rules"
+    },
     "FLOSS/docs/specs/intake-event.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (intake-event.schema)",
       "grandfathered": true
@@ -132,6 +150,9 @@
     "FLOSS/docs/specs/knowledge-triple.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Knowledge Triple Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
+      "spec": "OpenHuman bridge experiment specification"
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
@@ -192,6 +213,12 @@
       "spec": "GRANDFATHERED 2026-06-12 (ThoughtCredential Specification)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
+      "spec": "Yumeichan Watch architecture specification"
+    },
+    "FLOSS/docs/specs/yumeichan-watch-capabilities.schema.json": {
+      "spec": "Yumeichan Watch capability-token schema and proof shape"
+    },
     "FLOSS/scripts/artifact_actions.py": {
       "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
     },
@@ -238,6 +265,9 @@
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
+    },
+    "FLOSS/scripts/major_consolidation_sweep.py": {
+      "spec": "LLM-assisted consolidation sweep over designated research sources"
     },
     "FLOSS/scripts/materialize_shared_agent_memory.py": {
       "spec": "Agent-memory canonical markdown -> registry + per-client projections"
@@ -297,6 +327,9 @@
     "FLOSS/scripts/watch_intake.py": {
       "spec": "Polling intake watcher: root drops -> IntakeEvents",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    },
+    "FLOSS/scripts/yumeichan_watch_capabilities.py": {
+      "spec": "Semantic validation for Yumeichan Watch capability-token bounds"
     }
   }
 }

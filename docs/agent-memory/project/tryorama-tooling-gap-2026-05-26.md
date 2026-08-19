@@ -33,7 +33,9 @@ The ADR-12 truth-status table and the MVP_PLAN Phase 0 note were corrected in co
 
 ## Path forward
 
-Operator chose **option (a) of three** on 2026-05-26: migrate substrate to `holonix main-0.7-dev` so tryorama 0.18+ pairs cleanly. Full plan: [`docs/superpowers/plans/2026-05-26-holochain-0.7-migration.md`](../../superpowers/plans/2026-05-26-holochain-0.7-migration.md) (M14).
+**SUPERSEDED 2026-07-03 (operator directive, Anthony):** the JS-based Tryorama framework is replaced by the Rust-based **Sweettest** framework as the e2e path. Sweettest runs the conductor in-process from Rust (`cargo test`), which sidesteps the hc-sandbox/tryorama version-pairing gap entirely rather than fixing it. Repo state at directive time: Sweettest named as scaffolding target in `ARF/dnas/rose_forest/zomes/consent_integrity/src/lib.rs` §6 only; no `sweettest`/`holochain` dev-dependency in any workspace Cargo.toml yet; `ARF/tests/tryorama/*.test.ts` remain on disk as deprecated scenarios pending port. The 0.7 migration (M14) remains relevant for the substrate line itself, but tryorama pairing is no longer the driver.
+
+Prior decision (2026-05-26, superseded): option (a) of three — migrate substrate to `holonix main-0.7-dev` so tryorama 0.18+ pairs cleanly. Full plan: [`docs/superpowers/plans/2026-05-26-holochain-0.7-migration.md`](../../superpowers/plans/2026-05-26-holochain-0.7-migration.md) (M14).
 
 Options not chosen (preserved for reference):
 - (b) custom test harness on `@holochain/client 0.19.3` (which DOES install against conductor 0.6.1) — bypass tryorama Scenario class.

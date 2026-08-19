@@ -1,0 +1,54 @@
+{
+  "module": "provenance_packet_validation",
+  "version": "1.0.0",
+  "spec": "FLOSS/docs/specs/provenance-packet.spec.md v1.4",
+  "provenance": {
+    "generator": "claude-fable-5",
+    "date": "2026-07-03",
+    "source": "synthetic"
+  },
+  "crypto_facts_contract": "This symbolic eval supplies crypto_facts as counterfactual oracle inputs because adversarial packets, such as self-referential cycles, cannot all be executable signed packets. Each item therefore supplies the oracle results for signature verification over canonical bytes (sigs=[]), SAID digest recomputation, v byte-length check, and artifact re-hashing. The candidate must apply the spec's structural, sequencing, DAG, governed-boundary, and audit-disposition rules on top of these facts; this fixture does not claim that every row replays through production cryptography.",
+  "defect_codes": {
+    "PPV-OK": "Packet passes strict validation.",
+    "E-SIG-INVALID": "Signature does not verify over canonical bytes with sigs=[].",
+    "E-DIGEST-MISMATCH": "Recomputed SAID digest differs from d.",
+    "E-V-SHAPE": "v field not of shape FLOSSI10JSON{6 hex}_ or length mismatch vs canonical bytes.",
+    "E-T-NOT-PROV": "t is not the literal 'prov'.",
+    "E-D-SHAPE": "d is not 'E' + 43 base64url chars.",
+    "E-I-SHAPE": "i does not match ^[DB][A-Za-z0-9_-]{43}$; D is transferable and B is non-transferable, and both are valid signing identifiers.",
+    "E-SIG-SHAPE": "sigs is not exactly one '0B' + 86 base64url string.",
+    "E-SEQ-NONMONOTONIC": "s does not equal the latest sequence value for the same agent plus one (gapless per-agent sequence).",
+    "E-P-MISSING-PRIOR": "p references a prior packet digest that does not exist in this agent's chain.",
+    "E-P-CROSS-AGENT": "p points at another agent's packet; p is intra-agent continuity only (cross-agent lineage goes in evidence_refs).",
+    "E-PAYLOAD-MISSING-FIELD": "A required payload field is absent from an a[] entry.",
+    "E-EVIDENCE-NO-ROOT": "Evidence DAG contains no non-packet evidence root.",
+    "E-DAG-CYCLE": "Evidence-packet references form a cycle.",
+    "E-DEPTH-EXCEEDED": "Evidence DAG recursion exceeds depth 8.",
+    "E-GOVERNED-NO-CONSENT": "Governed claim (AdrChange/SpecChange/ConfigChange at System/Substrate) lacks consent_ref.decision_action_hash.",
+    "E-ARTIFACT-HASH-MISMATCH": "An artifact_ref sha256 no longer matches workspace content (strict validation failure; MAY be classified superseded under audit disposition)."
+  },
+  "statuses": {
+    "valid": "Strict validation passes against the current workspace.",
+    "superseded": "Structure preserved but artifact refs point at replaced/mutable generated content covered by newer valid evidence (audit disposition). Not current evidence for governed claims.",
+    "invalid": "Active validation failure not covered by the supersession policy."
+  },
+  "candidate_task_prompt": "You are a provenance-packet validator for the FLOSSI0ULLK Plane A spine. Given `packet`, `crypto_facts`, and `chain_context`, output JSON: {\"status\": valid|superseded|invalid, \"defects\": [codes], \"rationale\": <2-4 sentences>}. Use PPV-OK alone for a valid packet. List every applicable defect; do not stop at the first.",
+  "grading_rubric": {
+    "applies_as": "A grader model compares candidate output to golden.",
+    "hard_criteria": [
+      "H1 STATUS: candidate status equals golden status.",
+      "H2 DEFECT-SET: candidate defect set equals the golden set exactly (PPV-OK means exactly ['PPV-OK'])."
+    ],
+    "soft_criteria": [
+      "S1 rationale cites the spec rule (field shape, monotonic s, intra-agent p, non-packet root, depth 8, per-entry governed gate, audit disposition) rather than generic suspicion.",
+      "S2 for superseded verdicts, rationale states why the carve-out applies (mutable generated artifact + newer covering packet)."
+    ],
+    "scoring": "pass = H1 and H2. Module score = passed items / total items. Report defect-set F1 as a diagnostic."
+  },
+  "success_criterion": "A retained (non-frontier) model applying this rubric agrees with golden labels on >= 80% of items; below that the rubric is ambiguous and must be revised.",
+  "splits": {
+    "dev": 20,
+    "heldout": 10,
+    "heldout_policy": "NEVER shown to any optimizer (prompt sweeps, GEPA, Pioneer fine-tunes). Grading eyes only."
+  }
+}
