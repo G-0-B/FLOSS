@@ -119,6 +119,10 @@ def test_rounds_accumulation_persists_per_item(tmp_path):
     try:
         hb.run_one_tick()
     except RuntimeError:
+        # Deliberate: this test drives run_one_tick() into a mid-tick failure on
+        # purpose. Whether it propagates is not what is under test -- the
+        # assertion below is that state was still PERSISTED despite the failure,
+        # so the exception is swallowed here rather than asserted on.
         pass
 
     state = _read_state(tmp_path)

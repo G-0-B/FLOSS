@@ -583,6 +583,11 @@ def resolve_target_path(workspace_root: Path, raw_path: str) -> Path:
     scripts_dir = Path(__file__).resolve().parent
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
+    # Deliberate lazy import -- flagged as a cyclic import by static analysis and
+    # correct as written. materialize_shared_agent_surface imports THIS module at
+    # load time, so a module-level import here is a genuine cycle; deferring it
+    # into the function breaks that while keeping one shared path resolver. Do
+    # not "fix" this by hoisting it.
     from materialize_shared_agent_surface import resolve_manifest_path
 
     return resolve_manifest_path(workspace_root, raw_path)
@@ -605,6 +610,8 @@ def hermes_gateway_alive_for(target_path: Path) -> int | None:
     scripts_dir = Path(__file__).resolve().parent
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
+    # Same deliberate cycle-break as resolve_target_path above; additionally
+    # keeps a JSON-only run from importing the much larger agent-surface module.
     from materialize_shared_agent_surface import hermes_gateway_alive
 
     return hermes_gateway_alive(target_path.parent)
