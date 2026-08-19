@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-08-19 (PR41 review triage — see Section 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
+**Last refreshed:** 2026-08-19 (PR41 review fixes landed — see Section 0.1b; triage in 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -74,6 +74,31 @@ CodeRabbit all pass.
 omniroute provider attribution (P2, confirmed, small). The audit-sink gap (P2) is the most
 *consequential* — it silently voids the audit trail the migration was justified by.
 
+### 0.1b PR41 review fixes landed (2026-08-19)
+
+All eight commits are on `feat/preservation-spine`, which is a strict superset of
+the PR41 branch. **They are therefore NOT in PR41 yet** — see row 0.3; deciding
+the branch topology is still the gating step.
+
+| Commit | Finding | Evidence |
+|---|---|---|
+| `f0abc89` | `stop_mcp_daemons.ps1` assigned to PowerShell's read-only `$PID` | Reproduced: the error is non-terminating, so the script carried on with `$pid` holding its OWN process id, tried to `Stop-Process` itself, and deleted the pid file anyway — orphaning the daemons. Worse than the review described. |
+| `c51779f` | Audit sink never wired to any tool | `audit_appender` had only test callers; `_AUDIT_SINK` never read. Wrapper preserves the FastMCP schema (asserted, and checked against the live server). |
+| `8644707` | Provenance `RecursionError` on long chains | Reproduced at 1000 links. Fixing it exposed a pre-existing O(n²) fork check (97% of runtime). Both fixed: 1200 links went from crashing to 2.93s, and scaling is now linear to 2500. |
+| `94a2014` | agentmemory outage indistinguishable from empty recall | The warning could only fire on import failure. Confirmed live against the wedged engine on 2026-08-18. Also un-stuck two tests asserting a 1.0s budget the code deliberately abandoned in the 2026-08-10 audit. |
+| `e870497` | Staged actions hardcoded `provider: "litellm"` | `.env` sets `omniroute`, so every run was misattributed. |
+| `bdae612` | Oversized files staged a skip marker as if extracted | Silent data loss: `--commit` recorded them as completed distillations. `--force-full`, which the message advertised, did not exist; implemented. |
+| `c44ce8b` | Daemon pid file not claimed atomically | Verified cross-process (threads share a PID and cannot show it): 8 racers → exactly 1 WON, 7 BLOCKED. |
+| `284047f` | 19 CodeQL findings triaged | One real (cookie prototype pollution, fixed). Two guarded by design. The rest deliberate and now annotated at the site so they are not "fixed" into breakage. |
+
+**Not addressed, with reasons:**
+
+- `scripts/tests/test_audit_provenance_packets.py::...as_superseded` fails
+  (`assert 2 == 0`). Verified **identical with and without** every change above by
+  stashing — genuinely pre-existing, unrelated, and left alone.
+- Cloudflare `Workers Builds: floss` — operator reports it fixed on `main`; the
+  Worker has been running ~6 days. No action taken.
+
 ### Working-tree state (uncommitted, verified 2026-08-18)
 
 | Repo | Branch | Tracked-modified | Untracked | Note |
@@ -90,13 +115,13 @@ Nothing from this session is committed in either repo.
 | 0.1 | PR41 reconciliation review backlog (~2 months of work) | canon + repo reconciliation | `reconcile/pr38-salvage-20260817`, now 288 files | Codex sessions (`_codex_pr38_*`, `_pr38_*` scratch dirs at workspace root) | **OPEN — the dominant blocker**; 27 inline review comments triaged 2026-08-19, see Section 0.1a |
 | 0.2 | PR38 ADR cleanup / INDEX drift | governance / ADR | merged to `main` 2026-08-19 (`873cc0c`) | operator | **MERGED** — verified harmless to PR41, see conflict note in 0.1a. PR37/PR32/PR30 also merged |
 | 0.3 | `feat/preservation-spine` has no PR | repo topology | FLOSS, HEAD | — | **UNTRACKED BY REVIEW** — superset of PR38+PR41, fully pushed, invisible to review |
-| 0.4 | Hook surface: variables + `claude_user` + agentmemory 12 hooks | harness / metaharness | `shared-hook-surface.json` v0.2.0, `scripts/materialize_shared_hook_surface.py` | Claude Code, 2026-08-18 | **DONE, uncommitted** — 46 tests pass, drift gate clean, reviewed 3-family (unanimous `extend`, mean -0.61) |
-| 0.5 | Voter registry repaired to probed-working models | consensus gateway | `packages/metacoordinator_mcp/voter_registry.json`, `voters.py`, `tests/test_voters.py` | Claude Code, 2026-08-18 | **DONE, uncommitted** — 112 tests pass; see `[[project-omniroute-voter-probe-log]]` |
+| 0.4 | Hook surface: variables + `claude_user` + agentmemory 12 hooks | harness / metaharness | `shared-hook-surface.json` v0.2.0, `scripts/materialize_shared_hook_surface.py` | Claude Code, 2026-08-18 | **DONE, committed** `c2b38be` — 46 tests pass, drift gate clean, reviewed 3-family (unanimous `extend`, mean -0.61) |
+| 0.5 | Voter registry repaired to probed-working models | consensus gateway | `packages/metacoordinator_mcp/voter_registry.json`, `voters.py`, `tests/test_voters.py` | Claude Code, 2026-08-18 | **DONE, committed** `83894e2` — 112 tests pass; see `[[project-omniroute-voter-probe-log]]` |
 | 0.6 | Independence is policy, not enforcement | consensus gateway | `voters.py` roster build | unassigned | **OPEN** — degraded `balanced` (2 voters, 1 surface) voted normally and nothing detected it |
 | 0.7 | agentmemory project scope on 115/119 memories | memory substrate | `~/.agentmemory` state store | Claude Code attempted 2026-08-18 | **BLOCKED — not fixable via supported API**; see note below |
 | 0.8 | `mem::compress` failing 100% | memory substrate | agentmemory `mem::compress` | unassigned | **OPEN** — 192 calls, 192 failures, 0 successes (from `/agentmemory/health`) |
 | 0.9 | Session `project` identifiers inconsistent | memory substrate | agentmemory sessions | unassigned | **OPEN** — 18 sessions use three different ids: `C:\~shit`, `~shit`, `kalis` |
-| 0.10 | Workspace + FLOSS both dirty, nothing committed | repo hygiene | both repos | — | **OPEN** — 38 and 24 entries respectively |
+| 0.10 | Workspace + FLOSS both dirty, nothing committed | repo hygiene | both repos | Claude Code | **RESOLVED for tracked files** 2026-08-19 — 3 + 8 commits; untracked scratch dirs remain |
 | 0.11 | `context` + `agent-surface` materializer steps drifting | harness surfaces | `.agent-surface/context/CONTEXT_L1.md`, `context-view-registry.json` | pre-existing, predates 2026-08-18 | **OPEN** — `--check` reports DRIFT on 2 of 6 steps |
 
 **On row 0.7 (recorded so nobody retries it blind):** the documented fix
