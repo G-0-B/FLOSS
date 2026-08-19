@@ -1,0 +1,20 @@
+{
+  "name": "memory_governance_delete",
+  "description": "Delete specific memories with audit trail.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "memoryIds": {
+        "type": "string",
+        "description": "Comma-separated memory IDs to delete"
+      },
+      "reason": {
+        "type": "string",
+        "description": "Reason for deletion"
+      }
+    },
+    "required": [
+      "memoryIds"
+    ]
+  }
+}

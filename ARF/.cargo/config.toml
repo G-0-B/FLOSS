@@ -1,0 +1,16 @@
+# Cargo configuration for the FLOSSI0ULLK Rose Forest workspace.
+#
+# Added 2026-05-19 alongside the holochain-0.4 -> holochain-0.6 migration.
+# HDI 0.7.1 / HDK 0.6.1 brings in getrandom 0.3.x, which requires explicit
+# opt-in for the wasm32-unknown-unknown target via a config flag (see the
+# getrandom 0.3 release notes and the Holochain HDK 0.6 docs). Without
+# this, building wasm artifacts fails with:
+#
+#     error[E0425]: cannot find function `fill_inner` in module `backends`
+#
+# Cross-reference:
+# - FLOSS/docs/agent-memory/project/holochain-version-line-skew.md
+# - FLOSS/docs/specs/consent-payload.spec.md (validation-status table)
+
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

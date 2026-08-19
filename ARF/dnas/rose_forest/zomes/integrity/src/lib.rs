@@ -1,5 +1,8 @@
 use hdi::prelude::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
+
+const BUDGET_ENTRY_FUTURE_SKEW_SECONDS: u64 = 300;
+const MAX_BUDGET_ALLOCATION_RU: f32 = 200.0;
 
 /// Represents a node in the Rose-Forest knowledge graph.
 ///
@@ -70,7 +73,12 @@ pub struct BudgetEntry {
 }
 
 #[hdk_link_types]
-pub enum LinkTypes { AllNodes, Edge, TriplesBySubject, TriplesByPredicate }
+pub enum LinkTypes {
+    AllNodes,
+    Edge,
+    TriplesBySubject,
+    TriplesByPredicate,
+}
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
@@ -94,95 +102,231 @@ pub enum EntryTypes {
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
+        // ADR-15 R1: bind every identity-bearing entry to the action's author.
+        // `action.author` (hdi 0.7.1) is the author-of-record; an entry whose own
+        // identity field disagrees with it must be rejected. Create and Update carry
+        // distinct action types (Create / Update), so each arm extracts the author
+        // from its own action field rather than sharing one binding.
         FlatOp::StoreEntry(store) => match store {
-            OpEntry::CreateEntry { app_entry, .. } | OpEntry::UpdateEntry { app_entry, .. } => {
-                match app_entry {
-                    EntryTypes::RoseNode(node) => validate_rose_node(&node),
-                    EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
-                    EntryTypes::BudgetEntry(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::ThoughtCredential(credential) => validate_thought_credential(&credential),
-                    EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple),
-                }
+            OpEntry::CreateEntry { app_entry, action } => {
+                validate_app_entry(app_entry, &action.author, &action.timestamp)
             }
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => validate_app_entry(app_entry, &action.author, &action.timestamp),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
 
-fn validate_thought_credential(credential: &ThoughtCredential) -> ExternResult<ValidateCallbackResult> {
+/// ADR-15: dispatch an entry to its per-type validator, passing the action author
+/// so identity-bearing entries can be bound to their author-of-record.
+fn validate_app_entry(
+    app_entry: EntryTypes,
+    author: &AgentPubKey,
+    action_timestamp: &Timestamp,
+) -> ExternResult<ValidateCallbackResult> {
+    match app_entry {
+        EntryTypes::RoseNode(node) => validate_rose_node(&node),
+        EntryTypes::KnowledgeEdge(edge) => validate_knowledge_edge(&edge),
+        EntryTypes::BudgetEntry(budget) => validate_budget_entry(&budget, author, action_timestamp),
+        EntryTypes::ThoughtCredential(credential) => {
+            validate_thought_credential(&credential, author)
+        }
+        EntryTypes::KnowledgeTriple(triple) => validate_knowledge_triple(&triple, author),
+    }
+}
+
+fn validate_thought_credential(
+    credential: &ThoughtCredential,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    // ADR-15 R3: provenance is the verifiable author-of-record, not a free-form claim.
+    if &credential.provenance != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_THOUGHT_PROVENANCE: provenance must equal the action author".into(),
+        ));
+    }
     let dim = credential.content.len();
     if dim < 32 || dim > 4096 {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_THOUGHT_CONTENT_DIM: {} out of [32,4096]", dim)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_THOUGHT_CONTENT_DIM: {} out of [32,4096]",
+            dim
+        )));
     }
     if !(-1..=1).contains(&credential.connotation) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_CONNOTATION: {} out of [-1,1]", credential.connotation)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_CONNOTATION: {} out of [-1,1]",
+            credential.connotation
+        )));
     }
     if !(0.0..=1.0).contains(&credential.impact) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_IMPACT: {} out of [0,1]", credential.impact)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_IMPACT: {} out of [0,1]",
+            credential.impact
+        )));
     }
-    // Further validation could include checking provenance signature or resonance thresholds
+    // NOTE (ADR-15 R5, deferred to PR-B): `connotation` remains integer ternary (i8, -1..=1)
+    // here. Migration to the analog f32 [-1.0, +1.0] model (ADR-10 v2.0 / ADR-13) is a breaking
+    // data-model change with migration impact on existing data + ontology tests, handled separately.
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_rose_node(node: &RoseNode) -> ExternResult<ValidateCallbackResult> {
-    const VALID_LICENSES: &[&str] = &["MIT","Apache-2.0","BSD-3-Clause","MPL-2.0","CC-BY-4.0"];
+    const VALID_LICENSES: &[&str] = &["MIT", "Apache-2.0", "BSD-3-Clause", "MPL-2.0", "CC-BY-4.0"];
     if !VALID_LICENSES.contains(&node.license.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_LICENSE: '{}' not allowed", node.license)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_LICENSE: '{}' not allowed",
+            node.license
+        )));
     }
     let dim = node.embedding.len();
     if dim < 32 || dim > 4096 {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_EMBED_DIM: {} out of [32,4096]", dim)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_EMBED_DIM: {} out of [32,4096]",
+            dim
+        )));
     }
-    match (node.metadata.get("model_id"), node.metadata.get("model_card_hash")) {
+    match (
+        node.metadata.get("model_id"),
+        node.metadata.get("model_card_hash"),
+    ) {
         (Some(_), Some(hash)) if hash.starts_with("sha256:") => Ok(ValidateCallbackResult::Valid),
-        _ => Ok(ValidateCallbackResult::Invalid("E_MODEL_CARD_MISSING".into())),
+        _ => Ok(ValidateCallbackResult::Invalid(
+            "E_MODEL_CARD_MISSING".into(),
+        )),
     }
 }
 
-fn validate_knowledge_triple(triple: &KnowledgeTriple) -> ExternResult<ValidateCallbackResult> {
+fn validate_knowledge_triple(
+    triple: &KnowledgeTriple,
+    author: &AgentPubKey,
+) -> ExternResult<ValidateCallbackResult> {
+    // ADR-15 R4: the triple's `source` is provenance and must equal the action author.
+    if &triple.source != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_SOURCE: source must equal the action author".into(),
+        ));
+    }
     if triple.subject.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_SUBJECT: subject must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_SUBJECT: subject must not be empty".into(),
+        ));
     }
     if triple.predicate.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_PREDICATE: predicate must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_PREDICATE: predicate must not be empty".into(),
+        ));
     }
     if triple.object.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("E_TRIPLE_OBJECT: object must not be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_TRIPLE_OBJECT: object must not be empty".into(),
+        ));
     }
-    if !(0.0..=1.0).contains(&triple.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_TRIPLE_CONFIDENCE: {} out of [0,1]", triple.confidence)));
+    // Signed gradient: negative = movement away from truth, positive = toward truth.
+    // Aligns with ternary logic (-1/0/+1) and Yumeichan connotation framework.
+    if !(-1.0..=1.0).contains(&triple.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_TRIPLE_CONFIDENCE: {} out of [-1,1]",
+            triple.confidence
+        )));
     }
     // Predicate must be from a registered ontology namespace.
     // Base predicates + AI/ML predicates from the ontology_integrity module.
     const VALID_PREDICATES: &[&str] = &[
-        "is_a", "part_of", "related_to", "has_property",
-        "trained_on", "improves_upon", "capable_of", "evaluated_on",
+        "is_a",
+        "part_of",
+        "related_to",
+        "has_property",
+        "trained_on",
+        "improves_upon",
+        "capable_of",
+        "evaluated_on",
         // Knowledge graph relationship predicates (same as KnowledgeEdge)
-        "relates_to", "supports", "contradicts",
-        "heals", "releases", "neutralizes", "recalibrates",
+        "relates_to",
+        "supports",
+        "contradicts",
+        "heals",
+        "releases",
+        "neutralizes",
+        "recalibrates",
     ];
     if !VALID_PREDICATES.contains(&triple.predicate.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("E_TRIPLE_PREDICATE_UNKNOWN: '{}' not in registered ontology", triple.predicate)
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_TRIPLE_PREDICATE_UNKNOWN: '{}' not in registered ontology",
+            triple.predicate
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbackResult> {
-    if !(0.0..=1.0).contains(&edge.confidence) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_CONFIDENCE: {} out of [0,1]", edge.confidence)));
+    // Signed gradient: same range as KnowledgeTriple confidence.
+    if !(-1.0..=1.0).contains(&edge.confidence) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_CONFIDENCE: {} out of [-1,1]",
+            edge.confidence
+        )));
     }
     // New relationship types reflecting the manifesto
-    const VALID_RELATIONSHIPS: &[&str] = &["relates_to", "supports", "contradicts", "heals", "releases", "neutralizes", "recalibrates"];
+    const VALID_RELATIONSHIPS: &[&str] = &[
+        "relates_to",
+        "supports",
+        "contradicts",
+        "heals",
+        "releases",
+        "neutralizes",
+        "recalibrates",
+    ];
     if !VALID_RELATIONSHIPS.contains(&edge.relationship.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!("E_RELATIONSHIP: '{}' not allowed", edge.relationship)));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "E_RELATIONSHIP: '{}' not allowed",
+            edge.relationship
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-
+/// ADR-15 R2: `BudgetEntry` was previously accepted unconditionally (`Ok(Valid)`), letting any
+/// agent mint a budget naming any other agent. Bind it to the author, reject invalid balances,
+/// and use the deterministic action timestamp to constrain future-dated windows.
+fn validate_budget_entry(
+    budget: &BudgetEntry,
+    author: &AgentPubKey,
+    action_timestamp: &Timestamp,
+) -> ExternResult<ValidateCallbackResult> {
+    if &budget.agent != author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_AUTHOR: agent must equal the action author".into(),
+        ));
+    }
+    if !budget.remaining_ru.is_finite() || budget.remaining_ru < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into(),
+        ));
+    }
+    if budget.remaining_ru > MAX_BUDGET_ALLOCATION_RU {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into(),
+        ));
+    }
+    let Some(latest_permitted_window_start) =
+        action_timestamp.checked_add(&Duration::from_secs(BUDGET_ENTRY_FUTURE_SKEW_SECONDS))
+    else {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_WINDOW_FUTURE: action timestamp overflow while constructing future-skew boundary"
+                .into(),
+        ));
+    };
+    if budget.window_start > latest_permitted_window_start {
+        return Ok(ValidateCallbackResult::Invalid(
+            "E_BUDGET_WINDOW_FUTURE: window_start exceeds action timestamp by more than 300 seconds"
+                .into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
 
 /// A verifiable credential representing a moment of "thought" or insight.
 ///
@@ -196,9 +340,257 @@ fn validate_knowledge_edge(edge: &KnowledgeEdge) -> ExternResult<ValidateCallbac
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct ThoughtCredential {
-    pub content: Vec<f32>, // SemanticVector
-    pub connotation: i8, // TernaryScore: -1, 0, 1
-    pub provenance: AgentPubKey, // AgentSignature
+    pub content: Vec<f32>,           // SemanticVector
+    pub connotation: i8,             // TernaryScore: -1, 0, 1
+    pub provenance: AgentPubKey,     // AgentSignature
     pub resonance: Vec<AgentPubKey>, // AgentEndorsement
-    pub impact: f32, // WisdomMetric
+    pub impact: f32,                 // WisdomMetric
+}
+
+#[cfg(test)]
+mod tests {
+    //! ADR-15 R1–R4 author/provenance-binding tests (unit level).
+    //!
+    //! These exercise the pure validator helpers directly (no `Op` construction needed).
+    //! Cross-agent rejection at the conductor level is covered by the Tryorama test
+    //! `ARF/tests/tryorama/provenance_validation.test.ts`.
+    use super::*;
+
+    /// Two distinct, deterministic agent keys. Pattern mirrors `consent_integrity` tests.
+    fn agent(seed: u8) -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![seed; 36])
+    }
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(1_000_000)
+    }
+
+    fn validate_budget_at(
+        budget: &BudgetEntry,
+        author: &AgentPubKey,
+        action_timestamp: Timestamp,
+    ) -> ValidateCallbackResult {
+        validate_budget_entry(budget, author, &action_timestamp).unwrap()
+    }
+
+    #[test]
+    fn budget_rejects_author_mismatch() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
+        assert!(matches!(
+            validate_budget_entry(&b, &agent(2), &ts()).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn budget_accepts_self_authored() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_entry(&b, &agent(1), &ts()).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_accepts_maximum_allocated_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 200.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_rejects_next_representable_balance_above_maximum() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::from_bits(200.0f32.to_bits() + 1),
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_very_large_finite_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 1_000_000.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be <= 200.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_negative_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: -1.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_nan_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::NAN,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_infinite_balance() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: f32::INFINITY,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_BALANCE: remaining_ru must be finite and >= 0.0".into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_accepts_window_start_at_future_skew_boundary() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: Timestamp::from_micros(301_000_000),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn budget_rejects_window_start_one_microsecond_beyond_future_skew_boundary() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: Timestamp::from_micros(301_000_001),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), ts()),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_WINDOW_FUTURE: window_start exceeds action timestamp by more than 300 seconds"
+                    .into()
+            )
+        );
+    }
+
+    #[test]
+    fn budget_rejects_when_future_skew_boundary_overflows() {
+        let b = BudgetEntry {
+            agent: agent(1),
+            remaining_ru: 10.0,
+            window_start: ts(),
+        };
+        assert_eq!(
+            validate_budget_at(&b, &agent(1), Timestamp::MAX),
+            ValidateCallbackResult::Invalid(
+                "E_BUDGET_WINDOW_FUTURE: action timestamp overflow while constructing future-skew boundary"
+                    .into()
+            )
+        );
+    }
+
+    #[test]
+    fn thought_rejects_provenance_mismatch() {
+        let c = ThoughtCredential {
+            content: vec![0.0; 64],
+            connotation: 0,
+            provenance: agent(1),
+            resonance: vec![],
+            impact: 0.5,
+        };
+        assert!(matches!(
+            validate_thought_credential(&c, &agent(2)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn thought_accepts_self_authored() {
+        let c = ThoughtCredential {
+            content: vec![0.0; 64],
+            connotation: 0,
+            provenance: agent(1),
+            resonance: vec![],
+            impact: 0.5,
+        };
+        assert_eq!(
+            validate_thought_credential(&c, &agent(1)).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
+
+    #[test]
+    fn triple_rejects_source_mismatch() {
+        let t = KnowledgeTriple {
+            subject: "a".into(),
+            predicate: "is_a".into(),
+            object: "b".into(),
+            confidence: 0.5,
+            source: agent(1),
+            created_at: ts(),
+        };
+        assert!(matches!(
+            validate_knowledge_triple(&t, &agent(2)).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
+    }
+
+    #[test]
+    fn triple_accepts_self_authored() {
+        let t = KnowledgeTriple {
+            subject: "a".into(),
+            predicate: "is_a".into(),
+            object: "b".into(),
+            confidence: 0.5,
+            source: agent(1),
+            created_at: ts(),
+        };
+        assert_eq!(
+            validate_knowledge_triple(&t, &agent(1)).unwrap(),
+            ValidateCallbackResult::Valid
+        );
+    }
 }

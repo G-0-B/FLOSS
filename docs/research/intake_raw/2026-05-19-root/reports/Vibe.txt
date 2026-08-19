@@ -1,0 +1,66 @@
+        embeddings.
+      • Fix the MultiScaleEmbedding API mismatch.
+      • Implement the Holochain client bridge.
+   4. Phase 3: Multi-Agent + Tryorama Full Suite:
+      • Write and run a 2-agent Tryorama test for coordination.
+      • Verify budget isolation and edge linking across agents.
+
+  Key Focus Areas:
+
+  • Substrate Viability: Ensure the DNA compiles to WASM and
+    passes all integration tests.
+  • Symbolic-First Core: Implement the KnowledgeTriple and
+    ontology validation.
+  • Embeddings and Bridge: Replace mock embeddings and bridge
+    ConversationMemory with Holochain.
+  • Multi-Agent Coordination: Validate multi-agent coordination
+    through Tryorama tests.
+
+  Architectural Constraints:
+
+  • Agent Team Size: Design for small coordinated teams (k<=5).
+  • Output Verification: Focus on testing outputs and
+    adversarial scenarios.
+  • Non-Token Economics: Avoid token-based economics.
+  • IPFS Multi-Pinning: Ensure persistence with multi-pinning.
+
+  Governance and Documentation:
+
+  • Update ADRs and documentation as changes are made.
+  • Ensure all specifications and tests are aligned with the
+    SDD methodology.
+
+  Tools and Commands:
+
+  • Use nix develop for the build environment.
+  • Run cargo build --release --target wasm32-unknown-unknown
+    for WASM compilation.
+  • Use hc dna pack and hc app pack for DNA and hApp packaging.
+  • Run Tryorama tests with npm install and npm test.
+
+  Collaboration:
+
+  • Use the MCP passive-router consensus gateway for
+    multi-model collaboration.
+  • Ensure all agents (human, model, ensemble) can submit
+    Claims and Votes.
+
+  Verification:
+
+  • Ensure all phases pass their respective exit criteria.     ▄
+  • Document any issues and resolve them systematically.
+
+  Next Action:
+
+  Start with the Phase 0 Substrate Bridge Validation to confirm
+  the architecture end-to-end. If it compiles and tests pass,
+  proceed to Phase 1. If not, use the error messages to guide
+  the roadmap.
+
+
+┌──────────────────────────────────────────────────── default ─┐
+│ >                                                            │
+│                                                              │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+C:\~shit                                      23% of 200k tokens

@@ -5,20 +5,29 @@ id: "flossi0ullk-mvp-plan"
 version: "0.1.0"
 kind: "implementation_plan"
 status: "Proposed"
-updated: "2026-03-16"
+updated: "2026-03-25"
 truth_status: "Specified"
 evidence_sources:
   - "Master Metaprompt v1.3.1 (governance)"
   - "SDD-Master-Spec-0.22 (architecture)"
   - "ARF/dnas/rose_forest/ (412 LOC Rust, tested)"
   - "ARF/conversation_memory.py (503 LOC Python, 3/4 tests)"
-  - "All ADRs (0, 0.1, 1, 2, 3, 4)"
+  - "All ADRs (0, 0.1, 1, 2, 3, 4, 5)"
   - "SYMBOLIC_FIRST_CORE.md (878 lines specification)"
-  - "docs/specs/ (5 entry types, 4 JSON schemas)"
+  - "docs/specs/ (6 entry types, 5 JSON schemas, phase0 bridge spec)"
+  - "Orchestration Landscape Report v2.0.0 (Silo-Bench, MAS-ProVe constraints)"
 rollback_plan: "Each phase ships independently; any phase can stall without breaking prior phases"
 ```
 
 ---
+
+Current phase-status note (2026-05-18, **updated 2026-05-26**): MVP Phase 0 substrate viability is **partially verified**:
+
+- ✅ **Verified (2026-05-26):** DNA + hApp compile to WASM in holonix `main-0.6` (`hc 0.6.1`); `hc dna pack` + `hc app pack` succeed; consent_integrity has 10/10 native Rust unit tests passing; rose_forest vector_ops has 8/8 native unit tests passing.
+- ⚠️ **Tryorama integration tests are NOT currently passing end-to-end.** Investigated 2026-05-26 against hc 0.6.1: no `@holochain/tryorama` version pairs cleanly with the 0.6 conductor. tryorama 0.17 expects a separate `hc-sandbox` binary; tryorama 0.18 expects `hc sandbox network webrtc` + `ConfigRootPath(...)` schema not present in 0.6; tryorama 0.19 sends a request shape conductor 0.6.1 cannot deserialize. The 0.6 line is EOL upstream (`crates.io` latest `holochain_cli` is `0.7.0-dev.26`). The earlier "Tryorama integration tests pass" claim was true against the pre-migration hc 0.4 line; it broke when the substrate bumped to `hdi 0.7.1 / hdk 0.6.1` (commit `7e6d4e5`).
+- Path forward: either (a) migrate substrate to `holonix main-0.7-dev` (where tryorama 0.18+ pairs cleanly), (b) write a custom test harness against `@holochain/client 0.19.3` directly (which does install against conductor 0.6.1), or (c) wait for an upstream tryorama-0.6 backport. Tracked as task M13.
+
+Do not confuse MVP Phase 0 with the separate orchestration substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md`, which remains Specified until publish/provenance/independent-verify/fork-visible criteria are executed and logged.
 
 ## The Honest State of Things
 
@@ -31,7 +40,7 @@ rollback_plan: "Each phase ships independently; any phase can stall without brea
 | Coordinator zome (5 extern functions) | 100 Rust | compiles | `coordinator/lib.rs` |
 | ConversationMemory (cross-AI context) | 503 Python | 3/4 pass | `conversation_memory.py` |
 | Fractal embeddings (multi-scale) | ~150 Python | in use | `embedding_frames_of_scale.py` |
-| flake.nix (Holochain 0.4 dev env) | 37 Nix | boots | `flake.nix` |
+| flake.nix (Holochain 0.6 dev env via holonix `main-0.6`) | 37 Nix | boots in WSL (verified 2026-05-26) | `flake.nix` |
 | 5 entry type specs + 4 JSON schemas | ~500 lines | reviewed | `docs/specs/` |
 | 8 ADRs with clear status labels | ~1200 lines | reviewed | `docs/adr/` |
 | Governance stack (kernel, spine, seed packet) | ~800 lines | in use | `docs/governance/` |
@@ -44,10 +53,18 @@ rollback_plan: "Each phase ships independently; any phase can stall without brea
 - KERI/ACDC identity integration
 - Proof-carrying code
 
-### ~~The #1 blocker~~ RESOLVED
+### ~~The #1 blocker~~ RESOLVED (partially — see 2026-05-26 update)
+
 ~~**The Holochain DNA has never compiled to WASM or run in a conductor.**~~
 
-**Phase 0 is COMPLETE.** The DNA compiled to WASM and all tests pass. The round-trip test timed out on first run but passed on second.
+**Phase 0 substrate viability is verified.** The DNA compiles to WASM in holonix `main-0.6`, the hApp packs cleanly with `hc 0.6.1`, and the consent_integrity + rose_forest vector_ops zomes pass all native Rust unit tests (10/10 + 8/8 as of 2026-05-26).
+
+**However**, the original "all tests pass" claim was made against the prior hc 0.4 line. The 2026-05-19 substrate bump to `hdi 0.7.1 / hdk 0.6.1` (commit `7e6d4e5`) broke the Tryorama integration path because no `@holochain/tryorama` version pairs cleanly with the hc 0.6.1 in `holonix main-0.6`:
+- tryorama 0.17 expects separate `hc-sandbox` binary (not in 0.6.x monorepo)
+- tryorama 0.18 expects `hc sandbox network webrtc` + `ConfigRootPath` schema (hc 0.6.1 has only `mem`/`quic` + `DataRootPath`)
+- tryorama 0.19 sends a request shape `holochain conductor 0.6.1` cannot deserialize
+
+`crates.io` latest `holochain_cli` is `0.7.0-dev.26`, confirming the 0.6 line is EOL upstream. Path forward tracked as task M13: either migrate substrate to `holonix main-0.7-dev` (tryorama 0.18+ pairs there), write a custom test harness against `@holochain/client 0.19.3` (which does install against 0.6.1), or wait for an upstream tryorama-0.6 backport.
 
 Architectural cleanup performed:
 - `sharding.rs`, `crdt.rs`, `versioning.rs` removed (Holochain handles these natively)
@@ -359,9 +376,27 @@ Alice creates a node, Bob creates a supporting edge to it.
 
 ---
 
+## Architectural Constraints (from v2.0.0 Landscape Report)
+
+These constraints are empirically derived and must inform all implementation decisions:
+
+1. **Agent team size: k<=5** — Silo-Bench (March 2026) shows coordination overhead eliminates parallelization gains at k=50. At k=2, you lose 15-49% of single-agent performance. Design for small coordinated teams, not swarms.
+
+2. **Output verification > process verification** — MAS-ProVe demonstrates that process-level verification of LLM reasoning trajectories does not consistently improve performance. Test outputs and adversarial scenarios, not trajectories.
+
+3. **Non-token economics validated** — Every major token (OLAS, GTC, FET, AGIX, OCEAN) has declined dramatically. Holochain's intentional absence of a native token layer is the correct approach.
+
+4. **IPFS multi-pinning required** — Peer availability dropped from 60% to 40%, with 50% of peers online less than 4 days. Single-pin is insufficient for persistence.
+
+See `docs/research/Automated-Agent-Orchestration-Report_v2.0.0.md` for full analysis.
+
+---
+
 ## Immediate Next Action
 
-**Right now, today**: Enter the nix dev shell and attempt `cargo build --release --target wasm32-unknown-unknown`.
+**Phase 0 Substrate Bridge Validation** — `docs/specs/phase0-substrate-bridge.spec.md`
+
+Write and run a 2-agent Tryorama test that validates: publish, provenance, independent verify, discovery via query, fork visibility, and no privilege. This is the narrowest test that proves the architecture end-to-end.
 
 That single command will tell us whether Phase 0 is a 2-hour fix or a 2-week investigation. Everything else flows from there.
 

@@ -1,0 +1,38 @@
+{
+  "manifest_version": "0.1.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "canonical_root": "FLOSS/docs/agent-memory",
+  "rules": [
+    "Write durable agent memory to the repository-owned canonical memory tree first.",
+    "Treat agent-native memory directories as generated projections, not source of truth.",
+    "Keep memory entries scoped: feedback, user, project, or reference.",
+    "Use ADRs, working todo, and specs for decisions and task state; use agent memory for reusable operating knowledge."
+  ],
+  "targets": {
+    "claude": {
+      "enabled": true,
+      "memory_dir": "C:/Users/kalis/.claude/projects/C---shit/memory"
+    },
+    "shared": {
+      "enabled": true,
+      "output_dir": ".agent-surface/memory"
+    },
+    "chatgpt": {
+      "enabled": true,
+      "export_path": "FLOSS/docs/agent-memory/CHATGPT_MEMORY_EXPORT.md"
+    },
+    "codex": {
+      "enabled": true,
+      "projection_path": ".agent-surface/memory/AGENT_MEMORY.md"
+    },
+    "gemini": {
+      "enabled": true,
+      "projection_path": ".agent-surface/memory/AGENT_MEMORY.md"
+    },
+    "opencode": {
+      "enabled": true,
+      "projection_path": ".agent-surface/memory/AGENT_MEMORY.md"
+    }
+  }
+}

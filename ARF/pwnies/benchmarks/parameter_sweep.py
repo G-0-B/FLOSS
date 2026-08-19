@@ -8,18 +8,25 @@ Phase 4.1: Performance Optimization
 """
 
 import asyncio
-import time
-import logging
-import json
 import itertools
-from typing import Dict, Any, List, Tuple
-from dataclasses import dataclass, asdict
-from pathlib import Path
+import json
+import logging
+from importlib import import_module
 import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+if __package__ in {None, ""}:
+    benchmark_module = import_module("benchmarks.benchmark_suite")
+else:
+    benchmark_module = import_module(f"{__package__}.benchmark_suite")
 
-from benchmarks.benchmark_suite import BenchmarkSuite, BenchmarkQuery, BenchmarkResult
+BenchmarkSuite = benchmark_module.BenchmarkSuite
+BenchmarkQuery = benchmark_module.BenchmarkQuery
+BenchmarkResult = benchmark_module.BenchmarkResult
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +40,7 @@ class ParameterConfig:
         K: The aggregation size (how many responses to sample).
         T: The number of refinement iterations.
     """
+
     N: int  # Number of ponies
     K: int  # Aggregation size
     T: int  # Number of iterations
@@ -65,6 +73,7 @@ class SweepResult:
         total_time: The total time taken for the test run.
         num_queries: The number of queries used in the test.
     """
+
     config: ParameterConfig
     complexity: str
     avg_latency: float
@@ -76,15 +85,15 @@ class SweepResult:
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the sweep result to a dictionary."""
         return {
-            'N': self.config.N,
-            'K': self.config.K,
-            'T': self.config.T,
-            'complexity': self.complexity,
-            'avg_latency': self.avg_latency,
-            'avg_diversity': self.avg_diversity,
-            'avg_quality': self.avg_quality,
-            'total_time': self.total_time,
-            'num_queries': self.num_queries
+            "N": self.config.N,
+            "K": self.config.K,
+            "T": self.config.T,
+            "complexity": self.complexity,
+            "avg_latency": self.avg_latency,
+            "avg_diversity": self.avg_diversity,
+            "avg_quality": self.avg_quality,
+            "total_time": self.total_time,
+            "num_queries": self.num_queries,
         }
 
 
@@ -109,13 +118,15 @@ class ParameterSweep:
         self.use_mock = use_mock
         self.suite = BenchmarkSuite(use_mock=use_mock)
         self.results: List[SweepResult] = []
-        logger.info(f"Initialized ParameterSweep [{'MOCK' if use_mock else 'REAL'} mode]")
+        logger.info(
+            f"Initialized ParameterSweep [{'MOCK' if use_mock else 'REAL'} mode]"
+        )
 
     def generate_configs(
         self,
         N_values: List[int] = None,
         K_values: List[int] = None,
-        T_values: List[int] = None
+        T_values: List[int] = None,
     ) -> List[ParameterConfig]:
         """Generates a list of all valid parameter combinations for the sweep.
 
@@ -151,9 +162,7 @@ class ParameterSweep:
         return configs
 
     async def test_config(
-        self,
-        config: ParameterConfig,
-        queries: List[BenchmarkQuery]
+        self, config: ParameterConfig, queries: List[BenchmarkQuery]
     ) -> SweepResult:
         """Tests a single parameter configuration against a set of benchmark queries.
 
@@ -177,10 +186,7 @@ class ParameterSweep:
         async with self.suite.__class__(use_mock=self.use_mock) as suite:
             for query in queries:
                 result = await suite.run_single_benchmark(
-                    query,
-                    N=config.N,
-                    K=config.K,
-                    T=config.T
+                    query, N=config.N, K=config.K, T=config.T
                 )
                 results.append(result)
 
@@ -192,8 +198,7 @@ class ParameterSweep:
 
         # Quality score based on keyword matching
         quality_scores = [
-            r.quality_score(q.expected_keywords)
-            for r, q in zip(results, queries)
+            r.quality_score(q.expected_keywords) for r, q in zip(results, queries)
         ]
         avg_quality = sum(quality_scores) / len(quality_scores)
 
@@ -204,7 +209,7 @@ class ParameterSweep:
             avg_diversity=avg_diversity,
             avg_quality=avg_quality,
             total_time=total_time,
-            num_queries=len(results)
+            num_queries=len(results),
         )
 
         self.results.append(sweep_result)
@@ -224,7 +229,7 @@ class ParameterSweep:
         N_values: List[int] = None,
         K_values: List[int] = None,
         T_values: List[int] = None,
-        max_configs: int = None
+        max_configs: int = None,
     ) -> List[SweepResult]:
         """Runs a full parameter sweep for a specific query complexity level.
 
@@ -267,8 +272,7 @@ class ParameterSweep:
         return results
 
     def find_pareto_frontier(
-        self,
-        results: List[SweepResult] = None
+        self, results: List[SweepResult] = None
     ) -> List[SweepResult]:
         """Identifies the Pareto-optimal configurations from a set of sweep results.
 
@@ -298,10 +302,14 @@ class ParameterSweep:
                     continue
 
                 # Other dominates if it's better in latency AND quality
-                if (other.avg_latency <= candidate.avg_latency and
-                    other.avg_quality >= candidate.avg_quality and
-                    (other.avg_latency < candidate.avg_latency or
-                     other.avg_quality > candidate.avg_quality)):
+                if (
+                    other.avg_latency <= candidate.avg_latency
+                    and other.avg_quality >= candidate.avg_quality
+                    and (
+                        other.avg_latency < candidate.avg_latency
+                        or other.avg_quality > candidate.avg_quality
+                    )
+                ):
                     is_dominated = True
                     break
 
@@ -312,9 +320,7 @@ class ParameterSweep:
         return pareto_frontier
 
     def find_best_config(
-        self,
-        metric: str = "latency",
-        results: List[SweepResult] = None
+        self, metric: str = "latency", results: List[SweepResult] = None
     ) -> SweepResult:
         """Finds the single best configuration based on a specific metric.
 
@@ -334,12 +340,11 @@ class ParameterSweep:
 
         if metric == "latency":
             return min(results, key=lambda r: r.avg_latency)
-        elif metric == "diversity":
+        if metric == "diversity":
             return max(results, key=lambda r: r.avg_diversity)
-        elif metric == "quality":
+        if metric == "quality":
             return max(results, key=lambda r: r.avg_quality)
-        else:
-            raise ValueError(f"Unknown metric: {metric}")
+        raise ValueError(f"Unknown metric: {metric}")
 
     def save_results(self, filename: str = "sweep_results.json"):
         """Saves the sweep results to a JSON file.
@@ -350,13 +355,13 @@ class ParameterSweep:
         output_path = Path(__file__).parent / filename
 
         data = {
-            'timestamp': time.time(),
-            'mode': 'mock' if self.use_mock else 'real',
-            'total_configs': len(self.results),
-            'results': [r.to_dict() for r in self.results]
+            "timestamp": time.time(),
+            "mode": "mock" if self.use_mock else "real",
+            "total_configs": len(self.results),
+            "results": [r.to_dict() for r in self.results],
         }
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
 
         logger.info(f"Saved results to {output_path}")
@@ -381,9 +386,9 @@ class ParameterSweep:
             return "No results to report"
 
         report = []
-        report.append("\n" + "="*80)
+        report.append("\n" + "=" * 80)
         report.append("PARAMETER SWEEP REPORT")
-        report.append("="*80)
+        report.append("=" * 80)
         report.append(f"Mode: {'MOCK' if self.use_mock else 'REAL INFERENCE'}")
         report.append(f"Total Configurations: {len(results)}")
 
@@ -411,7 +416,7 @@ class ParameterSweep:
                 f"quality={config_result.avg_quality:.2%}"
             )
 
-        report.append("\n" + "="*80)
+        report.append("\n" + "=" * 80)
 
         return "\n".join(report)
 
@@ -425,22 +430,14 @@ async def main():
         "--complexity",
         choices=["micro", "medium", "large"],
         default="micro",
-        help="Complexity level to test"
+        help="Complexity level to test",
     )
     parser.add_argument(
-        "--max-configs",
-        type=int,
-        help="Limit number of configs (for quick testing)"
+        "--max-configs", type=int, help="Limit number of configs (for quick testing)"
     )
+    parser.add_argument("--real", action="store_true", help="Use real Horde.AI (slow)")
     parser.add_argument(
-        "--real",
-        action="store_true",
-        help="Use real Horde.AI (slow)"
-    )
-    parser.add_argument(
-        "--output",
-        default="sweep_results.json",
-        help="Output JSON file"
+        "--output", default="sweep_results.json", help="Output JSON file"
     )
 
     args = parser.parse_args()
@@ -448,15 +445,14 @@ async def main():
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     sweep = ParameterSweep(use_mock=not args.real)
 
     # Run sweep
     results = await sweep.run_sweep(
-        complexity=args.complexity,
-        max_configs=args.max_configs
+        complexity=args.complexity, max_configs=args.max_configs
     )
 
     # Save results

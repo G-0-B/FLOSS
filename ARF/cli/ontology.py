@@ -10,20 +10,31 @@ Examples:
     arf ontology list-predicates --json
 """
 
-import sys
 import json
 import re
+import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+CLI_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = CLI_ROOT.parent
 
-from conversation_memory import ConversationMemory
+for bootstrap_path in (WORKSPACE_ROOT, CLI_ROOT):
+    bootstrap_str = str(bootstrap_path)
+    if bootstrap_str not in sys.path:
+        sys.path.insert(0, bootstrap_str)
+
+
+def _get_conversation_memory():
+    """Import ConversationMemory lazily after local path bootstrap."""
+    from conversation_memory import ConversationMemory
+
+    return ConversationMemory
+
 
 app = typer.Typer(help="Ontology operations")
 console = Console()
@@ -46,11 +57,14 @@ def parse_triple(triple_str: str) -> Tuple[str, str, str]:
         ValueError: If the string is not in the expected format.
     """
     # Match pattern: (subject, predicate, object)
-    pattern = r'\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)'
+    pattern = r"\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)"
     match = re.match(pattern, triple_str.strip())
 
     if not match:
-        raise ValueError(f"Invalid triple format: {triple_str}. Expected: (subject, predicate, object)")
+        raise ValueError(
+            "Invalid triple format: "
+            f"{triple_str}. Expected: (subject, predicate, object)"
+        )
 
     return (
         match.group(1).strip(),
@@ -61,7 +75,9 @@ def parse_triple(triple_str: str) -> Tuple[str, str, str]:
 
 @app.command()
 def validate(
-    triple: str = typer.Argument(..., help="Triple to validate: (subject, predicate, object)"),
+    triple: str = typer.Argument(
+        ..., help="Triple to validate: (subject, predicate, object)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Validates a knowledge triple against the shared ontology.
@@ -77,30 +93,35 @@ def validate(
         subject, predicate, obj = parse_triple(triple)
 
         # Create a temporary memory instance for validation
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id="validator", validate_ontology=True)
 
         # Validate using the internal method
-        is_valid, error_msg = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory.validate_triple((subject, predicate, obj))
 
         if json_output:
-            print(json.dumps({
-                "success": True,
-                "valid": is_valid,
-                "triple": {
-                    "subject": subject,
-                    "predicate": predicate,
-                    "object": obj,
-                },
-                "error": error_msg,
-            }))
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "valid": is_valid,
+                        "triple": {
+                            "subject": subject,
+                            "predicate": predicate,
+                            "object": obj,
+                        },
+                        "error": error_msg,
+                    }
+                )
+            )
         else:
             if is_valid:
-                console.print(f"[green]✓ Valid triple[/green]")
+                console.print("[green]✓ Valid triple[/green]")
                 console.print(f"  Subject: {subject}")
                 console.print(f"  Predicate: {predicate}")
                 console.print(f"  Object: {obj}")
             else:
-                console.print(f"[red]✗ Invalid triple[/red]")
+                console.print("[red]✗ Invalid triple[/red]")
                 console.print(f"  Error: {error_msg}")
                 console.print(f"  Triple: ({subject}, {predicate}, {obj})")
 
@@ -116,7 +137,9 @@ def validate(
 
 @app.command()
 def infer(
-    triple: str = typer.Argument(..., help="Triple for inference: (subject, predicate, object)"),
+    triple: str = typer.Argument(
+        ..., help="Triple for inference: (subject, predicate, object)"
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Performs inference based on a given knowledge triple.
@@ -132,17 +155,22 @@ def infer(
         subject, predicate, obj = parse_triple(triple)
 
         # For now, just validate (full inference in Phase 7)
+        ConversationMemory = _get_conversation_memory()
         memory = ConversationMemory(agent_id="inference", validate_ontology=True)
-        is_valid, error_msg = memory._validate_triple((subject, predicate, obj))
+        is_valid, error_msg, _ = memory.validate_triple((subject, predicate, obj))
 
         if not is_valid:
             if json_output:
-                print(json.dumps({
-                    "success": False,
-                    "error": f"Invalid triple: {error_msg}",
-                }))
+                print(
+                    json.dumps(
+                        {
+                            "success": False,
+                            "error": f"Invalid triple: {error_msg}",
+                        }
+                    )
+                )
             else:
-                console.print(f"[red]✗ Cannot infer from invalid triple[/red]")
+                console.print("[red]✗ Cannot infer from invalid triple[/red]")
                 console.print(f"  Error: {error_msg}")
             sys.exit(1)
 
@@ -151,20 +179,24 @@ def infer(
         ref = memory.transmit({"content": content})
 
         if json_output:
-            print(json.dumps({
-                "success": True,
-                "triple": {
-                    "subject": subject,
-                    "predicate": predicate,
-                    "object": obj,
-                },
-                "stored_ref": ref,
-                "note": "Full inference engine coming in Phase 7",
-            }))
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "triple": {
+                            "subject": subject,
+                            "predicate": predicate,
+                            "object": obj,
+                        },
+                        "stored_ref": ref,
+                        "note": "Full inference engine coming in Phase 7",
+                    }
+                )
+            )
         else:
-            console.print(f"[green]✓ Triple validated and stored[/green]")
+            console.print("[green]✓ Triple validated and stored[/green]")
             console.print(f"  ({subject}, {predicate}, {obj})")
-            console.print(f"  [dim]Note: Full inference engine coming in Phase 7[/dim]")
+            console.print("  [dim]Note: Full inference engine coming in Phase 7[/dim]")
 
         sys.exit(0)
 
@@ -200,11 +232,15 @@ def list_predicates(
     ]
 
     if json_output:
-        print(json.dumps({
-            "success": True,
-            "count": len(predicates),
-            "predicates": predicates,
-        }))
+        print(
+            json.dumps(
+                {
+                    "success": True,
+                    "count": len(predicates),
+                    "predicates": predicates,
+                }
+            )
+        )
     else:
         table = Table(title="Known Ontology Predicates")
         table.add_column("#", style="cyan", justify="right")

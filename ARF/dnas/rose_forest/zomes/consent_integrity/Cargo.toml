@@ -1,0 +1,28 @@
+[package]
+name = "consent_integrity"
+version = "0.1.0"
+edition = "2021"
+
+# Consent Gate Protocol — ADR-12 integrity zome
+# Implements ConsentPayload + ConsentDecision entry types per:
+#   - FLOSS/docs/adr/ADR-12-consent-gate-protocol.md
+#   - FLOSS/docs/specs/consent-payload.spec.md
+#   - FLOSS/docs/specs/consent-payload.schema.json
+# Authored 2026-05-19 with holochain-agent-skill loaded as canonical
+# HDI-pattern reference (the first real adapter_test exercise of that skill —
+# see ledger entry 0013 + 2026-05-19 demotion + consensus claim 019e412d).
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+thiserror = "1.0"
+
+# HDK 0.6 / HDI 0.7 transitively depends on getrandom 0.3.x, which requires
+# the `wasm_js` feature to be enabled for wasm32-unknown-unknown builds.
+# Added 2026-05-19 during the holochain-0.4 -> 0.6 migration.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

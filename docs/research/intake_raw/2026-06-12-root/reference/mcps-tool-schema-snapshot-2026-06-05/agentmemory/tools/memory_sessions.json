@@ -1,0 +1,8 @@
+{
+  "name": "memory_sessions",
+  "description": "List recent sessions with their status and observation counts.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}

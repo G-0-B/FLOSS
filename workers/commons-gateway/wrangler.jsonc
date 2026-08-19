@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Cloudflare Workers Builds currently reports the linked service as "floss".
+  "name": "floss",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true
+}

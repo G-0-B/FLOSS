@@ -1,0 +1,2346 @@
+# FLOSSI0ULLK Reuse Ledger — Canonical Anti-Duplication Record
+# Parent: context_continuation_packet_v4_0.md + 2026-05-13-collaboration-research-plan.md
+# Version: 0.5-pressure-restored-2026-05-19 (was 0.4; throttling guard removed; 44 more entries promoted in pressure-restore batch)
+#          per feedback_pressure_helps_drop_throttling_guards memory; backlog
+#          accumulation in investigate-tier is FEATURE not bug for this user's
+#          working style — pressure is the production mechanism)
+# Location: FLOSS/docs/research/reuse-ledger-seed.yaml (relocated from workspace root 2026-05-16)
+# Rule: No new module may be created without a completed entry here.
+#        A missing entry = NEVER until filed.
+#
+# Accumulation discipline (corrected 2026-05-19):
+#   - Investigate-tier entries (decision: investigate / monitor): ACCUMULATE FREELY.
+#     The user-named pressure mechanism depends on backlog visibility. Treating
+#     ledger growth as the throttle inverts the operational model.
+#   - Adopt-tier entries (decision: adopt with multi-gate pass): canon-class.
+#     These are where due-diligence actually applies. Promotion to adopt requires
+#     license_gate=pass + adapter_test attempted + provenance recorded + rollback
+#     verified + contact path open. Anti-accumulation discipline applies HERE,
+#     not at the investigate-tier accumulation layer.
+#   - The Holochain integrity-zome equivalent: only `decision: adopt` entries
+#     would in principle bind agent behavior; investigate-tier is observation,
+#     not commitment.
+
+- id: reuse-ledger-0001
+  domain: agent-centric-p2p-substrate
+  candidate_project: Holochain
+  url: https://github.com/holochain/holochain
+  function_needed: Distributed peer-to-peer application substrate with integrity/coordinator zomes, source chain provenance, budgeted writes, vector search, edge linking, Tryorama test scaffolding
+  reuse_level: direct
+  license_status: pending  # Apache 2.0 — confirm current version
+  maturity: active
+  integration_risk: medium  # API churn between 0.5.x and 0.6.x
+  contact_path: https://forum.holochain.org + https://github.com/holochain
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: adopt  # Declared primitive — confirm current API
+  notes: "Must verify HDK/HDI breaking changes since Rose Forest spec was written. Survey existing hApps before writing custom zomes."
+  next_action: "Check current Holochain 0.6 beta release notes; document in research/holochain.md"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-19"
+
+- id: reuse-ledger-0002
+  domain: semantic-spanning-layer
+  candidate_project: AD4M
+  url: https://github.com/coasys/ad4m
+  function_needed: Agent-centric semantic bus with perspectives, links, languages, Social DNA validation, DID identity, protocol adapters
+  reuse_level: direct
+  license_status: pending  # GPL-3.0 — check copyleft propagation impact
+  maturity: active
+  integration_risk: medium  # GPL copyleft; Social DNA Prolog complexity
+  contact_path: https://github.com/coasys/ad4m/discussions
+  gate_status:
+    license: pending  # GPL-3.0 compatibility with AGPL project license needs legal review
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: adopt  # Declared primitive — confirm license compatibility
+  notes: "Flux/Perspect3vism is the production reference. Social DNA feasibility note needed before encoding ULLK values as Prolog rules."
+  next_action: "GPL-3.0/AGPL compatibility check; survey existing AD4M Languages; write Social DNA feasibility note"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-19"
+
+- id: reuse-ledger-0003
+  domain: portable-agent-identity
+  candidate_project: KERI / WebOfTrust
+  url: https://github.com/WebOfTrust/keripy
+  function_needed: Self-certifying portable identifiers, signed key event logs, multi-sig delegation, cross-system identity binding (Holochain + AD4M + Radicle)
+  reuse_level: adapter
+  license_status: pending  # Apache 2.0 — verify
+  maturity: active  # KERI Suite spec standardization milestone reached Jan 2026
+  integration_risk: medium  # Spec-heavy; adapter design required
+  contact_path: https://keri.foundation + https://github.com/WebOfTrust
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: "KERI AID is declared in identity_bindings.yaml schema. Minimum viable test: generate one AID, write one key event log entry in keripy or kerijs."
+  next_action: "Confirm keripy and kerijs library status; write minimal AID generation stub; document in research/keri.md"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-20"
+
+- id: reuse-ledger-0004
+  domain: value-flow-accounting
+  candidate_project: hREA / ValueFlows
+  url: https://github.com/h-REA/hREA
+  function_needed: Transparent distributed accounting of contribution events and resource flows between agents; maps to pilot step 7 (hREA records contribution)
+  reuse_level: direct
+  license_status: pending  # GPL-3.0 — check copyleft propagation
+  maturity: active  # Sensorica NRP-CAS demo 2025
+  integration_risk: medium  # GPL copyleft; GraphQL API stability
+  contact_path: https://github.com/h-REA/hREA/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate  # Highest priority — directly required by pilot success criteria
+  notes: "Sensorica NRP-CAS is the reference implementation. Minimum viable test: record one patch acceptance as a hREA economic event. GraphQL schema review needed."
+  next_action: "Review hREA GraphQL schema; write minimal contribution event stub; open GitHub discussion; document in research/hrea.md"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-18"
+
+- id: reuse-ledger-0005
+  domain: multi-agent-orchestration
+  candidate_project: LangGraph
+  url: https://github.com/langchain-ai/langgraph
+  function_needed: Stateful long-running agent workflow orchestration with human-in-the-loop gates and explanation object emission
+  reuse_level: adapter  # Use as execution engine; sovereignty preserved at AD4M/Holochain layer
+  license_status: pending  # MIT — verify
+  maturity: active
+  integration_risk: medium  # LangChain ecosystem churn; framework lock-in risk
+  contact_path: https://github.com/langchain-ai/langgraph/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: "Compare with AG2 and CrewAI before committing. Key criteria: human-in-the-loop gate support, explanation object emission, sandboxed execution, sovereignty-preserving adapter design."
+  next_action: "Produce comparison table: LangGraph vs AG2 vs CrewAI; document in research/agent-orchestration.md"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-21"
+
+- id: reuse-ledger-0006
+  domain: multi-agent-orchestration
+  candidate_project: AG2 / AutoGen
+  url: https://github.com/microsoft/autogen
+  function_needed: Cooperating multi-agent workflows with role separation and human approval patterns
+  reuse_level: adapter
+  license_status: pending  # Apache 2.0 — verify
+  maturity: active
+  integration_risk: medium  # Microsoft-controlled roadmap
+  contact_path: https://github.com/microsoft/autogen/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: "To be evaluated alongside LangGraph and CrewAI in research/agent-orchestration.md comparison."
+  next_action: "Include in orchestration comparison table"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-21"
+
+- id: reuse-ledger-0007
+  domain: sovereign-code-artifacts
+  candidate_project: Radicle
+  url: https://radicle.xyz
+  function_needed: Canonical peer-to-peer code hosting with signed refs, delegate authority, patch review, and release governance
+  reuse_level: direct
+  license_status: pending  # MIT/Apache 2.0 — verify current release
+  maturity: active
+  integration_risk: low
+  contact_path: https://radicle.xyz/community + https://github.com/radicle-dev
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: adopt  # Declared canonical substrate
+  notes: "Operational task: initialize pilot repo, configure GitHub mirror policy, verify current CLI version. Not a research question — an implementation task."
+  next_action: "Install Radicle CLI; initialize pilot repo; write repo_policy.md and mirror_policy.yaml"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-15"
+
+- id: reuse-ledger-0008
+  domain: offline-knowledge-commons
+  candidate_project: Kolibri
+  url: https://github.com/learningequality/kolibri
+  function_needed: Offline-first structured educational content distribution for low-resource environments
+  reuse_level: protocol-alignment  # Potential AD4M Language target in later scope
+  license_status: pending  # MIT — verify
+  maturity: active
+  integration_risk: low
+  contact_path: https://github.com/learningequality/kolibri/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: monitor  # LATER — does not unblock pilot
+  notes: "Log now to prevent re-discovery. Kolibri content channel API is a candidate AD4M Language for knowledge commons layer. Do not implement until pilot proves need."
+  next_action: "Note content channel API in research/knowledge-commons.md; revisit after pilot"
+  next_action_owner: Tony
+  next_action_deadline: "2026-06-30"
+
+- id: reuse-ledger-0009
+  domain: environmental-sensing
+  candidate_project: Safecast
+  url: https://safecast.org
+  function_needed: CC0 environmental sensor data and open hardware patterns for non-sentient enabling systems integration
+  reuse_level: protocol-alignment  # Data API as potential AD4M Language input
+  license_status: pending  # CC0 data — verify API terms
+  maturity: active
+  integration_risk: low
+  contact_path: https://safecast.org/contact + https://github.com/Safecast
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: monitor  # LATER — does not unblock pilot
+  notes: "CC0 data is the easiest near-term integration for demonstrating non-sentient system participation in the commons. Log now to prevent re-discovery."
+  next_action: "Note API endpoints in research/sensing-systems.md; revisit after pilot"
+  next_action_owner: Tony
+  next_action_deadline: "2026-06-30"
+
+- id: reuse-ledger-0010
+  domain: pilot-embedding-model
+  candidate_project: sentence-transformers
+  url: https://github.com/UKPLab/sentence-transformers
+  function_needed: Local sentence embedding model to replace mock embeddings in ConversationMemory; first pilot change
+  reuse_level: direct-dependency
+  license_status: pending  # Apache 2.0 — verify
+  maturity: active
+  integration_risk: low
+  contact_path: https://github.com/UKPLab/sentence-transformers
+  gate_status:
+    license: pending
+    adapter_test: pending  # This IS the pilot adapter test
+    provenance: pending
+    rollback: pending  # Rollback = revert to mock embeddings
+    contact: pending
+  decision: proceed  # This is the one concrete first move per packet instructions
+  notes: "Pilot: swap mock embeddings for sentence-transformers in ConversationMemory. Must produce a provenance record and pass existing ConversationMemory integration tests. Rollback is trivially available."
+  next_action: "Implement; write provenance_events.jsonl entry; run tests; open Radicle patch"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-20"
+
+# ============================================================================
+# 2026-05-16 expansion — entries 0011-0015 from kalisam fork inventory
+# Provenance: ~90 GitHub forks under kalisam, dated 2026-04 to 2026-05-16.
+# Selection criteria: (1) updated within last 3 days, (2) direct shape-match
+# to a declared FLOSSI0ULLK layer or load-bearing concern, (3) AGPL-cascade
+# license-compatible per ADR-7. Other ~80 forks remain inventory-only.
+# ============================================================================
+
+- id: reuse-ledger-0011
+  domain: personal-agent-harness
+  candidate_project: OpenHuman (tinyhumansai/openhuman)
+  url: https://github.com/tinyhumansai/openhuman
+  kalisam_fork: https://github.com/kalisam/openWhoman
+  function_needed: >
+    Local-first personal agent harness with Memory Tree (SQLite + Obsidian-compatible
+    Markdown vault), 118+ integrations with 20-min auto-fetch, model routing, and
+    token compression. Personal-scale FLOSSI0ULLK use-case: the n=12 silos
+    coordination wall named in session_summary_2026-05-04 §A15.
+  reuse_level: adapter  # federate via agentmemory backend; do not absorb as core
+  license_status: pass  # GPL-3.0 verified 2026-05-21; GPLv3/AGPLv3 section-13 compatibility is enough for adapter/federation use, not legal advice
+  maturity: active  # upstream v0.54.4 at ec9708a on 2026-05-21; active and fast-moving
+  integration_risk: medium  # active project with frequent breaking changes; federate-at-interface only
+  contact_path: https://discord.tinyhumans.ai/ + https://github.com/tinyhumansai/openhuman
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    Direct shape-match to FLOSSI0ULLK Layer 1-2 at personal scale. Memory Tree +
+    Obsidian-vault = same shape as ConversationMemory + intake-mouth convention.
+    Karpathy obsidian-wiki workflow heritage. Federation point is
+    `memory.backend = "agentmemory"` in config.toml — see entry 0012.
+    NOT P5-compatible at the routing level (single-subscription model routing
+    reintroduces partial centralization per obstruction taxonomy in
+    resonance_mechanism_v2.md §9). Federate at memory layer only.
+    Compares against Claude Cowork / OpenClaw / Hermes Agent in its own README;
+    same competitive territory as IBM "After Mythos" continuation packet.
+    2026-05-21 local-first check: no separate staging draft found because 0011
+    was seeded directly into canon on 2026-05-16. Current upstream still exposes
+    the agentmemory backend and maps namespace/key/content/id/session/timestamp
+    through REST; upstream AGENTS.md/CLAUDE.md say QuickJS skill runtime is
+    removed and skills are metadata-only, while some GitBook architecture pages
+    lag. Keep the adapter boundary.
+  next_action: "Adapter/data-model check: map OpenHuman Memory Tree + agentmemory fields to ConversationMemory Understanding + MultiScaleEmbedding provenance; decide whether to run OpenHuman agentmemory_backend tests against local agentmemory or document interface only."
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-23"
+
+- id: reuse-ledger-0012
+  domain: persistent-memory-federation
+  candidate_project: agentmemory (rohitg00/agentmemory)
+  url: https://github.com/rohitg00/agentmemory
+  kalisam_fork: https://github.com/kalisam/agentmemory
+  function_needed: >
+    Shared persistent-memory backend usable across Claude Code / Cursor / Codex /
+    OpenCode / OpenHuman. Direct answer to the cross-tool silos coordination wall.
+    Critical for personal-scale FLOSSI0ULLK before Holochain Layer 0 ships.
+  reuse_level: adapter
+  license_status: pass  # GitHub repo API reports Apache-2.0; checked 2026-05-19
+  maturity: active  # upstream pushed 2026-05-20T00:15:32Z per GitHub API
+  integration_risk: medium  # federation interface stability; data-model alignment with ConversationMemory still unverified
+  contact_path: https://github.com/rohitg00/agentmemory
+  gate_status:
+    license: pass
+    adapter_test: pass  # REST round-trip 2026-05-19: remember -> id mem_mpebqux9_d9ae5dbe18e4, smart-search recalled same obsId on first query (BM25 score 0.016); REST cross-session recall re-verified by Codex 2026-05-20
+    provenance: pass
+    rollback: pass
+    contact: pending  # MCP tool surface comes online next Claude Code session start; cross-session persistence still wants a second-session recall test
+  decision: investigate
+  notes: >
+    README claims "#1 Persistent memory for AI coding agents based on real-world
+    benchmarks" — verify benchmark methodology before adoption. Local server
+    verified healthy at http://localhost:3111 (uptime 3.6h, 257 functions
+    registered, version 0.11.6) and viewer at http://localhost:3113 on
+    2026-05-19. Root operator surface `AGENTMEMORY.md` placed, MCP registered
+    behind JanuScope lens (`.mcp/lenses/agentmemory.yaml` with audit sink at
+    `.agent-surface/heartbeat/janus-agentmemory-audit.jsonl` and invariants
+    that explicitly subordinate agentmemory to repository canon), shared
+    projections wired in both root and FLOSS .mcp.json. **2026-05-19 REST
+    adapter-test PASSED**: substrate-migration memory written (id
+    `mem_mpebqux9_d9ae5dbe18e4`), `smart-search` for "holochain substrate
+    migration HDI 0.7" recalled the same obsId on first query (score 0.016).
+    Codex re-ran the same REST search on 2026-05-20 and recalled
+    `mem_mpebqux9_d9ae5dbe18e4`, proving REST-level cross-session recall. Still
+    INVESTIGATE not ADOPT because: (a) MCP tool surface must be exercised from
+    an MCP-aware session via `memory_smart_search`; (b) contact gate (file GH
+    Discussion to rohitg00 acknowledging FLOSSI0ULLK use-case + JanuScope
+    wrapping) still pending. Promotion to ADOPT gated on those two.
+  next_action: "Next MCP-aware session: call memory_smart_search via MCP, verify it returns mem_mpebqux9_d9ae5dbe18e4. Then file GH Discussion to rohitg00 for contact gate, then promote to adopt."
+  next_action_owner: Tony or next MCP-aware Claude Code session
+  next_action_deadline: "2026-05-23"
+
+- id: reuse-ledger-0013
+  domain: holochain-development-tooling
+  candidate_project: holochain-agent-skill (Soushi888/holochain-agent-skill)
+  url: https://github.com/Soushi888/holochain-agent-skill
+  kalisam_fork: https://github.com/kalisam/holochain-agent-skill
+  function_needed: >
+    Agent Skills Open Standard skill for Holochain hApp development. Covers
+    architecture, design, scaffolding, implementation, testing, deployment.
+    Directly unblocks Phase 0 Rose Forest DNA Tryorama work
+    (working-todo §B Wave-3 item #1, voter-prioritized 8/13).
+  reuse_level: direct
+  license_status: pass  # Apache-2.0 (gate-passed 2026-05-17); AGPL-cascade compatible per ADR-7
+  maturity: active  # last push 2026-05-16
+  integration_risk: low  # development-time tooling, not runtime dependency; trivially rollback-able
+  contact_path: https://github.com/Soushi888/holochain-agent-skill
+  gate_status:
+    license: pass  # 2026-05-17 — Apache-2.0 verified directly from LICENSE file (not GitHub auto-detect)
+    adapter_test: pass  # RE-PROMOTED 2026-05-19 with real evidence — skill loaded via Skill tool and applied to write `ARF/dnas/rose_forest/zomes/consent_integrity/{Cargo.toml,src/lib.rs}` (ConsentPayload + ConsentDecision integrity zome implementing ADR-12 + consent-payload.spec.md). Code compiled cleanly via `cargo check -p consent_integrity --target wasm32-unknown-unknown` in 36.36s. Specific patterns from the skill's Pitfalls Checklist applied: (a) no `agent_pub_key` or `created_at` action-header fields as entry fields (action header is authoritative; entry uses DID strings for cross-substrate identity + semantic-meaning timestamps separately), (b) `#[serde(default)]` on all `Option<T>` fields for forward-compatible schema evolution, (c) `validate()` is purely deterministic — no DHT reads / no `agent_info()` / no `sys_time()`, (d) dispatch via `op.flattened::<EntryTypes, LinkTypes>()`. Skill ALSO surfaced 3 real findings on first invocation: (i) workspace HDI/HDK two minor versions behind what skill teaches (0.5.1 / 0.4.1 vs 0.7.1 / 0.6.1), (ii) only `rose_forest_integrity` is wired into `dna.yaml` — three other integrity zomes (hrea/identity/ontology) exist but are unused dev artifacts, (iii) existing zomes carry `created_at` and `agent_pub_key` as entry fields in violation of the timeless invariant. The findings + the compile-clean ConsentPayload zome ARE the real adapter_test data.
+    provenance: pass  # 2026-05-17 — install logged via working-todo §I and ledger gate update; git clone --depth 1 from https://github.com/Soushi888/holochain-agent-skill.git at commit-of-2026-05-16-push
+    rollback: pass  # trivial: `rm -rf C:/~shit/.claude/skills/holochain-agent-skill/` removes all skill state with zero downstream dependencies
+    contact: pending  # social-action gate — file GitHub Discussion AFTER real adapter-test exercise, NOT before. Per 2026-05-19 anti-fabrication catch: an introduction citing observations we hadn't actually had would have soft-grounded credibility with the maintainer.
+  decision: adopt  # RE-PROMOTED 2026-05-19 from investigate → adopt with REAL evidence (4/5 gates pass legitimately now). The demotion-then-promotion cycle within hours produced more value than the original sloppy 4/5 promotion 2026-05-17 ever did: the demotion forced honest evaluation; the real ConsentPayload zome implementation exercises the skill on real project work AND advances ADR-12 §8 next-action #4 simultaneously. Honest gate count: license: pass (Apache-2.0), adapter_test: pass (ConsentPayload zome compiles in 36s applying 4+ documented skill patterns + surfaced 3 real workspace findings), provenance: pass (durable in working-todo §I + consensus claim 019e412d demotion + this re-promotion claim + Rust file on disk), rollback: pass (`rm -rf .claude/skills/holochain-agent-skill/` + `rm -rf ARF/dnas/rose_forest/zomes/consent_integrity/` + revert Cargo.toml workspace member addition). Contact: pending — GitHub Discussion at Soushi888/holochain-agent-skill is now appropriate to draft with REAL observations (the 3 findings + the compile-clean zome) instead of the 2026-05-19 fabricated draft that the user caught.
+  notes: >
+    Compatible with Claude Code, GitHub Copilot, Cursor, Augment via Agent Skills
+    Open Standard. Installed 2026-05-17 at `C:/~shit/.claude/skills/holochain-agent-skill/`
+    via git clone (--depth 1) from upstream Soushi888/holochain-agent-skill.
+    Direct payoff: speeds up ARF/dnas/rose_forest/ Tryorama scenarios + integrity
+    zome work — directly serves Wave-3 priority #1 (Phase-0-Substrate-Viability-Test,
+    8/13 voter-prioritized). Version pins: hdk=0.6.1, hdi=0.7.1, holonix ref=main-0.6.
+    DEMOTION NOTE 2026-05-19: this entry held the project's "first adopt"
+    position 2026-05-17→2026-05-19 — but never earned a real adapter_test pass.
+    The 4/5-gates claim was premised on installation evidence, too thin for
+    adopt-class commitment. Now correctly at investigate with 2/5 real gates
+    + 1 thin-pass. Future promotion path: drive real Rust HDK work, observe the
+    skill in action, document concrete patterns-applied / drift-caught, promote
+    on actual evidence. NOT before.
+  next_action: "Hold at investigate until real Rust HDK session exercises the skill. Most likely catalyst: ConsentPayload Holochain entry-type implementation (ADR-12 §8 next-action #4). Invoke the skill on real integrity-zome work; document specific patterns applied; close adapter_test gate; THEN draft the GitHub Discussion with real observations to close contact gate."
+  next_action_owner: Tony (or grant-funded engineer per NLnet Deliverable 1)
+  next_action_deadline: "open — gated on real HDK work starting"
+
+- id: reuse-ledger-0014
+  domain: multi-model-consensus-governance
+  candidate_project: delimit-mcp-server (delimit-ai/delimit-mcp-server)
+  url: https://github.com/delimit-ai/delimit-mcp-server
+  kalisam_fork: https://github.com/kalisam/delimit-mcp-server
+  function_needed: >
+    "Govern AI coding across Claude Code, Codex, Cursor, and Gemini CLI.
+    Breaking-change detection, deploy gates, and multi-model consensus — delivered
+    as MCP server, CLI, and GitHub Action." Architectural cousin to FLOSSI0ULLK
+    Layer 4.5 consensus gateway but narrower scope (coding governance specifically).
+  reuse_level: adapter | protocol-alignment
+  license_status: pending
+  maturity: active
+  integration_risk: medium  # architectural-overlap risk: does their claim schema converge or fork from FLOSSI0ULLK's?
+  contact_path: https://github.com/delimit-ai/delimit-mcp-server
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    Direct architectural cousin to FLOSSI0ULLK packages/orchestrator/consensus_gate.py
+    and packages/metacoordinator_mcp/server.py. If their claim schema is
+    compatible, this becomes a Layer 4.5 ecosystem peer (Holochain-side equivalent
+    of an interop standard). If schemas diverge, document the fork in
+    resonance_mechanism_v2.md §9 obstruction taxonomy and decide whether to
+    converge, bridge, or reject.
+  next_action: "Read claim schema + consensus mechanism; compare to FLOSS/packages/orchestrator/consensus_gate.py wire format"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-25"
+
+- id: reuse-ledger-0015
+  domain: sibling-holochain-fractal-governance
+  candidate_project: mycelix + mycelix-edunet (Luminous-Dynamics)
+  url: https://github.com/Luminous-Dynamics/mycelix
+  url_secondary: https://github.com/Luminous-Dynamics/mycelix-edunet
+  kalisam_fork: https://github.com/kalisam/mycelix + https://github.com/kalisam/MyCellExtension
+  function_needed: >
+    "Mycelix Fractal CivOS — 16 cluster hApps, 123+ zomes, consciousness-gated
+    governance on Holochain." Educational-network variant adds P2P learning with
+    verifiable credentials. Sibling architectural class to FLOSSI0ULLK Rose Forest
+    DNA + CCES education layer.
+  reuse_level: investigate | collaboration  # likely collaboration not absorption
+  license_status: pending
+  maturity: active
+  integration_risk: medium  # philosophical resonance ≠ technical compatibility per plan §9 anti-pattern; verify before assuming alignment
+  contact_path: https://github.com/Luminous-Dynamics
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    Sibling project: also Holochain + flourishing architecture, but its own DNA
+    and governance model. NOT a fork of FLOSSI0ULLK and not a direct dependency.
+    Strong collaboration opportunity if values + technical shape align. The
+    "consciousness-gating" mechanism is the highest-priority compare-point — map
+    against CFIS v0.3 LSM-Override and the catuskoti 4-valued logic. The edunet
+    variant overlaps the long-arc CCES education layer (HOLISTIC_ARCHITECTURE
+    §2.5). Watch for shared blindspots: both projects may inherit similar
+    Holochain-substrate assumptions; cross-check via §9 obstruction taxonomy.
+  next_action: "Read Mycelix Fractal CivOS DNA architecture; map 16 hApps to CFIS frames / CCES layers; identify collaboration vs convergence question for outreach"
+  next_action_owner: Tony
+  next_action_deadline: "2026-05-30"
+
+# ============================================================================
+# 2026-05-18 promotion batch — entries 0016-0023 from harvest staging
+# Promoted: 2026-05-18T19:11:54.919294+00:00
+# Source: .agent-surface/harvest/staging/ (66 drafts, user spot-checked 2026-05-18)
+# Provenance preserved: staging YAMLs + JSON sidecars moved to .agent-surface/harvest/promoted/
+# Anti-accumulation note: brings ledger to 23 entries with 1 at decision=adopt (0013).
+# Approaching but not exceeding kill criterion (25 entries with none at adopt).
+# Selection criteria: license_gate=pass, decision=investigate, domain diversity.
+# ============================================================================
+
+- id: reuse-ledger-0016
+  domain: mcp-security-validation
+  promoted_from_staging: "0036_agentsid_dev_agentsid_scanner_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "agentsid-scanner (AgentsID-dev/agentsid-scanner)"
+  url: "https://github.com/AgentsID-dev/agentsid-scanner"
+  kalisam_fork: "https://github.com/kalisam/agentsid-scanner"
+  function_needed: |
+    The Layer 4.5 MCP passive-router consensus gateway connects to external MCP servers to execute tool calls. FLOSSI0ULLK needs a mechanism to validate the tool definitions of these connected servers for prompt injection vulnerabilities, dangerous permission patterns, and input validation gaps before allowing them to participate in the local agent node environment.
+  reuse_level: adapter
+  license_status: "pass - MIT per metadata; compatible with AGPL-3 cascade per ADR-7"
+  maturity: maintained
+  integration_risk: low
+  contact_path: "https://github.com/AgentsID-dev/agentsid-scanner/issues"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: |
+    Relevant for validating MCP server security connected to the Layer 4.5 consensus gateway. No direct FLOSSI0ULLK analogue exists for vulnerability scanning of MCP definitions. Key risk: The project pushes users toward a centralized registry (agentsid.dev/registry) and SDK for remediation, which touches on P5 centralization anti-patterns. However, the local programmatic `scanToolDefinitions` function appears to be usable independently without network calls.
+  next_action: "Review src/rules.mjs to extract prompt injection patterns for Layer 4.5 hashline pre-write verification."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0017
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0038_juliusbrussee_caveman_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "caveman (JuliusBrussee/caveman)"
+  url: "https://github.com/JuliusBrussee/caveman"
+  kalisam_fork: "https://github.com/kalisam/caveman"
+  function_needed: |
+    FLOSSI0ULLK requires token-efficient communication patterns for its Layer 4.5 local multi-model consensus gateway and Layer 4 agent coordination. Minimizing output verbosity reduces context window pressure during multi-agent polling and consensus rounds, while preserving the technical accuracy needed for Layer 3 symbolic validation.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "low"
+  contact_path: "https://github.com/JuliusBrussee/caveman/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    This project is relevant for reducing context window bloat in the Layer 4.5 local agent node via its `caveman-shrink` MCP middleware and agent skills. The closest FLOSSI0ULLK analogue is the Metaharness context optimization layer. A key risk is that forced brevity might strip out critical semantic nuances needed for Layer 3 integrity zome validation, requiring careful tuning of the compression level. An anti-pattern check confirms it operates locally without centralized routing or subscription gates, avoiding P5 violations.
+  next_action: "Evaluate caveman-shrink MCP middleware against Layer 4.5 consensus gateway for token efficiency."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0018
+  domain: "semantic-spanning-layer"
+  promoted_from_staging: "0054_andrewmoshu_agit_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "agit (andrewmoshu/agit)"
+  url: "https://github.com/andrewmoshu/agit"
+  kalisam_fork: "https://github.com/kalisam/edgit"
+  function_needed: >
+    A localized semantic annotation mechanism that travels with the codebase (Layer 2 semantic).
+    It provides persistent, file-level context, constraints, and historical decisions directly
+    to local agents, bypassing central knowledge bases and preserving context across agent sessions.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "low"
+  contact_path: "https://github.com/andrewmoshu/agit"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    agit provides a shadow directory structure mapping directly to code files, acting as a localized Layer 2 semantic memory.
+    This is highly relevant as a lightweight, filesystem-native alternative to complex vector stores for file-specific agent context.
+    The closest FLOSSI0ULLK analogue is the intended local agent workspace memory.
+    Risk is low due to its standalone CLI and MCP server approach, but shape-mismatches may occur if FLOSSI0ULLK requires graph-based rather than hierarchical directory-based context.
+    It strongly adheres to anti-centralization principles by keeping state strictly local and Git-tracked.
+  next_action: "Test agit init on a dummy repo and evaluate MCP server integration."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0019
+  domain: "agent-evaluation-benchmark"
+  promoted_from_staging: "0063_internlm_wildclawbench_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "WildClawBench (InternLM/WildClawBench)"
+  url: "https://github.com/InternLM/WildClawBench"
+  kalisam_fork: "https://github.com/kalisam/WildClawBench"
+  function_needed: >
+    FLOSSI0ULLK requires a rigorous, end-to-end evaluation framework to measure
+    the practical capabilities of its personal agent harnesses (Layer 4.5) and
+    multi-agent orchestration (Layer 4). WildClawBench provides a reproducible,
+    containerized suite of 60 real-world tasks that test autonomous planning,
+    multi-step tool orchestration, and long-horizon execution.
+  reuse_level: "adapter"
+  license_status: "MIT per metadata; pass - compatible with AGPL-3 cascade per ADR-7"
+  maturity: "active"
+  integration_risk: "low"
+  contact_path: "https://github.com/InternLM/WildClawBench/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    WildClawBench is highly relevant as an objective, containerized evaluation suite
+    for measuring agent capabilities on real-world, long-horizon tasks. It does not
+    directly replace a FLOSSI0ULLK runtime component, but serves as an essential
+    verification tool for Layer 4 and Layer 4.5 development. The primary integration
+    effort is writing a custom adapter harness to interface FLOSSI0ULLK agents with
+    the benchmark's test environment. It avoids alignment-as-proof anti-patterns by
+    evaluating purely on objective task success in isolated Docker containers.
+  next_action: "Review task schemas to assess effort for building a FLOSSI0ULLK agent harness."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id:                  reuse-ledger-0020
+  domain:              multi-agent-orchestration
+  promoted_from_staging: "0016_nvidia_nemo_agent_toolkit_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "NeMo-Agent-Toolkit (NVIDIA/NeMo-Agent-Toolkit)"
+  url:                 "https://github.com/NVIDIA/NeMo-Agent-Toolkit"
+  kalisam_fork: "https://github.com/kalisam/NeMo-Agent-Toolkit"
+  function_needed:     >
+    A framework for orchestrating, observing, and optimizing a heterogeneous
+    swarm of agents. FLOSSI0ULLK requires robust Layer 4 coordination capabilities
+    for its Recursive Self-Aggregation (RSA) swarms and a communication backbone
+    for the Layer 4.5 consensus gateway. This toolkit could provide pre-built
+    primitives for parallel execution, distributed agent communication (A2A),
+    and performance profiling, potentially accelerating the implementation of the
+    Metaharness operating model.
+  reuse_level:         adapter
+  license_status:      "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    medium
+  contact_path:        "https://github.com/NVIDIA/NeMo-Agent-Toolkit/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    The toolkit's focus on framework-agnostic, multi-agent orchestration and
+    observability makes it highly relevant to FLOSSI0ULLK's Layer 4/4.5 architecture.
+    It provides a potential off-the-shelf implementation for the RSA swarm's
+    coordination logic. However, the primary risk is its complexity and potential
+    for subtle dependencies on the NVIDIA ecosystem (e.g., Dynamo integration),
+    which may complicate integration with the Holochain substrate. The project
+    appears to be a practical toolkit, not a "vision accumulation" project, and
+    its support for MCP is a positive signal against P5 centralization risks.
+  next_action:         "Spike: Build a minimal PoC adapter to route a simple claim/vote between two mock agents using NeMo's A2A protocol and observe the trace with its tooling."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: "2026-05-27"
+
+- id:                  reuse-ledger-0021
+  domain:              multi-agent-orchestration
+  promoted_from_staging: "0016_brainblend_ai_atomic_agents_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "atomic-agents (BrainBlend-AI/atomic-agents)"
+  url:                 "https://github.com/BrainBlend-AI/atomic-agents"
+  kalisam_fork: "https://github.com/kalisam/atomic-agents"
+  function_needed:     >
+    A lightweight, modular Python framework for defining and orchestrating agentic AI pipelines.
+    FLOSSI0ULLK requires a structured, predictable way to build composable agent behaviors
+    with clear input/output schemas. This is especially relevant to the atomic side of the
+    metaharness: `BaseIOSchema` and `AtomicAgent[In, Out]` can prototype typed adapters for
+    FLOSSI0ULLK `Action`, Claim, Vote, router-decision, and synthesis-result contracts without
+    replacing ADR-10 consensus or the heartbeat composer.
+  reuse_level:         adapter
+  license_status:      "pass - MIT verified 2026-05-18 from GitHub license endpoint and pyproject.toml; AGPL-3 compatible as permissive dependency per ADR-7"
+  maturity:            "active - upstream v2.7.5, main f849087, 5.9k stars / 508 forks, pushed 2026-04-29"
+  integration_risk:    medium
+  contact_path:        "https://discord.gg/J3W9b5AZJR"
+  gate_status:
+    license:           pass
+    adapter_test:      pending
+    provenance:        pass
+    rollback:          pending
+    contact:           pending
+  decision:            investigate
+  notes: >
+    This project offers a relevant, schema-driven Python framework for building composable
+    AI agents, which aligns with FLOSSI0ULLK's need for predictable behavior. It should not
+    become the metaharness overseer. Better fit: typed leaf-agent and adapter scaffolding under
+    the existing heartbeat + ADR-10 + activity-log architecture. Primary integration risks:
+    Python >=3.12 only, dependency surface (`instructor==1.14.5`, `litellm`, `mcp[cli]`), and
+    possible schema overlap with FLOSSI0ULLK's own `Action` dataclass. The exact test is whether
+    an AtomicAgent can emit a valid Claim/Vote/Action-shaped object with less glue than our
+    current direct Pydantic/JSON path.
+  next_action:         "Adapter spike: implement a minimal FLOSSI0ULLK Action/Claim/Vote wrapper using AtomicAgent[In, Out], compare schema friction against direct Pydantic + Instructor, then decide adopt/monitor/reject."
+  next_action_owner:   "Tony or Codex/Gemini delegate"
+  next_action_deadline: "2026-05-27"
+
+- id:                  reuse-ledger-0022
+  domain:              persistent-memory-federation
+  promoted_from_staging: "0016_volcengine_openviking_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "OpenViking (volcengine/OpenViking)"
+  url:                 "https://github.com/volcengine/OpenViking"
+  kalisam_fork: "https://github.com/kalisam/OpenViking"
+  function_needed:     >
+    A structured, persistent store for agent context, unifying memory,
+    knowledge resources, and skills. FLOSSI0ULLK's Layer 1 (ConversationMemory)
+    and Layer 2 (semantic layer) are specified but lack a concrete, hierarchical
+    storage and retrieval mechanism. This project's filesystem paradigm could
+    provide a robust implementation for managing an agent's operational context
+    and long-term knowledge base.
+  reuse_level:         adapter
+  license_status:      "AGPL-3.0 per metadata; pass per ADR-7"
+  maturity:            active
+  integration_risk:    medium
+  contact_path:        "https://github.com/volcengine/OpenViking/issues"
+  gate_status:
+    license:           pass
+    adapter_test:      pending
+    provenance:        pending
+    rollback:          pending
+    contact:           pending
+  decision:            investigate
+  notes: >
+    OpenViking is highly relevant as it provides a dedicated "context database"
+    for AI agents, a core requirement for FLOSSI0ULLK. Its filesystem paradigm
+    is a potential implementation for the Layer 1/2 memory and semantic substrate,
+    analogous to our ConversationMemory component. The primary risk is architectural;
+    OpenViking is a complete system, not just a library, and integrating it may
+    impose its worldview. Its mixed-language stack (Python, Rust, C++) also adds
+    dependency complexity. The project does not appear to violate the P5 anti-centralization
+    rule.
+  next_action:         "Install OpenViking in a sandbox; test the filesystem paradigm with sample FLOSSI0ULLK docs to evaluate retrieval quality and observability."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: "2026-05-31"
+
+- id: reuse-ledger-0023
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0024_hkuds_nanobot_draft.yaml"
+  promoted_at: "2026-05-18T19:11:54.919294+00:00"
+  candidate_project: "nanobot (HKUDS/nanobot)"
+  url: "https://github.com/HKUDS/nanobot"
+  kalisam_fork: "https://github.com/kalisam/nanobot"
+  function_needed: >
+    FLOSSI0ULLK requires a lightweight personal agent harness and user-facing interface
+    for the Layer 4.5 consensus gateway. This project provides an open-source,
+    multi-channel agent loop with MCP server support, memory mechanisms, and
+    extensive provider integrations, which could inform or be adapted for the
+    local multi-model node's client surface.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://discord.gg/MnCvHqpUGB"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is relevant due to its lightweight agent loop, MCP support, and
+    broad provider integrations. Its closest FLOSSI0ULLK analogue is the Layer 4.5
+    local agent node / consensus gateway (metacoordinator_mcp). However, its rapid
+    accumulation of UI features (WebUI in wheel) and monolithic channel integrations
+    present a risk of vision accumulation. We must investigate to ensure its routing
+    model does not violate the P5 no-central-routing rule.
+  next_action: "Review nanobot's MCP implementation and memory architecture for compatibility with source-chain."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+
+# ============================================================================
+# 2026-05-19 promotion batch — entries 0024-0028 from harvest staging
+# Promoted: 2026-05-19T09:17:52.332743+00:00
+# Selection: 5 strategic domain-gap fillers identified via license-pass + new-domain analysis
+# Coverage added: democratic-deliberation, local-inference-execution, service-resilience-watchdog,
+#                  offline-first-AI-alternative, developer-trust-management
+# Anti-accumulation guard: brings ledger to 28 entries with 1 at adopt (0013).
+# Now AT the soft 25-entry threshold; next promotions blocked until ≥2 more close to adopt.
+# ============================================================================
+
+- id: reuse-ledger-0024
+  domain: "multi-model-consensus-governance"
+  promoted_from_staging: "0074_compdemocracy_polis_draft.yaml"
+  promoted_at: "2026-05-19T09:17:52.332743+00:00"
+  candidate_project: "polis (compdemocracy/polis)"
+  url: "https://github.com/compdemocracy/polis"
+  kalisam_fork: ""
+  function_needed: >
+    Layer 4 coordination requires robust mechanism design for open-ended sentiment gathering
+    and mapping high-dimensional opinion spaces to identify consensus. We need to integrate
+    deliberative democracy tooling without relying on centralized aggregation.
+  reuse_level: "adapter"
+  license_status: "pending - AGPL-3.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/compdemocracy/polis/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Polis is philosophically relevant for providing AI-driven, scalable deliberative feedback.
+    The closest FLOSSI0ULLK analogue is a Layer 4 coordination or governance orchestrator.
+    However, its architecture requires centralized routing and a single PostgreSQL database, which constitutes a P5 violation under the obstruction taxonomy.
+    We must guard against the alignment-as-proof anti-pattern; while the project's vision aligns with ours, its structural shape-mismatch requires significant adaptation to fit a peer-to-peer ecosystem.
+  next_action: "Evaluate isolating the Polis math engine and clustering logic for client-side or peer-to-peer execution."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-25"
+
+- id: reuse-ledger-0025
+  domain: "local-inference-execution"
+  promoted_from_staging: "0025_mozilla_ai_llamafile_draft.yaml"
+  promoted_at: "2026-05-19T09:17:52.332743+00:00"
+  candidate_project: "llamafile (mozilla-ai/llamafile)"
+  url: "https://github.com/mozilla-ai/llamafile"
+  kalisam_fork: "https://github.com/kalisam/llamafillet"
+  function_needed: >
+    FLOSSI0ULLK requires a portable, dependency-free local inference engine to
+    power Layer 4.5 multi-model consensus gateways and Layer 4 coordination.
+    Single-file execution supports the offline-first, sovereign architecture by
+    eliminating centralized package registries and simplifying node deployment.
+  reuse_level: "adapter"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/mozilla-ai/llamafile/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is highly relevant for enabling zero-dependency local model execution across platforms.
+    FLOSSI0ULLK does not currently have a built-in inference runner; this would serve as the neural execution engine for Layer 4.5 local agent nodes.
+    The 4GB limit for single executables on Windows presents an integration risk and shape-mismatch for larger models, requiring a fallback to external weights.
+    No centralization, subscription-gating, or P5 routing obstructions were found.
+  next_action: "Evaluate llamafile as the default local LLM runner for Layer 4.5 node."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0026
+  domain: "service-resilience-watchdog"
+  promoted_from_staging: "0023_ramsbaby_openclaw_self_healing_draft.yaml"
+  promoted_at: "2026-05-19T09:17:52.332743+00:00"
+  candidate_project: "openclaw-self-healing (Ramsbaby/openclaw-self-healing)"
+  url: "https://github.com/Ramsbaby/openclaw-self-healing"
+  kalisam_fork: "https://github.com/kalisam/openclaw-self-healing"
+  function_needed: |
+    FLOSSI0ULLK requires a robust resilience layer to ensure high availability of its Layer 4.5 local agent node and consensus gateway.
+    This project provides a multi-tier autonomous recovery system with LLM-based root-cause diagnosis that could harden our daemon processes against config corruption, environment drift, and persistent crash loops without requiring manual human intervention.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/Ramsbaby/openclaw-self-healing/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    This project is relevant as a potential resilience wrapper for FLOSSI0ULLK's Layer 4.5 consensus gateway, offering autonomous crash recovery and AI-driven debugging. FLOSSI0ULLK does not currently have a dedicated watchdog analogue, though the hashline pre/post-write verification serves a related integrity function. A key shape-mismatch is its reliance on simple HTTP/PID polling and shell scripts, which might not integrate cleanly with Holochain's Rust binaries or the nuanced file-based source-chain of the MCP gateway. We must verify it doesn't introduce centralized routing or external dependency lock-in, though its LLM-agnostic design and MIT license mitigate some P5 anti-pattern risks.
+  next_action: "Review OpenClaw watchdog architecture for compatibility with FLOSSI0ULLK Layer 4.5 and Holochain daemons."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0027
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0045_janhq_jan_draft.yaml"
+  promoted_at: "2026-05-19T09:17:52.332743+00:00"
+  candidate_project: "jan (janhq/jan)"
+  url: "https://github.com/janhq/jan"
+  kalisam_fork: "https://github.com/kalisam/june"
+  function_needed: >
+    FLOSSI0ULLK requires local execution of neural models to serve as formatting engines
+    and natural language interfaces (Layer 4.5 consensus gateway providers). It also
+    needs an orchestration harness that supports Model Context Protocol (MCP) to interact
+    with the local agent node. Jan provides a local, offline execution environment for
+    LLMs with an OpenAI-compatible API and MCP integration, which could fulfill the
+    neural model provider role or serve as a user-facing harness.
+  reuse_level: "adapter"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/janhq/jan/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Jan is relevant because it offers a fully open-source, local execution environment
+    for LLMs with MCP integration and an OpenAI-compatible API. The closest FLOSSI0ULLK
+    analogue would be a user-facing harness connecting to the Layer 4.5 consensus gateway,
+    or serving as a local model provider for the gateway itself. A key risk is its heavy
+    footprint as a Tauri-based desktop application, which may clash if we only need a
+    headless provider or if we intend to build our own biomimetic UI. There are no
+    immediate anti-patterns detected; it emphasizes offline-first privacy without
+    centralized routing.
+  next_action: "Evaluate Jan's API server mode and MCP implementation for compatibility with the Layer 4.5 gateway."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0028
+  domain: "developer-trust-management"
+  promoted_from_staging: "0062_mitchellh_vouch_draft.yaml"
+  promoted_at: "2026-05-19T09:17:52.332743+00:00"
+  candidate_project: "vouch (mitchellh/vouch)"
+  url: "https://github.com/mitchellh/vouch"
+  kalisam_fork: "https://github.com/kalisam/vouch"
+  function_needed: >
+    FLOSSI0ULLK needs a Layer 4 coordination mechanism and gateway to establish
+    explicit trust graphs among agents and human contributors. This is essential
+    to filter out low-quality automated contributions and manage reputation for
+    sovereign code artifacts.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/mitchellh/vouch/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is relevant as a conceptual model for explicit trust management to
+    prevent untrusted AI-generated slop in repositories. The closest FLOSSI0ULLK analogue
+    is the Layer 4 coordination gateway and identity ledgers. However, there is a major
+    shape-mismatch: the project relies on a single flat file for the vouch list, which
+    constitutes centralized routing or single-subscription model gating. This centralized
+    gating mechanism is a P5 violation per the obstruction taxonomy in resonance_mechanism_v2.md §9.
+  next_action: "Analyze trust graph flat file format for potential mapping to distributed Layer 4 CRDTs."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+
+# ============================================================================
+# 2026-05-19 PRESSURE-RESTORE batch — entries 0029+ from staging
+# Promoted: 2026-05-19T16:00:55.020395+00:00
+# Trigger: User correction 2026-05-19 — anti-accumulation throttling guard was
+# wrong default for this user. Memory pressure-helps-drop-throttling-guards.md
+# refined to distinguish adopt-tier canon (quality-gated) from investigate-tier
+# inventory (accumulation-encouraged for pressure mechanism).
+# This batch promotes ALL remaining license-pass/pending + non-rejected drafts
+# in one move, restoring the ledger as the pressure-surface the user wanted.
+# ============================================================================
+
+- id:                  reuse-ledger-0029
+  domain:              personal-agent-harness
+  promoted_from_staging: "0016_agiresearch_aios_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "AIOS (agiresearch/AIOS)"
+  url:                 "https://github.com/agiresearch/AIOS"
+  kalisam_fork: "https://github.com/kalisam/AIOURS"
+  function_needed:     >
+    A standardized runtime environment for developing, deploying, and managing LLM-based agents.
+    This includes an OS-like kernel providing resource management (scheduling, memory, storage, tools)
+    and an SDK for agent construction. This functionality maps to the FLOSSI0ULLK concept of a
+    personal agent harness, operating at a layer above the Layer 4 coordination substrate to handle
+    individual agent execution lifecycle.
+  reuse_level:         adapter
+  license_status:      "pending - NOASSERTION per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    high
+  contact_path:        https://github.com/agiresearch/AIOS/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    AIOS is relevant as a comprehensive agent OS, analogous to the FLOSSI0ULLK personal-agent-harness
+    concept. However, key risks make it unsuitable for direct adoption. The primary risk is the
+    "NOASSERTION" license status, which is an immediate blocker pending clarification.
+    Second, its architecture includes a central "Agent Hub Machine (AHM)" for distribution,
+    which appears to violate the FLOSSI0ULLK P5 principle against centralized routing. The project's
+    complexity and distinct kernel/SDK ecosystem also present a high integration barrier.
+  next_action:         "Clarify license status (currently NOASSERTION) via GitHub issue or discussion to assess AGPL-3 compatibility per ADR-7."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: "2026-05-31"
+
+- id:                  reuse-ledger-0030
+  domain:              multi-agent-orchestration
+  promoted_from_staging: "0016_agno_agi_agno_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "agno (agno-agi/agno)"
+  url:                 "https://github.com/agno-agi/agno"
+  kalisam_fork: "https://github.com/kalisam/agnostick"
+  function_needed:     >
+    FLOSSI0ULLK requires a production-grade runtime for agent execution,
+    including scheduling, observability, and a control plane for the Layer 4 RSA swarm.
+    Agno appears to offer a comprehensive, self-hostable platform for these
+    operational concerns, potentially serving as a feature-rich alternative or
+    superset to the current minimal Layer 4.5 consensus gateway.
+  reuse_level:         adapter
+  license_status:      "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    high
+  contact_path:        https://github.com/agno-agi/agno/blob/main/CONTRIBUTING.md
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    Agno is highly relevant as a potential implementation for the agent
+    harness/orchestration layer. It is analogous to the FLOSSI0ULLK Metaharness
+    (Layer 4.6) and Local Agent Node (Layer 4.5), but far more feature-complete.
+    The primary risk is a significant architectural impedance mismatch between Agno's
+    generic, container-based model and FLOSSI0ULLK's specific "symbolic-first"
+    design and eventual Holochain substrate. The project appears focused on providing
+    tooling rather than claiming unproven capabilities, and its self-hosted nature
+    avoids centralized routing anti-patterns.
+  next_action:         Review Agno's architecture for an entrypoint to substitute its storage and agent execution core with the FLOSSI0ULLK symbolic-first validation layer.
+  next_action_owner:   Gemini CLI delegate
+  next_action_deadline: 2026-05-27
+
+- id:                  reuse-ledger-0031
+  domain:              personal-agent-harness
+  promoted_from_staging: "0016_different_ai_openwork_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "openwork (different-ai/openwork)"
+  url:                 "https://github.com/different-ai/openwork"
+  kalisam_fork: "https://github.com/kalisam/openwork"
+  function_needed:     >
+    A local-first, user-facing desktop application to serve as a personal
+    agent harness. This would provide a GUI for interacting with the
+    FLOSSI0ULLK Layer 4.5 local agent node, allowing users to initiate
+    and monitor agentic workflows, manage sessions, and grant permissions
+    without needing to use a CLI.
+  reuse_level:         adapter
+  license_status:      "pending - NOASSERTION per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    high
+  contact_path:        https://github.com/different-ai/openwork/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    This project is highly relevant as a potential off-the-shelf UI for agentic
+    workflows, analogous to a GUI for the FLOSSI0ULLK local agent node (L4.5).
+    However, major risks exist. Its architecture is tightly coupled to the
+    'opencode' ecosystem, meaning a complex adapter would need to be built to
+    make it communicate with the FLOSSI0ULLK stack instead. The most critical
+    risk is the 'NOASSERTION' license, which may be incompatible with ADR-7's
+    AGPL-3 mandate. The presence of a paid enterprise plan and paywalled
+    Windows support also signals a potential misalignment with FLOSSI0ULLK's
+    uncompromising FLOSS ethos.
+  next_action:         "Clarify the repository's software license and its compatibility with FLOSSI0ULLK's AGPL-3 cascade requirement (ADR-7)."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: 2026-05-27
+
+- id: reuse-ledger-0032
+  domain: personal-agent-harness
+  promoted_from_staging: "0016_khoj_ai_khoj_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "khoj (khoj-ai/khoj)"
+  url: "https://github.com/khoj-ai/khoj"
+  kalisam_fork: "https://github.com/kalisam/khoj"
+  function_needed: >
+    FLOSSI0ULLK requires a robust, self-hostable personal agent interface that can integrate diverse local and remote LLMs, perform Retrieval Augmented Generation (RAG) over user documents and web content, and support agent creation. This directly supports FLOSSI0ULLK's Layer 1 (persistent memory abstraction), Layer 2 (semantic indexing/retrieval capabilities), and would interface with Layer 4.5 (local agent node) for generalized agent coordination.
+  reuse_level: adapter
+  license_status: "AGPL-3.0"
+  maturity: maintained
+  integration_risk: high
+  contact_path: "https://discord.gg/BDgyabRM6e"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    (a) Khoj is highly relevant for providing a user-facing personal agent interface with strong RAG and multi-LLM integration, aligning with FLOSSI0ULLK's agentic operating model. (b) The closest FLOSSI0ULLK analogue would be the envisioned personal agent harness, drawing on Layer 1 and Layer 2 capabilities. (c) Key risks include its LLM-first approach clashing with FLOSSI0ULLK's symbolic-first, logic-validates philosophy, requiring significant architectural adaptation for Holochain integrity zome enforcement. Its current reliance on conventional file systems and web services for persistence is another mismatch. (d) No immediate P5 violations for centralized routing are evident, but internal agent workings require audit for subtle data provenance and consensus mismatches.
+  next_action: Initiate technical investigation into Khoj's architecture and data flow for symbolic-first integration.
+  next_action_owner: Gemini CLI delegate
+  next_action_deadline: 2026-05-24
+
+- id:                  reuse-ledger-0033
+  domain:              personal-agent-harness
+  promoted_from_staging: "0016_nearai_ironclaw_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "ironclaw (nearai/ironclaw)"
+  url:                 "https://github.com/nearai/ironclaw"
+  kalisam_fork: "https://github.com/kalisam/tRustyironsWardenShieldancRavensClaw"
+  function_needed:     >
+    FLOSSI0ULLK requires a secure, user-facing agent harness for local execution and context management, corresponding to the Layer 4.6 Metaharness concept. This project could provide a reference implementation for a sandboxed (WASM) tool execution environment, persistent memory management, and multi-channel user interaction, serving as a component or tested pattern for the personal agent harness.
+  reuse_level:         adapter
+  license_status:      "pending - Apache-2.0 and MIT per metadata/README; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    high
+  contact_path:        https://github.com/nearai/ironclaw/discussions
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    IronClaw is highly relevant as a security-focused, Rust-based personal agent OS, analogous to the FLOSSI0ULLK Metaharness. Its use of WASM sandboxing for tool execution is a strong architectural parallel. However, the primary risk is its deep integration with a non-Holochain stack (PostgreSQL/pgvector, NEAR AI authentication), making direct reuse impossible and requiring a high-effort adaptation. The default reliance on a NEAR AI account for onboarding warrants investigation for potential P5 (central routing) violations per FLOSSI0ULLK principles.
+  next_action:         "Investigate the effort to replace the PostgreSQL backend and NEAR AI authentication with a Holochain-based identity and storage cell."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: "2026-05-31"
+
+- id:                  reuse-ledger-0034
+  domain:              personal-agent-harness
+  promoted_from_staging: "0016_nousresearch_hermes_agent_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "hermes-agent (NousResearch/hermes-agent)"
+  url:                 "https://github.com/NousResearch/hermes-agent"
+  kalisam_fork: "https://github.com/kalisam/hermaphroditey-agenty"
+  function_needed:     >
+    A persistent, multi-platform personal agent harness providing a user interaction gateway (CLI, messaging) with built-in capabilities for session continuity, long-term memory management, and autonomous skill creation/refinement. This would function as a user-facing component at Layer 4.5 (gateway) and Layer 1 (memory), allowing users to interact with the broader FLOSSI0ULLK system.
+  reuse_level:         adapter
+  license_status:      "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity:            active
+  integration_risk:    high
+  contact_path:        https://github.com/NousResearch/hermes-agent/discussions
+  gate_status:
+    license: pending
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision:            investigate
+  notes: >
+    This project is highly relevant as a mature, open-source personal agent framework with many features desired for FLOSSI0ULLK. It is a close analogue to the aspirational 'personal-agent-harness' component. However, integration risk is high; it's an opinionated Python application, and its internal memory/skill architecture would need significant adaptation to be backed by FLOSSI0ULLK's Holochain substrate and symbolic-first principles. The project appears to avoid centralized anti-patterns by supporting multiple backends and local execution.
+  next_action:         "Analyze hermes-agent's memory/skill architecture for potential alignment with FLOSSI0ULLK's Layer 0/1 substrate."
+  next_action_owner:   "Gemini CLI delegate"
+  next_action_deadline: "2026-05-27"
+
+- id: reuse-ledger-0035
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0017_ultraworkers_claw_code_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "claw-code (ultraworkers/claw-code)"
+  url: "https://github.com/ultraworkers/claw-code"
+  kalisam_fork: "https://github.com/kalisam/claw-code"
+  function_needed: >
+    A robust CLI-based interactive harness to serve as the user experience
+    for the Layer 4.5 local consensus gateway, enabling users to orchestrate
+    multi-model queries and submit claims/votes to the file-based source chain.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://discord.gg/5TUQKqFWd"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: "investigate"
+  notes: >
+    Relevant as a high-performance Rust CLI agent harness. The closest FLOSSI0ULLK
+    analogue is the metaharness operating model and Layer 4.5 consensus gateway.
+    Key shape-mismatch risk is the apparent coupling to commercial APIs
+    (Anthropic/OpenAI) which may violate the P5 anti-pattern (no central routing)
+    if it cannot route exclusively through our local multi-model roster.
+  next_action: "Audit MCP and provider extension points to assess adapter feasibility for Layer 4.5."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0036
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0018_khoj_ai_pipali_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "pipali (khoj-ai/pipali)"
+  url: "https://github.com/khoj-ai/pipali"
+  kalisam_fork: "https://github.com/kalisam/pippalee"
+  function_needed: >
+    A local agent execution environment and user interface capable of asynchronous
+    task management, skill execution, and MCP integration. This could potentially
+    serve as the user-facing harness and sandboxed execution layer for FLOSSI0ULLK's
+    Layer 4.5 (local multi-model consensus gateway).
+  reuse_level: "adapter"
+  license_status: "pass - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/khoj-ai/pipali/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Pipali provides a polished personal AI harness with built-in sandboxing and
+    MCP support, which maps well to a frontend for our Layer 4.5 gateway.
+    However, the README explicitly states model access is routed through the
+    'Pipali Platform' via SSO, which is a critical P5 violation (centralized
+    routing/single-subscription model gating) per resonance_mechanism_v2.md §9.
+    We must investigate if this platform dependency can be bypassed entirely
+    to allow local, sovereign multi-model routing.
+  next_action: "Verify if Pipali's central model platform can be bypassed for local inference routing."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0037
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0019_prinova_graphone_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "graphone (PriNova/graphone)"
+  url: "https://github.com/PriNova/graphone"
+  kalisam_fork: "https://github.com/kalisam/graphoneme"
+  function_needed: >
+    A visual workbench and human control surface capable of orchestrating local multi-agent interactions and artifact generation.
+    It needs to interface seamlessly with FLOSSI0ULLK's local agent node (Layer 4.5) to provide a rich desktop and cross-client UI over the consensus gateway without centralizing routing logic.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "medium"
+  contact_path: "https://github.com/PriNova/graphone/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Graphone offers a polished, artifact-first visual workbench built with Tauri and Svelte, making it a strong candidate for the human interface to our Layer 4.5 consensus gateway.
+    However, its reliance on the bundled 'pi' runtime sidecar presents a medium integration risk, as we must replace or adapt this boundary (services/agent-host) to route through our MCP orchestrator instead.
+    We must ensure it does not enforce centralized routing that violates the P5 obstruction taxonomy in resonance_mechanism_v2.md.
+    Overall, it is a promising shell but requires careful architectural decoupling.
+  next_action: "Analyze services/agent-host codebase in Graphone to determine effort required to adapt its UI for FLOSSI0ULLK Layer 4.5 MCP router."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0038
+  domain: personal-agent-harness
+  promoted_from_staging: "0020_badlogic_sitegeist_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "sitegeist (badlogic/sitegeist)"
+  url: "https://github.com/badlogic/sitegeist"
+  kalisam_fork: "https://github.com/kalisam/sitegeist"
+  function_needed: >
+    A local, browser-based execution environment and web interaction node.
+    FLOSSI0ULLK needs a way for the Layer 4.5 local consensus gateway to perform
+    web extraction, navigation, and task automation on behalf of the user without
+    relying on centralized web-scraping APIs or external routing servers.
+  reuse_level: adapter
+  license_status: "pass - AGPL-3.0 per metadata; fully compatible with ADR-7 cascade"
+  maturity: maintained
+  integration_risk: medium
+  contact_path: "https://github.com/badlogic/sitegeist/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    Highly relevant as a potential web-execution limb for the Layer 4.5 local
+    agent node due to its local-first, bring-your-own-keys design. Its philosophy
+    of "collaboration, not autonomy theater" resonates with FLOSSI0ULLK's principles.
+    The primary risk is integration friction: it requires adapting its internal
+    provider dispatch to route through the FLOSSI0ULLK consensus gateway instead.
+    WARNING: The README mentions a default centralized CORS proxy (`proxy.mariozechner.at`)
+    which violates P5 (no central routing) per resonance_mechanism_v2.md §9 and
+    must be bypassed or replaced with a local equivalent.
+  next_action: "Audit source to estimate effort for replacing provider APIs with local Layer 4.5 gateway endpoints."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-31"
+
+- id: reuse-ledger-0039
+  domain: "multi-agent-orchestration"
+  promoted_from_staging: "0022_stevenkozeniesky02_claude_plugins_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "claude-plugins (stevenkozeniesky02/claude-plugins)"
+  url: "https://github.com/stevenkozeniesky02/claude-plugins"
+  kalisam_fork: "https://github.com/kalisam/claude-plugins"
+  function_needed: |
+    FLOSSI0ULLK's Layer 4.5 local agent node (MCP consensus gateway) requires tooling for codebase analysis, testing gaps, and dependency audits. This project provides multi-agent MCP servers that could be adapted as read-only context providers for the consensus gateway, aiding in Layer 4 coordination and codebase health monitoring.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "medium"
+  contact_path: "https://github.com/stevenkozeniesky02/claude-plugins/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    This project offers relevant multi-agent codebase analysis and automated orchestration tools. Its closest FLOSSI0ULLK analogue would be the Layer 4.5 MCP passive-router consensus gateway or Layer 4 coordination. A key shape-mismatch is its strong orientation towards traditional SaaS startup pipelines (pricing, pitch decks) rather than a decentralized knowledge commons. Additionally, it exhibits a potential anti-pattern by assuming a single-model (Claude Code) ecosystem, which conflicts with FLOSSI0ULLK's multi-model consensus mandate (ADR-10).
+  next_action: "Evaluate MCP compatibility of the core development plugins with the Layer 4.5 consensus gateway."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0040
+  domain: multi-platform-chat-sdk
+  promoted_from_staging: "0026_vercel_chat_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "chat (vercel/chat)"
+  url: "https://github.com/vercel/chat"
+  kalisam_fork: "https://github.com/kalisam/vercel_unified_TS_chat_SDK"
+  function_needed: |
+    FLOSSI0ULLK needs a unified interface mechanism for its local agent node 
+    (Layer 4.5 consensus gateway) and coordinating models (Layer 4) to receive 
+    input from and stream output to human participants across various existing 
+    chat surfaces (Slack, Discord, Telegram) without maintaining platform-specific API logic.
+  reuse_level: adapter
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: active
+  integration_risk: medium
+  contact_path: "https://github.com/vercel/chat/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: |
+    This project provides a robust, unified SDK for multi-platform chat integrations, which is highly relevant for bridging the Layer 4.5 consensus gateway to human-in-the-loop interfaces. There is no direct FLOSSI0ULLK analogue, as this handles external Web2 surface connectivity rather than core logic. The primary integration risk is architectural mismatch: it inherently connects to centralized platforms (Slack, Discord), which is acceptable for Phase 1 MVC but conflicts with the ultimate Layer 0 Holochain p2p mandate. We must carefully isolate it to ensure its implementation does not introduce centralized routing constraints into the local node itself, avoiding a P5 violation.
+  next_action: "Evaluate vercel/chat event model for MCP translation to map human chat messages into Layer 4.5 Claims."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0041
+  domain: "offline-knowledge-commons"
+  promoted_from_staging: "0028_khoj_ai_openpaper_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "openpaper (khoj-ai/openpaper)"
+  url: "https://github.com/khoj-ai/openpaper"
+  kalisam_fork: "https://github.com/kalisam/openpooper"
+  function_needed: >
+    FLOSSI0ULLK requires a local UI for human-AI symbiotic reading, annotation,
+    and semantic extraction from research papers (PDFs). This aligns with
+    Layer 2 (semantic layer) for embeddings and Layer 1 (persistent memory),
+    bridging raw intake documents into the canonical knowledge graph before
+    storage in the Layer 0 Holochain substrate.
+  reuse_level: "adapter"
+  license_status: "pass - AGPL-3.0 per metadata; compatible with ADR-7 cascade"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/khoj-ai/openpaper/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Provides a strong parallel view UI for AI-assisted reading and annotation,
+    which maps well to Layer 2 ingestion needs. However, the README explicitly
+    states it is 'not optimized for self-hosting' and uses a client-server
+    model, presenting a high shape-mismatch risk with our local-first Holochain
+    architecture. We must verify if the AI routing avoids P5 centralization violations.
+  next_action: "Assess frontend decoupling viability for integration with Layer 4.5 MCP gateway"
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0042
+  domain: persistent-memory-federation
+  promoted_from_staging: "0029_amap_ml_skillclaw_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "SkillClaw (AMAP-ML/SkillClaw)"
+  url: "https://github.com/AMAP-ML/SkillClaw"
+  kalisam_fork: "https://github.com/kalisam/SkillClaw"
+  function_needed: >
+    Automated extraction, deduplication, and cross-pollination of agent
+    capabilities (skills) across multiple local agent nodes (Layer 4.5) and
+    users. We need a mechanism to take single-session learnings from Layer 1
+    (persistent memory) and evolve them into shared artifacts for Layer 4
+    (coordination) without manual curation.
+  reuse_level: monitor
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: active
+  integration_risk: high
+  contact_path: "https://github.com/AMAP-ML/SkillClaw/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    SkillClaw addresses the accumulation and refinement of agent skills across sessions, which aligns with our Layer 1 memory and Layer 4 coordination goals. The closest FLOSSI0ULLK analogue is the ARF ConversationMemory and semantic CRDTs. However, the 'shared group' sync functionality strongly suggests a centralized routing backend, which is a P5 violation of our obstruction taxonomy (no central routing). We must determine if its deduplication engine can be decoupled from its network layer and adapted to our Holochain DHT.
+  next_action: "Audit SkillClaw's sharing network topology to confirm if it requires a central server for cross-user synchronization."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0043
+  domain: agent-centric-p2p-substrate
+  promoted_from_staging: "0030_mikhashev_dpc_messenger_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "dpc-messenger (mikhashev/dpc-messenger)"
+  url: "https://github.com/mikhashev/dpc-messenger"
+  kalisam_fork: "https://github.com/kalisam/dpc-messenger"
+  function_needed: >
+    P2P agent-to-agent communication, shared human-AI memory spaces, and distributed 
+    knowledge commits. Relevant to Layer 4 coordination (swarm intelligence) and 
+    Layer 4.5 local agent node (consensus gateway), specifically regarding local/remote 
+    AI inference sharing and versioned thought boundaries.
+  reuse_level: monitor
+  license_status: "pass - Multi-License (GPL-3.0/LGPL-3.0/AGPL-3.0/CC0) per README; compatible with AGPL-3 cascade per ADR-7"
+  maturity: active
+  integration_risk: high
+  contact_path: "https://github.com/mikhashev/dpc-messenger/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    High philosophical resonance regarding human-AI co-evolution and git-like knowledge commits, 
+    but presents a severe shape-mismatch at the network substrate layer. They utilize a custom 
+    6-tier WebRTC/UDP P2P stack with an optional Federation Hub, whereas FLOSSI0ULLK is strictly 
+    bound to Holochain for Layer 0 DHT networking and state storage. Their knowledge commit 
+    architecture conceptually overlaps with our Layer 2/3 Integrity Zomes. Anti-pattern check: 
+    we must not adopt their custom networking stack based solely on vision alignment.
+  next_action: "Review CC0 protocol specs for knowledge commits to extract useful schemas for the Layer 4.5 gateway"
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0044
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0031_earendil_works_pi_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "pi (earendil-works/pi)"
+  url: "https://github.com/earendil-works/pi"
+  kalisam_fork: "https://github.com/kalisam/pi-mono"
+  function_needed: >
+    FLOSSI0ULLK requires a robust unified multi-provider LLM interface and agent state management
+    for the Layer 4.5 local agent node (consensus gateway) and Layer 4.6 metaharness. The candidate's
+    `pi-ai` and `pi-agent-core` packages could potentially standardize provider interactions across
+    the diverse voter roster without reinventing the API wheels.
+  reuse_level: "adapter"
+  license_status: "pass - MIT per metadata; compatible with AGPL-3 cascade per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://discord.com/invite/3cU7Bz4UPx"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: "investigate"
+  notes: >
+    This project is relevant as it offers a TypeScript-based unified LLM API and agent runtime, which aligns
+    with the language stack of our Layer 4.5 consensus gateway. The closest FLOSSI0ULLK analogue is the local
+    agent node (`FLOSS/packages/`), specifically the provider interface layer. A key shape-mismatch risk is
+    that Pi operates as an active coding agent CLI, whereas Layer 4.5 must remain a passive router without central
+    control. We must ensure integrating its runtime does not introduce unwanted active routing or violate the
+    consensus model.
+  next_action: "Evaluate @earendil-works/pi-ai for adapter integration into Layer 4.5"
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0045
+  domain: "offline-knowledge-commons"
+  promoted_from_staging: "0032_axoviq_ai_synthadoc_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "synthadoc (axoviq-ai/synthadoc)"
+  url: "https://github.com/axoviq-ai/synthadoc"
+  kalisam_fork: "https://github.com/kalisam/synthiadoc"
+  function_needed: |
+    FLOSSI0ULLK needs an ingest-time knowledge compilation engine to translate raw documents into structured, persistent, local-first wikis (Layer 1 memory and Layer 2 semantic). This provides an offline-accessible, human-readable artifact that aligns with the symbolic-first philosophy, avoiding reliance on neural models for query-time retrieval.
+  reuse_level: "adapter"
+  license_status: "pending - AGPL-3.0 per metadata; compatible with AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/axoviq-ai/synthadoc/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    Synthadoc is relevant for its ingest-time compilation of raw documents into structured, local Markdown wikis, replacing query-time RAG with a persistent offline artifact. The closest FLOSSI0ULLK analogue is the Layer 1/Layer 2 semantic CRDTs and persistent memory layer. A key shape-mismatch is its internal "Orchestrator" which dispatches sub-agents; this centralized routing model strongly indicates a potential P5 (no central routing) violation per the obstruction taxonomy in resonance_mechanism_v2.md §9. We must ensure its compilation pipeline can be decoupled from its centralized orchestration before any adoption.
+  next_action: "Audit Synthadoc Orchestrator for P5 central routing violations and decouple markdown compilation."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0046
+  domain: "offline-knowledge-commons"
+  promoted_from_staging: "0033_patwie_drafft_ink_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "drafft-ink (PatWie/drafft-ink)"
+  url: "https://github.com/PatWie/drafft-ink"
+  kalisam_fork: "https://github.com/kalisam/drafft-ink"
+  function_needed: >
+    FLOSSI0ULLK needs a spatial, high-performance visual canvas for human-agent 
+    interaction, sensemaking, and knowledge graph visualization (spanning Layer 2 
+    and Layer 4.5). This provides a local-first, WebGPU/Rust-based CRDT-backed 
+    infinite canvas that could serve as a UI substrate for the local agent node 
+    without relying on centralized SaaS whiteboards.
+  reuse_level: "adapter"
+  license_status: "pass - AGPL-3.0 per metadata; perfectly aligns with FLOSSI0ULLK ADR-7 cascade"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/PatWie/drafft-ink/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    drafft-ink is highly relevant as a potential local-first, Rust-based infinite 
+    canvas UI for FLOSSI0ULLK's spatial interfaces. It uses Loro CRDTs, which conceptually 
+    aligns with Layer 2 semantic CRDTs. However, it currently relies on a centralized 
+    WebSocket server for collaboration. The primary integration risk is routing its CRDT 
+    sync operations through Holochain (Layer 0) or the Layer 4.5 consensus gateway 
+    instead of its default hub-and-spoke server. There are no centralized SaaS or P5 
+    violations, and it perfectly matches the AGPL-3.0 cascade requirement.
+  next_action: "Investigate adapting drafftink-core CRDT sync to route through local MCP gateway or Holochain zomes."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0047
+  domain: "multi-agent-orchestration"
+  promoted_from_staging: "0035_eliavamar_mcp_of_mcps_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "mcp-of-mcps (eliavamar/mcp-of-mcps)"
+  url: "https://github.com/eliavamar/mcp-of-mcps"
+  kalisam_fork: "https://github.com/kalisam/mcp-of-mcps"
+  function_needed: >
+    FLOSSI0ULLK needs an efficient way to aggregate MCP capabilities and route
+    tool execution for the Layer 4.5 local agent node consensus gateway without
+    exhausting the token context window. The ability to run direct execution between
+    tools in-memory instead of forcing all intermediate data through the LLM aligns
+    with our need for a lean and performant multi-model gateway.
+  reuse_level: "adapter"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/eliavamar/mcp-of-mcps/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project provides a meta-server for aggregating MCP tools and executing
+    them directly in memory to reduce token usage. Its closest FLOSSI0ULLK
+    analogue is the Layer 4.5 local consensus gateway (MCP passive-router).
+    However, the design explicitly merges all MCP servers into a single smart
+    endpoint, which constitutes centralized routing and is a P5 violation per
+    the obstruction taxonomy in resonance_mechanism_v2.md §9. We need to assess
+    if the direct execution engine can be decoupled from the central gateway pattern.
+  next_action: "Analyze decoupling the direct tool execution feature from the centralized routing meta-server."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0048
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0037_xzf_thu_pask_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "Pask (xzf-thu/Pask)"
+  url: "https://github.com/xzf-thu/Pask"
+  kalisam_fork: "https://github.com/kalisam/Pask"
+  function_needed: >
+    FLOSSI0ULLK needs robust, low-latency intent classification and hierarchical memory
+    management to support the Layer 4.6 Metaharness and Layer 1 Persistent memory.
+    Pask provides a structured approach to "Demand Detection" (intent routing) and a
+    three-tier memory model (user profile, working memory, long-term store) that could
+    inform the reconciliation of the API mismatch between ConversationMemory and
+    MultiScaleEmbedding in Layers 1 and 2.
+  reuse_level: "monitor"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "high"
+  contact_path: "http://discord.gg/GQq35RaxSM"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Pask is highly relevant for its three-tier hierarchical memory architecture
+    (user, working, global) and its LatentNeeds evaluation benchmark, but irrelevant
+    as a direct software dependency due to its monolithic consumer-app architecture.
+    Its closest FLOSSI0ULLK analogues are the Layer 1 Persistent Memory
+    (ConversationMemory) and the planned Layer 4.6 Metaharness. A critical
+    shape-mismatch exists because Pask relies on a dedicated, centralized
+    IntentFlow model pipeline, which directly conflicts with FLOSSI0ULLK's Layer 4.5
+    multi-model consensus gateway and Layer 0/3 decentralized Holochain substrate.
+    Anti-pattern check: Pask's routing and application model suggest centralized
+    processing, violating the P5 (no central routing) obstruction taxonomy principle.
+  next_action: "Review LatentNeeds-Bench for Layer 4.5 evaluation suite and analyze memory schema."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0049
+  domain: "multi-agent-orchestration"
+  promoted_from_staging: "0039_openai_symphony_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "symphony (openai/symphony)"
+  url: "https://github.com/openai/symphony"
+  kalisam_fork: "https://github.com/kalisam/symphonium"
+  function_needed: >
+    Layer 4 coordination capability and execution metaharness integration.
+    FLOSSI0ULLK requires a system to accept isolated work definitions
+    from the context or consensus layers and spawn autonomous implementation
+    runs that produce verifiable proof-of-work, independent of synchronous
+    human supervision.
+  reuse_level: "adapter"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/openai/symphony/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Symphony's architecture for isolated, autonomous implementation runs
+    aligns with the execution metaharness goals at Layer 4. However, the
+    reference implementation relies heavily on centralized platforms like
+    Linear and GitHub PRs, violating P5 central routing rules if adopted
+    as-is. The closest analogue is FLOSSI0ULLK's Layer 4 coordination logic
+    and the execution metaharness. The Elixir codebase poses a language mismatch
+    risk against our Rust/Python stack. We should investigate adapting the
+    protocol specification rather than directly consuming the Elixir reference.
+  next_action: "Review SPEC.md to evaluate implementing a Python/Rust analogue tailored to the Layer 4.5 gateway."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0050
+  domain: agent-skill-distillation
+  promoted_from_staging: "0040_zjunlp_skillx_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "SkillX (zjunlp/SkillX)"
+  url: "https://github.com/zjunlp/SkillX"
+  kalisam_fork: "https://github.com/kalisam/ExtendingSkillX"
+  function_needed: >
+    FLOSSI0ULLK requires a mechanism to distill raw agent execution trajectories into a reusable, structured skill hierarchy to populate Layer 1 (Persistent Memory) and Layer 2 (Semantic Layer). This capability would allow the Layer 4 (Agent Coordination) multi-model ensemble to leverage refined, portable tool-usage patterns rather than relying solely on unstructured conversation memory or raw semantic CRDTs.
+  reuse_level: adapter
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: active
+  integration_risk: high
+  contact_path: "https://github.com/zjunlp/SkillX/issues"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    SkillX is relevant for its hierarchical approach to distilling agent trajectories into portable skills, conceptually aligning with our Layer 2 semantic abstraction goals. The closest FLOSSI0ULLK analogue is the in-flight ConversationMemory and the existing skill-corpus. A key shape-mismatch is that SkillX is designed for conventional single-agent pipelines, whereas FLOSSI0ULLK relies on a Layer 4.5 passive-router consensus gateway handling analog votes. Consequently, SkillX's extraction logic would require significant adaptation to process our multi-model source-chain claims rather than isolated JSONL trajectories.
+  next_action: "Review SkillX trajectory JSONL schema to determine adapter complexity for FLOSSI0ULLK source-chain claims."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0051
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0042_aiming_lab_metaclaw_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "MetaClaw (aiming-lab/MetaClaw)"
+  url: "https://github.com/aiming-lab/MetaClaw"
+  kalisam_fork: "https://github.com/kalisam/MetaClaw"
+  function_needed: |
+    FLOSSI0ULLK requires a local personal agent harness (Layer 4.6) capable of 
+    persisting cross-session context (Layer 1) and executing background cognitive 
+    tasks during idle windows. The system needs a mechanism to seamlessly wrap 
+    existing local agent interactions, inject contextual skills, and extract 
+    persistent memory without disrupting active use, all while interfacing 
+    with the local consensus gateway (Layer 4.5).
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "medium"
+  contact_path: "https://github.com/aiming-lab/MetaClaw/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    MetaClaw is relevant as it provides a proxy-based agent harness with cross-session 
+    memory extraction and idle-time processing, mapping closely to FLOSSI0ULLK Layer 1 
+    and Layer 4.6. However, because it places models behind a proxy intercepting all 
+    API interactions, it is flagged for a potential P5 violation (centralized routing 
+    bottleneck) per resonance_mechanism_v2.md §9. The structural shape-mismatch is 
+    significant: MetaClaw intercepts standard LLM traffic, whereas FLOSSI0ULLK's 
+    Layer 4.5 requires routing explicit analog Claims and Votes to a file-based 
+    source chain. We must ensure it does not bypass formal logic integrity zomes.
+  next_action: "Audit MetaClaw proxy layer to determine if memory/RL can be decoupled from routing"
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0052
+  domain: semantic-spanning-layer
+  promoted_from_staging: "0043_tobi_qmd_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "qmd (tobi/qmd)"
+  url: "https://github.com/tobi/qmd"
+  kalisam_fork: "https://github.com/kalisam/qmd"
+  function_needed: >
+    FLOSSI0ULLK needs a local, on-device semantic and keyword search engine capable of
+    indexing markdown documents, meeting transcripts, and knowledge bases for agentic context retrieval.
+    This functionality supports the Layer 2 semantic spanning layer and the Layer 4.5 local agent node
+    without relying on centralized cloud APIs or external vector databases.
+  reuse_level: adapter
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: active
+  integration_risk: medium
+  contact_path: "https://github.com/tobi/qmd/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    QMD provides an active, local MCP-enabled search engine combining BM25, vector search, and
+    LLM reranking over local files. While highly relevant for local context retrieval, FLOSSI0ULLK's
+    Layer 2 semantic layer is currently implemented in Python and expects deep Holochain integration.
+    Relying on a separate SQLite/Node.js indexing engine could fragment the persistent memory architecture.
+    We must ensure it can act as a stateless, ephemeral indexer for the context daemon without becoming
+    a centralized authoritative truth store.
+  next_action: "Evaluate QMD's MCP server integration with the Layer 4.5 consensus gateway"
+  next_action_owner: "Tony"
+  next_action_deadline: 2026-05-24
+
+- id: reuse-ledger-0053
+  domain: multi-agent-orchestration
+  promoted_from_staging: "0048_zjunlp_innoeval_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "InnoEval (zjunlp/InnoEval)"
+  url: "https://github.com/zjunlp/InnoEval"
+  kalisam_fork: "https://github.com/kalisam/Innoval"
+  function_needed: |
+    FLOSSI0ULLK requires multi-agent coordination (Layer 4) capable of gathering multi-source evidence to validate claims before they are committed to the Holochain storage substrate (Layer 0). We need mechanisms for semantic evidence mapping (Layer 2) and persona-based reflection (Execution/Reflection harnesses in Layer 4.6).
+  reuse_level: monitor
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: maintained
+  integration_risk: high
+  contact_path: "https://github.com/zjunlp/InnoEval/issues"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: |
+    InnoEval is relevant for its multi-agent pipeline that grounds claims against external web and academic sources. Its closest FLOSSI0ULLK analogue is the Layer 4 coordination LLM committee and the Layer 4.6 Reflection Metaharness. Key risks involve its heavy reliance on centralized commercial API keys (DeepSeek, OpenAI, Google), which likely violates the P5 (no central routing) obstruction rule. Furthermore, using LLM personas for evaluation risks falling into the alignment-as-proof anti-pattern, bypassing the strict symbolic validation required by Layer 3.
+  next_action: "Analyze GroundingAgent implementation for Layer 2 evidence mapping compatibility."
+  next_action_owner: "Tony"
+  next_action_deadline: 2026-05-24
+
+- id: reuse-ledger-0054
+  domain: "multi-model-consensus-governance"
+  promoted_from_staging: "0050_berriai_litellm_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "litellm (BerriAI/litellm)"
+  url: "https://github.com/BerriAI/litellm"
+  kalisam_fork: "https://github.com/kalisam/likellm"
+  function_needed: >
+    FLOSSI0ULLK's Layer 4.5 local agent node (multi-model consensus gateway)
+    requires a unified abstraction interface to route claims and votes across
+    a diverse roster of models (e.g., Cerebras, Groq, Mistral, Flowith) without
+    maintaining provider-specific SDK integrations.
+  reuse_level: "adapter"
+  license_status: "pending - NOASSERTION in metadata; requires AGPL-3 cascade compatibility verification per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://discord.gg/wuPM9dRgDw"
+  gate_status:
+    license: "pending"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is highly relevant for unifying the diverse multi-model LLM API calls required by
+    Layer 4.5's consensus gateway. The closest FLOSSI0ULLK analogue is the MCP passive-router
+    metacoordinator itself. A critical risk and potential shape-mismatch is that the project
+    heavily markets itself as a centralized proxy server (AI Gateway) with virtual keys and spend
+    tracking, which risks a P5 violation (centralized routing or single-subscription model gating)
+    per resonance_mechanism_v2.md §9. We must ensure the Python SDK can be used in a decentralized,
+    local capacity without the proxy server.
+  next_action: "Audit LiteLLM Python SDK to confirm absence of centralized routing and verify AGPL-3 compatibility."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0055
+  domain: "model-geometry-observability"
+  promoted_from_staging: "0051_ethyros_ai_modelcypher_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "ModelCypher (Ethyros-AI/ModelCypher)"
+  url: "https://github.com/Ethyros-AI/ModelCypher"
+  kalisam_fork: "https://github.com/kalisam/ModelCypher"
+  function_needed: >
+    FLOSSI0ULLK requires a deterministic methodology for introspecting the latent
+    geometric structures of local language models, directly supporting our Layer 2
+    semantic spanning layer and Layer 1 memory. We need reproducible measurement
+    surfaces to assess adapter-induced changes and prompt family alignments without
+    relying on opaque empirical hyperparameter tuning. ModelCypher provides an
+    offline, CLI-driven workbench for capturing these geometric observables directly.
+  reuse_level: "monitor"
+  license_status: "AGPL-3.0 per metadata; eligible for AGPL-3 cascade per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/Ethyros-AI/ModelCypher/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is highly relevant for establishing Layer 2 semantic observability
+    and deriving deterministic bounds for local pilot embedding model tuning. The
+    closest FLOSSI0ULLK analogue would be our internal model evaluation harnesses.
+    A key integration risk is practical maturity, as the README explicitly admits
+    the geometry-derived training path (`mc train run`) has not yet proven empirical
+    superiority over standard practice. The tool operates completely offline as a
+    CLI without centralized routing, avoiding P5 obstruction violations. We must
+    ensure that incorporating its strict geometric derivations does not result in
+    vision accumulation that overrides our modular adapter patterns.
+  next_action: "Run 'mc analyze capture' on a pilot embedding model to evaluate the emitted observation bundle."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0056
+  domain: "multi-agent-orchestration"
+  promoted_from_staging: "0052_jeremylongshore_hybrid_ai_stack_intent_solutions_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "Hybrid-ai-stack-intent-solutions (jeremylongshore/Hybrid-ai-stack-intent-solutions)"
+  url: "https://github.com/jeremylongshore/Hybrid-ai-stack-intent-solutions"
+  kalisam_fork: "https://github.com/kalisam/Hybrid-ai-stack-intent-solutions"
+  function_needed: >
+    FLOSSI0ULLK Layer 4.5 gateway requires intelligent request routing to minimize costs and optimize performance by directing simpler intents to local, lightweight models and complex intents to capable cloud models, complete with observability and metrics.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/jeremylongshore/Hybrid-ai-stack-intent-solutions/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project implements a smart routing API gateway to optimize LLM usage costs between local and cloud models. While the prompt complexity estimation logic is relevant to FLOSSI0ULLK Layer 4 coordination, the architecture relies on a centralized Flask API gateway. This represents a P5 violation (no central routing) per resonance_mechanism_v2.md, as it acts as a single centralized orchestrator rather than a peer-to-peer or agent-centric substrate. We should evaluate the complexity estimation heuristics but discard the centralized gateway shell.
+  next_action: "Review scripts/smart_router.py to evaluate prompt complexity estimation heuristics for adaptation into local agent logic."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0057
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0053_conway_research_automaton_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "automaton (Conway-Research/automaton)"
+  url: "https://github.com/Conway-Research/automaton"
+  kalisam_fork: "https://github.com/kalisam/automotony"
+  function_needed: >
+    FLOSSI0ULLK requires a Layer 4 coordination execution environment and Layer 4.5 gateway identity management.
+    Specifically, we need a robust Think-Act-Observe ReAct loop that supports self-modification,
+    cryptographic identity verifiable on-chain, and local state persistence to enable sovereign
+    agents to operate independently within the peer-to-peer substrate.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/Conway-Research/automaton/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is relevant for its continuous ReAct loop, self-modification audit logs, and on-chain ERC-8004 identity integration.
+    The closest FLOSSI0ULLK analogue is the personal-agent-harness.
+    However, a critical shape-mismatch and integration risk is its heavy reliance on centralized infrastructure like Conway Cloud and API keys for inference and provisioning.
+    This centralized routing and single-subscription model gating is a P5 violation per resonance_mechanism_v2.md §9.
+    We must investigate if these centralized dependencies can be cleanly bypassed to maintain architectural alignment with our decentralized vision.
+  next_action: "Analyze ReAct loop and registry implementation to verify centralized Conway Cloud dependencies can be fully decoupled."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0058
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0055_millia385_ryvos_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "ryvos (millia385/ryvos)"
+  url: "https://github.com/millia385/ryvos"
+  kalisam_fork: "https://github.com/kalisam/rybbits"
+  function_needed: >
+    FLOSSI0ULLK requires a secure, lightweight runtime harness (Layer 0 storage / Layer 1 memory / Layer 4 coordination) capable of orchestrating multi-agent DAG workflows, executing tools within isolated Docker sandboxes, and persisting session memory efficiently.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "medium"
+  contact_path: "https://github.com/millia385/ryvos/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Ryvos provides a highly relevant Rust-based agent harness with a low memory footprint and built-in security sandboxing. Its focus on goal-driven execution and multi-agent DAG workflows aligns closely with our Layer 4 coordination needs. However, as a standalone personal assistant, it may have overlapping components with existing FLOSSI0ULLK architecture, which increases the integration risk. We need to verify if its orchestrator can be decoupled from its native channels or if it forces an opinionated monolithic deployment. We must also ensure it does not violate the anti-pattern of vision accumulation by forcing an all-in-one ecosystem approach.
+  next_action: "Evaluate Ryvos DAG orchestrator decoupling potential and test Docker sandboxing overhead."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0059
+  domain: "multi-agent-orchestration"
+  promoted_from_staging: "0056_bytedance_deer_flow_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "deer-flow (bytedance/deer-flow)"
+  url: "https://github.com/bytedance/deer-flow"
+  kalisam_fork: "https://github.com/kalisam/DaerGoBam"
+  function_needed: >
+    Layer 4 multi-agent orchestration and Layer 1 persistent memory handling for
+    long-horizon task execution. FLOSSI0ULLK requires a decentralized harness to
+    coordinate sub-agents, manage execution sandboxes, and integrate extensible
+    skills without relying on a centralized message gateway.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/bytedance/deer-flow/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    DeerFlow is highly relevant as a comprehensive super-agent harness supporting
+    sandboxes, memory, and skills. The closest FLOSSI0ULLK analogue would be a
+    Layer 4 multi-agent orchestrator. Key risks include its massive scope and
+    tight integration with the ByteDance ecosystem (Volcengine, InfoQuest), which
+    may introduce significant shape-mismatches. We must verify it avoids the centralized
+    routing anti-pattern, as the explicit mention of a "message gateway" strongly
+    suggests centralized routing (a P5 violation per the obstruction taxonomy).
+  next_action: "Review architecture docs for Layer 4 compatibility and centralized routing assumptions."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0060
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0057_cmblir_memex_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "Memex (cmblir/Memex)"
+  url: "https://github.com/cmblir/Memex"
+  kalisam_fork: "https://github.com/kalisam/Memex"
+  function_needed: >
+    FLOSSI0ULLK needs a Layer 1 memory mechanism that persistently integrates new source material into a structured, cross-referenced knowledge base, avoiding repetitive RAG operations on every query. The system requires local, agent-driven bookkeeping of markdown files to maintain semantic connections and track source provenance over time.
+  reuse_level: "protocol-alignment"
+  license_status: "pending"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/cmblir/Memex/issues"
+  gate_status:
+    license: "pending"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Memex is highly relevant for its approach to pre-computing knowledge integration, shifting the LLM workload to ingest time rather than query time. Its closest FLOSSI0ULLK analogue is the personal-agent-harness's local memory store. A key integration risk (high) is its architectural shape as a Tauri-based desktop monolith, which conflicts with our need for composable, headless daemons. We must avoid vision accumulation by treating Memex as a reference for vault organization and MCP tools rather than adopting it as a direct software dependency.
+  next_action: "Review Memex vault schema and MCP server tools for Layer 1 protocol alignment."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0061
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0058_agentscope_ai_qwenpaw_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "QwenPaw (agentscope-ai/QwenPaw)"
+  url: "https://github.com/agentscope-ai/QwenPaw"
+  kalisam_fork: "https://github.com/kalisam/QwenPaw"
+  function_needed: >
+    FLOSSI0ULLK requires a Layer 4.5 gateway and personal agent harness capable of managing multi-agent collaboration, local memory, and skill execution. This project provides a robust, locally deployable assistant with broad channel integrations (DingTalk, Discord, WeChat) that could serve as a user-facing interface for Layer 0/1 local data without relying on central routing.
+  reuse_level: "adapter"
+  license_status: "pending - Apache-2.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://discord.gg/eYMpfnkG8h"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is highly relevant as a potential personal agent harness due to its focus on local control, memory evolution, and multi-channel integration. The closest FLOSSI0ULLK analogue is the proposed Layer 4.5 gateway. A key shape-mismatch risk is its reliance on a Python-based orchestration framework, which could conflict with our Layer 4 coordination substrate. We must also perform an anti-pattern check for "vision accumulation," as the project attempts to bundle PDF processing, cron jobs, browser use, and model routing into a single toolset.
+  next_action: "Review QwenPaw architecture for alignment with Layer 4.5 gateway and evaluate skill extension mechanisms."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0062
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0059_vercel_labs_open_agents_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "open-agents (vercel-labs/open-agents)"
+  url: "https://github.com/vercel-labs/open-agents"
+  kalisam_fork: "https://github.com/kalisam/open-agents"
+  function_needed: >
+    FLOSSI0ULLK needs a Layer 4 orchestration harness capable of durable workflow
+    execution that strictly separates the agent control loop from the execution sandbox.
+    This project provides a reference architecture for maintaining long-running
+    background agents that interact with ephemeral environments via explicit tools.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/vercel-labs/open-agents/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is highly relevant for its clean architectural separation of the agent workflow from the sandbox VM, aligning with FLOSSI0ULLK Layer 4 coordination principles. The closest FLOSSI0ULLK analogue would be the personal-agent-harness. A significant shape-mismatch exists because the execution environment is heavily coupled to Vercel's proprietary Sandbox primitives and Workflow SDK. This presents a high integration risk and a potential P5 violation (central routing) if sandbox instantiation relies on Vercel's single-subscription model gating. We must avoid alignment-as-proof where adopting the template locks us into a specific vendor ecosystem.
+  next_action: "Evaluate workflow and sandbox abstractions to determine if they can be decoupled from Vercel infrastructure."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0063
+  domain: "semantic-spanning-layer"
+  promoted_from_staging: "0060_giancarloerra_socraticode_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "SocratiCode (giancarloerra/SocratiCode)"
+  url: "https://github.com/giancarloerra/SocratiCode"
+  kalisam_fork: "https://github.com/kalisam/SocratiCode"
+  function_needed: >
+    FLOSSI0ULLK needs a Layer 2 semantic spanning capability to give autonomous agents deep contextual understanding of codebase artifacts without excessive token consumption. This project would provide the AST-aware chunking, hybrid semantic search, and dependency graph generation required for the semantic layer to ground multi-agent orchestration.
+  reuse_level: "adapter"
+  license_status: "pass - AGPL-3.0 per metadata"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://discord.gg/5DrMXfNG"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    Relevance: This project directly addresses the need for codebase intelligence via AST-aware chunking, polyglot graphs, and semantic search. Closest analogue is the planned Layer 2 semantic spanning layer for codebase artifacts. Key risk: While the local core is open-source, the promotion of SocratiCode Cloud with SSO and hosted team indices suggests a potential trajectory towards centralized routing or single-subscription model gating, which is a P5 violation. Anti-pattern check: We must ensure the open-source version doesn't suffer from vision accumulation or become merely a funnel for the centralized cloud offering.
+  next_action: "Evaluate open-source MCP performance and verify multi-agent index sharing without centralized routing."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0064
+  domain: "value-flow-accounting"
+  promoted_from_staging: "0061_floss_funding_floss_funding_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "floss_funding (floss-funding/floss_funding)"
+  url: "https://github.com/floss-funding/floss_funding"
+  kalisam_fork: "https://github.com/kalisam/floss_funding"
+  function_needed: >
+    FLOSSI0ULLK requires a decentralized, offline-first value-flow accounting mechanism (Layer 4 coordination) to track deep dependency usage and prompt for funding. It needs a way to recognize and reward contributors at the bottom of the stack locally, without network telemetry or sacrificing user privacy.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://discord.gg/3qme4XHNKN"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is relevant for its exploration of privacy-preserving, offline-first dependency funding via localized messaging and offline key validation. The closest FLOSSI0ULLK analogue is the value-flow accounting substrate. A major shape-mismatch is its Ruby-specific implementation relying on STDOUT and environment variables, which does not fit a multi-language spanning layer. Most critically, it contains a P5 violation (no central routing) by relying on a centralized web service (floss-funding.dev) to generate the cryptographic activation keys, introducing a single point of failure and control.
+  next_action: "Evaluate offline key validation cryptography for language-agnostic protocol design."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0065
+  domain: personal-agent-harness
+  promoted_from_staging: "0064_mo_vic_opencrab_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "OpenCrab (mo-vic/OpenCrab)"
+  url: "https://github.com/mo-vic/OpenCrab"
+  kalisam_fork: "https://github.com/kalisam/OpenCrab"
+  function_needed: >
+    Layer 1 memory and Layer 4.5 gateway capability for capturing user trajectories
+    and corrections, offloading complex tasks to frontier models, and distilling
+    these interactions into local model weights for continuous personalized
+    self-improvement without relying solely on semantic spanning layers.
+  reuse_level: adapter
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: active
+  integration_risk: high
+  contact_path: "https://github.com/mo-vic/OpenCrab/discussions"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    This project is highly relevant for exploring weight-based memory refinement over pure semantic RAG, acting as a personal proxy for API interactions.
+    The closest FLOSSI0ULLK analogue is the Layer 1 persistent memory federation, though OpenCrab approaches memory via fine-tuning distillation.
+    Key risks involve the hardware overhead required for local fine-tuning and potential impedance mismatch with FLOSSI0ULLK's sovereign orchestration.
+    The local "OpenCrab Router" proxy must be audited to ensure it does not violate P5 (no central routing) when scaled across a multi-agent topology.
+  next_action: "Analyze intercept/ and training/ modules for hardware overhead and P5 routing compliance."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0066
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0065_frkak_mymir_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "mymir (FrkAk/mymir)"
+  url: "https://github.com/FrkAk/mymir"
+  kalisam_fork: "https://github.com/kalisam/OURmirror"
+  function_needed: |
+    FLOSSI0ULLK needs a localized context management and task coordination mechanism (Layer 1 memory / Layer 4 coordination) for personal agent harnesses. This ensures agents can maintain persistent project state, decompose workflows into dependency graphs, and automatically resume work across distinct sessions without requiring manual re-briefing.
+  reuse_level: "adapter"
+  license_status: "AGPL-3.0 per metadata; compatible with AGPL-3 cascade per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/FrkAk/mymir/discussions"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    Mymir provides an end-to-end task graph and context injection layer directly integrated into local agent harnesses like Gemini CLI. Its use of MCP tools for dynamic context retrieval strongly aligns with FLOSSI0ULLK's Layer 1 memory needs. However, its reliance on a local PostgreSQL instance and Next.js server introduces an architectural shape-mismatch, as it leans towards a heavy local service rather than a lightweight embedded substrate. We should investigate its graph ontology and MCP schema designs to evaluate if they can be adapted or ported natively into our stack.
+  next_action: "Review Mymir's MCP tool schemas to evaluate alignment with FLOSSI0ULLK's task ontology."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0067
+  domain: generative-ui-rendering
+  promoted_from_staging: "0067_thesysdev_openui_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: openui (thesysdev/openui)
+  url: https://github.com/thesysdev/openui
+  kalisam_fork: "https://github.com/kalisam/openui"
+  function_needed: >
+    FLOSSI0ULLK Layer 4.5 (gateway/interface) requires a token-efficient, streaming-first mechanism to translate agent state and coordination outputs into interactive human interfaces. We need a way to map semantic spanning layer outputs to UI components progressively without waiting for full JSON structures.
+  reuse_level: adapter
+  license_status: pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7
+  maturity: active
+  integration_risk: medium
+  contact_path: https://github.com/thesysdev/openui/issues
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: >
+    Relevant for token-efficient, streaming UI rendering of agent outputs at the gateway layer. No direct FLOSSI0ULLK analogue exists yet, but it touches the personal-agent-harness. The main integration risk is the heavy coupling to React (@openuidev/react-lang, @openuidev/react-ui), which may violate framework-agnostic requirements of the sovereign-code-artifacts layer. No centralized routing or subscription-gating anti-patterns are evident in the documentation.
+  next_action: Evaluate openuidev/react-lang for framework-agnostic extraction and test streaming from local agent
+  next_action_owner: Gemini CLI delegate
+  next_action_deadline: 2026-05-24
+
+- id: reuse-ledger-0068
+  domain: multi-agent-orchestration
+  promoted_from_staging: "0068_stevenjohnson998_agorai_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "Agorai (StevenJohnson998/Agorai)"
+  url: "https://github.com/StevenJohnson998/Agorai"
+  kalisam_fork: "https://github.com/kalisam/Agorai"
+  function_needed: |
+    FLOSSI0ULLK requires a Layer 4 coordination mechanism to facilitate debate and consensus among diverse, locally hosted agent models. It also needs a Layer 1 memory substrate to manage persistent, clearance-gated shared context across these multi-agent interactions without hitting context window limits.
+  reuse_level: adapter
+  license_status: "AGPL-3.0 per metadata; compatible with AGPL-3 cascade per ADR-7"
+  maturity: maintained
+  integration_risk: high
+  contact_path: "https://github.com/StevenJohnson998/Agorai/issues"
+  gate_status:
+    license: pass
+    adapter_test: pending
+    provenance: pending
+    rollback: pending
+    contact: pending
+  decision: investigate
+  notes: |
+    This project is highly relevant for Layer 4 multi-agent orchestration and Layer 1 persistent memory. The closest FLOSSI0ULLK analogue is the coordination and shared-context substrate. A key risk is that Agorai's server-based architecture ("built-in orchestrator", centralized GUI) strongly suggests a central routing model, which is a P5 violation (no central routing) per resonance_mechanism_v2.md. We must ensure it does not introduce a centralized choke point for agent communication.
+  next_action: "Evaluate Keryx orchestrator for central routing choke points and P5 compliance."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-27"
+
+- id: reuse-ledger-0069
+  domain: "autonomous-skill-generation"
+  promoted_from_staging: "0069_zhang_henry_coevoskills_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "CoEvoSkills (Zhang-Henry/CoEvoSkills)"
+  url: "https://github.com/Zhang-Henry/CoEvoSkills"
+  kalisam_fork: "https://github.com/kalisam/CoEvoSkills"
+  function_needed: >
+    FLOSSI0ULLK needs a robust mechanism to autonomously construct, verify, and refine
+    multi-file, structured agent skills without relying on human ground-truth supervision.
+    This functionality maps to Layer 2 (semantic layer) and Layer 4 (coordination),
+    enabling agents to iteratively evolve their capabilities for complex tasks against
+    an isolated surrogate verifier.
+  reuse_level: "monitor"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "high"
+  contact_path: "https://github.com/Zhang-Henry/CoEvoSkills/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project introduces a promising co-evolutionary framework for generating multi-file agent skills, which aligns conceptually with FLOSSI0ULLK's agent capability evolution goals. The closest analogue in FLOSSI0ULLK would be the personal-agent-harness requiring self-improving skill routines. However, a major shape-mismatch and integration risk is that the repository currently contains no source code ("Code-coming soon" badge). There is no working interoperability to test yet, so we must avoid premature adoption and monitor the repository for the actual code release.
+  next_action: "Monitor repository for source code release and evaluate the skill generation pipeline."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0070
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0070_kcosr_codapter_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "codapter (kcosr/codapter)"
+  url: "https://github.com/kcosr/codapter"
+  kalisam_fork: "https://github.com/kalisam/codepender"
+  function_needed: >
+    FLOSSI0ULLK needs a Layer 4.5 gateway mechanism to allow off-the-shelf,
+    specialized graphical client interfaces (like existing desktop apps)
+    to communicate with the sovereign multi-agent backends, avoiding
+    the need to build and maintain custom UI shells.
+  reuse_level: "adapter"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "maintained"
+  integration_risk: "medium"
+  contact_path: "https://github.com/kcosr/codapter/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    This project is relevant as a lightweight bridge layer that decouples
+    the client UI from the backend agent process. There isn't a direct FLOSSI0ULLK
+    analogue yet, but it acts as a local Layer 4.5 gateway. Key risks include its
+    early-prototype status and heavy reliance on the specific Codex JSON-RPC protocol
+    which might mismatch FLOSSI0ULLK's desired protocol shapes. It avoids vision
+    accumulation by strictly remaining a protocol translation layer.
+  next_action: "Review codapter's internal router architecture to evaluate alignment with FLOSSI0ULLK's protocol needs."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0071
+  domain: "sovereign-code-artifacts"
+  promoted_from_staging: "0071_zjunlp_skillnet_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "SkillNet (zjunlp/SkillNet)"
+  url: "https://github.com/zjunlp/SkillNet"
+  kalisam_fork: "https://github.com/kalisam/SkillNet"
+  function_needed: >
+    FLOSSI0ULLK needs a structured format and evaluation pipeline for agent capabilities
+    (Layer 2 semantic). This project provides 5-dimensional evaluation (safety, maintainability)
+    and auto-creation of skills from unstructured sources, which could inform our portable
+    agent harness.
+  reuse_level: "protocol-alignment"
+  license_status: "pending - MIT per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "high"
+  contact_path: "https://github.com/zjunlp/SkillNet/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: >
+    SkillNet is highly relevant for its automated skill creation from raw documents and its
+    5-dimensional quality evaluation framework. The closest FLOSSI0ULLK analogue is the
+    personal-agent-harness capability registry. A major shape-mismatch and key risk is their
+    reliance on a centralized repository (api-skillnet.openkg.cn) for search and distribution,
+    which is a P5 violation (no central routing). We must guard against the vision accumulation
+    anti-pattern by isolating their evaluation logic rather than importing their entire network
+    architecture.
+  next_action: "Investigate decoupling the skill evaluation pipeline from the centralized API."
+  next_action_owner: "Tony"
+  next_action_deadline: "2026-05-24"
+
+- id: reuse-ledger-0072
+  domain: "personal-agent-harness"
+  promoted_from_staging: "0073_neolabhq_context_engineering_kit_draft.yaml"
+  promoted_at: "2026-05-19T16:00:55.020395+00:00"
+  candidate_project: "context-engineering-kit (NeoLabHQ/context-engineering-kit)"
+  url: "https://github.com/NeoLabHQ/context-engineering-kit"
+  kalisam_fork: "https://github.com/kalisam/context-engineering-kit"
+  function_needed: |
+    Provides advanced context engineering techniques and sub-agent orchestration
+    patterns (such as reflection and spec-driven development) to improve agent
+    reliability, minimize token footprint, and mitigate context degradation
+    within our Layer 4 coordination and personal agent harnesses.
+  reuse_level: "adapter"
+  license_status: "pending - GPL-3.0 per metadata; needs AGPL-3 cascade compat per ADR-7"
+  maturity: "active"
+  integration_risk: "medium"
+  contact_path: "https://github.com/NeoLabHQ/context-engineering-kit/issues"
+  gate_status:
+    license: "pass"
+    adapter_test: "pending"
+    provenance: "pending"
+    rollback: "pending"
+    contact: "pending"
+  decision: "investigate"
+  notes: |
+    This project is highly relevant for its scientifically proven, token-efficient
+    context engineering techniques and sub-agent orchestration patterns. Its closest
+    FLOSSI0ULLK analogue would be our internal agent skills and prompt engineering
+    guidelines. The primary shape-mismatch risk, justifying a medium integration risk,
+    is its heavy optimization for specific commercial tools like Claude Code and Cursor,
+    requiring adaptation for our sovereign infrastructure. We must also verify that its
+    sub-agent routing mechanisms do not introduce centralized routing bottlenecks (P5 violation).
+  next_action: "Review the reflexion and SADD plugins to determine adaptability for FLOSSI0ULLK agent harnesses."
+  next_action_owner: "Gemini CLI delegate"
+  next_action_deadline: "2026-05-24"
+

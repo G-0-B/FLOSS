@@ -1,0 +1,614 @@
+{
+  "manifest_version": "0.3.0",
+  "workspace_id": "flossi0ullk",
+  "workspace_name": "FLOSSI0ULLK",
+  "default_route_order": [
+    "canon",
+    "architecture",
+    "code",
+    "source-chain",
+    "agent-memory",
+    "harness-roster",
+    "serena-memory",
+    "research",
+    "reference",
+    "skills",
+    "traces"
+  ],
+  "rules": [
+    "Route corpus first, then retrieve inside the chosen corpus.",
+    "Load L0 context before L1 or L2 whenever possible.",
+    "Do not bulk-load `_reference/`; treat it as a last-resort published research library and background corpus.",
+    "Prefer current code and source-chain artifacts over stale summaries.",
+    "Generated L0/L1 context views are additive projections; canonical docs remain the source of truth.",
+    "Agent memory is repository-owned under `FLOSS/docs/agent-memory/` and projected outward; agent-private memory directories are not canonical.",
+    "Signed provenance packets under `.agent-surface/provenance/` are Plane A evidence; Plane B must re-validate before trust."
+  ],
+  "context_views": {
+    "note": "Generated cheap-load context layers derived from canonical docs. Keep canon rich; compress the projections, not the source.",
+    "outputs": {
+      "registry": ".agent-surface/context/context-view-registry.json",
+      "l0": ".agent-surface/context/CONTEXT_L0.md",
+      "l1": ".agent-surface/context/CONTEXT_L1.md"
+    },
+    "sources": [
+      {
+        "id": "workspace-index",
+        "label": "Workspace Index",
+        "path": "INDEX.md",
+        "summary_chars": 220,
+        "max_headings": 3,
+        "max_bullets": 3
+      },
+      {
+        "id": "operator-primer",
+        "label": "Operator Primer",
+        "path": "FLOSS/docs/architecture/OPERATOR_PRIMER.md",
+        "summary_chars": 360,
+        "max_headings": 5,
+        "max_bullets": 6
+      },
+      {
+        "id": "project-orientation",
+        "label": "Project Orientation",
+        "path": "FLOSS/CLAUDE.md",
+        "summary_chars": 220,
+        "max_headings": 3,
+        "max_bullets": 3
+      },
+      {
+        "id": "mvp-phase-state",
+        "label": "MVP Plan / Phase State",
+        "path": "FLOSS/MVP_PLAN.md",
+        "summary_chars": 260,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "sdd-discipline",
+        "label": "SDD Discipline",
+        "path": "FLOSS/SDD-Master-Spec-0.22.md",
+        "summary_chars": 260,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "shared-agent-memory",
+        "label": "Shared Agent Memory",
+        "path": "FLOSS/docs/agent-memory/MEMORY.md",
+        "summary_chars": 260,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "agentmemory-operator-surface",
+        "label": "agentmemory Operator Surface",
+        "path": "AGENTMEMORY.md",
+        "summary_chars": 280,
+        "max_headings": 4,
+        "max_bullets": 5
+      },
+      {
+        "id": "root-intake-digestion",
+        "label": "Root Intake Digestion Map",
+        "path": "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "summary_chars": 260,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "working-todo",
+        "label": "Working Todo",
+        "path": "FLOSS/docs/research/2026-05-15-working-todo-list.md",
+        "summary_chars": 320,
+        "max_headings": 5,
+        "max_bullets": 6
+      },
+      {
+        "id": "ad4m-audit-delta",
+        "label": "AD4M Audit Delta",
+        "path": "FLOSS/docs/research/2026-05-09-ad4m-coasys-audit-delta.md",
+        "summary_chars": 360,
+        "max_headings": 5,
+        "max_bullets": 6
+      },
+      {
+        "id": "agentic-operating-model",
+        "label": "Agentic Operating Model",
+        "path": "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "metaharness-operating-model",
+        "label": "Metaharness Operating Model",
+        "path": "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "holistic-architecture",
+        "label": "Holistic Architecture",
+        "path": "FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "context-daemon",
+        "label": "Context Daemon Architecture",
+        "path": "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
+        "summary_chars": 240,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "context-router-policy",
+        "label": "Context Router Routing Policy",
+        "path": "FLOSS/docs/research/2026-05-22-context-router-routing-policy.md",
+        "summary_chars": 280,
+        "max_headings": 4,
+        "max_bullets": 5
+      },
+      {
+        "id": "runtime-surfaces",
+        "label": "Runtime Surfaces",
+        "path": "FLOSS/docs/architecture/RUNTIME_SURFACES.md",
+        "summary_chars": 260,
+        "max_headings": 4,
+        "max_bullets": 4
+      },
+      {
+        "id": "provenance-packet-spine",
+        "label": "Provenance Packet Spine",
+        "path": "FLOSS/docs/specs/provenance-packet.spec.md",
+        "summary_chars": 320,
+        "max_headings": 5,
+        "max_bullets": 6
+      },
+      {
+        "id": "ai-harness-roster",
+        "label": "AI Harness Roster",
+        "path": ".agent-surface/harness/AI_ROSTER.md",
+        "summary_chars": 320,
+        "max_headings": 5,
+        "max_bullets": 8
+      },
+      {
+        "id": "harness-update-packet",
+        "label": "Cross-Harness Update Packet",
+        "path": ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
+        "summary_chars": 320,
+        "max_headings": 5,
+        "max_bullets": 8
+      }
+    ]
+  },
+  "corpora": [
+    {
+      "id": "canon",
+      "uri": "floss://canon",
+      "tier": "L0",
+      "priority": 100,
+      "summary": "Canonical orientation and authority documents for current FLOSSI0ULLK work.",
+      "route_label": "canonical authority",
+      "route_policy": "Use for authoritative project state, ADR/spec governance, kernel orientation, and operator-facing current truth.",
+      "route_intents": [
+        "canonical authority",
+        "current canon",
+        "ADR decision",
+        "spec governance",
+        "project kernel",
+        "operator primer",
+        "phase status"
+      ],
+      "keywords": [
+        "canon",
+        "authority",
+        "index",
+        "kernel",
+        "operator",
+        "primer",
+        "wtf",
+        "how to use",
+        "claude",
+        "adr",
+        "spec",
+        "decision",
+        "governance"
+      ],
+      "roots": [
+        "INDEX.md",
+        "FLOSS/docs/architecture/OPERATOR_PRIMER.md",
+        "FLOSS/CLAUDE.md",
+        "FLOSS/MVP_PLAN.md",
+        "FLOSS/SDD-Master-Spec-0.22.md",
+        "FLOSS/INSTRUCTIONS_FOR_CODE.md",
+        "AGENTMEMORY.md",
+        "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "FLOSS/docs/agent-memory/MEMORY.md",
+        "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+        "FLOSS/docs/adr/INDEX.md",
+        "FLOSS/docs/specs/provenance-packet.spec.md"
+      ]
+    },
+    {
+      "id": "architecture",
+      "uri": "floss://architecture",
+      "tier": "L0",
+      "priority": 95,
+      "summary": "Active architecture, operating model, and local-agent-node design references.",
+      "route_label": "architecture and operating model",
+      "route_policy": "Use for system design, metaharness structure, runtime planes, context daemon behavior, and Holochain/Radicle stack questions.",
+      "route_intents": [
+        "architecture design",
+        "operating model",
+        "metaharness operating model",
+        "context daemon",
+        "runtime surface",
+        "holochain radicle stack",
+        "agentic architecture"
+      ],
+      "keywords": [
+        "architecture",
+        "operating",
+        "operator",
+        "primer",
+        "how to use",
+        "model",
+        "context",
+        "daemon",
+        "watch",
+        "filewatch",
+        "intake",
+        "event",
+        "queue",
+        "consolidation",
+        "compression",
+        "meta",
+        "harness",
+        "hook",
+        "radicle",
+        "holochain",
+        "agentic",
+        "stack",
+        "design"
+      ],
+      "roots": [
+        "FLOSS/docs/architecture/OPERATOR_PRIMER.md",
+        "FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md",
+        "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md",
+        "FLOSS/docs/architecture/HOLISTIC_ARCHITECTURE.md",
+        "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
+        "FLOSS/docs/architecture/RUNTIME_SURFACES.md",
+        "FLOSS/docs/specs/phase0-substrate-bridge.spec.md",
+        "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md",
+        "FLOSS/docs/superpowers/specs/2026-04-12-local-agent-node-design.md",
+        "FLOSS/docs/superpowers/plans/2026-04-19-filewatch-metaharness.md"
+      ]
+    },
+    {
+      "id": "skills",
+      "uri": "floss://skills",
+      "tier": "L1",
+      "priority": 92,
+      "summary": "Portable FLOSSI0ULLK skill corpus and shared skill manifest for reusable agent workflows.",
+      "route_label": "agent workflow skills",
+      "route_policy": "Use for portable skill instructions, reusable agent workflows, and shared skill-surface materialization.",
+      "route_intents": [
+        "skill corpus",
+        "agent workflow",
+        "portable skill",
+        "shared skill surface",
+        "codex claude gemini skill"
+      ],
+      "keywords": [
+        "skill",
+        "workflow",
+        "portable",
+        "codex",
+        "gemini",
+        "claude",
+        "shared surface",
+        "holochain",
+        "radicle"
+      ],
+      "roots": [
+        "FLOSS/shared-skill-surface.json",
+        "FLOSS/skill-corpus"
+      ]
+    },
+    {
+      "id": "code",
+      "uri": "floss://code",
+      "tier": "L1",
+      "priority": 90,
+      "summary": "Live implementation surfaces for orchestration, source-chain logic, scripts, and ARF.",
+      "route_label": "implementation and tests",
+      "route_policy": "Use for code changes, scripts, packages, functions, tests, bugs, refactors, and implementation details before reading docs.",
+      "route_intents": [
+        "code implementation",
+        "implementation test",
+        "python script",
+        "function class",
+        "pytest bug",
+        "context router",
+        "package module",
+        "refactor code"
+      ],
+      "keywords": [
+        "code",
+        "implementation",
+        "module",
+        "package",
+        "script",
+        "runtime",
+        "heartbeat",
+        "budget",
+        "token",
+        "function",
+        "class",
+        "test",
+        "bug",
+        "refactor"
+      ],
+      "roots": [
+        "FLOSS/packages",
+        "FLOSS/scripts",
+        "FLOSS/ARF"
+      ]
+    },
+    {
+      "id": "serena-memory",
+      "uri": "floss://serena-memory",
+      "tier": "L1",
+      "priority": 80,
+      "summary": "Repo-local Serena project configuration and durable codebase memories.",
+      "route_label": "serena codebase memory",
+      "route_policy": "Use only when the query names Serena, codebase onboarding, LSP memory, or repo-local development conventions.",
+      "route_intents": [
+        "serena memory",
+        "codebase memory",
+        "lsp onboarding",
+        "project conventions",
+        "repo style checklist"
+      ],
+      "keywords": [
+        "serena",
+        "memory",
+        "conventions",
+        "overview",
+        "onboarding",
+        "style",
+        "checklist",
+        "lsp"
+      ],
+      "roots": [
+        "FLOSS/.serena/project.yml",
+        "FLOSS/.serena/memories"
+      ]
+    },
+    {
+      "id": "agent-memory",
+      "uri": "floss://agent-memory",
+      "tier": "L1",
+      "priority": 89,
+      "summary": "Shared reusable agent memory projected from repository-owned canonical markdown into agent-native surfaces.",
+      "route_label": "shared agent memory",
+      "route_policy": "Use for durable agent memory, AGENTMEMORY, cross-agent projections, user preferences, remembered project state, and recall surfaces.",
+      "route_intents": [
+        "agentmemory",
+        "agent memory",
+        "durable memory",
+        "shared memory",
+        "cross agent memory",
+        "user preference",
+        "project recall",
+        "memory harness"
+      ],
+      "keywords": [
+        "memory",
+        "agent memory",
+        "claude memory",
+        "codex memory",
+        "gemini memory",
+        "shared surface",
+        "feedback",
+        "user preference",
+        "project state"
+      ],
+      "roots": [
+        "FLOSS/docs/agent-memory",
+        "AGENTMEMORY.md",
+        ".agent-surface/memory/AGENT_MEMORY.md",
+        "FLOSS/shared-agent-memory-surface.json",
+        "FLOSS/docs/agent-memory/project/cross-harness-ai-roster.md"
+      ]
+    },
+    {
+      "id": "harness-roster",
+      "uri": "floss://harness-roster",
+      "tier": "L1",
+      "priority": 88,
+      "summary": "Generated inventory of AI providers, models, agent surfaces, MCP servers, and the startup packet each harness should consume.",
+      "route_label": "AI harness roster",
+      "route_policy": "Use for questions about OpenWork/OpenCode, available models, Claude/Codex/Gemini/Kimi/Grok/Moonshot/x.ai surfaces, shared startup instructions, and central harness update propagation.",
+      "route_intents": [
+        "AI roster",
+        "available models",
+        "OpenWork",
+        "OpenCode",
+        "cross harness update",
+        "central instruction update",
+        "model provider inventory",
+        "manual copypasta replacement"
+      ],
+      "keywords": [
+        "openwork",
+        "opencode",
+        "claude",
+        "codex",
+        "chatgpt",
+        "gemini",
+        "kimi",
+        "grok",
+        "moonshot",
+        "x.ai",
+        "model",
+        "provider",
+        "roster",
+        "harness",
+        "copypasta",
+        "instruction"
+      ],
+      "roots": [
+        "FLOSS/shared-ai-roster-surface.json",
+        ".agent-surface/harness/AI_ROSTER.md",
+        ".agent-surface/harness/HARNESS_UPDATE_PACKET.md",
+        ".agent-surface/harness/ai-roster.json",
+        "opworkers/.opencode/agents/openwork.md"
+      ]
+    },
+    {
+      "id": "source-chain",
+      "uri": "floss://source-chain",
+      "tier": "L1",
+      "priority": 88,
+      "summary": "Local source-chain state for claims, votes, decisions, and cell-level provenance.",
+      "route_label": "source-chain provenance",
+      "route_policy": "Use for claims, votes, consensus evidence, provenance, local cell state, hashline/head checks, and decision records.",
+      "route_intents": [
+        "source chain",
+        "claim vote",
+        "consensus provenance",
+        "decision record",
+        "cell state",
+        "hashline head",
+        "provenance packet",
+        "cross-agent handoff",
+        "ledger evidence"
+      ],
+      "keywords": [
+        "claim",
+        "vote",
+        "decision",
+        "consensus",
+        "provenance",
+        "cell",
+        "source chain",
+        "packet",
+        "handoff",
+        "ledger"
+      ],
+      "roots": [
+        ".agent-surface/provenance",
+        "FLOSS/docs/specs/provenance-packet.spec.md",
+        "~/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/source_chain",
+        "~/.floss_agent/cells/0000000000000000000000000000000000000000000000000000000000000000/head.json"
+      ]
+    },
+    {
+      "id": "traces",
+      "uri": "floss://traces",
+      "tier": "L2",
+      "priority": 70,
+      "summary": "Hook logs and consensus traces used for optimization, debugging, and retrospective analysis.",
+      "route_label": "runtime traces and logs",
+      "route_policy": "Use for hook logs, consensus traces, latency/debug evidence, and retrospective runtime analysis.",
+      "route_intents": [
+        "runtime trace",
+        "hook log",
+        "consensus trace",
+        "debug latency",
+        "failure analysis",
+        "retrospective log"
+      ],
+      "keywords": [
+        "trace",
+        "log",
+        "hook",
+        "round",
+        "optimization",
+        "debug",
+        "latency",
+        "failure"
+      ],
+      "roots": [
+        "~/.floss_agent/traces/consensus",
+        "~/.floss_agent/hook.log"
+      ]
+    },
+    {
+      "id": "research",
+      "uri": "floss://research",
+      "tier": "L2",
+      "priority": 60,
+      "summary": "Active FLOSSI0ULLK research notes, synthesis reports, and external-fork analysis.",
+      "route_label": "research intake and synthesis",
+      "route_policy": "Use for active research digestion, paper/report synthesis, external project comparisons, AD4M/RAGRoute/DecentMem/DAMCS analysis, and research-derived next steps.",
+      "route_intents": [
+        "research report",
+        "research synthesis",
+        "paper survey",
+        "arxiv paper",
+        "open distributed intelligence",
+        "ragroute routing",
+        "decentmem damcs",
+        "external fork analysis",
+        "ad4m fit"
+      ],
+      "keywords": [
+        "research",
+        "fork",
+        "survey",
+        "paper",
+        "analysis",
+        "meta",
+        "report",
+        "ad4m",
+        "anti-duplication",
+        "sidecar",
+        "social dna"
+      ],
+      "roots": [
+        "FLOSS/docs/research",
+        "FLOSS/docs/research/2026-05-19-root-intake-digestion.md",
+        "FLOSS/docs/research/2026-05-15-working-todo-list.md",
+        "FLOSS/docs/research/2026-05-09-ad4m-coasys-audit-delta.md",
+        "deep-flossi0ullkreport.md",
+        "oh-my-meta.md"
+      ]
+    },
+    {
+      "id": "reference",
+      "uri": "floss://reference",
+      "tier": "L2",
+      "priority": 20,
+      "summary": "Read-only published research and books library used only after canon, code, and active research have been routed.",
+      "route_label": "published reference library",
+      "route_policy": "Use as the last-resort background library for published papers, books, PDFs, textbooks, and broad external context.",
+      "route_intents": [
+        "reference library",
+        "published papers",
+        "books background",
+        "textbook pdf",
+        "external reference",
+        "background corpus"
+      ],
+      "keywords": [
+        "reference",
+        "research library",
+        "papers",
+        "books",
+        "software engineering",
+        "ai ml",
+        "background"
+      ],
+      "roots": [
+        "_reference"
+      ]
+    }
+  ]
+}

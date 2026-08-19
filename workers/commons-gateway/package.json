@@ -1,0 +1,22 @@
+{
+  "name": "@flossioullk/commons-gateway-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "cf:typegen": "wrangler types src/worker-configuration.d.ts --include-runtime false",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --local",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "versions:upload": "wrangler versions upload"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.18.8",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.114.0"
+  }
+}

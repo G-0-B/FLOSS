@@ -33,20 +33,16 @@ impl Vector {
             ));
         }
 
-        let dot_product: f32 = self.data.iter()
+        let dot_product: f32 = self
+            .data
+            .iter()
             .zip(other.data.iter())
             .map(|(a, b)| a * b)
             .sum();
 
-        let self_magnitude: f32 = self.data.iter()
-            .map(|a| a.powi(2))
-            .sum::<f32>()
-            .sqrt();
+        let self_magnitude: f32 = self.data.iter().map(|a| a.powi(2)).sum::<f32>().sqrt();
 
-        let other_magnitude: f32 = other.data.iter()
-            .map(|b| b.powi(2))
-            .sum::<f32>()
-            .sqrt();
+        let other_magnitude: f32 = other.data.iter().map(|b| b.powi(2)).sum::<f32>().sqrt();
 
         if self_magnitude == 0.0 || other_magnitude == 0.0 {
             return Ok(0.0);
@@ -67,7 +63,9 @@ impl Vector {
             ));
         }
 
-        Ok(self.data.iter()
+        Ok(self
+            .data
+            .iter()
             .zip(other.data.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f32>()
@@ -76,10 +74,7 @@ impl Vector {
 
     /// Normalize the vector to unit length in-place.
     pub fn normalize(&mut self) {
-        let magnitude: f32 = self.data.iter()
-            .map(|a| a.powi(2))
-            .sum::<f32>()
-            .sqrt();
+        let magnitude: f32 = self.data.iter().map(|a| a.powi(2)).sum::<f32>().sqrt();
 
         if magnitude > 0.0 {
             for val in self.data.iter_mut() {

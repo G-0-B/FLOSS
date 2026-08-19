@@ -4,12 +4,12 @@ Individual desktop pony agent with full dAsGI capabilities.
 Priority system: Wellbeing > Honesty > Tools
 """
 
-import asyncio
 import logging
 import time
 from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
+
 
 class DesktopPonyAgent:
     """Represents a single, autonomous pony agent within the dAsGI ecosystem.
@@ -31,13 +31,13 @@ class DesktopPonyAgent:
         context_buffer: A list that maintains the agent's recent conversational history.
         horde_client: The client used to communicate with the Horde.AI network.
     """
-    
+
     def __init__(
         self,
         pony_id: str,
         pony_name: str = "Pinkie Pie",
         role: str = "generalist",
-        use_mock: bool = True
+        use_mock: bool = True,
     ):
         """Initializes a DesktopPonyAgent instance.
 
@@ -52,37 +52,57 @@ class DesktopPonyAgent:
         self.pony_name = pony_name
         self.role = role
         self.use_mock = use_mock
-        
+
         # Context management
         self.context_buffer: List[Dict[str, Any]] = []
         self.max_context_size = 100
-        
+
         # Horde client (created on demand)
         self.horde_client: Optional[Any] = None
-        
-        logger.info(f"Initialized pony: {pony_id} ({pony_name}) [{'MOCK' if use_mock else 'REAL'} mode]")
-    
-    async def __aenter__(self):
-        """Asynchronously initializes the Horde.AI client upon entering a context."""
-        # Import the appropriate client
+
+        logger.info(
+            "Initialized pony: %s (%s) [%s mode]",
+            pony_id,
+            pony_name,
+            "MOCK" if use_mock else "REAL",
+        )
+
+    async def _ensure_horde_client(self):
+        """Lazily initialize the right client, honoring `use_mock`.
+
+        `HordeClient` / `MockHordeClient` are imported locally (never at module
+        scope), so callers must route through here rather than referencing the
+        names directly — otherwise a lazy init raises NameError and ignores the
+        mock flag.
+        """
+        if self.horde_client:
+            return
         if self.use_mock:
             from .mock_horde_client import MockHordeClient
+
             self.horde_client = await MockHordeClient().__aenter__()
         else:
             from .horde_client import HordeClient
+
             self.horde_client = await HordeClient().__aenter__()
+
+    async def __aenter__(self):
+        """Asynchronously initializes the Horde.AI client upon entering a context."""
+        await self._ensure_horde_client()
         return self
-    
+
     async def __aexit__(self, *args):
         """Asynchronously cleans up the Horde.AI client upon exiting a context."""
         if self.horde_client:
             await self.horde_client.__aexit__(*args)
-    
+
     # ============================================================
     # PRIORITY 1: USER WELLBEING
     # ============================================================
-    
-    def check_crisis_indicators(self, text: str, user_state: Dict[str, Any]) -> Optional[str]:
+
+    def check_crisis_indicators(
+        self, text: str, user_state: Dict[str, Any]
+    ) -> Optional[str]:
         """Scans for indicators of user crisis, prioritizing well-being.
 
         This is the agent's highest-priority function. It checks for keywords
@@ -100,31 +120,35 @@ class DesktopPonyAgent:
             An alert message string if a crisis is detected, otherwise None.
         """
         crisis_keywords = [
-            'suicide', 'kill myself', 'end it all', 'not worth living',
-            'everyone better off without me', 'can\'t go on'
+            "suicide",
+            "kill myself",
+            "end it all",
+            "not worth living",
+            "everyone better off without me",
+            "can't go on",
         ]
-        
+
         text_lower = text.lower()
-        
+
         if any(keyword in text_lower for keyword in crisis_keywords):
             return (
                 f"[CRISIS ALERT] {self.pony_id} detected distress signals. "
                 f"Escalating to support network."
             )
-        
+
         # Check stress levels if in recovery
-        if user_state.get('recovery_status') and user_state.get('stress_level', 0) > 8:
+        if user_state.get("recovery_status") and user_state.get("stress_level", 0) > 8:
             return (
                 f"[WELLBEING] {self.pony_id} noticed high stress. "
                 f"Reminder: {user_state.get('anchor_reason', 'You matter.')}"
             )
-        
+
         return None
-    
+
     # ============================================================
     # PRIORITY 2: RADICAL HONESTY
     # ============================================================
-    
+
     def express_uncertainty(self, confidence: float) -> str:
         """Generates a statement of uncertainty if confidence is low.
 
@@ -141,19 +165,16 @@ class DesktopPonyAgent:
         """
         if confidence < 0.5:
             return f"⚠️ Low confidence ({confidence:.0%}). Verify this carefully: "
-        elif confidence < 0.7:
+        if confidence < 0.7:
             return f"Moderate confidence ({confidence:.0%}). Consider alternatives: "
         return ""  # High confidence, no caveat
-    
+
     # ============================================================
     # CORE GENERATION
     # ============================================================
-    
+
     async def generate_response(
-        self,
-        prompt: str,
-        max_length: int = 512,
-        temperature: float = 0.8
+        self, prompt: str, max_length: int = 512, temperature: float = 0.8
     ) -> str:
         """Generates a textual response using the Horde.AI distributed network.
 
@@ -170,9 +191,8 @@ class DesktopPonyAgent:
         Returns:
             A string containing the generated response.
         """
-        if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()
-        
+        await self._ensure_horde_client()
+
         # Add pony personality to prompt
         full_prompt = f"""You are {self.pony_name}, a helpful desktop assistant.
 Your role: {self.role}
@@ -182,28 +202,28 @@ User query:
 {prompt}
 
 Your response:"""
-        
+
         try:
             response = await self.horde_client.generate_text(
-                prompt=full_prompt,
-                max_length=max_length,
-                temperature=temperature
+                prompt=full_prompt, max_length=max_length, temperature=temperature
             )
-            
+
             # Add to context buffer
-            self.add_to_context({
-                'type': 'generation',
-                'prompt': prompt,
-                'response': response,
-                'timestamp': time.time()
-            })
-            
+            self.add_to_context(
+                {
+                    "type": "generation",
+                    "prompt": prompt,
+                    "response": response,
+                    "timestamp": time.time(),
+                }
+            )
+
             return response.strip()
-        
+
         except Exception as e:
             logger.error(f"{self.pony_id} generation failed: {e}")
             return f"[Error] {self.pony_name} couldn't generate response: {str(e)}"
-    
+
     async def generate_embedding(self, text: str) -> list[float]:
         """Generates a semantic embedding vector for a given text.
 
@@ -217,15 +237,14 @@ Your response:"""
         Returns:
             A list of floats representing the embedding vector.
         """
-        if not self.horde_client:
-            self.horde_client = await HordeClient().__aenter__()
-        
+        await self._ensure_horde_client()
+
         return await self.horde_client.generate_embedding(text)
-    
+
     # ============================================================
     # CONTEXT MANAGEMENT
     # ============================================================
-    
+
     def add_to_context(self, entry: Dict[str, Any]):
         """Adds an entry to the agent's context buffer.
 
@@ -236,11 +255,11 @@ Your response:"""
             entry: A dictionary representing a conversational turn or event.
         """
         self.context_buffer.append(entry)
-        
+
         # Trim if exceeds max size
         if len(self.context_buffer) > self.max_context_size:
-            self.context_buffer = self.context_buffer[-self.max_context_size:]
-    
+            self.context_buffer = self.context_buffer[-self.max_context_size :]
+
     def get_recent_context(self, n: int = 10) -> List[Dict[str, Any]]:
         """Retrieves the `n` most recent entries from the context buffer.
 
@@ -251,11 +270,11 @@ Your response:"""
             A list of the `n` most recent context entries.
         """
         return self.context_buffer[-n:]
-    
+
     # ============================================================
     # UTILITIES
     # ============================================================
-    
+
     def __repr__(self):
         """Provides a string representation of the agent."""
         return f"<PonyAgent {self.pony_id} ({self.pony_name})>"

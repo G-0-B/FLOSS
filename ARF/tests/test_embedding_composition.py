@@ -43,10 +43,10 @@ class TestComposeMergeStrategy:
         emb2.add("concept_b", vec_b)
 
         # ACT
-        emb1.compose(emb2, strategy='merge')
+        emb1.compose(emb2, strategy="merge")
 
         # ASSERT
-        assert len(emb1.levels.get('default', {})) == 2
+        assert len(emb1.levels.get("default", {})) == 2
         assert emb1.get("concept_a") is not None
         assert emb1.get("concept_b") is not None
 
@@ -66,11 +66,11 @@ class TestComposeMergeStrategy:
         emb2.add("same_concept", similar)
 
         # ACT
-        emb1.compose(emb2, strategy='merge', similarity_threshold=0.95)
+        emb1.compose(emb2, strategy="merge", similarity_threshold=0.95)
 
         # ASSERT
         # Should still be 1 (duplicate was skipped)
-        assert len(emb1.levels.get('default', {})) == 1
+        assert len(emb1.levels.get("default", {})) == 1
 
     def test_compose_merge_exact_key_overwrites(self):
         """Test that merge with exact same key overwrites."""
@@ -84,10 +84,10 @@ class TestComposeMergeStrategy:
         emb2.add("concept", vec2)
 
         # ACT
-        emb1.compose(emb2, strategy='merge', similarity_threshold=0.0)
+        emb1.compose(emb2, strategy="merge", similarity_threshold=0.0)
 
         # ASSERT
-        assert len(emb1.levels.get('default', {})) == 1
+        assert len(emb1.levels.get("default", {})) == 1
         result = emb1.get("concept")
         # Should be the second vector (overwritten)
         assert np.allclose(result, vec2)
@@ -113,7 +113,7 @@ class TestComposeAverageStrategy:
 
         # ACT
         # Use low threshold so these similar vectors will be averaged
-        emb1.compose(emb2, strategy='average', similarity_threshold=0.5)
+        emb1.compose(emb2, strategy="average", similarity_threshold=0.5)
 
         # ASSERT
         result = emb1.get("concept")
@@ -134,10 +134,10 @@ class TestComposeAverageStrategy:
         emb2.add("concept_b", vec2)
 
         # ACT
-        emb1.compose(emb2, strategy='average', similarity_threshold=0.95)
+        emb1.compose(emb2, strategy="average", similarity_threshold=0.95)
 
         # ASSERT
-        assert len(emb1.levels.get('default', {})) == 2
+        assert len(emb1.levels.get("default", {})) == 2
         assert emb1.get("concept_a") is not None
         assert emb1.get("concept_b") is not None
 
@@ -157,10 +157,10 @@ class TestComposeAppendStrategy:
         emb2.add("concept", vec2)  # Same key, different embedding
 
         # ACT
-        emb1.compose(emb2, strategy='append')
+        emb1.compose(emb2, strategy="append")
 
         # ASSERT
-        assert len(emb1.levels.get('default', {})) == 2  # Both kept
+        assert len(emb1.levels.get("default", {})) == 2  # Both kept
         assert emb1.get("concept") is not None
         assert emb1.get("concept_2") is not None  # Second one renamed
 
@@ -174,10 +174,10 @@ class TestComposeAppendStrategy:
         emb2.add("concept_b", np.random.randn(384))
 
         # ACT
-        emb1.compose(emb2, strategy='append')
+        emb1.compose(emb2, strategy="append")
 
         # ASSERT
-        assert len(emb1.levels.get('default', {})) == 2
+        assert len(emb1.levels.get("default", {})) == 2
         assert emb1.get("concept_a") is not None
         assert emb1.get("concept_b") is not None
 
@@ -194,11 +194,11 @@ class TestComposeAppendStrategy:
         emb2.add("other", np.random.randn(384))
 
         # ACT
-        emb1.compose(emb2, strategy='append')
+        emb1.compose(emb2, strategy="append")
 
         # ASSERT
         # Should have: concept, concept_2 (from emb1), concept_3 (from emb2's "concept"), other (from emb2)
-        assert len(emb1.levels.get('default', {})) == 4
+        assert len(emb1.levels.get("default", {})) == 4
         assert emb1.get("concept") is not None
         assert emb1.get("concept_2") is not None
         assert emb1.get("concept_3") is not None
@@ -227,8 +227,8 @@ class TestComposeDimensionValidation:
         emb2 = MultiScaleEmbedding()  # Empty
 
         # Should not raise error
-        emb1.compose(emb2, strategy='merge')
-        assert len(emb1.levels.get('default', {})) == 1
+        emb1.compose(emb2, strategy="merge")
+        assert len(emb1.levels.get("default", {})) == 1
 
     def test_compose_nonempty_to_empty_works(self):
         """Test composing non-empty into empty works."""
@@ -238,8 +238,8 @@ class TestComposeDimensionValidation:
         emb2.add("a", np.random.randn(384))
 
         # Should not raise error
-        emb1.compose(emb2, strategy='merge')
-        assert len(emb1.levels.get('default', {})) == 1
+        emb1.compose(emb2, strategy="merge")
+        assert len(emb1.levels.get("default", {})) == 1
 
 
 class TestComposeEdgeCases:
@@ -251,13 +251,15 @@ class TestComposeEdgeCases:
         emb2 = MultiScaleEmbedding()
 
         with pytest.raises(ValueError, match="Invalid strategy"):
-            emb1.compose(emb2, strategy='invalid')
+            emb1.compose(emb2, strategy="invalid")
 
     def test_compose_wrong_type_raises_error(self):
         """Test that composing with wrong type raises error."""
         emb1 = MultiScaleEmbedding()
 
-        with pytest.raises(TypeError, match="Can only compose with MultiScaleEmbedding"):
+        with pytest.raises(
+            TypeError, match="Can only compose with MultiScaleEmbedding"
+        ):
             emb1.compose({"not": "an embedding"})
 
     def test_compose_empty_embeddings(self):
@@ -266,8 +268,8 @@ class TestComposeEdgeCases:
         emb2 = MultiScaleEmbedding()
 
         # Should not raise error
-        emb1.compose(emb2, strategy='merge')
-        assert len(emb1.levels.get('default', {})) == 0
+        emb1.compose(emb2, strategy="merge")
+        assert len(emb1.levels.get("default", {})) == 0
 
     def test_compose_returns_self(self):
         """Test that compose returns self for chaining."""
@@ -277,7 +279,7 @@ class TestComposeEdgeCases:
         emb2 = MultiScaleEmbedding()
         emb2.add("b", np.random.randn(384))
 
-        result = emb1.compose(emb2, strategy='merge')
+        result = emb1.compose(emb2, strategy="merge")
         assert result is emb1
 
 
@@ -294,8 +296,8 @@ class TestCompositionProperties:
         for i in range(5, 10):
             emb2.add(f"concept_{i}", np.random.randn(384))
 
-        emb1.compose(emb2, strategy='merge')
-        assert len(emb1.levels.get('default', {})) == 10
+        emb1.compose(emb2, strategy="merge")
+        assert len(emb1.levels.get("default", {})) == 10
 
     def test_append_is_commutative_in_size(self):
         """Test that append strategy results in same total size regardless of order."""
@@ -315,11 +317,13 @@ class TestCompositionProperties:
         emb2b.add("c", np.random.randn(384))
 
         # Compose in both orders
-        emb1a.compose(emb2a, strategy='append')
-        emb2b.compose(emb1b, strategy='append')
+        emb1a.compose(emb2a, strategy="append")
+        emb2b.compose(emb1b, strategy="append")
 
         # Should have same total size
-        assert len(emb1a.levels.get('default', {})) == len(emb2b.levels.get('default', {}))
+        assert len(emb1a.levels.get("default", {})) == len(
+            emb2b.levels.get("default", {})
+        )
 
 
 class TestSerialization:
@@ -338,7 +342,7 @@ class TestSerialization:
         emb2 = MultiScaleEmbedding.from_dict(data)
 
         # Check contents match
-        assert len(emb2.levels.get('default', {})) == 2
+        assert len(emb2.levels.get("default", {})) == 2
         assert np.allclose(emb2.get("a"), np.array([1.0, 2.0, 3.0]))
         assert np.allclose(emb2.get("b"), np.array([4.0, 5.0, 6.0]))
 
@@ -351,7 +355,7 @@ class TestSerialization:
         emb2 = MultiScaleEmbedding.from_dict(data)
 
         # Get the embedding object directly to check metadata
-        emb_obj = emb2.levels['default']['a']
+        emb_obj = emb2.levels["default"]["a"]
         assert emb_obj.metadata == {"source": "test"}
 
 

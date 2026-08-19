@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.org/schemas/intake-event/v0.1.0",
+  "title": "IntakeEvent",
+  "description": "Normalized file-change event emitted by the FLOSSI0ULLK filewatch metaharness skeleton.",
+  "type": "object",
+  "required": [
+    "id",
+    "observed_at",
+    "event_type",
+    "watch_domain",
+    "source",
+    "abs_path"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "created",
+        "modified",
+        "deleted"
+      ]
+    },
+    "watch_domain": {
+      "type": "string",
+      "enum": [
+        "root-intake",
+        "canon",
+        "shared-surface",
+        "traces",
+        "agent-surface",
+        "other"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "abs_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rel_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "corpus_hint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mtime_ns": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

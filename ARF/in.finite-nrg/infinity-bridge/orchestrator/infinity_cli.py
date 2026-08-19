@@ -3,20 +3,40 @@
 Infinity Bridge CLI
 Command-line interface for bridge operations: discovery, subscription, and streaming
 """
+
 import asyncio
 import sys
 import os
 import argparse
 import json
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-from mcp_server import InfinityBridgeMCPServer, BridgeStream, MockBridgeStream
-from discovery import BridgeDiscovery, MockBridgeDiscovery, BridgeInfo
-from holochain_connector import HolochainConnector, MockHolochainConnector, BridgeRegistration
+
+def _get_cli_dependencies():
+    """Import orchestrator types lazily after local path bootstrap."""
+    from discovery import BridgeInfo, BridgeDiscovery, MockBridgeDiscovery
+    from holochain_connector import (
+        BridgeRegistration,
+        HolochainConnector,
+        MockHolochainConnector,
+    )
+    from mcp_server import BridgeStream, InfinityBridgeMCPServer, MockBridgeStream
+
+    return {
+        "BridgeInfo": BridgeInfo,
+        "BridgeDiscovery": BridgeDiscovery,
+        "MockBridgeDiscovery": MockBridgeDiscovery,
+        "BridgeRegistration": BridgeRegistration,
+        "HolochainConnector": HolochainConnector,
+        "MockHolochainConnector": MockHolochainConnector,
+        "BridgeStream": BridgeStream,
+        "InfinityBridgeMCPServer": InfinityBridgeMCPServer,
+        "MockBridgeStream": MockBridgeStream,
+    }
 
 
 class InfinityBridgeCLI:
@@ -32,23 +52,25 @@ class InfinityBridgeCLI:
         """
         self.conductor_url = conductor_url
         self.mock = mock
-        self.server: Optional[InfinityBridgeMCPServer] = None
-        self.connector: Optional[HolochainConnector] = None
+        dependencies = _get_cli_dependencies()
+        self._dependencies = dependencies
+        self.server: Optional[object] = None
+        self.connector: Optional[object] = None
 
     async def initialize(self):
         """Initialize server and connector"""
         if not self.server:
-            self.server = InfinityBridgeMCPServer(
-                conductor_url=self.conductor_url,
-                mock=self.mock
-            )
+            server_cls = self._dependencies["InfinityBridgeMCPServer"]
+            self.server = server_cls(conductor_url=self.conductor_url, mock=self.mock)
             await self.server.start()
 
         if not self.connector:
             if self.mock:
-                self.connector = MockHolochainConnector(conductor_url=self.conductor_url)
+                connector_cls = self._dependencies["MockHolochainConnector"]
+                self.connector = connector_cls(conductor_url=self.conductor_url)
             else:
-                self.connector = HolochainConnector(conductor_url=self.conductor_url)
+                connector_cls = self._dependencies["HolochainConnector"]
+                self.connector = connector_cls(conductor_url=self.conductor_url)
             await self.connector.connect()
 
     async def cleanup(self):
@@ -155,10 +177,13 @@ class InfinityBridgeCLI:
 
         # Mock stream for testing
         if self.mock:
+            mock_stream_cls = self._dependencies["MockBridgeStream"]
+
             async def mock_subscribe(bid: str, stype: str):
+                """Create a mock stream subscription for CLI testing."""
                 bridge = self.server.discovery.get_bridge(bid)
                 if bridge:
-                    stream = MockBridgeStream(bridge, stype)
+                    stream = mock_stream_cls(bridge, stype)
                     await stream.connect()
                     return stream
                 return None
@@ -180,8 +205,16 @@ class InfinityBridgeCLI:
 
         for i, sample in enumerate(samples, 1):
             peak_amplitude = max(sample.frequencies) if sample.frequencies else 0
-            peak_idx = sample.frequencies.index(peak_amplitude) if sample.frequencies and peak_amplitude > 0 else 0
-            freq_hz = peak_idx * (sample.sample_rate_hz / 2) / len(sample.frequencies) if sample.frequencies else 0
+            peak_idx = (
+                sample.frequencies.index(peak_amplitude)
+                if sample.frequencies and peak_amplitude > 0
+                else 0
+            )
+            freq_hz = (
+                peak_idx * (sample.sample_rate_hz / 2) / len(sample.frequencies)
+                if sample.frequencies
+                else 0
+            )
 
             print(f"Sample {i}:")
             print(f"  Timestamp: {sample.timestamp_ns} ns")
@@ -198,7 +231,9 @@ class InfinityBridgeCLI:
                     "stream_type": s.stream_type,
                     "timestamp_ns": s.timestamp_ns,
                     "sample_rate_hz": s.sample_rate_hz,
-                    "frequencies": s.frequencies[:10] if not args.full else s.frequencies,  # Truncate for readability
+                    "frequencies": (
+                        s.frequencies[:10] if not args.full else s.frequencies
+                    ),  # Truncate for readability
                 }
                 for s in samples
             ]
@@ -212,24 +247,25 @@ class InfinityBridgeCLI:
 
         print(f"\n📝 Registering bridge: {args.bridge_id}...\n")
 
-        registration = BridgeRegistration(
+        bridge_registration = self._dependencies["BridgeRegistration"]
+        registration = bridge_registration(
             bridge_id=args.bridge_id,
             capabilities=args.capabilities.split(","),
             transport=args.transport.split(","),
             endpoint=args.endpoint,
             signature=bytes.fromhex(args.signature) if args.signature else b"\x00" * 64,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
         success = await self.connector.register_bridge(registration)
 
         if success:
-            print(f"✓ Bridge registered successfully")
+            print("✓ Bridge registered successfully")
             print(f"  ID: {registration.bridge_id}")
             print(f"  Capabilities: {', '.join(registration.capabilities)}")
             print(f"  Endpoint: {registration.endpoint}")
         else:
-            print(f"✗ Failed to register bridge")
+            print("✗ Failed to register bridge")
 
     async def cmd_streams(self, args):
         """Get streams for a bridge"""
@@ -248,7 +284,7 @@ class InfinityBridgeCLI:
 
         for i, stream in enumerate(streams, 1):
             print(f"{i}. {stream.get('stream_type', 'unknown')}")
-            metadata = stream.get('metadata', {})
+            metadata = stream.get("metadata", {})
             for key, value in metadata.items():
                 print(f"   {key}: {value}")
             print()
@@ -321,31 +357,26 @@ Examples:
   %(prog)s search acoustic_20hz_20khz          # Search by capability
   %(prog)s subscribe acoustic-esp32-001 acoustic/spectrum --samples 10
   %(prog)s resources                           # List MCP resources
-  %(prog)s register my-bridge "acoustic_20hz_20khz,fft_1024" tcp tcp://192.168.1.100:9999
+  %(prog)s register my-bridge "acoustic_20hz_20khz,fft_1024" tcp
+      tcp://192.168.1.100:9999
   %(prog)s info acoustic-esp32-001             # Show bridge info
   %(prog)s ping                                # Ping conductor
 
 Configuration:
   Use --conductor to specify Holochain conductor URL (default: ws://localhost:8888)
   Use --mock for testing without real Holochain conductor
-        """
+        """,
     )
 
     parser.add_argument(
         "--conductor",
         default="ws://localhost:8888",
-        help="Holochain conductor URL (default: ws://localhost:8888)"
+        help="Holochain conductor URL (default: ws://localhost:8888)",
     )
     parser.add_argument(
-        "--mock",
-        action="store_true",
-        help="Use mock implementations for testing"
+        "--mock", action="store_true", help="Use mock implementations for testing"
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -363,11 +394,22 @@ Configuration:
     parser_resources.set_defaults(func=lambda cli, args: cli.cmd_resources(args))
 
     # Subscribe command
-    parser_subscribe = subparsers.add_parser("subscribe", help="Subscribe to bridge stream")
+    parser_subscribe = subparsers.add_parser(
+        "subscribe", help="Subscribe to bridge stream"
+    )
     parser_subscribe.add_argument("bridge_id", help="Bridge ID")
-    parser_subscribe.add_argument("stream_type", help="Stream type (e.g., acoustic/spectrum)")
-    parser_subscribe.add_argument("--samples", type=int, default=10, help="Number of samples to read (default: 10)")
-    parser_subscribe.add_argument("--full", action="store_true", help="Include full frequency data in JSON output")
+    parser_subscribe.add_argument(
+        "stream_type", help="Stream type (e.g., acoustic/spectrum)"
+    )
+    parser_subscribe.add_argument(
+        "--samples",
+        type=int,
+        default=10,
+        help="Number of samples to read (default: 10)",
+    )
+    parser_subscribe.add_argument(
+        "--full", action="store_true", help="Include full frequency data in JSON output"
+    )
     parser_subscribe.set_defaults(func=lambda cli, args: cli.cmd_subscribe(args))
 
     # Register command
@@ -375,7 +417,9 @@ Configuration:
     parser_register.add_argument("bridge_id", help="Bridge ID")
     parser_register.add_argument("capabilities", help="Comma-separated capabilities")
     parser_register.add_argument("transport", help="Comma-separated transports")
-    parser_register.add_argument("endpoint", help="Bridge endpoint (e.g., tcp://192.168.1.100:9999)")
+    parser_register.add_argument(
+        "endpoint", help="Bridge endpoint (e.g., tcp://192.168.1.100:9999)"
+    )
     parser_register.add_argument("--signature", help="Signature (hex)", default=None)
     parser_register.set_defaults(func=lambda cli, args: cli.cmd_register(args))
 
@@ -412,6 +456,7 @@ Configuration:
         print(f"\n✗ Error: {e}", file=sys.stderr)
         if os.getenv("DEBUG"):
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
     finally:

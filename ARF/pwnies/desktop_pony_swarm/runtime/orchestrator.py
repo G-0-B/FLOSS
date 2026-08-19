@@ -15,9 +15,7 @@ class SwarmRuntime:
     """
 
     def __init__(self, conductor_url: str = "ws://localhost:8888"):
-        """
-        Initializes the SwarmRuntime and its managers.
-        """
+        """Initializes the SwarmRuntime and its managers."""
         self.conductor_url = conductor_url
         self.connector = None
         self.conductor_process = None
@@ -27,12 +25,11 @@ class SwarmRuntime:
         self.version_manager = VersionManager()
 
     async def connect(self):
-        """
-        Connects to the Holochain conductor.
-        """
+        """Connects to the Holochain conductor."""
         # Start the conductor using the helper script
         self.conductor_process = await asyncio.create_subprocess_exec(
-            'node', 'ARF/tests/tryorama/start_conductor.js',
+            "node",
+            "ARF/tests/tryorama/start_conductor.js",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -50,34 +47,24 @@ class SwarmRuntime:
         await self.connector.connect()
 
     async def disconnect(self):
-        """
-        Disconnects from the Holochain conductor and stops the conductor process.
-        """
+        """Disconnects from the Holochain conductor and stops the conductor process."""
         if self.connector:
             await self.connector.disconnect()
         if self.conductor_process:
             self.conductor_process.kill()
 
     def start(self):
-        """
-        Starts the swarm and all its managers.
-        """
+        """Starts the swarm and all its managers."""
         print("SwarmRuntime starting...")
         # In the future, this will initialize and start the managers.
-        pass
 
     def stop(self):
-        """
-        Stops the swarm and all its managers.
-        """
+        """Stops the swarm and all its managers."""
         print("SwarmRuntime stopping...")
         # In the future, this will stop the managers.
-        pass
 
     async def get_latest_version(self):
-        """
-        Gets the latest version of the DNA from the Holochain conductor.
-        """
+        """Gets the latest version of the DNA from the Holochain conductor."""
         return await self.connector.call_zome(
             zome_name="coordinator",
             fn_name="get_latest_version",

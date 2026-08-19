@@ -7,6 +7,7 @@ for unit and integration tests.
 Phase 4 Post-Merge Enhancement
 """
 
+from importlib import import_module
 import pytest
 import tempfile
 import shutil
@@ -16,8 +17,7 @@ import sys
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from conversation_memory import ConversationMemory
+ConversationMemory = import_module("conversation_memory").ConversationMemory
 
 
 @pytest.fixture(scope="session")
@@ -55,8 +55,7 @@ def mock_memory(temp_data_dir: Path) -> ConversationMemory:
     Uses temporary storage that's automatically cleaned up.
     """
     return ConversationMemory(
-        agent_id="test_agent",
-        storage_path=str(temp_data_dir / "memory.json")
+        agent_id="test_agent", storage_path=str(temp_data_dir / "memory.json")
     )
 
 
@@ -64,8 +63,7 @@ def mock_memory(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_alice(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'alice'."""
     return ConversationMemory(
-        agent_id="alice",
-        storage_path=str(temp_data_dir / "memory_alice.json")
+        agent_id="alice", storage_path=str(temp_data_dir / "memory_alice.json")
     )
 
 
@@ -73,8 +71,7 @@ def mock_memory_alice(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_bob(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'bob'."""
     return ConversationMemory(
-        agent_id="bob",
-        storage_path=str(temp_data_dir / "memory_bob.json")
+        agent_id="bob", storage_path=str(temp_data_dir / "memory_bob.json")
     )
 
 
@@ -82,8 +79,7 @@ def mock_memory_bob(temp_data_dir: Path) -> ConversationMemory:
 def mock_memory_carol(temp_data_dir: Path) -> ConversationMemory:
     """Create ConversationMemory for agent 'carol'."""
     return ConversationMemory(
-        agent_id="carol",
-        storage_path=str(temp_data_dir / "memory_carol.json")
+        agent_id="carol", storage_path=str(temp_data_dir / "memory_carol.json")
     )
 
 
@@ -95,7 +91,7 @@ def sample_understanding():
         "metadata": {
             "source": "test",
             "timestamp": "2025-11-14T00:00:00Z",
-        }
+        },
     }
 
 
@@ -120,7 +116,7 @@ def sample_understandings():
 
 # Swarm fixtures (optional - only if swarm is available)
 try:
-    from pwnies.desktop_pony_swarm.core.swarm import PonySwarm
+    from pwnies.desktop_pony_swarm.core.swarm import PonySwarm  # noqa: F401
     from pwnies.desktop_pony_swarm.core.adaptive_params import RSAParams
 
     @pytest.fixture
@@ -181,11 +177,16 @@ def mock_holochain_conductor():
     Returns a mock object that simulates conductor operations
     without requiring actual Holochain installation.
     """
+
     class MockConductor:
+        """Minimal in-memory conductor stub for integration-style tests."""
+
         def __init__(self):
+            """Initialize the mock conductor state."""
             self.entries = {}
 
         def create_entry(self, entry_type: str, content: dict):
+            """Create a mock entry and return its generated hash."""
             entry_hash = f"mock_hash_{len(self.entries)}"
             self.entries[entry_hash] = {
                 "type": entry_type,
@@ -194,9 +195,11 @@ def mock_holochain_conductor():
             return entry_hash
 
         def get_entry(self, entry_hash: str):
+            """Fetch a mock entry by its generated hash."""
             return self.entries.get(entry_hash)
 
         def query_entries(self, entry_type: str):
+            """Return all mock entries matching the requested type."""
             return [
                 (hash, entry)
                 for hash, entry in self.entries.items()
@@ -214,6 +217,7 @@ def reset_logging():
     Prevents log spam from accumulating across tests.
     """
     import logging
+
     # Clear all handlers from root logger
     root = logging.getLogger()
     for handler in root.handlers[:]:
@@ -232,9 +236,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line(
         "markers", "requires_swarm: marks tests that require pony swarm"
     )

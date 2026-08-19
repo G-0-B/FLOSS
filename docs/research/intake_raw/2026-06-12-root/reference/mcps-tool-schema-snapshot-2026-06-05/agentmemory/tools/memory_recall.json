@@ -1,0 +1,28 @@
+{
+  "name": "memory_recall",
+  "description": "Search past session observations for relevant context. Use when you need to recall what happened in previous sessions, find past decisions, or look up how a file was modified before.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search query (keywords, file names, concepts)"
+      },
+      "limit": {
+        "type": "number",
+        "description": "Max results to return (default 10)"
+      },
+      "format": {
+        "type": "string",
+        "description": "Result format: full, compact, or narrative (default full)"
+      },
+      "token_budget": {
+        "type": "number",
+        "description": "Optional token budget to trim returned results"
+      }
+    },
+    "required": [
+      "query"
+    ]
+  }
+}

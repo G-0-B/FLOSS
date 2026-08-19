@@ -1,0 +1,8 @@
+{
+  "name": "memory_export",
+  "description": "Export all memory data as JSON.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}

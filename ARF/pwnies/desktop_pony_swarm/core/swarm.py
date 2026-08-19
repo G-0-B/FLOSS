@@ -17,9 +17,10 @@ import time
 from typing import List, Dict, Any, Optional
 from .pony_agent import DesktopPonyAgent
 from .embedding import SwarmEmbeddingManager
-from .adaptive_params import AdaptiveParameterSelector, RSAParams
+from .adaptive_params import AdaptiveParameterSelector
 
 logger = logging.getLogger(__name__)
+
 
 class PonySwarm:
     """Orchestrates a swarm of Desktop Pony agents using Recursive Self-Aggregation.
@@ -42,13 +43,13 @@ class PonySwarm:
         param_selector: An optional component for adaptively selecting RSA parameters.
         metrics: A dictionary for tracking performance and diversity metrics.
     """
-    
+
     def __init__(
         self,
         num_ponies: int = 4,
         pony_names: Optional[List[str]] = None,
         use_mock: bool = True,
-        use_adaptive_params: bool = True
+        use_adaptive_params: bool = True,
     ):
         """Initializes the PonySwarm.
 
@@ -65,7 +66,12 @@ class PonySwarm:
 
         # Default pony names
         if not pony_names:
-            pony_names = ["Pinkie Pie", "Rainbow Dash", "Twilight Sparkle", "Fluttershy"]
+            pony_names = [
+                "Pinkie Pie",
+                "Rainbow Dash",
+                "Twilight Sparkle",
+                "Fluttershy",
+            ]
 
         # Initialize ponies
         self.ponies: List[DesktopPonyAgent] = []
@@ -75,7 +81,7 @@ class PonySwarm:
                 pony_id=f"pony_{i}",
                 pony_name=name,
                 role="generalist",
-                use_mock=use_mock
+                use_mock=use_mock,
             )
             self.ponies.append(pony)
 
@@ -83,41 +89,45 @@ class PonySwarm:
         self.embedding_manager = SwarmEmbeddingManager()
 
         # Adaptive parameter selector
-        self.param_selector = AdaptiveParameterSelector() if use_adaptive_params else None
+        self.param_selector = (
+            AdaptiveParameterSelector() if use_adaptive_params else None
+        )
 
         # Performance metrics
         self.metrics: Dict[str, Any] = {
-            'total_queries': 0,
-            'avg_diversity': [],
-            'iteration_times': [],
-            'param_selections': []
+            "total_queries": 0,
+            "avg_diversity": [],
+            "iteration_times": [],
+            "param_selections": [],
         }
 
         mode = "MOCK" if use_mock else "REAL"
         adaptive = " + ADAPTIVE" if use_adaptive_params else ""
-        logger.info(f"Initialized swarm with {num_ponies} ponies [{mode}{adaptive} inference]")
-    
+        logger.info(
+            f"Initialized swarm with {num_ponies} ponies [{mode}{adaptive} inference]"
+        )
+
     async def __aenter__(self):
         """Enters the asynchronous context, initializing pony agents."""
         for pony in self.ponies:
             await pony.__aenter__()
         return self
-    
+
     async def __aexit__(self, *args):
         """Exits the asynchronous context, cleaning up pony agents."""
         for pony in self.ponies:
             await pony.__aexit__(*args)
-    
+
     # ============================================================
     # RSA CORE ALGORITHM
     # ============================================================
-    
+
     async def recursive_self_aggregation(
         self,
         query: str,
         K: Optional[int] = None,
         T: Optional[int] = None,
-        user_state: Optional[Dict[str, Any]] = None
+        user_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Executes the Recursive Self-Aggregation (RSA) algorithm.
 
@@ -146,29 +156,24 @@ class PonySwarm:
             params = self.param_selector.select_parameters(query)
             K = K or params.K
             T = T or params.T
-            self.metrics['param_selections'].append({
-                'query': query[:50],
-                'params': {'N': N, 'K': K, 'T': T}
-            })
+            self.metrics["param_selections"].append(
+                {"query": query[:50], "params": {"N": N, "K": K, "T": T}}
+            )
         else:
             # Use defaults if not specified
             K = K or 2
             T = T or 3
 
         start_time = time.time()
-        self.metrics['total_queries'] += 1
+        self.metrics["total_queries"] += 1
 
         logger.info(f"Starting RSA: query='{query[:50]}...', N={N}, K={K}, T={T}")
-        
+
         # Priority 1: Check for crisis indicators
         crisis_alert = self._check_all_ponies_for_crisis(query, user_state)
         if crisis_alert:
-            return {
-                'response': crisis_alert,
-                'is_crisis': True,
-                'iterations': []
-            }
-        
+            return {"response": crisis_alert, "is_crisis": True, "iterations": []}
+
         # ============================================================
         # STEP 1: INITIALIZATION - Generate initial population
         # ============================================================
@@ -197,25 +202,26 @@ class PonySwarm:
                 iteration=1,
                 response=response,
                 vector=embedding,
-                metadata={'timestamp': time.time()}
+                metadata={"timestamp": time.time()},
             )
-        
+
         # Aggregate to community level
         self.embedding_manager.aggregate_to_community(
-            iteration=1,
-            pony_ids=[p.pony_id for p in self.ponies]
+            iteration=1, pony_ids=[p.pony_id for p in self.ponies]
         )
-        
-        iteration_history = [{
-            'iteration': 1,
-            'population': population.copy(),
-            'diversity': self.embedding_manager.get_diversity_metric(1)
-        }]
-        
+
+        iteration_history = [
+            {
+                "iteration": 1,
+                "population": population.copy(),
+                "diversity": self.embedding_manager.get_diversity_metric(1),
+            }
+        ]
+
         # ============================================================
         # STEPS 2-T: RECURSIVE AGGREGATION
         # ============================================================
-        
+
         for t in range(2, T + 1):
             iter_start = time.time()
             logger.info(f"Step {t}: Recursive aggregation (K={K})")
@@ -230,15 +236,17 @@ class PonySwarm:
                 # Build aggregation prompt
                 agg_prompt = self._build_aggregation_prompt(query, subset, K)
 
-                aggregation_data.append({
-                    'pony_index': i,
-                    'prompt': agg_prompt,
-                    'subset_indices': subset_indices
-                })
+                aggregation_data.append(
+                    {
+                        "pony_index": i,
+                        "prompt": agg_prompt,
+                        "subset_indices": subset_indices,
+                    }
+                )
 
             # OPTIMIZATION: Generate all improved responses in parallel
             response_tasks = [
-                self.ponies[data['pony_index']].generate_response(data['prompt'])
+                self.ponies[data["pony_index"]].generate_response(data["prompt"])
                 for data in aggregation_data
             ]
             new_population = await asyncio.gather(*response_tasks)
@@ -258,69 +266,81 @@ class PonySwarm:
                     response=improved,
                     vector=embedding,
                     metadata={
-                        'timestamp': time.time(),
-                        'aggregated_from': aggregation_data[i]['subset_indices']
-                    }
+                        "timestamp": time.time(),
+                        "aggregated_from": aggregation_data[i]["subset_indices"],
+                    },
                 )
-            
+
             # Update population
             population = new_population
-            
+
             # Aggregate to community
             self.embedding_manager.aggregate_to_community(
-                iteration=t,
-                pony_ids=[p.pony_id for p in self.ponies]
+                iteration=t, pony_ids=[p.pony_id for p in self.ponies]
             )
-            
+
             # Track metrics
             diversity = self.embedding_manager.get_diversity_metric(t)
             iter_time = time.time() - iter_start
-            
-            iteration_history.append({
-                'iteration': t,
-                'population': population.copy(),
-                'diversity': diversity
-            })
-            
-            self.metrics['avg_diversity'].append(diversity)
-            self.metrics['iteration_times'].append(iter_time)
-            
-            logger.info(f"  Iteration {t} complete: diversity={diversity:.4f}, time={iter_time:.2f}s")
-        
+
+            iteration_history.append(
+                {
+                    "iteration": t,
+                    "population": population.copy(),
+                    "diversity": diversity,
+                }
+            )
+
+            self.metrics["avg_diversity"].append(diversity)
+            self.metrics["iteration_times"].append(iter_time)
+
+            logger.info(
+                "  Iteration %s complete: diversity=%.4f, time=%.2fs",
+                t,
+                diversity,
+                iter_time,
+            )
+
         # ============================================================
         # STEP 4: TERMINATION - Select final response
         # ============================================================
-        
+
         # Random sample from final population (as recommended in paper)
         final_response = random.choice(population)
-        
+
         total_time = time.time() - start_time
-        
+
         result = {
-            'response': final_response,
-            'is_crisis': False,
-            'iterations': iteration_history,
-            'final_population': population,
-            'metrics': {
-                'total_time': total_time,
-                'avg_diversity': sum(self.metrics['avg_diversity']) / len(self.metrics['avg_diversity']) if self.metrics['avg_diversity'] else 0,
-                'total_generations': N * T
-            }
+            "response": final_response,
+            "is_crisis": False,
+            "iterations": iteration_history,
+            "final_population": population,
+            "metrics": {
+                "total_time": total_time,
+                "avg_diversity": (
+                    sum(self.metrics["avg_diversity"])
+                    / len(self.metrics["avg_diversity"])
+                    if self.metrics["avg_diversity"]
+                    else 0
+                ),
+                "total_generations": N * T,
+            },
         }
-        
-        logger.info(f"RSA complete: time={total_time:.2f}s, final_diversity={iteration_history[-1]['diversity']:.4f}")
-        
+
+        logger.info(
+            "RSA complete: time=%.2fs, final_diversity=%.4f",
+            total_time,
+            iteration_history[-1]["diversity"],
+        )
+
         return result
-    
+
     # ============================================================
     # AGGREGATION PROMPTS
     # ============================================================
-    
+
     def _build_aggregation_prompt(
-        self,
-        query: str,
-        candidates: List[str],
-        K: int
+        self, query: str, candidates: List[str], K: int
     ) -> str:
         """Constructs the prompt for the aggregation step of the RSA algorithm.
 
@@ -350,15 +370,13 @@ Candidate solution:
 {candidates[0]}
 
 Now refine the candidate into an improved solution with clear reasoning:"""
-        
-        else:
-            # Multi-candidate aggregation prompt
-            candidates_text = "\n\n".join([
-                f"---- Solution {i+1} ----\n{cand}"
-                for i, cand in enumerate(candidates)
-            ])
-            
-            return f"""You are given a problem and several candidate solutions.
+
+        # Multi-candidate aggregation prompt
+        candidates_text = "\n\n".join(
+            [f"---- Solution {i+1} ----\n{cand}" for i, cand in enumerate(candidates)]
+        )
+
+        return f"""You are given a problem and several candidate solutions.
 Some candidates may be incorrect or contain errors.
 Aggregate the useful ideas and produce a single, high-quality solution.
 Reason carefully; if candidates disagree, choose the correct path.
@@ -371,11 +389,9 @@ Candidate solutions:
 {candidates_text}
 
 Now write a single improved solution with clear reasoning:"""
-    
+
     def _check_all_ponies_for_crisis(
-        self,
-        query: str,
-        user_state: Dict[str, Any]
+        self, query: str, user_state: Dict[str, Any]
     ) -> Optional[str]:
         """Performs a safety check across all ponies for crisis indicators.
 
@@ -396,16 +412,12 @@ Now write a single improved solution with clear reasoning:"""
             if alert:
                 return alert
         return None
-    
+
     # ============================================================
     # ALTERNATIVE: SINGLE-STEP AGGREGATION
     # ============================================================
-    
-    async def single_step_aggregation(
-        self,
-        query: str,
-        K: int = 4
-    ) -> Dict[str, Any]:
+
+    async def single_step_aggregation(self, query: str, K: int = 4) -> Dict[str, Any]:
         """Performs a single-step aggregation of multiple pony responses.
 
         This method is a simplified version of the RSA algorithm with only one
@@ -421,18 +433,20 @@ Now write a single improved solution with clear reasoning:"""
             candidate responses.
         """
         logger.info(f"Single-step aggregation: K={K}")
-        
+
         # Generate K responses
-        tasks = [self.ponies[i % self.num_ponies].generate_response(query) for i in range(K)]
+        tasks = [
+            self.ponies[i % self.num_ponies].generate_response(query) for i in range(K)
+        ]
         candidates = await asyncio.gather(*tasks)
-        
+
         # Aggregate using first pony
         agg_prompt = self._build_aggregation_prompt(query, candidates, K)
         final_response = await self.ponies[0].generate_response(agg_prompt)
-        
+
         return {
-            'response': final_response,
-            'is_crisis': False,
-            'candidates': candidates,
-            'method': 'single_step_aggregation'
+            "response": final_response,
+            "is_crisis": False,
+            "candidates": candidates,
+            "method": "single_step_aggregation",
         }

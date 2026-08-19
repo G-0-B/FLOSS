@@ -1,0 +1,38 @@
+classDiagram
+    class HierarchicalClusterManager {
+        -GlobalCentroids globalCentroids
+        -LocalCentroids localCentroids
+        -ClusterConfig config
+        +updateGlobalCentroids()
+        +computeLocalCentroids()
+        +assignVectorToCluster()
+    }
+
+    class VectorDistributor {
+        -RebalanceStrategy strategy
+        -NodeRegistry nodes
+        +distributeVectors()
+        +handleNodeJoin()
+        +handleNodeLeave()
+    }
+
+    class ClusterNode {
+        -UsearchIndex localIndex
+        -CentroidCache cache
+        -SyncManager syncManager
+        +query(vector)
+        +insert(vector)
+        +synchronize()
+    }
+
+    class SyncManager {
+        -VersionVector versionVector
+        -UpdateLog updates
+        +pushUpdates()
+        +pullUpdates()
+        +resolveConflicts()
+    }
+
+    HierarchicalClusterManager --> ClusterNode
+    VectorDistributor --> ClusterNode
+    ClusterNode --> SyncManager

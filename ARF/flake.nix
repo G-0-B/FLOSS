@@ -2,8 +2,11 @@
   description = "FLOSSIOULLK Rose Forest – Holochain hApp dev environment";
 
   inputs = {
+    # Holochain 0.6 line — bumped 2026-05-19 from main-0.4. See
+    # FLOSS/docs/agent-memory/project/holochain-version-line-skew.md
+    # for substrate-line decision context.
     holonix = {
-      url = "github:holochain/holonix?ref=main-0.4";
+      url = "github:holochain/holonix?ref=main-0.6";
       flake = true;
     };
     nixpkgs.follows = "holonix/nixpkgs";

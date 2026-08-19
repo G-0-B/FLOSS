@@ -1,1 +1,1 @@
-print('validator stub')
+print("validator stub")

@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/specs/provenance-packet.schema.json",
+  "title": "FLOSSI0ULLK Provenance Packet v1.4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "t", "d", "i", "s", "p", "a", "sigs"],
+  "properties": {
+    "v": {
+      "type": "string",
+      "pattern": "^FLOSSI10JSON[0-9a-f]{6}_$"
+    },
+    "t": {
+      "const": "prov"
+    },
+    "d": {
+      "type": "string",
+      "pattern": "^E[A-Za-z0-9_-]{43}$"
+    },
+    "i": {
+      "type": "string",
+      "pattern": "^[DB][A-Za-z0-9_-]{43}$"
+    },
+    "s": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "p": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^E[A-Za-z0-9_-]{43}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "a": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/payloadEntry"
+      }
+    },
+    "sigs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^0B[A-Za-z0-9_-]{86}$"
+      }
+    }
+  },
+  "$defs": {
+    "payloadEntry": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "claim_type",
+        "truth_status",
+        "source_systems",
+        "created_at",
+        "human_collision_node",
+        "artifact_refs",
+        "evidence_refs",
+        "risks",
+        "benefits",
+        "next_action"
+      ],
+      "properties": {
+        "claim_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "truth_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_systems": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "human_collision_node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceRef"
+          }
+        },
+        "risks": {
+          "type": "array"
+        },
+        "benefits": {
+          "type": "array"
+        },
+        "next_action": {
+          "type": "string"
+        },
+        "consent_ref": {
+          "$ref": "#/$defs/consentRef"
+        },
+        "keri_event_ref": {
+          "type": "string"
+        },
+        "a2a_entity_card_ref": {
+          "type": "string"
+        },
+        "in_toto_predicate_type": {
+          "type": "string"
+        },
+        "prov_o_activity_id": {
+          "type": "string"
+        }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type", "ref"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["spec", "test", "adr", "url", "commit", "provenance_packet"]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "consentRef": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["decision_action_hash"],
+      "properties": {
+        "decision_action_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload_action_hash": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

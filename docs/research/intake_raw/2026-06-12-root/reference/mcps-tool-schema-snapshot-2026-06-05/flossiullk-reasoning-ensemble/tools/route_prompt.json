@@ -1,0 +1,29 @@
+{
+  "name": "route_prompt",
+  "description": "Classify a prompt into pass_through / single_strong / ensemble mode.\n\nThe Router runs locally (default: phi4-mini via Ollama) at ~10s warm-call.\nReturns JSON with mode, reason, confidence, bias_applied, duration_seconds.\n\nIf force_mode is supplied (one of pass_through, single_strong, ensemble),\nthe classifier is bypassed and that mode is returned. Use for --debate\noverrides or user-explicit routing.\n\nbias_applied=\"tier4_similarity\" means a past Tier-4 divergence on a\nsemantically-adjacent prompt forced ensemble mode per Upgrade A in\n2026-05-17-inline-reasoning-ensemble.md §12.2.\n\n---\nFLOSSI0ULLK Reasoning Ensemble — reasoning aid, not authority.\n\nInvariants you MUST honor when using these tools:\n- Router output is a routing hint: pass_through, single_strong, or ensemble.\n- Synthesizer output is Plane A draft reasoning. It never promotes canon.\n- Decision-grade claims still go through the separate flossiullk-consensus MCP.\n- Prefer this MCP for architectural, multi-file, ADR-class, or rollback-costly\n  reasoning where preserved disagreement has value.\n- Do not use this as a heartbeat health pulse. It is on-demand.\n- If the MCP is unavailable, fall back to normal single-strong reasoning and\n  record that the ensemble surface was unavailable if the decision mattered.",
+  "inputSchema": {
+    "properties": {
+      "prompt": {
+        "title": "Prompt",
+        "type": "string"
+      },
+      "force_mode": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Force Mode"
+      }
+    },
+    "required": [
+      "prompt"
+    ],
+    "title": "route_promptArguments",
+    "type": "object"
+  }
+}

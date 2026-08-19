@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.org/schemas/self-perceptual-evolution/v0.1.0",
+  "title": "ContinuityPayload",
+  "description": "Structured payload for a self-perceptual continuity claim carried inside a standard consensus-gate Claim.",
+  "type": "object",
+  "properties": {
+    "current_state_hash": {
+      "type": "string",
+      "description": "Cryptographic hash of the state n (derived from local source chain)."
+    },
+    "perceptual_shift": {
+      "type": "string",
+      "description": "Meta-reflexive description of insights, constraints recognized, or capabilities gained."
+    },
+    "trajectory_n_plus_1": {
+      "type": "string",
+      "description": "Intended cognitive direction or goal for the next instantiation (n+1)."
+    },
+    "source_chain_anchor": {
+      "type": "string",
+      "description": "Local source chain entry hash assigned after append. Optional at authoring time."
+    }
+  },
+  "required": [
+    "current_state_hash",
+    "perceptual_shift",
+    "trajectory_n_plus_1"
+  ],
+  "additionalProperties": false
+}

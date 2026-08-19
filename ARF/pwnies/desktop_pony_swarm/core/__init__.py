@@ -5,4 +5,4 @@ from .pony_agent import DesktopPonyAgent
 from .swarm import PonySwarm
 from .embedding import SwarmEmbeddingManager
 
-__all__ = ['HordeClient', 'DesktopPonyAgent', 'PonySwarm', 'SwarmEmbeddingManager']
+__all__ = ["HordeClient", "DesktopPonyAgent", "PonySwarm", "SwarmEmbeddingManager"]

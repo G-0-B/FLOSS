@@ -25,7 +25,7 @@ import Ajv from "ajv/dist/2020.js";
 // ── Setup ────────────────────────────────────────────
 const hAppPath = path.resolve(
   fileURLToPath(import.meta.url),
-  "../../../workdir/rose_forest.happ"
+  "../../workdir/rose_forest.happ"
 );
 
 const ZOME = "rose_forest";
@@ -71,7 +71,7 @@ describe("KnowledgeTriple Schema Validation (offline)", () => {
     assert.ok(!validateKnowledgeTriple(payload), "Should fail on invalid predicate");
   });
 
-  test("KnowledgeTriple with out-of-range confidence fails schema", () => {
+  test("KnowledgeTriple with out-of-range confidence fails schema (above)", () => {
     const payload = {
       subject: "entity_a",
       predicate: "is_a",
@@ -81,6 +81,30 @@ describe("KnowledgeTriple Schema Validation (offline)", () => {
       created_at: [1710000000, 0],
     };
     assert.ok(!validateKnowledgeTriple(payload), "Should fail on confidence > 1.0");
+  });
+
+  test("KnowledgeTriple with out-of-range confidence fails schema (below)", () => {
+    const payload = {
+      subject: "entity_a",
+      predicate: "is_a",
+      object: "Entity",
+      confidence: -1.5,
+      source: "uhCAkAgent",
+      created_at: [1710000000, 0],
+    };
+    assert.ok(!validateKnowledgeTriple(payload), "Should fail on confidence < -1.0");
+  });
+
+  test("KnowledgeTriple with negative confidence is valid (signed gradient)", () => {
+    const payload = {
+      subject: "entity_a",
+      predicate: "contradicts",
+      object: "entity_b",
+      confidence: -0.8,
+      source: "uhCAkAgent",
+      created_at: [1710000000, 0],
+    };
+    assert.ok(validateKnowledgeTriple(payload), "Negative confidence should be valid in [-1,+1]");
   });
 
   test("KnowledgeTriple with empty subject fails schema", () => {
@@ -151,6 +175,48 @@ describe("KnowledgeTriple Holochain Integration", () => {
       assert.equal(results[0].predicate, "capable_of");
       assert.equal(results[0].object, "coding_capability");
       assert.ok(results[0].confidence > 0.9, "Confidence preserved");
+    });
+  });
+
+  test("assert_triple accepts negative confidence in signed range", async () => {
+    await runScenario(async (scenario: Scenario) => {
+      const alice = await scenario.addPlayerWithApp({ path: hAppPath });
+      const call = getZomeCaller(alice.cells[0], ZOME);
+
+      await call<ActionHash>("assert_triple", {
+        subject: "entity_a",
+        predicate: "contradicts",
+        object: "entity_b",
+        confidence: -0.8,
+      });
+
+      const results = await call<Array<{
+        hash: ActionHash;
+        subject: string;
+        predicate: string;
+        object: string;
+        confidence: number;
+        author: unknown;
+        created_at: unknown;
+      }>>("query_triples", {
+        subject: "entity_a",
+      });
+
+      assert.equal(results.length, 1, "Should retrieve one signed-negative triple");
+      assert.equal(results[0].confidence, -0.8, "Negative confidence should round-trip exactly");
+
+      const schemaPayload = {
+        subject: results[0].subject,
+        predicate: results[0].predicate,
+        object: results[0].object,
+        confidence: results[0].confidence,
+        source: results[0].author,
+        created_at: results[0].created_at,
+      };
+      assert.ok(
+        validateKnowledgeTriple(schemaPayload),
+        `Retrieved triple should still satisfy schema: ${JSON.stringify(validateKnowledgeTriple.errors)}`
+      );
     });
   });
 
