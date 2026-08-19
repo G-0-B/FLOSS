@@ -649,6 +649,16 @@ _CREDENTIAL_ENV_BY_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("xai/", ("XAI_API_KEY",)),
     ("openai/", ("OPENAI_API_KEY",)),
     ("anthropic/", ("ANTHROPIC_API_KEY",)),
+    # Added 2026-08-12 alongside the probed voter-registry repair. Any prefix
+    # absent from this table falls through to "no built-in credential gate for
+    # provider" -- i.e. reported as AVAILABLE unconditionally -- so a voter on
+    # an ungated provider passes the `include_unavailable=False` filter and is
+    # enrolled in a live poll that can only fail at request time. That is the
+    # same failure shape the removed flowith voters had (credential file
+    # present, endpoint gone), and it is why every provider newly referenced by
+    # voter_registry.json must be gated here at the same time.
+    ("huggingface/", ("HUGGINGFACE_API_KEY", "HF_TOKEN")),
+    ("nvidia/", ("NVIDIA_NIM_API_KEY", "NVIDIA_API_KEY")),
 )
 
 
