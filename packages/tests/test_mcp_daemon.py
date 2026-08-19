@@ -63,3 +63,116 @@ def test_audit_appender_best_effort_no_crash(tmp_path):
     append = mcp_daemon.audit_appender(str(impossible_sink))
     # Should not raise
     append("some_tool", {"key": "val"})
+
+
+def test_audited_preserves_tool_signature_for_schema_generation():
+    """The audit wrapper must not destroy the tool schema FastMCP derives.
+
+    FastMCP builds each tool's inputSchema from the registered callable's
+    signature and annotations. A wrapper that does not set `__wrapped__`
+    registers as `(*args, **kwargs)`, which silently strips every parameter
+    from the published schema — the tool still appears, but with no arguments.
+    functools.wraps is what prevents that, so assert it directly.
+    """
+    import inspect
+
+    from packages import mcp_daemon
+
+    def sample(claim_text: str, blast_radius: str = "Local") -> dict:
+        """Sample docstring."""
+        return {"claim_text": claim_text, "blast_radius": blast_radius}
+
+    wrapped = mcp_daemon.audited(sample, lambda *_: None)
+
+    assert wrapped.__name__ == "sample"
+    assert (wrapped.__doc__ or "").strip().startswith("Sample docstring")
+    assert str(inspect.signature(wrapped)) == str(inspect.signature(sample))
+    assert wrapped.__annotations__ == sample.__annotations__
+    assert wrapped("x", blast_radius="System")["blast_radius"] == "System"
+
+
+def test_audited_records_named_arguments(tmp_path):
+    """Positional args are bound to parameter names so rows stay readable."""
+    import json
+
+    from packages import mcp_daemon
+
+    sink = tmp_path / "audit.jsonl"
+    append = mcp_daemon.audit_appender(str(sink))
+
+    def submit(proposer: str, summary: str = "s") -> str:
+        return "ok"
+
+    mcp_daemon.audited(submit, append)("claude", summary="hello")
+
+    row = json.loads(sink.read_text(encoding="utf-8").strip())
+    assert row["tool"] == "submit"
+    # bound by name even though `proposer` was passed positionally
+    assert row["payload"] == {"proposer": "claude", "summary": "hello"}
+
+
+def test_audited_bounds_values_and_survives_hostile_repr(tmp_path):
+    """A huge Claim body must not be copied wholesale into the audit sink."""
+    import json
+
+    from packages import mcp_daemon
+
+    sink = tmp_path / "audit.jsonl"
+    append = mcp_daemon.audit_appender(str(sink))
+
+    class Hostile:
+        def __repr__(self):
+            raise RuntimeError("boom")
+
+    def tool(body: str, obj: object = None) -> str:
+        return "ok"
+
+    mcp_daemon.audited(tool, append)("A" * 5000, obj=Hostile())
+
+    row = json.loads(sink.read_text(encoding="utf-8").strip())
+    assert len(row["payload"]["body"]) < 1000
+    assert row["payload"]["body"].endswith("<truncated>")
+    assert row["payload"]["obj"] == "<unrepresentable>"
+
+
+def test_audited_wraps_async_tools(tmp_path):
+    """Async tools must stay async — awaiting a sync wrapper breaks registration."""
+    import asyncio
+    import inspect
+
+    import json
+
+    from packages import mcp_daemon
+
+    sink = tmp_path / "audit.jsonl"
+    append = mcp_daemon.audit_appender(str(sink))
+
+    async def atool(x: int) -> int:
+        return x + 1
+
+    wrapped = mcp_daemon.audited(atool, append)
+    assert inspect.iscoroutinefunction(wrapped)
+    assert asyncio.run(wrapped(1)) == 2
+    assert json.loads(sink.read_text(encoding="utf-8").strip())["payload"] == {"x": 1}
+
+
+def test_registered_consensus_tools_are_audited():
+    """Regression: the consensus server must register through the audited path.
+
+    This is the check that would have caught the original defect — audit_appender
+    existed and was unit-tested, but had no production caller, so _AUDIT_SINK was
+    dead config and every tool call bypassed the audit trail.
+    """
+    from packages.metacoordinator_mcp import server
+
+    if server.mcp is None:
+        return  # MCP SDK not installed in this environment
+
+    import asyncio
+
+    names = {t.name for t in asyncio.run(server.mcp.list_tools())}
+    assert "submit_claim" in names
+    # schema must survive the wrapper
+    tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
+    props = set((tools["submit_claim"].inputSchema or {}).get("properties", {}))
+    assert {"proposer", "summary", "blast_radius"} <= props
