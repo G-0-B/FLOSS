@@ -41,6 +41,15 @@ LOG_FILE = LOG_DIR / "APPEND_ONLY_KNOWLEDGE_LOG.md"
 # (Consensus-approved 2026-07-10, claim 019f4a9f, mean +0.617)
 MAX_CHUNKS_PER_FILE = 20
 
+# Returned by extract_semantics() when a file is DEFERRED rather than extracted.
+# It must be distinguishable from real output: the deferral message used to be a
+# plain "SKIPPED: ..." string that the caller happily staged as though it were
+# extraction output, so the file was excluded from later pending runs and
+# `--commit` recorded it as a completed knowledge_distillation. Oversized files
+# were therefore marked permanently processed with nothing extracted from them.
+DEFERRED_PREFIX = "DEFERRED::"
+
+
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -78,8 +87,13 @@ def _get_processed_files(cell: CellDirectory) -> set[str]:
     return processed
 
 
-def extract_semantics(file_path: Path, model: str) -> str:
-    """Use LiteLLM to extract high-ROI fractal semantics from the file in chunks."""
+def extract_semantics(file_path: Path, model: str, force_full: bool = False) -> str:
+    """Extract high-ROI fractal semantics from the file in chunks.
+
+    Returns a string prefixed with DEFERRED_PREFIX when the file exceeds
+    MAX_CHUNKS_PER_FILE and `force_full` is not set. Callers MUST treat that as
+    "not processed" and leave the file pending.
+    """
     try:
         content = file_path.read_text(encoding="utf-8")
     except Exception as e:
@@ -94,10 +108,11 @@ def extract_semantics(file_path: Path, model: str) -> str:
     # the tick budget. Files exceeding the cap are deferred, not lost — the caller
     # logs them and they can be processed via a separate offline batch.
     # (Consensus-approved 2026-07-10, claim 019f4a9f, mean +0.617)
-    if len(chunks) > MAX_CHUNKS_PER_FILE:
+    if len(chunks) > MAX_CHUNKS_PER_FILE and not force_full:
         return (
-            f"SKIPPED: file has {len(chunks)} chunks (cap={MAX_CHUNKS_PER_FILE}); "
-            f"size={len(content)} bytes. Defer to offline batch or use --force-full."
+            f"{DEFERRED_PREFIX} file has {len(chunks)} chunks "
+            f"(cap={MAX_CHUNKS_PER_FILE}); size={len(content)} bytes. "
+            "Left PENDING; re-run with --force-full to process it anyway."
         )
 
     all_insights = []
@@ -308,6 +323,15 @@ def main() -> int:
     parser.add_argument("--commit", action="store_true", help="Commit verified drafts from staging to the source chain")
     parser.add_argument("--model", default="groq/llama-3.1-8b-instant", help="LiteLLM model to use")
     parser.add_argument("--limit", type=int, default=5, help="Max files to process per run")
+    parser.add_argument(
+        "--force-full",
+        action="store_true",
+        help=(
+            f"Process files exceeding the {MAX_CHUNKS_PER_FILE}-chunk cap instead "
+            "of deferring them. The deferral message previously advertised this "
+            "flag before it existed."
+        ),
+    )
     args = parser.parse_args()
 
     if ENV_PATH.exists():
@@ -364,8 +388,17 @@ def main() -> int:
             print("[DRY RUN] Would extract semantics and write to staging.")
             continue
             
-        insights = extract_semantics(file_path, args.model)
-        
+        insights = extract_semantics(file_path, args.model, force_full=args.force_full)
+
+        if insights.startswith(DEFERRED_PREFIX):
+            # Deferral is NOT completion. Staging this would exclude the file
+            # from later pending runs and let --commit record it as a finished
+            # distillation, permanently marking it processed with nothing
+            # extracted. Leave it pending and say so.
+            deferred.append(file_path)
+            print(f"  DEFERRED (still pending): {insights[len(DEFERRED_PREFIX):].strip()}")
+            continue
+
         if "LLM Extraction Failed" in insights:
             if "RateLimitError" in insights or "rate_limit_exceeded" in insights:
                 print(f"Rate limit hit. Waiting 45 seconds before retrying...")

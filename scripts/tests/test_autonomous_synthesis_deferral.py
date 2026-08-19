@@ -1,0 +1,100 @@
+"""Tests for deferral handling in scripts/autonomous_synthesis_loop.py.
+
+Regression cover for a silent data-loss path found on PR41: a file over the
+chunk cap returned a plain ``"SKIPPED: ..."`` string, the caller's only guard
+checked for ``"LLM Extraction Failed"``, so the skip message fell through and
+was staged as though it were extraction output. Staging excluded the file from
+later pending runs, and ``--commit`` then recorded it as a completed
+``knowledge_distillation`` -- permanently marking large files processed with
+nothing extracted from them.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import inspect
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = REPO_ROOT / "scripts" / "autonomous_synthesis_loop.py"
+
+
+def load_module():
+    """Load the loop module by path; it is a script, not an importable package."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    spec = importlib.util.spec_from_file_location("autonomous_synthesis_loop", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_oversized_file_is_deferred_not_extracted(tmp_path):
+    """A file over the cap returns the deferral sentinel and makes no LLM call."""
+    module = load_module()
+
+    oversized = tmp_path / "big.md"
+    oversized.write_text("word " * 200_000, encoding="utf-8")
+
+    result = module.extract_semantics(oversized, "groq/irrelevant")
+
+    assert result.startswith(module.DEFERRED_PREFIX)
+    assert str(module.MAX_CHUNKS_PER_FILE) in result
+
+
+def test_deferral_is_not_mistaken_for_an_llm_failure(tmp_path):
+    """The deferral must not rely on the caller's LLM-error guard.
+
+    This is the exact hole: the caller checked only for "LLM Extraction Failed",
+    which a skip message never contained, so the skip fell through to staging.
+    """
+    module = load_module()
+
+    oversized = tmp_path / "big.md"
+    oversized.write_text("word " * 200_000, encoding="utf-8")
+
+    result = module.extract_semantics(oversized, "groq/irrelevant")
+
+    assert "LLM Extraction Failed" not in result
+    assert result.startswith(module.DEFERRED_PREFIX)
+
+
+def test_caller_skips_staging_before_it_can_stage_a_deferral():
+    """main() must test for the deferral sentinel *before* calling stage_draft."""
+    module = load_module()
+    source = inspect.getsource(module.main)
+
+    assert "DEFERRED_PREFIX" in source, "main() no longer checks for deferrals"
+    assert source.index("DEFERRED_PREFIX") < source.index("stage_draft(file_path"), (
+        "deferral check must precede staging, or deferred files get recorded as "
+        "completed distillations again"
+    )
+
+
+def test_force_full_flag_exists():
+    """The deferral message advertises --force-full; it must actually exist.
+
+    The original message told operators to "use --force-full" while no such flag
+    was ever defined, so the documented escape hatch silently did not exist.
+    """
+    module = load_module()
+    source = inspect.getsource(module.main)
+
+    assert "--force-full" in source
+    assert "force_full" in inspect.signature(module.extract_semantics).parameters
+
+
+def test_force_full_bypasses_the_cap_check(tmp_path):
+    """With force_full set, the cap must not short-circuit into a deferral.
+
+    Asserted by reading the guard rather than by running extraction: a real run
+    would fan out to hundreds of live model calls with rate-limit sleeps.
+    """
+    module = load_module()
+    source = inspect.getsource(module.extract_semantics)
+
+    assert "not force_full" in source, (
+        "the chunk-cap guard must honour force_full, or the flag does nothing"
+    )
