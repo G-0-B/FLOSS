@@ -63,11 +63,17 @@ def recall_recent_memories() -> list[str]:
             sys.path.insert(0, hooks_dir)
         import agentmemory_client
 
-        items = agentmemory_client.recall(
+        # recall_status(), not recall(): recall() returns [] for BOTH a healthy
+        # empty result and a total outage, so the ⚠️ block below could never
+        # fire for the failures it exists to surface. Confirmed live on
+        # 2026-08-18 against a wedged agentmemory engine.
+        ok, items = agentmemory_client.recall_status(
             "FLOSSI0ULLK recent session decisions and outcomes",
             limit=MEMORY_RECALL_LIMIT,
             timeout=MEMORY_RECALL_TIMEOUT_SECONDS,
         )
+        if not ok:
+            return RECALL_FAILED  # type: ignore[return-value]
         trimmed = []
         for item in items:
             if not isinstance(item, str):

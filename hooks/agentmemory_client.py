@@ -266,10 +266,84 @@ def save(
         return False
 
 
+def recall_status(
+    query: str, limit: int = 3, timeout: float = 5.0
+) -> tuple[bool, list[str]]:
+    """Like `recall()`, but distinguishes failure from a genuinely empty result.
+
+    Returns `(ok, items)`. `ok` is False only when the call itself failed --
+    dead server, timeout, malformed envelope, unparseable payload. A healthy
+    server that simply has nothing to say returns `(True, [])`.
+
+    This exists because `recall()` collapses both cases to `[]`, which made a
+    total agentmemory outage look identical to "no memories exist" at session
+    start -- so the warning that was written specifically to surface an outage
+    was omitted precisely during one. Observed live on 2026-08-18: the REST
+    engine was wedged (port held, every request returning nothing) and the
+    session-start block rendered as though memory were merely empty.
+
+    Same hard guarantees as the rest of this module: never raises, never blocks
+    past `timeout`, never writes to stdout.
+    """
+    try:
+        if not query or not query.strip():
+            return True, []
+
+        response = _call_tool(
+            "memory_recall", {"query": query, "limit": limit}, timeout
+        )
+        if response is None:
+            return False, []
+
+        text_payload = _extract_text(response)
+        if text_payload is None:
+            return False, []
+
+        try:
+            parsed = json.loads(text_payload)
+        except Exception:
+            return False, []
+
+        results = parsed.get("results") if isinstance(parsed, dict) else None
+        if not isinstance(results, list):
+            return False, []
+
+        return True, _narratives(results, limit)
+    except Exception as exc:  # noqa: BLE001 -- absolute last-resort guard
+        _log(f"[agentmemory] recall_status() crashed: {type(exc).__name__}: {exc}")
+        return False, []
+
+
+def _narratives(results: list, limit: int) -> list[str]:
+    """Pull up to `limit` human-readable strings out of a results list."""
+    out: list[str] = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        observation = item.get("observation")
+        if not isinstance(observation, dict):
+            continue
+        narrative = observation.get("narrative")
+        if isinstance(narrative, str) and narrative.strip():
+            out.append(narrative.strip())
+            continue
+        facts = observation.get("facts")
+        if isinstance(facts, list) and facts:
+            joined = "; ".join(str(f) for f in facts if f)
+            if joined:
+                out.append(joined)
+        if len(out) >= limit:
+            break
+    return out[:limit]
+
+
 def recall(query: str, limit: int = 3, timeout: float = 5.0) -> list[str]:
     """Recall up to `limit` short strings relevant to `query` from
     agentmemory. Returns [] on any failure whatsoever. Never raises, never
     blocks past `timeout`, never prints to stdout.
+
+    Callers that need to tell an outage apart from an empty result should use
+    `recall_status()` instead -- this function deliberately collapses both.
     """
     try:
         if not query or not query.strip():
