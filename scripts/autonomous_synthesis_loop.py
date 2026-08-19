@@ -149,6 +149,19 @@ DOCUMENT CONTENT CHUNK:
     return "\n\n---\n\n".join(all_insights)
 
 
+def active_model_backend() -> str:
+    """Name the transport actually used for model calls this run.
+
+    Read from the same env var the call sites branch on, so the durable
+    activity log cannot disagree with what really happened. Previously every
+    staged Action was hardcoded `provider: "litellm"`, which silently
+    misattributed every run once FLOSS/.env made omniroute the default
+    (ADR-19) -- corrupting provider-level audit, latency, and cost comparison
+    exactly when a transport migration made that comparison matter most.
+    """
+    return "omniroute" if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute" else "litellm"
+
+
 def stage_draft(file_path: Path, model: str, insights: str) -> Path:
     """Write the extraction to the staging directory for human review."""
     started_at = datetime.now(timezone.utc).isoformat()
@@ -192,7 +205,7 @@ def stage_draft(file_path: Path, model: str, insights: str) -> Path:
         },
         llm_calls=[{
             "model": model,
-            "provider": "litellm",
+            "provider": active_model_backend(),
             "prompt_hash": "",
             "response_hash": "",
             "duration_seconds": 0.0,
