@@ -326,12 +326,19 @@ function timingSafeEqualStr(a, b) {
 }
 
 function parseCookies(header) {
-  const out = {};
+  // Null-prototype: cookie NAMES are attacker-controlled, and writing them onto
+  // a normal object literal lets a request carrying a `__proto__` (or
+  // `constructor`) cookie reach Object.prototype instead of setting a plain
+  // key. Object.create(null) has no prototype to pollute, so every name is
+  // stored as an ordinary own property.
+  const out = Object.create(null);
   if (!header) return out;
   for (const part of header.split(';')) {
     const eq = part.indexOf('=');
     if (eq < 0) continue;
-    out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+    const name = part.slice(0, eq).trim();
+    if (!name) continue;
+    out[name] = part.slice(eq + 1).trim();
   }
   return out;
 }

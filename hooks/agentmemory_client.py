@@ -111,19 +111,24 @@ def _read_json_line(stream: Any) -> dict | None:
 
 def _kill(proc: subprocess.Popen) -> None:
     """Unconditionally terminate the child so nothing lingers as an orphan."""
+    # Each step is independently best-effort: the child may already be dead,
+    # its pipes already closed, or it may ignore the kill until the wait times
+    # out. None of those are actionable and all three must still be attempted,
+    # so each is swallowed separately rather than sharing one try block --
+    # a failure in kill() must not skip the stdin close or the reap.
     try:
         proc.kill()
     except Exception:
-        pass
+        pass  # already exited, or never started
     try:
         if proc.stdin is not None:
             proc.stdin.close()
     except Exception:
-        pass
+        pass  # pipe already broken/closed
     try:
         proc.wait(timeout=2)
     except Exception:
-        pass
+        pass  # unreapable within the bound; the OS cleans up the orphan
 
 
 def _call_tool(tool_name: str, arguments: dict, timeout: float) -> dict | None:
