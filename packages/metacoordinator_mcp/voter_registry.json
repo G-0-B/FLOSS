@@ -1,9 +1,41 @@
 {
+  "_probe": {
+    "probed_utc": "2026-08-18",
+    "backend": "omniroute",
+    "why": "FLOSS/.env sets FLOSS_MODEL_BACKEND=omniroute (ADR-19), so every voter resolves through OmniRoute. Model IDs below were each confirmed with a live one-token completion through that exact path. OmniRoute's own catalog reports status:'available' for models that 404 on contact, so catalog status is NOT accepted as evidence here -- only a recorded successful completion is.",
+    "id_format": "OmniRoute requires a provider/model prefix; bare model ids are rejected as ambiguous.",
+    "verified_working": {
+      "groq/openai/gpt-oss-120b": "OpenAI-oss family | groq surface | 489ms",
+      "groq/openai/gpt-oss-20b": "OpenAI-oss family | groq surface | 359ms",
+      "groq/qwen/qwen3.6-27b": "Qwen/Alibaba family | groq surface | 562ms",
+      "mistral/mistral-large-latest": "Mistral family | mistral surface | 638ms",
+      "mistral/devstral-small-latest": "Mistral family | mistral surface | 534ms",
+      "mistral/open-mistral-nemo": "Mistral family | mistral surface | 407ms",
+      "mistral/ministral-8b-2410": "Mistral family | mistral surface | 407ms",
+      "huggingface/Qwen/Qwen3.6-27B": "Qwen/Alibaba family | huggingface surface | 2349ms",
+      "huggingface/deepseek-ai/DeepSeek-V4-Flash": "DeepSeek family | huggingface surface | 5785ms",
+      "openrouter/openai/gpt-4o-mini": "GPT-4o family | openrouter surface | 1022ms",
+      "nvidia/openai/gpt-oss-20b": "OpenAI-oss family | nvidia surface | 669ms",
+      "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1": "Nemotron family | nvidia surface | 448ms"
+    },
+    "removed_because_dead": {
+      "cerebras/gpt-oss-120b": "404. Was in balanced/fast/diverse/diverse-plus/diverse-max/yumeichan -- i.e. the DEFAULT profile. OmniRoute returns an error naming a DIFFERENT model ('zai-glm-4.7 is archived') than the one requested and the cooldown keeps resetting, so the error appears cached per-provider rather than per-model.",
+      "cerebras/zai-glm-4.7": "404 archived for this organization.",
+      "groq/llama-3.3-70b-versatile": "404 no access. Was in diverse-max.",
+      "groq/meta-llama/llama-4-scout-17b-16e-instruct": "404 no access. Was in diverse-max and post-window.",
+      "flowith/*": "CORRECTED 2026-08-18: flowith voters do NOT route through OmniRoute or litellm -- build_default_voters dispatches any `flowith/` model to make_flowith_voter, a bespoke direct HTTPS call to FLOWITH_API_URL (https://edge.flowith.io/external/use/llm) authenticated from ~/.flowith/credentials.json. An OmniRoute 'no active credentials' result therefore says nothing about flowith. Probed on the REAL path instead: the credential file exists and loads cleanly, but the endpoint returns HTTP 404 Not Found for gemini-2.5-flash, deepseek-chat, and gpt-4.1-mini alike -- the endpoint itself is gone, not the models. Removed for that reason. Note this is the WORST failure shape available: because the credential file is present, _flowith_credential_state reports the provider as available, so these voters passed the include_unavailable=False gate and would have been enrolled in a poll only to fail at request time.",
+      "ollama/gemma3:12b-it-qat": "OmniRoute reports 'No active credentials for provider: ollama' EVEN WHILE the local ollama server answers normally on :11434. The local model is fine; OmniRoute simply has no route to it. This is why ADR-18's reuse-review profile could never reach three surfaces. See the `local` profile note."
+    },
+    "independence_rule": "Nontrivial polls need >=3 provider surfaces and >=4 model families; same-family endpoints on different surfaces do NOT count as independent (groq/qwen and huggingface/Qwen are one family). Before this repair the default `balanced` profile degraded to two voters BOTH on groq once cerebras died, silently failing its own bar.",
+    "falsifier": "Re-probe before relying on this. Failures may be transient quota or circuit-breaker state, and a restored credential (notably flowith/ollama) would change these verdicts.",
+    "local_profile_note": "The `local` profile intentionally still names ollama/gemma3:12b-it-qat. The model is genuinely healthy -- probed directly against http://localhost:11434 on 2026-08-18 and it answered. What is broken is only the ROUTE: with FLOSS_MODEL_BACKEND=omniroute (the current default) OmniRoute has no ollama credential and returns 'No active credentials for provider: ollama'. Pointing this profile at a hosted model to make it 'pass' would have made the name a lie. To actually use it, either run with FLOSS_MODEL_BACKEND=litellm or add an ollama connection in OmniRoute.",
+    "lesson": "Probe the path the code actually takes. A voter's transport is decided by build_default_voters dispatch (voter-name prefix, then model prefix, else litellm/OmniRoute), NOT by the model string alone -- an initial pass here wrongly declared flowith dead from an OmniRoute error on a path flowith never uses, and reached the right answer only after re-probing correctly."
+  },
   "aliases": {
     "default": "balanced",
     "yumeichan": "yumeichan",
     "free": "balanced",
-    "subscriptions": "flowith",
+    "subscriptions": "diverse",
     "mistral-free": "mistral",
     "roi": "diverse",
     "provider-diverse": "diverse",
@@ -17,24 +49,20 @@
     "reuse": "reuse-review"
   },
   "profiles": {
-    "yumeichan": {
-      "omo-critic-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "omo-critic-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
-    },
     "balanced": {
-      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "mistral-devstral-small": "mistral/devstral-small-latest",
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1"
     },
     "fast": {
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
+      "mistral-ministral-8b": "mistral/ministral-8b-2410"
     },
-    "flowith": {
-      "flowith-gpt-4.1-mini": "flowith/gpt-4.1-mini",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-      "flowith-deepseek-chat": "flowith/deepseek-chat"
+    "yumeichan": {
+      "omo-critic-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "omo-critic-qwen3-27b": "huggingface/Qwen/Qwen3.6-27B",
+      "omo-critic-nemotron-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1"
     },
     "mistral": {
       "mistral-open-nemo": "mistral/open-mistral-nemo",
@@ -42,59 +70,58 @@
       "mistral-devstral-small": "mistral/devstral-small-latest"
     },
     "amplified": {
-      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+      "mistral-devstral-small": "mistral/devstral-small-latest",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1"
     },
     "diverse": {
-      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-      "flowith-deepseek-chat": "flowith/deepseek-chat",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
+      "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini"
     },
     "diverse-plus": {
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
       "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-      "flowith-deepseek-chat": "flowith/deepseek-chat",
-      "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b"
+      "mistral-large": "mistral/mistral-large-latest",
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
+      "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini"
     },
     "diverse-max": {
-      "groq-llama-3.3-70b-versatile": "groq/llama-3.3-70b-versatile",
-      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
       "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "groq-llama-4-scout": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+      "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+      "mistral-large": "mistral/mistral-large-latest",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "mistral-ministral-8b": "mistral/ministral-8b-2410",
       "mistral-open-mistral-nemo": "mistral/open-mistral-nemo",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-      "flowith-deepseek-chat": "flowith/deepseek-chat",
-      "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
-      "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat",
-      "exec-review-gpt-oss-120b": "groq/openai/gpt-oss-120b",
-      "exec-review-llama-3.3-70b": "groq/llama-3.3-70b-versatile"
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+      "huggingface-qwen3-27b": "huggingface/Qwen/Qwen3.6-27B",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
+      "nvidia-gpt-oss-20b": "nvidia/openai/gpt-oss-20b",
+      "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini"
     },
     "post-window": {
-      "omo-critic-gpt-oss-120b": "cerebras/gpt-oss-120b",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "groq-llama-4-scout": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+      "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
       "mistral-devstral-small": "mistral/devstral-small-latest",
       "mistral-open-mistral-nemo": "mistral/open-mistral-nemo",
-      "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash"
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+      "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1"
     },
     "local": {
       "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat"
     },
     "reuse-review": {
-      "ollama-gemma3-12b": "ollama/gemma3:12b-it-qat",
-      "groq-qwen3-32b": "groq/qwen/qwen3.6-27b",
-      "mistral-devstral-small": "mistral/devstral-small-latest"
+      "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+      "mistral-devstral-small": "mistral/devstral-small-latest",
+      "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash"
     }
   }
 }
