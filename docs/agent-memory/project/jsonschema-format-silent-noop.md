@@ -16,7 +16,7 @@ format.
 
 Found the hard way: the first run of the new `green-set` gate failed with
 
-```
+```text
 FAILED tests/test_pr38_review_cleanup.py::test_capability_schema_rejects_malformed_issued_at
 Failed: DID NOT RAISE ValidationError
 ```

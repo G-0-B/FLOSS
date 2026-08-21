@@ -23,6 +23,13 @@ Baseline measured on `origin/main @ c1f51ac`, 2026-08-21 — not estimated, not 
 | `scripts/tests/` | 1 failed, 35 passed |
 | Proposed green set | **346 passed, 1 deselected, ~14s** |
 
+The green set is not "these three directories are clean" -- `scripts/tests/`
+has one known-red test in it. 223 + 88 + 35 = 346 passing, with
+`test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded`
+deselected **by name** in `.github/workflows/python-ci.yml`, reason recorded
+beside it. Deselecting one named test is a stated exception; describing the
+directory as green would not be true.
+
 Every failure but one is under `ARF/` — 20 in `test_conversation_memory.py`, 19 in
 `test_embedding_composition.py`, 18 in `test_embedding_frames.py`, and a tail.
 

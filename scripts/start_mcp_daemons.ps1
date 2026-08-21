@@ -14,7 +14,14 @@ Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.
 Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.reasoning_ensemble.mcp_server"
 
 # Start OmniRoute daemon (port 20128) — model routing + token compression
-$omni = Get-Process -Name 'node' -ErrorAction SilentlyContinue | Where-Object { $_.Path -match 'omniroute' }
+# Match on the COMMAND LINE, not $_.Path. For an npm-installed OmniRoute the
+# process is plain node.exe, so .Path is the Node binary and never contains
+# "omniroute". The old filter therefore found nothing every time, and this
+# script started ANOTHER OmniRoute on every rerun despite the duplicate
+# guard it advertises below. Same root cause as the stop script, opposite
+# and equally wrong outcome.
+$omni = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Where-Object { $_.CommandLine -match 'omniroute' }
 if (-not $omni) {
     Start-Process -WindowStyle Hidden "omniroute" "--no-open"
     Write-Host "[FLOSS MCP] OmniRoute started (:20128)"

@@ -48,6 +48,7 @@ def test_hooks_only_target_emits_wrapped_shape_without_unrelated_keys(tmp_path):
         "targets": {
             "codex": {
                 "enabled": True,
+                "scope": "repo",
                 "settings_path": ".codex/hooks.json",
                 "payload_shape": "hooks_only",
                 "hooks": {
@@ -806,6 +807,7 @@ def test_missing_file_yaml_target_skipped_via_materialize_without_drift(tmp_path
         "targets": {
             "hermes": {
                 "enabled": True,
+                "scope": "repo",
                 "settings_path": "config.yaml",
                 "format": "yaml",
                 "event_map": {"PreToolUse": "pre_tool_call"},
@@ -836,6 +838,7 @@ def test_default_format_is_json_and_existing_targets_unaffected(tmp_path):
 
     target_cfg = {
         "enabled": True,
+        "scope": "repo",
         "settings_path": "settings.json",
         "hooks": {"PreToolUse": [{"matcher": "*", "hooks": []}]},
     }
@@ -1108,6 +1111,7 @@ def test_materialize_expands_env_var_settings_path_end_to_end(tmp_path, monkeypa
         "targets": {
             "env_target": {
                 "enabled": True,
+                "scope": "repo",
                 "settings_path": "%HOOK_SURFACE_TEST_HOME%/settings.json",
                 "hooks": {
                     "PreToolUse": [
@@ -1176,6 +1180,7 @@ def test_materialize_reports_refused_for_live_gateway_and_leaves_file_untouched(
         "targets": {
             "hermes_workspace": {
                 "enabled": True,
+                "scope": "repo",
                 "settings_path": ".toilet/hermes/config.yaml",
                 **_hermes_target_cfg(),
             }

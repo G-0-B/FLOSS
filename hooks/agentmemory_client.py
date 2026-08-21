@@ -109,8 +109,37 @@ def _read_json_line(stream: Any) -> dict | None:
         return None
 
 
+def _reap_detached(proc: subprocess.Popen) -> None:
+    """Wait for an already-killed child on a daemon thread.
+
+    `Popen.__del__` warns about a still-running child, and a zombie lingers on
+    POSIX until someone waits on it -- but doing that wait on the request path
+    is what blew the caller's timeout budget. A daemon thread reaps it without
+    holding anyone up, and does not keep the interpreter alive at exit.
+    """
+    threading.Thread(
+        target=lambda: _swallow(lambda: proc.wait(timeout=30)),
+        daemon=True,
+        name="agentmemory-reap",
+    ).start()
+
+
+def _swallow(fn) -> None:
+    try:
+        fn()
+    except Exception:
+        pass  # best-effort cleanup; nothing here is actionable
+
+
 def _kill(proc: subprocess.Popen) -> None:
-    """Unconditionally terminate the child so nothing lingers as an orphan."""
+    """Unconditionally terminate the child so nothing lingers as an orphan.
+
+    Must not block. This runs *after* `_call_tool` has already spent the
+    caller's full `timeout`, so a synchronous `proc.wait(timeout=2)` here added
+    up to two more seconds on top of a bound the caller was promised -- turning
+    a 2.5s recall budget into 4.5s of session startup, precisely when the server
+    is wedged and the wait is most likely to run its full length.
+    """
     # Each step is independently best-effort: the child may already be dead,
     # its pipes already closed, or it may ignore the kill until the wait times
     # out. None of those are actionable and all three must still be attempted,
@@ -125,10 +154,9 @@ def _kill(proc: subprocess.Popen) -> None:
             proc.stdin.close()
     except Exception:
         pass  # pipe already broken/closed
-    try:
-        proc.wait(timeout=2)
-    except Exception:
-        pass  # unreapable within the bound; the OS cleans up the orphan
+    # Reap off the request path. The child has already been killed above; all
+    # that remains is collecting its exit status, which no caller waits for.
+    _reap_detached(proc)
 
 
 def _call_tool(tool_name: str, arguments: dict, timeout: float) -> dict | None:

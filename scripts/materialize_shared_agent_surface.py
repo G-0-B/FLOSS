@@ -1870,6 +1870,7 @@ def materialize(
             output_dir=workspace_root / ".agent-surface" / "hooks",
             check=check,
             dry_run=dry_run,
+            include_user_scope=include_user_scope,
         )
         results.extend(hook_results)
         drift_found = drift_found or hook_drift

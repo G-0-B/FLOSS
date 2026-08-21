@@ -193,7 +193,9 @@ def load_manifest(path: Path) -> dict[str, Any]:
 TEMPLATE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
-def resolve_variables(manifest: dict[str, Any]) -> dict[str, str]:
+def resolve_variables(
+    manifest: dict[str, Any], workspace_root: Path | None = None
+) -> dict[str, str]:
     """Resolve the manifest's `variables` block into concrete strings.
 
     Hook commands are plain strings handed to a shell, so before this existed
@@ -223,6 +225,13 @@ def resolve_variables(manifest: dict[str, Any]) -> dict[str, str]:
     rather than raising, which would bake a bogus path into every generated
     harness config.
     """
+    # Defaults may be written relative to the workspace so the manifest does
+    # not bake one machine's absolute path into every checkout. A default of
+    # "${WORKSPACE_ROOT}/FLOSS/hooks" resolves against the tree actually being
+    # materialized; without this a second clone silently generated hook
+    # commands pointing back at the first one, which still "run" and just
+    # exit nonzero where nobody looks.
+    workspace_token = str(workspace_root) if workspace_root is not None else None
     raw = manifest.get("variables", {})
     if not isinstance(raw, dict):
         raise HookSurfaceError("Manifest `variables` field must be an object if present")
@@ -263,6 +272,8 @@ def resolve_variables(manifest: dict[str, Any]) -> dict[str, str]:
                 "`env`/`default`"
             )
 
+        if workspace_token is not None:
+            value = value.replace("${WORKSPACE_ROOT}", workspace_token)
         expanded = os.path.expandvars(value)
         leftover = re.search(r"%[^%]+%|\$[A-Za-z_][A-Za-z0-9_]*", expanded)
         if leftover is not None:
@@ -756,9 +767,63 @@ def apply_yaml_target(
     )
 
 
+def hook_target_in_scope(
+    target_name: str, target_cfg: dict[str, Any], include_user_scope: bool
+) -> bool:
+    """Gate hook targets that write outside the repository.
+
+    This module previously had no scope gate at all, while the sibling
+    agent-surface materializer -- called from the same runner, in the same pass
+    -- gated `~/.codex/config.toml` and the Hermes AppData config carefully and
+    documented why. The asymmetry meant a plain `refresh_agent_surfaces.py`
+    with no `--include-user-scope` still rewrote `~/.claude/settings.json` and
+    the Hermes config, i.e. machine-wide state, from a repo-scope run. Observed
+    doing exactly that on 2026-08-21.
+
+    Skipping out-of-scope targets *before* their `settings_path` is resolved
+    also fixes a portability failure: `hermes_user` points at
+    `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX `os.path.expandvars` does
+    not expand `%VAR%`, so `resolve_target_path` raised on Linux and macOS
+    before the target could be skipped for any other reason. A repo-scope run
+    now never touches it.
+
+    `scope` is required rather than defaulted, for the reason the sibling
+    module gives: defaulting an absent scope to the permissive value would mean
+    a future target that forgets the field writes outside the repo with this
+    gate never consulted.
+    """
+    if "scope" not in target_cfg:
+        raise HookSurfaceError(
+            f"Target {target_name!r} is missing required `scope` field "
+            "(must be 'repo' or 'user'); this gate does not default absence"
+        )
+    scope = str(target_cfg["scope"]).strip().lower()
+    if scope not in {"repo", "user"}:
+        raise HookSurfaceError(
+            f"Target {target_name!r} `scope` must be 'repo' or 'user', got {scope!r}"
+        )
+    return scope == "repo" or include_user_scope
+
+
 def build_registry(
     manifest: dict[str, Any], workspace_root: Path, variables: dict[str, str]
 ) -> dict[str, Any]:
+    """Describe every target, in scope or not.
+
+    Deliberately independent of `include_user_scope`: the registry is the
+    manifest's description, and `--check` compares against it. If its content
+    changed with the opt-in flag, a repo-scope `--check` would report drift
+    purely because the last write happened to use `--include-user-scope`.
+    The gate belongs on the writes, not on the description.
+    """
+    # Same deliberate lazy import as `resolve_target_path` below: the sibling
+    # module imports THIS one at load time, so a module-level import is a real
+    # cycle. We need the exception type it raises in order to catch it.
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import SharedSurfaceError
+
     registry_targets: dict[str, Any] = {}
     for target_name, target_cfg in manifest["targets"].items():
         if not isinstance(target_cfg, dict):
@@ -766,9 +831,19 @@ def build_registry(
         resolved_cfg = dict(target_cfg)
         settings_path = target_cfg.get("settings_path")
         if isinstance(settings_path, str) and settings_path.strip():
-            resolved_cfg["resolved_settings_path"] = str(
-                resolve_target_path(workspace_root, settings_path)
-            )
+            try:
+                resolved_cfg["resolved_settings_path"] = str(
+                    resolve_target_path(workspace_root, settings_path)
+                )
+            except SharedSurfaceError as exc:
+                # A platform-specific target that cannot be expressed on this
+                # OS -- `hermes_user` is `%LOCALAPPDATA%/...`, and POSIX
+                # expandvars leaves `%VAR%` literal. Recording it as
+                # unresolved keeps the registry honest and lets a Linux or
+                # macOS run of the repo-scope surface succeed, which it could
+                # not do while this raised.
+                resolved_cfg["resolved_settings_path"] = None
+                resolved_cfg["unresolved_reason"] = str(exc)
         hooks = resolved_cfg.get("hooks")
         if isinstance(hooks, dict):
             resolved_cfg["hooks"] = expand_hook_commands(hooks, variables)
@@ -868,9 +943,10 @@ def materialize(
     *,
     check: bool,
     dry_run: bool,
+    include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = load_manifest(manifest_path)
-    variables = resolve_variables(manifest)
+    variables = resolve_variables(manifest, workspace_root)
     registry = build_registry(manifest, workspace_root, variables)
     index = build_index(registry)
 
@@ -895,6 +971,12 @@ def materialize(
         if not isinstance(target_cfg, dict):
             raise HookSurfaceError(f"Target {target_name!r} must be a JSON object")
         if not target_cfg.get("enabled"):
+            continue
+        if not hook_target_in_scope(target_name, target_cfg, include_user_scope):
+            results.append(
+                f"SKIP  user-scope target {target_name!r} "
+                "(pass --include-user-scope to write it)"
+            )
             continue
         settings_path = target_cfg.get("settings_path")
         if not isinstance(settings_path, str) or not settings_path.strip():
@@ -946,6 +1028,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--include-user-scope",
+        action="store_true",
+        help="Also write targets outside the repository (~/.claude, Hermes AppData)",
+    )
     return parser.parse_args()
 
 
@@ -957,6 +1044,7 @@ def main() -> int:
         output_dir=args.output_dir.resolve(),
         check=args.check,
         dry_run=args.dry_run,
+        include_user_scope=args.include_user_scope,
     )
     for line in results:
         print(line)

@@ -28,27 +28,49 @@ foreach ($pidFile in $pidFiles) {
             Write-Host "[FLOSS MCP] $pidFile names this very process ($PID) - refusing to self-terminate"
             continue
         }
+        # Do NOT assume every Stop-Process failure means the process is gone.
+        # It also fails on access-denied and on protected processes. Reporting
+        # those as "stale" and deleting the pid file anyway makes a LIVE daemon
+        # unfindable -- the same end state the $PID bug above produced, reached
+        # a different way. Confirm the process is actually gone before removing
+        # the file.
+        $stopped = $false
         try {
             Stop-Process -Id $daemonPid -Force -ErrorAction Stop
+            $stopped = $true
             Write-Host "[FLOSS MCP] Killed $pidFile (PID $daemonPid)"
         } catch {
-            Write-Host "[FLOSS MCP] $pidFile stale (PID $daemonPid not running)"
+            if (-not (Get-Process -Id $daemonPid -ErrorAction SilentlyContinue)) {
+                $stopped = $true
+                Write-Host "[FLOSS MCP] $pidFile stale (PID $daemonPid not running)"
+            } else {
+                Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is ALIVE but could not be stopped: $($_.Exception.Message)"
+                Write-Host "[FLOSS MCP] Keeping $pidFile so the daemon stays findable."
+            }
         }
-        Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+        if ($stopped) {
+            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
-# Kill OmniRoute
-$omni = Get-Process -Name 'node' -ErrorAction SilentlyContinue | Where-Object { $_.Path -match 'omniroute' }
+# Kill OmniRoute.
+# Match on the COMMAND LINE, not $_.Path. For an npm-installed OmniRoute the
+# process is plain node.exe, so .Path is the Node binary and never contains
+# "omniroute" -- the old filter found nothing and the script cheerfully reported
+# OmniRoute stopped while it kept running. The identical mistake in
+# start_mcp_daemons.ps1 launched a second copy on every rerun.
+$omni = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Where-Object { $_.CommandLine -match 'omniroute' }
 if ($omni) {
-    $omni | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+    $omni | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Write-Host "[FLOSS MCP] OmniRoute stopped"
 } else {
     Write-Host "[FLOSS MCP] OmniRoute not running"
 }
 
 # Kill any orphaned npx @agentmemory processes
-$orphans = Get-WmiObject Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'agentmemory|januscope' }
+$orphans = Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'agentmemory|januscope' }
 if ($orphans) {
     $orphans | ForEach-Object {
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
