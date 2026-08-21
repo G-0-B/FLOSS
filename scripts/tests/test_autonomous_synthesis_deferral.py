@@ -73,6 +73,42 @@ def test_caller_skips_staging_before_it_can_stage_a_deferral():
     )
 
 
+def test_main_actually_runs_the_deferral_branch_without_crashing(tmp_path, capsys, monkeypatch):
+    """Execute the deferral path in main() rather than reading its source.
+
+    The source-text assertion above passed while main() was in fact broken:
+    the deferral branch appended to a name that was never defined, so every
+    deferral raised NameError and aborted the run -- the exact opposite of
+    leaving the file pending. Ruff caught it as F821; the test suite did not,
+    because no test ever executed that branch. This one does.
+    """
+    module = load_module()
+
+    doc = tmp_path / "oversized.md"
+    doc.write_text("# oversized\n", encoding="utf-8")
+
+    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: [doc])
+    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
+    monkeypatch.setattr(
+        module,
+        "extract_semantics",
+        lambda *a, **k: f"{module.DEFERRED_PREFIX}over the chunk cap",
+    )
+
+    def _fail_if_staged(*a, **k):
+        raise AssertionError("a deferred file must never be staged")
+
+    monkeypatch.setattr(module, "stage_draft", _fail_if_staged)
+    monkeypatch.setattr(module.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(sys, "argv", ["autonomous_synthesis_loop.py", "--limit", "1"])
+
+    assert module.main() == 0
+
+    out = capsys.readouterr().out
+    assert "DEFERRED" in out
+    assert doc.name in out, "the deferred file must be named in the summary"
+
+
 def test_force_full_flag_exists():
     """The deferral message advertises --force-full; it must actually exist.
 

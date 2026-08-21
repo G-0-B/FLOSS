@@ -15,6 +15,29 @@ import jsonschema
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _pin_model_backend(monkeypatch):
+    """Pin the LLM backend so these tests exercise the path they patch.
+
+    `major_consolidation_sweep._extract` branches on FLOSS_MODEL_BACKEND. Under
+    `omniroute` it never calls `litellm.completion`, so the `patch.object(...,
+    "completion", ...)` in the tests below has no target and the code performs a
+    REAL HTTP request to the local OmniRoute daemon -- in tests whose own names
+    promise no external effects.
+
+    That made results depend on ambient environment rather than on the code:
+    green in CI and in any git worktree (no `.env` there), red in the operator's
+    checkout, where `.env` sets `FLOSS_MODEL_BACKEND=omniroute`. Observed on
+    2026-08-21 as four failures that reproduced only in the real tree.
+
+    Pinning to litellm here is not hiding the omniroute path; it is making these
+    tests deterministic about which path they claim to cover. Coverage for the
+    omniroute branch belongs in a test that sets the variable on purpose.
+    """
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
+
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "docs" / "specs" / "yumeichan-watch-capabilities.schema.json"
 SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke_test_gateway.py"

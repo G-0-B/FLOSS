@@ -382,6 +382,12 @@ def main() -> int:
     to_process = pending_files[:args.limit]
     print(f"\nProcessing batch of {len(to_process)} files using {args.model}...")
 
+    # Files the extractor declined to process this run. They stay pending on
+    # purpose, so they must be collected and reported rather than silently
+    # dropped -- reporting them is the whole point of deferring instead of
+    # staging a skip marker.
+    deferred: list[Path] = []
+
     for file_path in to_process:
         print(f"\nProcessing: {file_path.name}")
         if args.dry_run:
@@ -418,6 +424,12 @@ def main() -> int:
             time.sleep(20)
         else:
             time.sleep(3)
+
+    if deferred:
+        print(f"\n{len(deferred)} file(s) DEFERRED and still pending:")
+        for file_path in deferred:
+            print(f"  - {file_path.name}")
+        print("Re-run with --force-full to process them despite the chunk cap.")
 
     if not args.dry_run:
         print("\nExtraction complete. Review the drafts in docs/knowledge_log/staging/")
