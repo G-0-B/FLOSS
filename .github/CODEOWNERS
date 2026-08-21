@@ -1,0 +1,21 @@
+# Default owner for everything.
+* @kalisam
+
+# Invariant-touching surfaces. These are the "Substrate" blast radius in the
+# consensus gateway's own vocabulary: override forbidden, approval threshold
+# 0.85. A review request here is not a formality.
+/ARF/dnas/                      @kalisam
+/docs/adr/                      @kalisam
+/docs/specs/spec-registry.json  @kalisam
+/.github/                       @kalisam
+
+# Shared-surface manifests. Every one of these is materialized outward into
+# per-harness projections (Claude, Codex, Gemini, Hermes, OpenCode). Editing a
+# projection instead of its manifest is always a mistake; editing a manifest
+# changes what every harness sees.
+/shared-agent-memory-surface.json  @kalisam
+/shared-agent-surface.json         @kalisam
+/shared-ai-roster-surface.json     @kalisam
+/shared-context-surface.json       @kalisam
+/shared-hook-surface.json          @kalisam
+/shared-skill-surface.json         @kalisam
