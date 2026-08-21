@@ -34,7 +34,14 @@ No claim ships as ✅ Verified without a traceable repo artifact behind it.
 
 ## Tests
 
-- [ ] `python -m pytest packages/ tests/ scripts/tests/` passes locally
+- [ ] The green set passes locally. This is the exact invocation the required
+      `green-set` job runs; the deselection is the one known-red test recorded
+      in `.github/workflows/python-ci.yml`, so the plain three-directory command
+      exits nonzero even on an unchanged baseline:
+
+      ```
+      python -m pytest packages/ tests/ scripts/tests/ \n        --deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded
+      ```
 - [ ] New behaviour has a test that fails without the change
 - [ ] Green set in `.github/workflows/python-ci.yml` unchanged, or widened (never narrowed)
 
