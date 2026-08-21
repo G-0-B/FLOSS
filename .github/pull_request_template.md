@@ -40,7 +40,7 @@ No claim ships as ✅ Verified without a traceable repo artifact behind it.
 
 Result:
 
-```
+```text
 <!-- paste the pytest summary line -->
 ```
 

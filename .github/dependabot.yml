@@ -80,9 +80,15 @@ updates:
   # --- Rust ----------------------------------------------------------------
   # ARF/Cargo.toml is the workspace root. The hdi/hdk pins there are EXACT
   # (`=0.7.1` / `=0.6.1`) and deliberate -- see the comment block in that file
-  # and docs/agent-memory/project/holochain-version-line-skew.md. Dependabot
-  # will not move an exact pin, which is the intended behaviour; this entry is
-  # here for the transitive tree, not for the Holochain line.
+  # and docs/agent-memory/project/holochain-version-line-skew.md.
+  #
+  # An earlier version of this comment claimed Dependabot would not move an
+  # exact pin. That was wrong, and it was the load-bearing assumption behind
+  # registering this ecosystem at all. Dependabot treats `=0.7.1` as a target
+  # to update, not as a constraint to respect, and it edits the manifest as
+  # well as the lockfile. The Holochain line skew is exactly the thing those
+  # pins exist to hold still, so the exclusion is explicit below rather than
+  # assumed. This entry is for the transitive tree, not the Holochain line.
   - package-ecosystem: cargo
     directory: "/ARF"
     schedule:
@@ -91,5 +97,10 @@ updates:
     groups:
       arf-cargo:
         patterns: ["*"]
+    ignore:
+      # Held by ADR-tracked version-line decisions, not by the pin syntax.
+      - dependency-name: "hdi"
+      - dependency-name: "hdk"
+      - dependency-name: "holochain_serialized_bytes"
     commit-message:
       prefix: "chore(deps)"

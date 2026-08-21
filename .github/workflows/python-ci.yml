@@ -29,14 +29,19 @@ on:
       - "requirements-ci.txt"
       - "ARF/requirements.txt"
       - ".github/workflows/python-ci.yml"
+  # Deliberately NOT path-filtered, unlike `push` above.
+  #
+  # `green-set` is meant to be a required check. GitHub leaves a required check
+  # PENDING -- not passing -- when its workflow is skipped by path filtering, so
+  # a path filter here would block any PR that happens to touch no Python.
+  # That is not hypothetical: PR #42 (dependabot npm) changes four files, none
+  # of them .py, and would hang forever the moment this check is required.
+  #
+  # The green set runs in ~14s, so running it unconditionally is cheap. If it
+  # ever stops being cheap, gate the expensive STEPS on a path check -- never
+  # the workflow trigger.
   pull_request:
     branches: [ "main" ]
-    paths:
-      - "**/*.py"
-      - "pytest.ini"
-      - "requirements-ci.txt"
-      - "ARF/requirements.txt"
-      - ".github/workflows/python-ci.yml"
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -103,15 +108,24 @@ jobs:
       - name: Install full dependencies (CPU-only torch)
         run: |
           python -m pip install --upgrade pip
-          pip install --extra-index-url https://download.pytorch.org/whl/cpu \
-            -r requirements-ci.txt -r ARF/requirements.txt
+          # torch first, from the CPU index EXCLUSIVELY. `--extra-index-url`
+          # adds a source rather than preferring it, so with that flag pip is
+          # free to pick a newer PyPI build and drag in the whole CUDA stack --
+          # gigabytes, on a job that only needs to run tests.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          # Everything else from PyPI. torch is already satisfied, so the CPU
+          # build installed above is the one that stays.
+          pip install -r requirements-ci.txt -r ARF/requirements.txt
 
       - name: Run full suite
         id: full
         continue-on-error: true
         run: |
+          # Without pipefail the pipeline reports tee's status, so a failing
+          # pytest run would mark this step green. The job stays non-blocking
+          # via continue-on-error above; this only makes the status honest.
+          set -o pipefail
           python -m pytest -q --color=yes --junitxml=pytest-full.xml | tee pytest-full.log
-          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Summarize
         if: always()
