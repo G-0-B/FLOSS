@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-08-19 (PR41 review fixes landed — see Section 0.1b; triage in 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
+**Last refreshed:** 2026-08-21 (branch separation + CI config + PR41 landing — see Section 0.1c. Prior: 2026-08-19 PR41 review fixes, see 0.1b; triage in 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -99,6 +99,75 @@ the branch topology is still the gating step.
 - Cloudflare `Workers Builds: floss` — operator reports it fixed on `main`; the
   Worker has been running ~6 days. No action taken.
 
+### 0.1c Branch separation, CI config, and PR41 landing (2026-08-21)
+
+**What changed structurally.** The preservation spine had been entangled with the
+reconciliation line by `c7c62d0` ("merge: bring the salvage/preservation spine onto the
+reconciled line"), which is what made `feat/preservation-spine` a superset of PR41 and
+unreviewable as a feature. That merge was dropped: the 31 non-merge spine commits were
+cherry-picked onto `origin/main` in an isolated worktree, resolving one conflict in
+`docs/specs/spec-registry.json` by taking main's registry wholesale and adding only the
+three spine entries. Row 0.3 is now resolved.
+
+**Open PRs after this pass:**
+
+| PR | Branch | Files | State |
+|---|---|---|---|
+| **#44** | `chore/github-ci-config` | 34 | green; `green-set` required-ready |
+| **#43** | `feat/preservation-spine-standalone` | 25 | green; the spine as its own feature PR |
+| **#42** | dependabot npm group | 4 | green; open since before this session |
+| **#41** | `reconcile/pr38-salvage-20260817` | 288 | green; now carries `main` + all 11 review fixes |
+
+Suggested order **#44 → #42 → #43 → #41**. #44 first so everything after is gated by a
+real Python check. #43 and #41 overlap on exactly one file (`docs/specs/spec-registry.json`);
+everything else is disjoint — PR41 contains zero `preservation_spine` paths, verified.
+
+**Caveat on gating:** `python-ci.yml` exists only on #44's branch, and GitHub runs
+`pull_request` workflows from the PR head. So #41 and #43 are **not** currently gated by
+it. After #44 merges, both need a merge from `main` to pick the gate up.
+
+**GitHub config findings (PR #44).** `.github/` held exactly two files, and the second
+was `rust-ci.md` — renamed from `.yml` by `593f9e1` (2025-11-15) to put Rust CI "on hold".
+GitHub only loads `.yml`/`.yaml` from that directory, so the rename silently disabled the
+whole workflow for nine months and left a file that reads as documentation. It also ran
+cargo from the repo root, which has no `Cargo.toml`. Restored with the hold made explicit
+and selective: `fmt` runs (verified green), `clippy`/`test`/`sarif` stay `workflow_dispatch`-only.
+
+`pytest.ini` had **never been committed** — the four `--ignore` entries that make the
+suite runnable existed only in the operator's working tree, so a clean checkout hit five
+collection errors and aborted before running a single test. Now committed with each
+ignore naming the import that breaks it. See [[project-ci-green-list-ratchet]] for the
+measured baseline and the green-list contract.
+
+Also: CodeQL query suite is now conditional (`security-extended` on PRs,
+`security-and-quality` on push/schedule) after triage found **1 real finding out of 19**
+on PR41; concurrency groups added (every push previously stacked another full matrix);
+`dependabot.yml` added against 23 open vulns with nothing configured to fix them;
+CODEOWNERS and a PR template that asks for changed-vs-inherited file separation; and 25
+tracked `.pyc` files untracked.
+
+**Two findings the new gate produced on its first runs**, both recorded as memories:
+
+- [[project-jsonschema-format-silent-noop]] — `FormatChecker()` registers no checker for
+  `date-time` without an RFC-3339 backend, so capability `issued_at` validation accepted
+  anything. Passed locally only because `rfc3339-validator` was present transitively.
+- [[project-hash-pins-need-repin-discipline]] — the orient-skill sha256 contract had been
+  red since a kernel-rename commit changed the pinned file without re-pinning.
+
+**Process defect in this session, recorded rather than glossed:** zero agentmemory
+writes, zero work-board entries, and 1 of 29 skills invoked, until the operator asked.
+Zero consensus claims on Module-to-System-class changes. This is a verbatim repeat of
+A.0000000. See [[feedback-record-as-you-go-not-at-the-end]].
+
+**Still needs the operator (cannot be done from the repo):**
+
+1. **Branch protection** on `green-set`, after #44 merges and it runs once on `main`.
+2. **`Workers Builds: floss`** — red on all four PRs including ones touching no worker
+   code. Cloudflare-side build pointed at the repo root, where there is no wrangler
+   config; the only one is `workers/commons-gateway/wrangler.jsonc`. Repoint it or
+   disconnect it.
+3. **Hook-surface split-brain**, see row 0.12.
+
 ### Working-tree state (uncommitted, verified 2026-08-18)
 
 | Repo | Branch | Tracked-modified | Untracked | Note |
@@ -114,7 +183,7 @@ Nothing from this session is committed in either repo.
 |---|---|---|---|---|---|
 | 0.1 | PR41 reconciliation review backlog (~2 months of work) | canon + repo reconciliation | `reconcile/pr38-salvage-20260817`, now 288 files | Codex sessions (`_codex_pr38_*`, `_pr38_*` scratch dirs at workspace root) | **OPEN — the dominant blocker**; 27 inline review comments triaged 2026-08-19, see Section 0.1a |
 | 0.2 | PR38 ADR cleanup / INDEX drift | governance / ADR | merged to `main` 2026-08-19 (`873cc0c`) | operator | **MERGED** — verified harmless to PR41, see conflict note in 0.1a. PR37/PR32/PR30 also merged |
-| 0.3 | `feat/preservation-spine` has no PR | repo topology | FLOSS, HEAD | — | **UNTRACKED BY REVIEW** — superset of PR38+PR41, fully pushed, invisible to review |
+| 0.3 | `feat/preservation-spine` has no PR | repo topology | `feat/preservation-spine-standalone` | Claude Code, 2026-08-21 | **RESOLVED** — split back into **PR #43**, 25 files, green. The entangling merge `c7c62d0` was dropped; the old branch is left untouched |
 | 0.4 | Hook surface: variables + `claude_user` + agentmemory 12 hooks | harness / metaharness | `shared-hook-surface.json` v0.2.0, `scripts/materialize_shared_hook_surface.py` | Claude Code, 2026-08-18 | **DONE, committed** `c2b38be` — 46 tests pass, drift gate clean, reviewed 3-family (unanimous `extend`, mean -0.61) |
 | 0.5 | Voter registry repaired to probed-working models | consensus gateway | `packages/metacoordinator_mcp/voter_registry.json`, `voters.py`, `tests/test_voters.py` | Claude Code, 2026-08-18 | **DONE, committed** `83894e2` — 112 tests pass; see `[[project-omniroute-voter-probe-log]]` |
 | 0.6 | Independence is policy, not enforcement | consensus gateway | `voters.py` roster build | unassigned | **OPEN** — degraded `balanced` (2 voters, 1 surface) voted normally and nothing detected it |
@@ -123,6 +192,9 @@ Nothing from this session is committed in either repo.
 | 0.9 | Session `project` identifiers inconsistent | memory substrate | agentmemory sessions | unassigned | **OPEN** — 18 sessions use three different ids: `C:\~shit`, `~shit`, `kalis` |
 | 0.10 | Workspace + FLOSS both dirty, nothing committed | repo hygiene | both repos | Claude Code | **RESOLVED for tracked files** 2026-08-19 — 3 + 8 commits; untracked scratch dirs remain |
 | 0.11 | `context` + `agent-surface` materializer steps drifting | harness surfaces | `.agent-surface/context/CONTEXT_L1.md`, `context-view-registry.json` | pre-existing, predates 2026-08-18 | **OPEN** — `--check` reports DRIFT on 2 of 6 steps |
+| 0.12 | Hook surface split-brain: live projections are v0.2.0, FLOSS working tree is v0.1.0 | harness surfaces | `C:\~shit\FLOSS` checked out on `feat/preservation-spine` | Claude Code, found 2026-08-21 | **OPEN — armed footgun.** Running `refresh_agent_surfaces.py` *without* `--check` from that tree regresses `~/.claude/settings.json`, `.gemini/settings.json`, `.codex/hooks.json` and the hermes config back to v0.1.0, wiping the 12 agentmemory hooks and the `claude_user` target. The v0.2.0 manifest is now reachable on PR41's branch, so it is recoverable rather than stranded; the tree still needs to move off `feat/preservation-spine` |
+| 0.13 | `jsonschema` undeclared in `ARF/requirements.txt` | dependencies / validation | `ARF/requirements.txt` | unassigned | **OPEN** — `scripts/` and `packages/` import it. Runtime carries the same silent-no-op exposure that [[project-jsonschema-format-silent-noop]] fixed for CI |
+| 0.14 | Session recorded nothing durable until asked | process | this work board, `docs/agent-memory/` | Claude Code, 2026-08-21 | **CORRECTED same session** — 4 memories written, this section added. Root cause and the standing rule in [[feedback-record-as-you-go-not-at-the-end]] |
 
 **On row 0.7 (recorded so nobody retries it blind):** the documented fix
 `POST /agentmemory/migrate {"step":"infer-memory-projects"}` was run and returned
