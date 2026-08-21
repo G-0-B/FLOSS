@@ -15,7 +15,15 @@ pytest-asyncio>=0.21.0
 
 blake3>=1.0.8
 jcs>=0.2.1
-jsonschema>=4.23.0
+# The `format-nongpl` extra is load-bearing, not cosmetic. jsonschema's
+# FormatChecker only validates `date-time` if an RFC-3339 backend is
+# installed; with bare jsonschema the check is a silent no-op. That made
+# tests/test_pr38_review_cleanup.py::test_capability_schema_rejects_malformed_issued_at
+# pass locally (rfc3339-validator was present transitively) and fail in CI.
+# The test is right: without this extra, capability `issued_at` validation
+# accepts anything. `format-nongpl` rather than `format` avoids pulling the
+# GPL-licensed rfc3987 while still providing the RFC-3339 backend.
+jsonschema[format-nongpl]>=4.23.0
 litellm
 mcp
 pynacl>=1.6.0
