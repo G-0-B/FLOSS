@@ -121,7 +121,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -354,12 +354,25 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
             duration_seconds=round(duration, 3),
             error=embed_err,
         )
-    except (
-        urllib.error.URLError,
-        RuntimeError,
-        json.JSONDecodeError,
-        TimeoutError,
-    ) as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate, see below
+        # Catch EVERYTHING. This function's contract, stated in its own
+        # docstring, is that it never raises: one voter failing must degrade to
+        # an errored VoterResponse so the other voters' answers still count.
+        #
+        # The previous tuple (URLError, RuntimeError, JSONDecodeError,
+        # TimeoutError) did not hold that contract. Provider clients raise their
+        # own types -- httpx.ConnectError, LiteLLM's API exception classes,
+        # ssl.SSLError, bare OSError -- and none of those are subclasses of the
+        # four listed. Such an exception propagated out of `fut.result()` in
+        # dispatch_parallel and aborted the entire synthesis, so a single
+        # transient provider hiccup discarded every other voter's work. Provider
+        # 404s and timeouts are routine on this stack, so this was not a rare
+        # path.
+        #
+        # Naming provider exception types explicitly is not an option worth
+        # taking: it would make this module import-depend on every transport's
+        # client library, and the next new provider would silently reintroduce
+        # the same bug. A voter boundary is exactly where a broad catch belongs.
         duration = time.perf_counter() - started
         return VoterResponse(
             voter_id=voter["voter_id"],
@@ -454,7 +467,6 @@ def greedy_cluster(
     n = len(responses)
     assignments: dict[str, int] = {}
     next_cluster_id = 0
-    voter_to_idx = {r.voter_id: i for i, r in enumerate(responses)}
 
     for i, r in enumerate(responses):
         if r.voter_id in assignments:
@@ -615,7 +627,7 @@ def write_synthesis(
             lines.append("## Named dissent (passed coherence guard)")
             for v_id in tier_class.minority_coherent_voters:
                 v = voter_by_id[v_id]
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"**{v.voter_id} / {v.family}:**")
                 lines.append(f"> {v.response}")
         elif minority_voters:

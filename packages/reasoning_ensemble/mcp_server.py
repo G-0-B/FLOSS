@@ -109,8 +109,42 @@ from pathlib import Path
 # Allow running both as a module and as a CLI script
 _THIS_DIR = Path(__file__).resolve().parent
 _WORKSPACE_ROOT = _THIS_DIR.parents[2]
+_REPO_ROOT = _THIS_DIR.parent.parent
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
+
+
+def _load_repo_env() -> None:
+    """Load repo-local `.env` so MCP-launched servers see provider credentials.
+
+    The consensus server has done this since it was written; this one did not,
+    and the asymmetry was invisible until it mattered. `start_mcp_daemons.ps1`
+    sets only PYTHONPATH, so when this server is launched that way the provider
+    keys that live in `.env` are simply absent from its environment. Every
+    online voter then looks unavailable, `resolve_default_voter_specs(...,
+    include_unavailable=False)` filters them out, and the ensemble silently
+    deliberates with a smaller pool than the profile asked for -- the exact
+    "degraded roster votes anyway" failure the voter registry's independence
+    rule exists to prevent.
+
+    Deliberately `override=False`: a variable already set in the real
+    environment wins over the file, so an operator can still pin a backend or
+    key for one run without editing `.env`.
+    """
+    env_path = Path(os.environ.get("FLOSS_ENV_PATH", _REPO_ROOT / ".env")).expanduser()
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ImportError as exc:
+        raise RuntimeError(
+            "python-dotenv is required to load repo credentials from "
+            f"{env_path}. Install python-dotenv or remove the env file override."
+        ) from exc
+    load_dotenv(env_path, override=False)
+
+
+_load_repo_env()
 
 try:
     from FLOSS.packages.reasoning_ensemble.router import classify as router_classify

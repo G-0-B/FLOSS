@@ -204,6 +204,29 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
                 f"{rel}: reuse evidence stale ({age}d > {window}d window) — "
                 f"re-run the scan"
             )
+    if tier == 2 and rel not in REVIEWER_GRANDFATHERED:
+        # ADR-18 / reuse-gate.spec.md require an INDEPENDENT reuse review for
+        # every tier-2 entry, not only for compose/build. Nothing enforced it,
+        # and the registry demonstrated the bypass: the one entry carrying a
+        # reuse block had `"reviewer": "pending first reuse-review poll..."`
+        # while run_check reported 0 reuse violations. A placeholder that
+        # satisfies a gate is worse than an empty field, because it reads as
+        # done.
+        reviewer = str(reuse.get("reviewer") or "").strip()
+        if not reviewer:
+            fails.append(
+                f"{rel}: tier 2 requires an independent reuse review "
+                f"(`reuse.reviewer`), ADR-18"
+            )
+        elif any(
+            marker in reviewer.lower()
+            for marker in ("pending", "tbd", "todo", "not_reviewed", "placeholder")
+        ):
+            fails.append(
+                f"{rel}: tier 2 `reuse.reviewer` is a placeholder ({reviewer!r}); "
+                f"run the reuse-review poll (>=3 provider surfaces, >=4 model "
+                f"families) and record its outcome, ADR-18"
+            )
     if tier == 2 and verdict in ("compose", "build"):
         candidates = reuse.get("candidates") or []
         probed = [
@@ -219,6 +242,26 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
                 f"(anti-gaming, ADR-18)"
             )
     return fails, []
+
+
+# Entries that predate reviewer enforcement (added 2026-08-21 after PR41 review
+# found the requirement stated but unchecked). Fail-closed for everything NEW,
+# grandfathered here for what already existed -- the same ratchet the CI green
+# set uses. This list only ever shrinks.
+#
+# A first reuse-review poll WAS attempted for this entry on 2026-08-21 (claim
+# 01a02666-ad63-71db-a187-4968e67699fa, profile-equivalent 4 surfaces / 4
+# families). It came back REJECTED, mean -0.5375, variance 0.0092 -- but all
+# four voters rejected on the same procedural ground, an empty evidence list,
+# and none engaged the substantive verdict question. A governed SpecChange needs
+# provenance packets, which the claim did not carry. That is a valid negative on
+# procedure, not a reuse review, so it is NOT recorded as one.
+#
+# To clear this entry: re-run the poll with provenance evidence attached, then
+# record the outcome in `reuse.reviewer` and delete the line below.
+REVIEWER_GRANDFATHERED = {
+    "FLOSS/docs/specs/reuse-gate.spec.md",
+}
 
 
 def run_check() -> int:
