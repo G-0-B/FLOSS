@@ -33,7 +33,6 @@ def _pid_alive(pid: int) -> bool:
         return False
     if sys.platform == "win32":
         import ctypes
-        from ctypes import wintypes
 
         # PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         kernel32 = ctypes.windll.kernel32

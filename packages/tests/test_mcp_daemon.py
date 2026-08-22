@@ -54,9 +54,7 @@ def test_audit_appender_best_effort_no_crash(tmp_path):
     """audit_appender must never raise — audit is defense-in-depth, not fatal."""
     from packages import mcp_daemon
 
-    # Point sink at a path that can't be created (under a file, not a dir)
-    sink = tmp_path / "not_a_dir"  # missing_ok but parent exists — try impossible path
-    # Make parent a file to trigger OSError
+    # Make the parent a FILE so the sink path cannot be created at all.
     blocker = tmp_path / "blocker"
     blocker.write_text("x")
     impossible_sink = blocker / "audit.jsonl"  # blocker is a file, not a dir
