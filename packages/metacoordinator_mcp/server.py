@@ -133,7 +133,33 @@ Invariants you MUST honor when using these tools:
   requiring human resolution, not more votes.
 """
 
-_AUDIT_SINK = "C:/~shit/.agent-surface/heartbeat/janus-consensus-audit.jsonl"
+_WORKSPACE_ROOT = _REPO_ROOT.parent
+
+
+def _audit_sink_path(filename: str) -> str:
+    """Resolve the audit sink against the workspace, not a hardcoded absolute.
+
+    This was the literal string "C:/~shit/.agent-surface/heartbeat/...". From
+    any other checkout the audited calls landed outside that checkout's own
+    advertised `.agent-surface` trail; on POSIX the Windows-looking value is not
+    absolute at all, so it created a literal `C:/~shit/...` subtree under
+    whatever the process working directory happened to be.
+
+    An audit trail that writes somewhere other than where the operator is told
+    to look is worse than none -- it reads as present.
+
+    Override with FLOSS_AUDIT_DIR when the trail belongs elsewhere.
+    """
+    override = os.environ.get("FLOSS_AUDIT_DIR")
+    base = (
+        Path(override).expanduser()
+        if override
+        else _WORKSPACE_ROOT / ".agent-surface" / "heartbeat"
+    )
+    return str(base / filename)
+
+
+_AUDIT_SINK = _audit_sink_path("janus-consensus-audit.jsonl")
 
 
 def _create_mcp():

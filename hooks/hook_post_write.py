@@ -135,6 +135,39 @@ def is_substantive(path_str: str) -> bool:
     return False
 
 
+# Surface -> (proposal_type, blast_radius).
+#
+# Before this, EVERY substantive write was submitted as a CodeChange at Local.
+# Local's approve threshold is 0.30; Module is 0.50 and System 0.60. So once the
+# 2026-08-10 audit widened the hook to include canon surfaces, an ADR or a spec
+# edit became eligible for approval at the routine-code-change bar -- a
+# governance outcome that reads as legitimate and is not.
+#
+# Deliberately NOT mapping anything to Substrate. Substrate is override-forbidden
+# at 0.85 and is for invariant-touching changes; assigning it by path alone would
+# be a guess with a very expensive failure mode.
+CANON_CLAIM_CLASS: tuple[tuple[str, str, str], ...] = (
+    ("/docs/adr/", "AdrChange", "System"),
+    ("/docs/governance/", "SpecChange", "System"),
+    ("/docs/specs/", "SpecChange", "Module"),
+)
+GOVERNED_TYPES = frozenset({"SpecChange", "ConfigChange", "AdrChange"})
+GOVERNED_RADII = frozenset({"System", "Substrate"})
+
+
+def classify_change(path_str: str) -> tuple[str, str]:
+    """Return (proposal_type, blast_radius) for a written path.
+
+    Code keeps CodeChange/Local. Canon surfaces get the class their content
+    actually is, so the gateway applies the threshold that matches the risk.
+    """
+    norm = "/" + (path_str or "").replace("\\", "/").lstrip("/").lower()
+    for segment, proposal_type, radius in CANON_CLAIM_CLASS:
+        if segment in norm:
+            return proposal_type, radius
+    return "CodeChange", "Local"
+
+
 def is_mutating_tool(tool_name: str) -> bool:
     """True if the hook fired for a file-modifying tool we want to inspect."""
     return (tool_name or "").strip().lower() in MUTATING_TOOL_NAMES
@@ -444,13 +477,31 @@ def main() -> int:
             f"{type(exc).__name__}: {exc}"
         )
 
+    proposal_type, blast_radius = classify_change(rel_path)
+    if (
+        proposal_type in GOVERNED_TYPES
+        and blast_radius in GOVERNED_RADII
+        and not evidence
+    ):
+        # The gateway fails these closed with E_GOVERNED_PROVENANCE_REQUIRED.
+        # Say so plainly instead of quietly downgrading the radius to make the
+        # submit succeed -- a canon edit approved at the Local 0.30 bar is
+        # exactly the misleading governance outcome this classification exists
+        # to prevent. A refused claim is the correct outcome here.
+        log(
+            f"[hook] {rel_path} is {proposal_type}/{blast_radius} but no "
+            "provenance packet was attached; the gateway will refuse this "
+            "claim (E_GOVERNED_PROVENANCE_REQUIRED). Check the packet failure "
+            "logged above."
+        )
+
     try:
         result_str = gw.submit_claim(
             proposer=f"{surface}-hook",
-            proposal_type="CodeChange",
+            proposal_type=proposal_type,
             summary=summary,
             body=body,
-            blast_radius="Local",
+            blast_radius=blast_radius,
             evidence=evidence,
         )
         result = json.loads(result_str)

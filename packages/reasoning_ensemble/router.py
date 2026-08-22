@@ -147,7 +147,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -628,7 +628,7 @@ def _test_suite() -> int:
     print(f"\n{'=' * 80}")
     print(f"Score: {correct}/{len(cases)} ({100 * correct / len(cases):.0f}%)")
     print(
-        f"Note: classification is probabilistic; treat as calibration aid, not strict test."
+        "Note: classification is probabilistic; treat as calibration aid, not strict test."
     )
     return 0
 

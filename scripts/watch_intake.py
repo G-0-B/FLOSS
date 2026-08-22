@@ -61,6 +61,9 @@ DEFAULT_DEBOUNCE_SECONDS = 1.5
 # stops emitting until process_intake_events.py drains it. Prevents unbounded
 # feedback storms (2026-06-16/17 incident: 1.23M events accumulated).
 MAX_INCOMING_QUEUE_DEPTH = 5000
+
+# Sentinel: a withheld key whose state entry must be removed, not restored.
+_DROP = object()
 RESERVED_AGENT_SURFACE_SUBTREES = {
     ".agent-surface",
     ".agent-surface/events",
@@ -362,6 +365,36 @@ def scan_once(
         )
         return 0
 
+    # Remaining capacity for THIS scan.
+    #
+    # The depth check above runs once, before any emitting. On its own that
+    # bounds the queue only at the moment the scan starts: at depth 4,999 a scan
+    # that discovers 10,000 changes passed the guard and then emitted all of
+    # them, recreating the exact flood the cap exists to prevent. This workspace
+    # has an `incoming.flood-quarantine-20260616-17` directory from one such
+    # event, so it is not hypothetical.
+    #
+    # Budget the emits instead. `_emit_within_budget` returns False once the cap
+    # is reached, and what was withheld is reported rather than dropped silently
+    # -- the files stay on disk and the next scan, after a drain, picks them up.
+    emit_budget = max(0, MAX_INCOMING_QUEUE_DEPTH - queue_depth)
+    withheld = 0
+    # key -> the state entry to restore, or _DROP to remove the key entirely.
+    # Applied just before save_state, NOT during the scan: `current` doubles as
+    # the overlapping-spec dedup guard ("if key in current: continue"), so
+    # mutating it mid-scan makes the same file be re-visited and re-withheld by
+    # the next spec, inflating the counts and the queue.
+    withheld_state: dict[str, Any] = {}
+
+    def _emit_within_budget(**kwargs: Any) -> bool:
+        nonlocal emit_budget, withheld
+        if emit_budget <= 0:
+            withheld += 1
+            return False
+        emit_event(**kwargs)
+        emit_budget -= 1
+        return True
+
     for spec in default_watch_specs(workspace_root):
         for path in iter_domain_files(spec):
             if not should_include(path, workspace_root):
@@ -399,24 +432,34 @@ def scan_once(
             if prior is None:
                 if not had_state and not emit_on_first_scan:
                     continue
-                emit_event(
-                    incoming_dir,
+                if _emit_within_budget(
+                    incoming_dir=incoming_dir,
                     domain=spec.domain,
                     corpus_hint=spec.corpus_hint,
                     event_type="created",
                     payload=info,
-                )
-                emitted += 1
+                ):
+                    emitted += 1
+                else:
+                    # Withheld, so this file must NOT be recorded as seen --
+                    # saved state is what the next scan diffs against. Leaving
+                    # it in would mean the event is never emitted at all,
+                    # turning backpressure into silent loss.
+                    withheld_state[key] = _DROP
                 continue
             if prior != fingerprint:
-                emit_event(
-                    incoming_dir,
+                if _emit_within_budget(
+                    incoming_dir=incoming_dir,
                     domain=spec.domain,
                     corpus_hint=spec.corpus_hint,
                     event_type="modified",
                     payload=info,
-                )
-                emitted += 1
+                ):
+                    emitted += 1
+                else:
+                    # Same reasoning as the created branch: keep the PRIOR
+                    # fingerprint so the next scan still sees a difference.
+                    withheld_state[key] = prior
 
     for abs_path, prior in previous.items():
         if abs_path in current:
@@ -428,8 +471,8 @@ def scan_once(
         # after EXCLUDED_DIR_NAMES landed, all node_modules. Filter here too.
         if not should_include(Path(abs_path), workspace_root):
             continue
-        emit_event(
-            incoming_dir,
+        if _emit_within_budget(
+            incoming_dir=incoming_dir,
             domain=str(prior.get("watch_domain", "other")),
             corpus_hint=str(prior.get("corpus_hint", "reference")),
             event_type="deleted",
@@ -437,8 +480,27 @@ def scan_once(
                 "abs_path": abs_path,
                 "rel_path": prior.get("rel_path"),
             },
+        ):
+            emitted += 1
+        else:
+            # Deletions are inferred from stored state. If a withheld deletion
+            # were allowed to drop out of `current`, the saved state would lose
+            # the path entirely and the deletion would never be reported. Carry
+            # it forward; the next scan finds the file still absent and retries.
+            withheld_state[abs_path] = prior
+
+    for key, restore in withheld_state.items():
+        if restore is _DROP:
+            current.pop(key, None)
+        else:
+            current[key] = restore
+
+    if withheld:
+        print(
+            f"[watch_intake] BACKPRESSURE: emitted {emitted} and withheld "
+            f"{withheld} event(s) to stay within {MAX_INCOMING_QUEUE_DEPTH}; "
+            f"drain with process_intake_events.py and re-scan"
         )
-        emitted += 1
 
     with lock_file(event_root / "locks", "watch-state"):
         save_state(state_path, current)

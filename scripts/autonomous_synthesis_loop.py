@@ -23,7 +23,6 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -407,7 +406,7 @@ def main() -> int:
 
         if "LLM Extraction Failed" in insights:
             if "RateLimitError" in insights or "rate_limit_exceeded" in insights:
-                print(f"Rate limit hit. Waiting 45 seconds before retrying...")
+                print("Rate limit hit. Waiting 45 seconds before retrying...")
                 time.sleep(45)
                 # `force_full` MUST be threaded through the retry. Without it a
                 # --force-full run whose first attempt is rate-limited retries

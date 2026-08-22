@@ -129,3 +129,75 @@ def test_same_family_on_two_surfaces_does_not_count_as_independent(model_index):
 
     assert groq_qwen["family"] == hf_qwen["family"]
     assert groq_qwen["surface"] != hf_qwen["surface"]
+
+
+# ---------------------------------------------------------------------------
+# Runtime rosters. The tests above check the registry FILE; these check the
+# roster that actually votes, which is what credential filtering can degrade.
+# ---------------------------------------------------------------------------
+
+
+def _voters_module():
+    import importlib
+    import sys
+
+    sys.path.insert(0, str(REGISTRY_PATH.parents[2]))
+    return importlib.import_module("packages.metacoordinator_mcp.voters")
+
+
+DEGRADED = {
+    "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+    "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+}
+
+
+def test_a_degraded_runtime_roster_is_refused(monkeypatch):
+    """One surface must not be able to return a confident tally.
+
+    `resolve_default_voter_specs(include_unavailable=False)` drops voters whose
+    credentials are missing, so a compliant profile can arrive at voting time as
+    two voters on a single surface. That exact shape -- `balanced` reduced to
+    two groq voters after cerebras died -- polled normally and nothing caught it.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", DEGRADED)
+
+
+def test_the_refusal_names_what_was_missing(monkeypatch):
+    """An operator has to be able to act on it without reading the source."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        voters.assert_roster_is_independent("balanced", DEGRADED)
+
+    message = str(excinfo.value)
+    assert "groq" in message, "the surfaces actually present must be named"
+    assert voters.ALLOW_DEGRADED_ENV in message, "the escape hatch must be named"
+
+
+def test_a_deliberate_override_is_honoured(monkeypatch):
+    """Proceeding anyway is allowed -- deliberately, never by default."""
+    voters = _voters_module()
+    monkeypatch.setenv(voters.ALLOW_DEGRADED_ENV, "1")
+    voters.assert_roster_is_independent("balanced", DEGRADED)
+
+
+@pytest.mark.parametrize("profile_name", sorted(EXEMPT_PROFILES))
+def test_exempt_profiles_are_not_refused_at_runtime(profile_name, monkeypatch):
+    """The runtime exemptions must match the registry-file exemptions."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    assert profile_name in voters.DEGRADED_OK_PROFILES
+    voters.assert_roster_is_independent(profile_name, DEGRADED)
+
+
+def test_the_full_balanced_profile_passes_at_runtime(monkeypatch):
+    """The guard must not reject a healthy roster."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    _aliases, profiles = voters._load_builtin_registry()
+    voters.assert_roster_is_independent("balanced", dict(profiles["balanced"]))

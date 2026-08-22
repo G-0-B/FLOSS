@@ -6,7 +6,6 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 _THIS_DIR = Path(__file__).parent
@@ -332,7 +331,6 @@ def _run_all() -> int:
     tests = [
         test_parse_weight_accepts_leading_dot_float,
         test_omo_critic_system_keeps_shared_checklist_mandatory,
-        test_omo_momus_system_keeps_shared_checklist_mandatory,
         test_resolve_default_voter_specs_filters_missing_provider_keys,
         test_resolve_default_voter_specs_honors_profile_and_credentials,
         test_roster_override_takes_precedence_over_profile_and_extra,

@@ -832,6 +832,74 @@ def describe_default_roster(profile: str | None = None) -> list[dict[str, str | 
     return described
 
 
+MIN_INDEPENDENT_SURFACES = 3
+MIN_INDEPENDENT_FAMILIES = 4
+ALLOW_DEGRADED_ENV = "FLOSS_ALLOW_DEGRADED_ROSTER"
+
+# Profiles that are intentionally narrow. Mirrors EXEMPT_PROFILES in
+# tests/test_voter_independence.py, which enforces the same rule against the
+# registry FILE. This one enforces it against the roster that actually votes.
+DEGRADED_OK_PROFILES = frozenset({"fast", "mistral", "local"})
+
+
+def _model_index() -> dict[str, dict[str, str]]:
+    """Model id -> {family, surface} from the registry's probe record."""
+    try:
+        raw = json.loads(VOTER_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    index = (raw.get("_probe") or {}).get("verified_working") or {}
+    return {k: v for k, v in index.items() if isinstance(v, dict)}
+
+
+def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None:
+    """Enforce the registry's independence rule on the roster that will vote.
+
+    The registry states the rule and a test checks the file, but the file is not
+    what votes. `resolve_default_voter_specs(include_unavailable=False)` drops
+    voters whose credentials are missing, so a compliant four-surface profile can
+    arrive here as one voter on one surface and still poll normally, returning a
+    confident tally nobody flags.
+
+    That is not hypothetical: `balanced` degraded to two voters BOTH on groq
+    after cerebras died, voted, and nothing detected it -- the incident recorded
+    in the registry's own `independence_rule` note.
+
+    Refusing is the honest failure. A poll that cannot meet its own independence
+    bar has not produced consensus, and reporting one is worse than reporting
+    nothing. Set FLOSS_ALLOW_DEGRADED_ROSTER=1 to proceed deliberately.
+    """
+    if profile in DEGRADED_OK_PROFILES:
+        return
+    if os.environ.get(ALLOW_DEGRADED_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        return
+
+    index = _model_index()
+    if not index:
+        # No probe data to judge against. Do not invent a verdict either way.
+        return
+
+    known = [model for model in resolved.values() if model in index]
+    surfaces = {index[model]["surface"] for model in known}
+    families = {index[model]["family"] for model in known}
+    if (
+        len(surfaces) >= MIN_INDEPENDENT_SURFACES
+        and len(families) >= MIN_INDEPENDENT_FAMILIES
+    ):
+        return
+
+    raise RuntimeError(
+        f"Profile {profile!r} resolved to a roster below its own independence "
+        f"rule: {len(surfaces)} provider surface(s) {sorted(surfaces)} and "
+        f"{len(families)} model family/families {sorted(families)}, against a "
+        f"bar of >={MIN_INDEPENDENT_SURFACES} surfaces and "
+        f">={MIN_INDEPENDENT_FAMILIES} families. Voters resolved: "
+        f"{sorted(resolved)}. Load the missing provider credentials, choose a "
+        f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
+        "accept that the result is not independent consensus."
+    )
+
+
 def build_default_voters(profile: str | None = None) -> list[Voter]:
     """Build the active voter roster from env-aware profile resolution."""
     resolved = resolve_default_voter_specs(profile=profile, include_unavailable=False)
@@ -842,6 +910,7 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
             f"{active_profile!r}. Load provider credentials or configure "
             f"{ROSTER_ENV}/{EXTRA_VOTERS_ENV}."
         )
+    assert_roster_is_independent(_normalize_profile(profile), resolved)
     voters: list[Voter] = []
     for name, model in resolved.items():
         lower_name = name.strip().lower()
