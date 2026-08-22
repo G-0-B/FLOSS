@@ -31,3 +31,11 @@ python-dotenv
 requests>=2.32.0
 websockets>=10.0
 PyYAML>=6.0
+
+# tests/test_shared_agent_surface_mcp.py imports it directly. It was missing
+# here, so the required green-set job failed with ModuleNotFoundError the
+# first time PR41 ran against this file -- green locally because tomlkit was
+# already installed, red on a clean runner. Same shape as the jsonschema
+# format-extras gap: a dependency that only exists by accident on the
+# developer machine.
+tomlkit>=0.13
