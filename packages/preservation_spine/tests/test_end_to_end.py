@@ -92,8 +92,12 @@ def _required_local_deltas(repo: Path) -> _ExpectedLocalDeltas:
     assert (repo / _TRACKED_PATH).read_bytes() == _TRACKED_WORKTREE_CONTENT
     assert _git(repo, "show", f":{_TRACKED_PATH}") == _TRACKED_INDEX_CONTENT
 
-    staged_diff = _git(repo, "diff", "--binary", "--cached")
-    tracked_unstaged_diff = _git(repo, "diff-files", "--binary")
+    # Must mirror git_capture.capture_planes exactly, --full-index included.
+    # Without the flag Git abbreviates the `index` line and the capture records
+    # null blob identities; this expectation is what proves the capture keeps
+    # real provenance, so it has to ask for the same bytes.
+    staged_diff = _git(repo, "diff", "--binary", "--full-index", "--cached")
+    tracked_unstaged_diff = _git(repo, "diff-files", "--binary", "--full-index")
     assert b"diff --git a/staged.txt b/staged.txt\n" in staged_diff
     assert b"+staged content\n" in staged_diff
     assert b"diff --git a/local.txt b/local.txt\n" in tracked_unstaged_diff

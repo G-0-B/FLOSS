@@ -436,7 +436,14 @@ def _sanitize_command(value: object) -> str:
         raise ProjectionValidationError(
             "next_safe_command must not contain remote or absolute paths"
         )
-    if _UNSAFE_COMMAND_RE.search(value):
+    # Match the NORMALIZED form too, not just the raw one.
+    #
+    # Every other guard in this function inspects `normalized`, and
+    # normalization percent-decodes. Checking only `value` here meant an encoded
+    # verb slipped through and was rendered decoded: `git push` was rejected,
+    # `git %70ush` was ACCEPTED and emitted as `git push`. Verified before and
+    # after. The tests never included an encoded verb, so nothing caught it.
+    if _UNSAFE_COMMAND_RE.search(value) or _UNSAFE_COMMAND_RE.search(normalized):
         raise ProjectionValidationError(
             "next_safe_command contains an unsafe or mutating command"
         )

@@ -195,10 +195,18 @@ def snapshot_subject(
         stash=_optional_stash(repo),
         index_sha256=index_digest,
         status=run_git(repo, "status", "--porcelain=v2", "-z", "--ignored"),
+        # --full-index is load-bearing, not cosmetic. Without it Git abbreviates
+        # the `index` line object names to 7 characters, and `_diff_atoms` only
+        # records an id of length 40 or 64 -- so every ordinary text change
+        # captured both blob identities as null. A preservation capsule whose
+        # whole purpose is reconstructable provenance was silently recording
+        # none. Verified against git 2.54: without the flag `blob_before` and
+        # `blob_after` are None; with it they are the real SHAs.
         staged_diff=_diff_with_exclusions(
             repo,
             "diff",
             "--binary",
+            "--full-index",
             "--cached",
             exclude_paths=exclude_paths,
         ),
@@ -206,6 +214,7 @@ def snapshot_subject(
             repo,
             "diff-files",
             "--binary",
+            "--full-index",
             exclude_paths=exclude_paths,
         ),
         tracked_flags=run_git(repo, "ls-files", "-v", "-z"),

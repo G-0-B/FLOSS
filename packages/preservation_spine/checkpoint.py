@@ -659,17 +659,41 @@ def _intent_payload(intent: _PendingAppendIntent) -> dict[str, object]:
 
 
 def _write_pending_intent(path: Path, intent: _PendingAppendIntent) -> None:
+    """Write the append intent, or leave nothing behind.
+
+    A HALF-written intent is not recoverable information, and leaving one on
+    disk wedged the checkpoint permanently: both public entry points call
+    `_recover_pending_append` first, which calls `_read_pending_intent`, which
+    fails the field-set or digest check on a truncated file and raises. From
+    that point `append_checkpoint` and `load_latest_checkpoint` both failed for
+    that path until an operator deleted the file by hand.
+
+    So the intent is all-or-nothing. Any failure between create and verify
+    removes it, and the caller sees the original error rather than a chain
+    frozen by a fragment of one.
+    """
     pending = _intent_path(path)
     payload = canonical_json_bytes(_intent_payload(intent))
     descriptor = _open_exclusive_output_descriptor(pending)
     try:
-        _write_exact_descriptor(descriptor, payload)
-        _fsync_descriptor(descriptor)
-    finally:
-        os.close(descriptor)
-    written = _read_regular_bytes(pending)
-    if written != payload:
-        raise CheckpointIntegrityError("checkpoint append intent verification failed")
+        try:
+            _write_exact_descriptor(descriptor, payload)
+            _fsync_descriptor(descriptor)
+        finally:
+            os.close(descriptor)
+        written = _read_regular_bytes(pending)
+        if written != payload:
+            raise CheckpointIntegrityError(
+                "checkpoint append intent verification failed"
+            )
+    except BaseException:
+        # Best-effort cleanup, including on KeyboardInterrupt: an interrupted
+        # write is exactly the case that used to leave the wedging fragment.
+        try:
+            pending.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def _open_exclusive_output_descriptor(path: Path) -> int:

@@ -216,6 +216,13 @@ def validate_manifest(data: dict) -> list[str]:
     ]
     for atom_id in _duplicates(atom_ids):
         errors.append(f"duplicate atom ID: {atom_id}")
+    # Membership set alongside the list. The list is still needed for duplicate
+    # detection, but every atom reference on every item was tested against it
+    # with `in` -- a linear scan. `inventory_change_universe` creates one atom
+    # and one item per capsule entry, so validation cost grew as O(N^2) in the
+    # number of atoms and dominated `inventory` on large untracked or tracked
+    # planes.
+    atom_id_set = set(atom_ids)
 
     identity_owners: dict[bytes, list[str]] = defaultdict(list)
     for atom in raw_atoms:
@@ -268,7 +275,7 @@ def validate_manifest(data: dict) -> list[str]:
         for ref in _duplicates(valid_refs):
             errors.append(f"{label}.atom_ids repeats atom: {ref}")
         for ref in valid_refs:
-            if ref not in atom_ids:
+            if ref not in atom_id_set:
                 errors.append(f"{label} references missing atom: {ref}")
             owned_by[ref].append(str(item_id))
 
@@ -585,6 +592,50 @@ def _split_diff_header(line: bytes) -> tuple[str, str]:
     if not line.startswith(prefix):
         raise CapsuleVerificationError("diff header is malformed")
     payload = line[len(prefix) :].rstrip(b"\r\n")
+
+    # A quoted pair is unambiguous: Git quotes when core.quotePath applies
+    # (non-ASCII, control characters). Tokenise those normally.
+    if payload.startswith(b'"'):
+        tokens = _split_quoted_header_tokens(payload)
+        if len(tokens) != 2:
+            raise CapsuleVerificationError("diff header is malformed")
+        return _decode_git_path(tokens[0]), _decode_git_path(tokens[1])
+
+    # Unquoted: Git does NOT quote an ordinary space, so `a/a b.txt b/a b.txt`
+    # is a single valid header with four space-separated words. Splitting on
+    # every space produced "diff header is malformed" and, because `capture`
+    # calls `inventory_change_universe` immediately, aborted the entire capture
+    # after leaving a partial state directory behind. That is not a corner
+    # case here: this repository tracks 186 paths containing spaces, so the
+    # spine could not capture the tree it exists to preserve.
+    #
+    # The prefixes disambiguate it. The header is always `a/<path> b/<path>`
+    # with the SAME path on both sides unless it is a rename, and a rename
+    # carries explicit `rename from`/`rename to` lines that the caller already
+    # prefers over this parse. So: find the ` b/` that splits the payload into
+    # two halves whose prefixes are `a/` and `b/`, taking the split that
+    # consumes the whole payload.
+    if not payload.startswith(b"a/"):
+        raise CapsuleVerificationError("diff header is malformed")
+    search_from = 0
+    while True:
+        index = payload.find(b" b/", search_from)
+        if index == -1:
+            raise CapsuleVerificationError("diff header is malformed")
+        before = payload[:index]
+        after = payload[index + 1 :]
+        # Prefer the split where both sides name the same path, which is the
+        # non-rename case and by far the common one. Otherwise accept the first
+        # structurally valid split.
+        if before[2:] == after[2:]:
+            return _decode_git_path(before), _decode_git_path(after)
+        search_from = index + 1
+        if payload.find(b" b/", search_from) == -1:
+            return _decode_git_path(before), _decode_git_path(after)
+
+
+def _split_quoted_header_tokens(payload: bytes) -> list[bytes]:
+    """Tokenise a header whose paths are C-quoted by Git."""
     tokens: list[bytes] = []
     index = 0
     while index < len(payload):
@@ -612,9 +663,23 @@ def _split_diff_header(line: bytes) -> tuple[str, str]:
             while index < len(payload) and payload[index] != ord(" "):
                 index += 1
         tokens.append(payload[start:index])
-    if len(tokens) != 2:
-        raise CapsuleVerificationError("diff header is malformed")
-    return _decode_git_path(tokens[0]), _decode_git_path(tokens[1])
+    return tokens
+
+
+def _trim_unified_header(value: bytes) -> bytes:
+    """Drop the trailing TAB field from a unified-diff `---`/`+++` path.
+
+    The unified diff format allows `<path>TAB<timestamp>`, and Git emits the
+    tab whenever the path would otherwise be ambiguous -- which includes any
+    path containing a space. So `--- a/a b.txt` actually arrives as
+    `--- a/a b.txt` + TAB.
+
+    Leaving it on made `_safe_manifest_path` reject the path as unsafe, because
+    a tab is not printable. That fired only for paths with spaces, which is why
+    it went unseen; this repository tracks 186 of them.
+    """
+    index = value.find(b"\t")
+    return value if index == -1 else value[:index]
 
 
 def _strip_diff_prefix(value: str, prefix: str) -> str | None:
@@ -690,20 +755,27 @@ def _diff_atoms(
                 if match is None:
                     raise CapsuleVerificationError("diff index identity is malformed")
                 old, new, common_mode = match.groups()
-                if len(old) in {40, 64}:
+                # An all-zero id is Git's "this side does not exist" sentinel,
+                # emitted for a binary addition or deletion. It is the right
+                # length, so a length check alone accepted forty zeroes as a
+                # real blob identity and recorded it as provenance. The absent
+                # side must stay null.
+                if len(old) in {40, 64} and set(old) != {ord("0")}:
                     blob_before = old.decode("ascii")
-                if len(new) in {40, 64}:
+                if len(new) in {40, 64} and set(new) != {ord("0")}:
                     blob_after = new.decode("ascii")
                 if common_mode is not None:
                     mode_before = mode_before or common_mode.decode("ascii")
                     mode_after = mode_after or common_mode.decode("ascii")
             elif stripped.startswith(b"--- "):
                 path_before = _strip_diff_prefix(
-                    _decode_git_path(stripped[len(b"--- ") :]), "a/"
+                    _decode_git_path(_trim_unified_header(stripped[len(b"--- ") :])),
+                    "a/",
                 )
             elif stripped.startswith(b"+++ "):
                 path_after = _strip_diff_prefix(
-                    _decode_git_path(stripped[len(b"+++ ") :]), "b/"
+                    _decode_git_path(_trim_unified_header(stripped[len(b"+++ ") :])),
+                    "b/",
                 )
         if mode_before is not None and not _MODE.fullmatch(mode_before):
             raise CapsuleVerificationError("diff old mode is malformed")
