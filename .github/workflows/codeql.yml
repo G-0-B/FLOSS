@@ -1,5 +1,21 @@
 name: CodeQL
 
+# ---------------------------------------------------------------------------
+# Noise control.
+#
+# The `security-and-quality` query suite is what produces most low-value
+# findings (style, maintainability, "cyclic import" on deliberate lazy imports).
+# It is worth running periodically over the whole tree; it is not worth putting
+# in front of every pull request, where it buries the security findings that
+# actually matter. So:
+#
+#   pull_request        -> `security-extended`  (security only, still broad)
+#   push / schedule     -> `security-and-quality` (full sweep on main)
+#
+# Triage evidence: of 19 CodeQL findings reviewed on PR #41, 1 was a real
+# defect. The rest were quality-suite findings in files the PR merely touched.
+# ---------------------------------------------------------------------------
+
 on:
   push:
     branches: [ "main" ]
@@ -23,10 +39,17 @@ on:
     - cron: "34 17 * * 0"
   workflow_dispatch:
 
+# Without this, every push to a PR branch stacks another full 4-language matrix
+# on top of the still-running one.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     permissions:
       security-events: write
@@ -51,21 +74,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Select query suite
+        id: suite
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "queries=security-extended" >> "$GITHUB_OUTPUT"
+          else
+            echo "queries=security-and-quality" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: +security-and-quality
+          queries: ${{ steps.suite.outputs.queries }}
           config: |
             paths-ignore:
+              # Superseded canonical work. Never product code.
               - archive/**
               - ai-conversations/**
-              - docs/research/intake_raw/**
+              # Prose and raw intake, including any code fenced inside it.
+              - docs/**
+              # Vendored / generated / third-party.
+              - skill-corpus/**
+              - evals/**
               - "**/node_modules/**"
               - "**/target/**"
               - "**/dist/**"
               - "**/build/**"
+              - "**/venv/**"
+              - "**/.venv/**"
               - "**/*.min.js"
 
       - name: Perform CodeQL Analysis

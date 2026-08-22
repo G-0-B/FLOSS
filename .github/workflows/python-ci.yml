@@ -1,0 +1,153 @@
+name: Python CI
+
+# ---------------------------------------------------------------------------
+# Green-list ratchet.
+#
+# The repository is not green end-to-end (see the `full-suite-advisory` job).
+# Rather than either (a) gating on a suite that is red and therefore ignoring
+# the gate forever, or (b) having no Python gate at all, this workflow splits
+# the suite in two:
+#
+#   * `green-set`  -- REQUIRED. Directories proven green on `main`. Blocks merge.
+#   * `full-suite-advisory` -- NOT required. Runs everything, reports, never blocks.
+#
+# When a directory in the advisory job goes green, move it into GREEN_PATHS and
+# it becomes gated from then on. The ratchet only ever tightens.
+#
+# Baseline measured on main @ c1f51ac (2026-08-20):
+#   green-set            346 passed, 1 deselected, ~14s
+#   full suite            77 failed, 459 passed, 7 skipped  (all failures in ARF/,
+#                         plus one in scripts/tests/)
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "**/*.py"
+      - "pytest.ini"
+      - "requirements-ci.txt"
+      - "ARF/requirements.txt"
+      - ".github/workflows/python-ci.yml"
+  # Deliberately NOT path-filtered, unlike `push` above.
+  #
+  # `green-set` is meant to be a required check. GitHub leaves a required check
+  # PENDING -- not passing -- when its workflow is skipped by path filtering, so
+  # a path filter here would block any PR that happens to touch no Python.
+  # That is not hypothetical: PR #42 (dependabot npm) changes four files, none
+  # of them .py, and would hang forever the moment this check is required.
+  #
+  # The green set runs in ~14s, so running it unconditionally is cheap. If it
+  # ever stops being cheap, gate the expensive STEPS on a path check -- never
+  # the workflow trigger.
+  pull_request:
+    branches: [ "main" ]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+# One run per ref. A new push cancels the in-flight run for the same PR, but
+# never cancels a run on `main` or in a merge queue.
+concurrency:
+  group: python-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Directories proven green. Extend this list; do not shrink it.
+  GREEN_PATHS: "packages/ tests/ scripts/tests/"
+  # Known-red tests inside an otherwise-green directory. Each entry needs a
+  # reason on the line above it.
+  #
+  # test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded:
+  #   supersession classification for provenance packets is still being
+  #   reconciled; tracked on the work board, not a CI-config problem.
+  DESELECT: "--deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded"
+
+jobs:
+  green-set:
+    name: Green set (required)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install CI dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+
+      - name: Run green set
+        run: |
+          python -m pytest -q --color=yes ${{ env.GREEN_PATHS }} ${{ env.DESELECT }}
+
+  full-suite-advisory:
+    name: Full suite (advisory, never blocks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            ARF/requirements.txt
+
+      - name: Install full dependencies (CPU-only torch)
+        run: |
+          python -m pip install --upgrade pip
+          # torch first, from the CPU index EXCLUSIVELY. `--extra-index-url`
+          # adds a source rather than preferring it, so with that flag pip is
+          # free to pick a newer PyPI build and drag in the whole CUDA stack --
+          # gigabytes, on a job that only needs to run tests.
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          # Everything else from PyPI. torch is already satisfied, so the CPU
+          # build installed above is the one that stays.
+          pip install -r requirements-ci.txt -r ARF/requirements.txt
+
+      - name: Run full suite
+        id: full
+        continue-on-error: true
+        run: |
+          # Without pipefail the pipeline reports tee's status, so a failing
+          # pytest run would mark this step green. The job stays non-blocking
+          # via continue-on-error above; this only makes the status honest.
+          set -o pipefail
+          python -m pytest -q --color=yes --junitxml=pytest-full.xml | tee pytest-full.log
+
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "### Full Python suite (advisory)"
+            echo ""
+            echo '```'
+            tail -n 40 pytest-full.log 2>/dev/null || echo "no log produced"
+            echo '```'
+            echo ""
+            echo "This job never blocks a merge. Move a directory into \`GREEN_PATHS\`"
+            echo "in \`.github/workflows/python-ci.yml\` once it is green here."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-full-report
+          path: |
+            pytest-full.xml
+            pytest-full.log
+          if-no-files-found: warn
+          retention-days: 14
