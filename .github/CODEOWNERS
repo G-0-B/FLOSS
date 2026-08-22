@@ -1,0 +1,26 @@
+# Default owner for everything.
+* @kalisam
+
+# Invariant-touching surfaces. In the consensus gateway's own vocabulary these
+# are "Substrate" blast radius -- but note what this file does and does not do.
+# CODEOWNERS assigns owners to paths and requests their review. It does not
+# enforce an approval threshold and it does not prevent a bypass; that is branch
+# protection, configured in repository settings, and it is not set up yet. Nor
+# do these rules add an independent reviewer today, since the default rule and
+# every rule below name the same owner. They are here so the paths are declared
+# and so branch protection has something to point at.
+/ARF/dnas/                      @kalisam
+/docs/adr/                      @kalisam
+/docs/specs/spec-registry.json  @kalisam
+/.github/                       @kalisam
+
+# Shared-surface manifests. Every one of these is materialized outward into
+# per-harness projections (Claude, Codex, Gemini, Hermes, OpenCode). Editing a
+# projection instead of its manifest is always a mistake; editing a manifest
+# changes what every harness sees.
+/shared-agent-memory-surface.json  @kalisam
+/shared-agent-surface.json         @kalisam
+/shared-ai-roster-surface.json     @kalisam
+/shared-context-surface.json       @kalisam
+/shared-hook-surface.json          @kalisam
+/shared-skill-surface.json         @kalisam

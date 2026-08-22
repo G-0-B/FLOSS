@@ -1,0 +1,33 @@
+# Dependency set for the REQUIRED `green-set` job in .github/workflows/python-ci.yml.
+#
+# Scope: exactly what `packages/`, `tests/`, and `scripts/tests/` need to import.
+# Deliberately excludes the heavy ML stack (torch, sentence-transformers, numpy)
+# in ARF/requirements.txt -- nothing in the green set touches it, and pulling it
+# in would turn a 15-second gate into a multi-minute one.
+#
+# Note on msgpack: it appears in `import` statements under packages/, but every
+# such import is guarded, and the green set passes with msgpack absent. It is
+# left out on purpose so CI matches the environment the green baseline was
+# measured in. If a hard dependency on it ever lands, add it here.
+
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+blake3>=1.0.8
+jcs>=0.2.1
+# The `format-nongpl` extra is load-bearing, not cosmetic. jsonschema's
+# FormatChecker only validates `date-time` if an RFC-3339 backend is
+# installed; with bare jsonschema the check is a silent no-op. That made
+# tests/test_pr38_review_cleanup.py::test_capability_schema_rejects_malformed_issued_at
+# pass locally (rfc3339-validator was present transitively) and fail in CI.
+# The test is right: without this extra, capability `issued_at` validation
+# accepts anything. `format-nongpl` rather than `format` avoids pulling the
+# GPL-licensed rfc3987 while still providing the RFC-3339 backend.
+jsonschema[format-nongpl]>=4.23.0
+litellm
+mcp
+pynacl>=1.6.0
+python-dotenv
+requests>=2.32.0
+websockets>=10.0
+PyYAML>=6.0

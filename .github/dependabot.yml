@@ -1,0 +1,106 @@
+# Dependabot version updates.
+#
+# Security ALERTS were already on for this repository (23 open on `main` as of
+# 2026-08-20: 9 high, 11 moderate, 3 low) but nothing was configured to actually
+# propose fixes, so the alerts just accumulated.
+#
+# Deliberately conservative so this does not become its own noise source:
+#   * monthly, not daily or weekly
+#   * everything grouped per ecosystem, so one PR per ecosystem per cycle
+#   * low open-PR limits
+#   * `archive/` and `ARF/in.finite-nrg/` manifests are NOT registered -- they
+#     are superseded or pre-migration trees, and updating them means nothing.
+#
+# Security updates are not rate-limited by these settings; they open regardless.
+
+version: 2
+updates:
+  # --- GitHub Actions used by the workflows in this directory ---------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # --- Python --------------------------------------------------------------
+  # Root: the CI dependency set for the required green-set job.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      ci-python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # ARF: the application dependency set, including the ML stack.
+  - package-ecosystem: pip
+    directory: "/ARF"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      arf-python:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # --- JavaScript ----------------------------------------------------------
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      root-npm:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # The Cloudflare commons-gateway worker -- live and serving, so keep it
+  # patched, but grouped so it is one review per cycle.
+  - package-ecosystem: npm
+    directory: "/workers/commons-gateway"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      commons-gateway:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # --- Rust ----------------------------------------------------------------
+  # ARF/Cargo.toml is the workspace root. The hdi/hdk pins there are EXACT
+  # (`=0.7.1` / `=0.6.1`) and deliberate -- see the comment block in that file
+  # and docs/agent-memory/project/holochain-version-line-skew.md.
+  #
+  # An earlier version of this comment claimed Dependabot would not move an
+  # exact pin. That was wrong, and it was the load-bearing assumption behind
+  # registering this ecosystem at all. Dependabot treats `=0.7.1` as a target
+  # to update, not as a constraint to respect, and it edits the manifest as
+  # well as the lockfile. The Holochain line skew is exactly the thing those
+  # pins exist to hold still, so the exclusion is explicit below rather than
+  # assumed. This entry is for the transitive tree, not the Holochain line.
+  - package-ecosystem: cargo
+    directory: "/ARF"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      arf-cargo:
+        patterns: ["*"]
+    ignore:
+      # Held by ADR-tracked version-line decisions, not by the pin syntax.
+      - dependency-name: "hdi"
+      - dependency-name: "hdk"
+      - dependency-name: "holochain_serialized_bytes"
+    commit-message:
+      prefix: "chore(deps)"
