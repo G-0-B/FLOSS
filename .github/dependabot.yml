@@ -28,26 +28,27 @@ updates:
       prefix: "chore(ci)"
 
   # --- Python --------------------------------------------------------------
-  # Root: the CI dependency set for the required green-set job.
+  # ONE entry covering every requirements location, not one per directory.
+  #
+  # Two entries (`/` and `/ARF`) produced two PRs that both edited
+  # ARF/requirements.txt -- #51 and #49 -- so they were guaranteed to conflict,
+  # and whichever merged second would need a manual rebase for no reason. The
+  # root entry already reaches ARF/requirements.txt on its own; `directories`
+  # adds the pwnies file that only the /ARF entry was picking up.
+  #
+  # One group means one PR per cycle across the whole Python surface, which is
+  # also what makes the green-set gate meaningful: the CI set and the app set
+  # move together or not at all.
   - package-ecosystem: pip
-    directory: "/"
+    directories:
+      - "/"
+      - "/ARF"
+      - "/ARF/pwnies"
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
     groups:
-      ci-python:
-        patterns: ["*"]
-    commit-message:
-      prefix: "chore(deps)"
-
-  # ARF: the application dependency set, including the ML stack.
-  - package-ecosystem: pip
-    directory: "/ARF"
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 3
-    groups:
-      arf-python:
+      python:
         patterns: ["*"]
     commit-message:
       prefix: "chore(deps)"
@@ -102,5 +103,24 @@ updates:
       - dependency-name: "hdi"
       - dependency-name: "hdk"
       - dependency-name: "holochain_serialized_bytes"
+      # getrandom is NOT an ordinary dependency of the zomes. Each zome declares
+      # `getrandom = { version = "0.3", features = ["wasm_js"] }` purely to turn
+      # on the wasm backend of the getrandom that hdi/hdk already pull in. It is
+      # a feature-enabling shim, and it only works while it resolves to the SAME
+      # version hdi requires.
+      #
+      # PR #46 bumped it to 0.4 on its own. hdi 0.7.1 still needs 0.3.4, so the
+      # two now coexisted as separate crates, `wasm_js` applied only to 0.4.3,
+      # and 0.3.4 was left with no wasm backend:
+      #
+      #     error[E0425]: cannot find function `inner_u32` in module `backends`
+      #       --> getrandom-0.3.4/src/lib.rs
+      #
+      # Verified by `cargo check --workspace --target wasm32-unknown-unknown`:
+      # clean on origin/main, broken on that PR. Native `cargo check` passes on
+      # both, which is why it looks harmless.
+      #
+      # It moves when the Holochain line moves, not before.
+      - dependency-name: "getrandom"
     commit-message:
       prefix: "chore(deps)"

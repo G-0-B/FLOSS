@@ -84,6 +84,44 @@ jobs:
         working-directory: ${{ env.CARGO_WORKSPACE }}
         run: cargo fmt --all -- --check
 
+  wasm-check:
+    name: Compile check (wasm32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ARF/target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('ARF/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
+
+      - name: Set up Rust toolchain (stable + wasm32)
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c  # `stable` branch head, 2026-08-21
+        with:
+          targets: wasm32-unknown-unknown
+
+      # NOT part of the `clippy`/`test` hold. Those are held because the full
+      # Holochain build and test surface is not expected to pass yet. This is a
+      # type-check of the zomes against the target they actually ship to, and it
+      # is the only thing that can catch a dependency bump breaking the wasm
+      # backend.
+      #
+      # It exists because it was needed: dependabot PR #46 bumped getrandom
+      # 0.3 -> 0.4 and every check on that PR passed -- green set, CodeQL,
+      # semgrep, cargo fmt -- while `cargo check --target wasm32-unknown-unknown`
+      # failed outright. `cargo fmt` does not compile, and clippy and test are
+      # held, so nothing in CI could see it. Native `cargo check` passes too, so
+      # the target matters.
+      - name: Cargo check (wasm32)
+        working-directory: ${{ env.CARGO_WORKSPACE }}
+        run: cargo check --workspace --target wasm32-unknown-unknown
+
   clippy:
     name: Lint (cargo clippy) [HELD -- manual only]
     if: github.event_name == 'workflow_dispatch'
