@@ -409,7 +409,26 @@ def main() -> int:
             if "RateLimitError" in insights or "rate_limit_exceeded" in insights:
                 print(f"Rate limit hit. Waiting 45 seconds before retrying...")
                 time.sleep(45)
-                insights = extract_semantics(file_path, args.model)
+                # `force_full` MUST be threaded through the retry. Without it a
+                # --force-full run whose first attempt is rate-limited retries
+                # WITHOUT the flag, gets DEFERRED:: back, and -- because that is
+                # not "LLM Extraction Failed" -- falls through to stage_draft
+                # below. --commit then records the oversized file as a completed
+                # distillation with nothing extracted: the exact data loss the
+                # deferral path exists to prevent, reached by the retry.
+                insights = extract_semantics(
+                    file_path, args.model, force_full=args.force_full
+                )
+                if insights.startswith(DEFERRED_PREFIX):
+                    # Re-check after the retry. The pre-retry deferral check
+                    # above has already been passed at this point, so without
+                    # this the marker reaches staging.
+                    deferred.append(file_path)
+                    print(
+                        "  DEFERRED after retry (still pending): "
+                        f"{insights[len(DEFERRED_PREFIX):].strip()}"
+                    )
+                    continue
                 if "LLM Extraction Failed" in insights:
                     print(f"Skipping due to persistent LLM error: {insights}")
                     continue

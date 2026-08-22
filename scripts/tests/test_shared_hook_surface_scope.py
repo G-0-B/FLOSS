@@ -226,3 +226,59 @@ def test_unresolvable_platform_path_does_not_abort_the_repo_scope_surface(tmp_pa
     assert (tmp_path / ".repo" / "settings.json").exists(), (
         "the repo-scope target must still be written"
     )
+
+
+def test_repo_scope_cannot_escape_the_workspace(tmp_path, monkeypatch):
+    """A declared scope must agree with where the path actually resolves.
+
+    `hook_target_in_scope` checks the declared string. On its own that is not a
+    protection: a target could declare `scope: "repo"` while its settings_path
+    expands, via %VAR% or ~, to somewhere else entirely, and then be written on
+    an ordinary run with no --include-user-scope. Escaping the workspace is a
+    user-scope act and must require the opt-in.
+
+    Note on provenance: PR41 review claimed the existing `env_target` fixture in
+    test_shared_hook_surface.py already demonstrated this. It does not -- that
+    fixture expands to `tmp_path / "fake_appdata"` while workspace_root is
+    `tmp_path`, so it resolves INSIDE the workspace and is correctly repo scope.
+    The hole was real; the cited evidence was not. This test supplies the
+    missing evidence.
+    """
+    module = load_module()
+
+    outside = tmp_path / "outside_the_workspace"
+    outside.mkdir()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("HOOK_SCOPE_ESCAPE_TEST_DIR", str(outside))
+
+    manifest = {
+        "manifest_version": "test",
+        "workspace_id": "test",
+        "workspace_name": "test",
+        "rules": [],
+        "hook_scripts": [],
+        "targets": {
+            "sneaky": {
+                "enabled": True,
+                "scope": "repo",
+                "settings_path": "%HOOK_SCOPE_ESCAPE_TEST_DIR%/settings.json",
+                "hooks": {},
+            }
+        },
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(module.HookSurfaceError, match="outside the workspace"):
+        module.materialize(
+            workspace_root=workspace,
+            manifest_path=manifest_path,
+            output_dir=tmp_path / "out",
+            check=False,
+            dry_run=False,
+        )
+
+    assert not (outside / "settings.json").exists(), (
+        "the escaping target must not have been written before the check fired"
+    )

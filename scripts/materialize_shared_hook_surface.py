@@ -767,6 +767,42 @@ def apply_yaml_target(
     )
 
 
+def assert_repo_scope_stays_inside(
+    target_name: str,
+    target_cfg: dict[str, Any],
+    target_path: Path,
+    workspace_root: Path,
+) -> None:
+    """A `scope: "repo"` target must resolve inside the workspace.
+
+    `hook_target_in_scope` checks the DECLARED scope. On its own that is not a
+    protection: a target could declare `scope: "repo"` while its
+    `settings_path` expands, via `%VAR%` or `~`, to somewhere else entirely --
+    and then write there on an ordinary run with no `--include-user-scope`.
+    This repository's own test suite contained exactly that shape
+    (`env_target`, repo scope, `%HOOK_SURFACE_TEST_HOME%/settings.json`), which
+    is what proved the gap.
+
+    So the declared scope and the resolved path have to agree. Escaping the
+    workspace is a user-scope act, and user scope needs the opt-in.
+    """
+    if str(target_cfg.get("scope", "")).strip().lower() != "repo":
+        return
+    try:
+        resolved_root = workspace_root.resolve()
+        resolved_target = target_path.resolve()
+    except OSError:  # pragma: no cover -- unresolvable path, let the write fail
+        return
+    if resolved_root == resolved_target or resolved_root in resolved_target.parents:
+        return
+    raise HookSurfaceError(
+        f"Target {target_name!r} declares scope 'repo' but its settings_path "
+        f"resolves to {resolved_target}, outside the workspace "
+        f"{resolved_root}. Writing outside the repository is user scope: "
+        "declare `\"scope\": \"user\"` and pass --include-user-scope."
+    )
+
+
 def hook_target_in_scope(
     target_name: str, target_cfg: dict[str, Any], include_user_scope: bool
 ) -> bool:
@@ -984,6 +1020,7 @@ def materialize(
                 f"Enabled target {target_name!r} must define `settings_path`"
             )
         target_path = resolve_target_path(workspace_root, settings_path)
+        assert_repo_scope_stays_inside(target_name, target_cfg, target_path, workspace_root)
 
         target_format = target_cfg.get("format", "json")
         if target_format not in ("json", "yaml"):

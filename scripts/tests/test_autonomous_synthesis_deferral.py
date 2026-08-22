@@ -134,3 +134,51 @@ def test_force_full_bypasses_the_cap_check(tmp_path):
     assert "not force_full" in source, (
         "the chunk-cap guard must honour force_full, or the flag does nothing"
     )
+
+
+def test_rate_limit_retry_still_defers_an_oversized_file(tmp_path, capsys, monkeypatch):
+    """The deferral path must survive the rate-limit retry.
+
+    The first attempt returns a rate-limit failure; the retry returns the
+    deferral sentinel. Before this was fixed the retry dropped `force_full`,
+    got DEFERRED:: back, and -- because that string is not "LLM Extraction
+    Failed" -- fell through to stage_draft(). A later --commit then recorded the
+    oversized file as a completed distillation with nothing extracted.
+    """
+    module = load_module()
+
+    doc = tmp_path / "oversized.md"
+    doc.write_text("# oversized" + chr(92) + "n", encoding="utf-8")
+
+    calls = []
+
+    def flaky(path, model, force_full=False):
+        calls.append(force_full)
+        if len(calls) == 1:
+            return "LLM Extraction Failed for chunk 1: RateLimitError"
+        return f"{module.DEFERRED_PREFIX}over the chunk cap"
+
+    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: [doc])
+    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
+    monkeypatch.setattr(module, "extract_semantics", flaky)
+
+    def _fail_if_staged(*a, **k):
+        raise AssertionError(
+            "a file deferred on retry must never be staged -- that is the "
+            "silent data loss this whole path exists to prevent"
+        )
+
+    monkeypatch.setattr(module, "stage_draft", _fail_if_staged)
+    monkeypatch.setattr(module.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(
+        sys, "argv", ["autonomous_synthesis_loop.py", "--limit", "1", "--force-full"]
+    )
+
+    assert module.main() == 0
+
+    assert calls == [True, True], (
+        f"force_full must be threaded through the retry; got {calls}"
+    )
+    out = capsys.readouterr().out
+    assert "DEFERRED" in out
+    assert doc.name in out

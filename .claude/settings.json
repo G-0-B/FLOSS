@@ -1,29 +1,11 @@
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python hooks/hook_pre_write.py"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python hooks/hook_post_write.py"
-          }
-        ]
-      }
-    ]
+    "PreToolUse": [],
+    "PostToolUse": [],
+    "SessionStart": []
   },
   "enabledPlugins": {
     "context7-plugin@context7-marketplace": true
-  }
+  },
+  "_hooks_note": "Deliberately EMPTY, matching the `claude` (project) target in FLOSS/shared-hook-surface.json. Claude Code merges user-scope and project-scope hooks -- both fire, it is not most-specific-wins -- so with the `claude_user` target materialized into ~/.claude/settings.json, duplicating the pre/post-write hooks here made every substantive edit run them TWICE and submit duplicate durable Claims to the source chain. This file is a hand-maintained mirror for sessions launched from FLOSS/, not a materializer output, which is how it drifted from the manifest. Keep it in step with the `claude` target by hand, or make it a target."
 }

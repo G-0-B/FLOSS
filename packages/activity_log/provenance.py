@@ -151,7 +151,23 @@ def _acquire_lock(lock_path: Path) -> str:
             with lock_path.open("x", encoding="utf-8") as f:
                 f.write(token)
             return token
-        except FileExistsError:
+        except (FileExistsError, PermissionError):
+            # PermissionError is contention too, on Windows.
+            #
+            # POSIX gives a clean FileExistsError when the lock is held. Windows
+            # does not: while another writer's unlink is in flight the file
+            # enters DELETE_PENDING, and an O_EXCL create against it raises
+            # PermissionError (WinError 5 / errno 13) rather than FileExistsError.
+            # Catching only FileExistsError therefore let that escape and kill
+            # the caller mid-chain, instead of retrying like any other contended
+            # acquire.
+            #
+            # Observed as an intermittent failure of
+            # test_concurrent_first_packet_creation_converges_on_one_identity --
+            # it looked like a chain-integrity flake (two writers both believing
+            # they were genesis) and was in fact this. It reproduced only under
+            # full-suite CPU load on Windows, and never on the Linux CI runner,
+            # which is why the required gate stayed green while local runs did not.
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"timed out acquiring provenance lock {lock_path}")
             time.sleep(0.05)
@@ -162,6 +178,12 @@ def _release_lock(lock_path: Path, token: str) -> None:
         if lock_path.read_text(encoding="utf-8") == token:
             lock_path.unlink(missing_ok=True)
     except FileNotFoundError:
+        pass
+    except PermissionError:
+        # Same Windows sharing semantics as the acquire side: another writer may
+        # hold a transient handle on the lock file. Releasing is best-effort --
+        # a lock we failed to remove is reclaimed by the next acquirer's timeout
+        # rather than by raising here and unwinding a completed chain write.
         pass
 
 
