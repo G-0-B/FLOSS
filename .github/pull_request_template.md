@@ -40,7 +40,8 @@ No claim ships as ✅ Verified without a traceable repo artifact behind it.
       exits nonzero even on an unchanged baseline:
 
       ```
-      python -m pytest packages/ tests/ scripts/tests/ \n        --deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded
+      python -m pytest -q --color=yes packages/ tests/ scripts/tests/ \
+        --deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded
       ```
 - [ ] New behaviour has a test that fails without the change
 - [ ] Green set in `.github/workflows/python-ci.yml` unchanged, or widened (never narrowed)
