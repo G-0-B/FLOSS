@@ -7,6 +7,7 @@ import ctypes
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import secrets
 import stat
@@ -281,6 +282,22 @@ def _locked_directory(path: Path) -> Iterator[Path]:
         os.close(descriptor)
 
 
+# Transient write files: `.{name}.pending-{32 hex}` at the capsule root, created
+# by the atomic-output path and renamed into place on success. The docstring
+# there says a FAILED write deliberately leaves one behind.
+#
+# `_walk_regular_files` excluded only the exact `_SEAL_ARTIFACTS` names, so such
+# a leftover was walked into `checksums.sha256` on the next successful seal --
+# becoming authenticated capsule payload that `verify_checksums` then requires
+# to be present forever. A failed write must not be able to promote itself into
+# the sealed universe.
+_PENDING_OUTPUT_RE = re.compile(r"^\.[^/]+\.pending-[0-9a-f]{32}$")
+
+
+def _is_pending_output(relative: str) -> bool:
+    return _PENDING_OUTPUT_RE.match(relative) is not None
+
+
 def _walk_regular_files(
     root: Path, *, excluded_root_names: frozenset[str] = _SEAL_ARTIFACTS
 ) -> Iterator[Path]:
@@ -319,8 +336,9 @@ def _walk_regular_files(
                 if metadata.st_nlink != 1:
                     raise CapsuleVerificationError("capsule hardlink is not supported")
                 relative = path.relative_to(root).as_posix()
-                if relative not in excluded_root_names:
-                    yield path
+                if relative in excluded_root_names or _is_pending_output(relative):
+                    continue
+                yield path
             else:
                 raise CapsuleVerificationError(
                     "capsule contains an unsupported special file"
