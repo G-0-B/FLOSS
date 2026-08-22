@@ -109,7 +109,7 @@ name = "consent"
 version = "0.1.0"
 dependencies = [
  "consent_integrity",
- "getrandom",
+ "getrandom 0.4.3",
  "hdk",
  "serde",
 ]
@@ -118,11 +118,11 @@ dependencies = [
 name = "consent_integrity"
 version = "0.1.0"
 dependencies = [
- "getrandom",
+ "getrandom 0.4.3",
  "hdi",
  "holochain_serialized_bytes",
  "serde",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -362,10 +362,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
+ "libc",
+ "r-efi 5.3.0",
+ "wasip2",
+]
+
+[[package]]
+name = "getrandom"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
+dependencies = [
+ "cfg-if",
  "js-sys",
  "libc",
- "r-efi",
- "wasip2",
+ "r-efi 6.0.0",
  "wasm-bindgen",
 ]
 
@@ -381,7 +392,7 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df74665942cd911ca26245b3a68c783eef902018d41994e3192660fd9b157e0c"
 dependencies = [
- "getrandom",
+ "getrandom 0.3.4",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
@@ -401,7 +412,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cccd037e53cd05e518f66b839f0a57cda156a55dca0599bb1a4518ec371da801"
 dependencies = [
- "getrandom",
+ "getrandom 0.3.4",
  "hdi",
  "hdk_derive",
  "holo_hash",
@@ -452,7 +463,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -478,7 +489,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bcf25c0d084ff290a8650c2fc82bd4341fc25d0d5f7ffe9af63a2ca9d50d9f0f"
 dependencies = [
- "getrandom",
+ "getrandom 0.3.4",
  "holochain_secure_primitive",
  "holochain_timestamp",
 ]
@@ -506,7 +517,7 @@ dependencies = [
  "serde-transcode",
  "serde_bytes",
  "serde_json",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -551,7 +562,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
- "thiserror 2.0.18",
+ "thiserror",
 ]
 
 [[package]]
@@ -585,7 +596,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "subtle",
- "thiserror 2.0.18",
+ "thiserror",
  "tracing",
 ]
 
@@ -755,6 +766,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
+name = "r-efi"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
 name = "rmp"
 version = "0.8.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -778,7 +795,7 @@ dependencies = [
 name = "rose_forest"
 version = "0.1.0"
 dependencies = [
- "getrandom",
+ "getrandom 0.4.3",
  "hdk",
  "rose_forest_integrity",
  "serde",
@@ -788,7 +805,7 @@ dependencies = [
 name = "rose_forest_integrity"
 version = "0.1.0"
 dependencies = [
- "getrandom",
+ "getrandom 0.4.3",
  "hdi",
  "holochain_serialized_bytes",
  "serde",
@@ -808,12 +825,6 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
-
-[[package]]
-name = "ryu"
-version = "1.0.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "semver"
@@ -871,15 +882,16 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.143"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d401abef1d108fbd9cbaebc3e46611f4b1021f714a0597a71f41ee463f5f4a5a"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
  "indexmap",
  "itoa",
  "memchr",
- "ryu",
  "serde",
+ "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -958,31 +970,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.18",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -1255,3 +1247,9 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "zmij"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
