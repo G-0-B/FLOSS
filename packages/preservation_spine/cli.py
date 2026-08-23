@@ -22,7 +22,12 @@ from .models import (
     canonical_json_bytes,
 )
 from .restore import PlaneRestoreResult, VerificationRecord, restore_and_verify
-from .seal import CapsuleVerificationError, provenance_root, seal_capsule
+from .seal import (
+    CapsuleVerificationError,
+    provenance_root,
+    seal_capsule,
+    verify_checksums,
+)
 
 _CAPSULE_DIRNAME = "capsule"
 _CAPSULE_RECORD = "capsule.json"
@@ -195,6 +200,35 @@ def _handle_verify(args: argparse.Namespace) -> int:
     if latest.phase in _VERIFY_PHASES and verification_path.is_file():
         digest = _verification_digest(verification_path)
         if latest.verification_digest == digest:
+            # Re-verify the capsule BYTES before short-circuiting.
+            #
+            # The digest above covers verification.json only. Changing a sealed
+            # payload file while leaving that record untouched used to take this
+            # shortcut and re-report the old `verification-complete` -- the
+            # verify command itself attesting to a capsule that had changed
+            # since the attestation was made. For a preservation tool that is
+            # the worst possible failure: not missing damage, but certifying it
+            # as absent.
+            try:
+                verify_checksums(state_dir / _CAPSULE_DIRNAME)
+            except CapsuleVerificationError as exc:
+                _emit_json(
+                    {
+                        "phase": "verification-stale",
+                        "status": ResultStatus.BLOCKED.value,
+                        "inventory_eligible": False,
+                        "verification_digest": digest,
+                        "idempotent": False,
+                        "error": str(exc),
+                        "detail": (
+                            "the recorded verification still matches, but the "
+                            "sealed capsule no longer does; re-run verify "
+                            "without reusing the checkpoint"
+                        ),
+                        "next_safe_command": _STATUS_COMMAND,
+                    }
+                )
+                return 1
             existing = _load_verification(state_dir)
             eligible = _verification_inventory_eligible(existing)
             _emit_json(

@@ -305,6 +305,45 @@ def test_blocked_verification_is_repeatable_without_rewriting_evidence(
     ).read_bytes() == verification_before
     assert (state_dir / "checkpoints.jsonl").read_bytes() == checkpoints_before
 
+    # A sealed payload byte changes while verification.json does NOT.
+    #
+    # The idempotent shortcut compared only verification.json's digest, so this
+    # re-reported the old `verification-complete` -- the verify command
+    # attesting to a capsule that had changed since the attestation. For a
+    # preservation tool that is the worst failure available: not missing damage,
+    # but certifying its absence.
+    payloads = [
+        path
+        for path in (state_dir / "capsule").rglob("*")
+        if path.is_file() and path.name not in {"verification.json"}
+    ]
+    assert payloads, "fixture must contain sealed payload files"
+    victim = sorted(payloads)[0]
+    victim.write_bytes(victim.read_bytes() + b"tampered")
+
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "unused-tampered-restore"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 1
+    )
+    tampered = json.loads(capsys.readouterr().out)
+    assert tampered["phase"] == "verification-stale", (
+        "a changed capsule must not be re-attested as verification-complete; "
+        f"got {tampered['phase']!r}"
+    )
+    assert tampered["idempotent"] is False
+    assert tampered["inventory_eligible"] is False
+
+
 
 def test_pass_flow_inventory_render_and_overlap_guards(
     tmp_path: Path,

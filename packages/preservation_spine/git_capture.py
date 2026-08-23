@@ -128,8 +128,31 @@ _REDACTED_DISPOSITION = _PlaneDisposition(
 
 
 def _git_environment() -> dict[str, str]:
-    environment = os.environ.copy()
+    """Environment for read-only capture queries, with Git routing stripped.
+
+    Copying os.environ wholesale let ambient GIT_* routing variables override
+    the repository chosen by `git -C`. Under a Git hook -- which is exactly
+    where a capture is plausibly triggered -- GIT_DIR, GIT_INDEX_FILE and
+    GIT_OBJECT_DIRECTORY are all set. History and index queries would then read
+    a DIFFERENT repository while worktree paths still came from `--repo`,
+    producing a hybrid capsule that claims to preserve the requested source and
+    does not. restore.py already strips these; capture did not.
+
+    Deliberately NOT setting GIT_CONFIG_GLOBAL=/dev/null or
+    GIT_CONFIG_NOSYSTEM the way restore does. Restore builds a clean room and
+    wants Git's behaviour to be independent of the machine. Capture is the
+    opposite: it must read the source checkout AS CONFIGURED, because
+    core.autocrlf, gitattributes and clean/smudge filters are part of what the
+    bytes on disk actually are. Stripping routing is about pointing at the right
+    repository; it is not a licence to reinterpret its contents.
+    """
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
     environment["GIT_OPTIONAL_LOCKS"] = "0"
+    environment["GIT_TERMINAL_PROMPT"] = "0"
     return environment
 
 
@@ -157,6 +180,23 @@ def _optional_stash(repo: Path) -> bytes | None:
     if completed.returncode != 0:
         return None
     return completed.stdout
+
+
+def _shared_index_files(repo: Path) -> list[Path]:
+    """Backing files an index may depend on under `core.splitIndex`.
+
+    With splitIndex enabled, `.git/index` is a stub -- 186 bytes in a two-file
+    repository -- carrying a `link` extension that points at
+    `$GIT_DIR/sharedindex.<oid>`, which holds the actual entries. Copying
+    index.raw on its own therefore preserved a pointer to a file the capsule
+    does not contain, and the staged diff is not a substitute: it does not carry
+    conflict-stage entries or index extensions.
+
+    Returned so they can be copied beside index.raw and restored together.
+    """
+    raw = run_git(repo, "rev-parse", "--path-format=absolute", "--git-dir")
+    git_dir = Path(raw.rstrip(b"\r\n").decode("utf-8", errors="surrogateescape"))
+    return sorted(path for path in git_dir.glob("sharedindex.*") if path.is_file())
 
 
 def _index_path(repo: Path) -> Path:
@@ -707,6 +747,7 @@ def capture_planes(
     local_history_id = _resolved_commit(repo, "HEAD")
     object_format = _storage_object_format(repo)
     index_bytes = _index_path(repo).read_bytes()
+    shared_index_files = _shared_index_files(repo)
     tracked_manifest = _tracked_manifest(repo, tracked_paths, secret_policy)
 
     destination.mkdir(parents=True, exist_ok=False)
@@ -750,12 +791,22 @@ def capture_planes(
         elif plane_id is PlaneId.LOCAL_INDEX:
             plane_root.mkdir()
             (plane_root / "index.raw").write_bytes(index_bytes)
+            # Under core.splitIndex, index.raw is only a link to these.
+            for shared in shared_index_files:
+                (plane_root / shared.name).write_bytes(shared.read_bytes())
             (plane_root / "staged.diff").write_bytes(before.staged_diff)
             _write_json(
                 plane_root / "metadata.json",
                 {
                     **dispositions[plane_id].metadata(),
                     "index_sha256": before.index_sha256,
+                    "shared_index_files": [
+                        {
+                            "name": shared.name,
+                            "sha256": hashlib.sha256(shared.read_bytes()).hexdigest(),
+                        }
+                        for shared in shared_index_files
+                    ],
                     "secret_path_exclusions": list(secret_tracked_paths),
                 },
             )
