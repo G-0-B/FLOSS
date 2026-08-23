@@ -22,6 +22,20 @@ if str(SCRIPTS_DIR) not in sys.path:
 import materialize_shared_agent_surface as mas  # noqa: E402
 
 
+def env_ref(name: str) -> str:
+    """Reference an environment variable the way THIS platform expands it.
+
+    `os.path.expandvars` expands `%VAR%` only on Windows; on POSIX it expands
+    `$VAR` and leaves `%VAR%` as a literal. Tests that set a variable and then
+    referenced it as `%VAR%` therefore passed on Windows and failed on the Linux
+    CI runner with "references undefined environment variable".
+
+    The production manifests keep `%LOCALAPPDATA%` because that target is
+    Windows-only by nature and is skipped elsewhere; these tests are about the
+    expansion mechanism itself, so they have to ask in the local dialect.
+    """
+    return f"%{name}%" if os.name == "nt" else f"${name}"
+
 def test_classify_transport_stdio():
     transport, spec = mas.classify_transport(
         "serena", {"command": "januscope", "args": ["--config", "x.yaml"]}
@@ -350,6 +364,7 @@ def test_codex_rejects_non_table_existing_entry():
 
 import io
 import json
+import os
 
 from ruamel.yaml import YAML
 
@@ -922,7 +937,9 @@ def test_resolve_manifest_path_expands_env_vars(tmp_path, monkeypatch):
     `hermes_user`'s manifest path is `%LOCALAPPDATA%/hermes/config.yaml`.
     """
     monkeypatch.setenv("MAS_TEST_VAR", str(tmp_path / "expanded"))
-    resolved = mas.resolve_manifest_path(tmp_path, "%MAS_TEST_VAR%/hermes/config.yaml")
+    resolved = mas.resolve_manifest_path(
+        tmp_path, env_ref("MAS_TEST_VAR") + "/hermes/config.yaml"
+    )
     assert resolved == (tmp_path / "expanded" / "hermes" / "config.yaml").resolve()
 
 

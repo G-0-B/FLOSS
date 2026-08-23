@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -23,6 +24,20 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "scripts" / "materialize_shared_hook_surface.py"
 
+
+def env_ref(name: str) -> str:
+    """Reference an environment variable the way THIS platform expands it.
+
+    `os.path.expandvars` expands `%VAR%` only on Windows; on POSIX it expands
+    `$VAR` and leaves `%VAR%` as a literal. Tests that set a variable and then
+    referenced it as `%VAR%` therefore passed on Windows and failed on the Linux
+    CI runner with "references undefined environment variable".
+
+    The production manifests keep `%LOCALAPPDATA%` because that target is
+    Windows-only by nature and is skipped elsewhere; these tests are about the
+    expansion mechanism itself, so they have to ask in the local dialect.
+    """
+    return f"%{name}%" if os.name == "nt" else f"${name}"
 
 def load_module():
     scripts_dir = str(REPO_ROOT / "scripts")
@@ -262,7 +277,8 @@ def test_repo_scope_cannot_escape_the_workspace(tmp_path, monkeypatch):
             "sneaky": {
                 "enabled": True,
                 "scope": "repo",
-                "settings_path": "%HOOK_SCOPE_ESCAPE_TEST_DIR%/settings.json",
+                "settings_path": env_ref("HOOK_SCOPE_ESCAPE_TEST_DIR")
+                + "/settings.json",
                 "hooks": {},
             }
         },

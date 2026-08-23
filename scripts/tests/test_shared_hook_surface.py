@@ -12,6 +12,20 @@ import pytest
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
 
+def env_ref(name: str) -> str:
+    """Reference an environment variable the way THIS platform expands it.
+
+    `os.path.expandvars` expands `%VAR%` only on Windows; on POSIX it expands
+    `$VAR` and leaves `%VAR%` as a literal. Tests that set a variable and then
+    referenced it as `%VAR%` therefore passed on Windows and failed on the Linux
+    CI runner with "references undefined environment variable".
+
+    The production manifests keep `%LOCALAPPDATA%` because that target is
+    Windows-only by nature and is skipped elsewhere; these tests are about the
+    expansion mechanism itself, so they have to ask in the local dialect.
+    """
+    return f"%{name}%" if os.name == "nt" else f"${name}"
+
 def load_hook_surface_module():
     if str(FLOSS_ROOT / "scripts") not in sys.path:
         sys.path.insert(0, str(FLOSS_ROOT / "scripts"))
@@ -1043,7 +1057,7 @@ def test_resolve_target_path_expands_defined_env_var(tmp_path, monkeypatch):
 
     monkeypatch.setenv("HOOK_SURFACE_TEST_VAR", str(tmp_path / "expanded"))
     resolved = surface.resolve_target_path(
-        tmp_path, "%HOOK_SURFACE_TEST_VAR%/hermes/config.yaml"
+        tmp_path, env_ref("HOOK_SURFACE_TEST_VAR") + "/hermes/config.yaml"
     )
 
     assert resolved == (tmp_path / "expanded" / "hermes" / "config.yaml").resolve()
@@ -1112,7 +1126,8 @@ def test_materialize_expands_env_var_settings_path_end_to_end(tmp_path, monkeypa
             "env_target": {
                 "enabled": True,
                 "scope": "repo",
-                "settings_path": "%HOOK_SURFACE_TEST_HOME%/settings.json",
+                "settings_path": env_ref("HOOK_SURFACE_TEST_HOME")
+                + "/settings.json",
                 "hooks": {
                     "PreToolUse": [
                         {
@@ -1141,7 +1156,7 @@ def test_materialize_expands_env_var_settings_path_end_to_end(tmp_path, monkeypa
     assert written_path.exists()
     assert any("WROTE" in line and "settings.json" in line for line in results)
     # Must NOT have been written under a literal, unexpanded path.
-    assert not (tmp_path / "%HOOK_SURFACE_TEST_HOME%").exists()
+    assert not (tmp_path / env_ref("HOOK_SURFACE_TEST_HOME")).exists()
 
 
 def test_materialize_reports_refused_for_live_gateway_and_leaves_file_untouched(
