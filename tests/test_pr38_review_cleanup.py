@@ -1017,10 +1017,23 @@ def test_spec_gate_advisory_command_resolves_in_all_worktree_layouts(
     advisory_argument = command_match["add_path"]
     assert advisory_argument == "FLOSS/scripts/advisory_target.py"
 
-    assert spec_gate.run_add(advisory_argument, "advisory target", None) == 0
-    assert spec_gate.run_add("scripts/physical_target.py", "physical target", None) == 0
+    # A tier is now mandatory on --add. Omitting it used to register the entry
+    # as untiered, and _reuse_problems returns immediately for anything not
+    # tier 1 or 2 -- so the omission silently exempted it from ADR-18. This test
+    # is about path resolution across worktree layouts, so it passes tier 1
+    # rather than exercising the exemption.
+    assert spec_gate.run_add(advisory_argument, "advisory target", None, tier=1) == 0
+    assert (
+        spec_gate.run_add(
+            "scripts/physical_target.py", "physical target", None, tier=1
+        )
+        == 0
+    )
+    assert spec_gate.run_add(advisory_argument, "advisory target", None) == 1, (
+        "omitting --tier must be refused, not treated as an exemption"
+    )
     assert spec_gate._normalize(tmp_path / "outside.py") is None
-    assert spec_gate.run_add(str(tmp_path / "outside.py"), "outside", None) == 1
+    assert spec_gate.run_add(str(tmp_path / "outside.py"), "outside", None, tier=1) == 1
 
     entries = json.loads(registry_path.read_text(encoding="utf-8"))["entries"]
     assert set(entries) == {

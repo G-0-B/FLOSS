@@ -34,6 +34,13 @@ def load_hook_post_write_module(tmp_path: Path, monkeypatch):
     module.AGENT_DIR = tmp_path / "agent_dir"
     module.LOG_FILE = module.AGENT_DIR / "hook.log"
     module.PRE_WRITE_CHECKPOINT_DIR = module.AGENT_DIR / "checkpoints" / "pre_write"
+    # The fixtures build their edits under tmp_path/workspace, so REPO_ROOT has
+    # to follow them. `is_substantive` now refuses paths outside REPO_ROOT --
+    # the `claude_user` hook target runs this hook in EVERY Claude project, and
+    # without containment an edit in an unrelated repository was submitted into
+    # FLOSS's durable Claim chain. Pointing REPO_ROOT at the fake workspace
+    # keeps these tests exercising the real predicate rather than bypassing it.
+    module.REPO_ROOT = tmp_path / "workspace"
     return module
 
 

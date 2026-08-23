@@ -35,11 +35,20 @@ SUBSTANTIVE_PATH_SEGMENTS = ("/packages/",)
 SUBSTANTIVE_EXTENSIONS = (".py", ".rs", ".toml")
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
 MUTATING_TOOL_NAMES = {
+    # Claude Code
     "write",
     "edit",
     "multiedit",
+    # Gemini
     "write_file",
     "replace",
+    # Hermes. `patch` is Hermes's own file-editing tool name -- the hook
+    # manifest matches `write_file|patch` for both Hermes events and was
+    # confirmed against tools/file_tools.py -- but it was missing here, so every
+    # Hermes patch returned immediately at is_mutating_tool(): no checkpoint, no
+    # Claim, while `hermes hooks list` reported the hook installed and allowed.
+    # An installed hook that silently does nothing is worse than an absent one.
+    "patch",
 }
 
 

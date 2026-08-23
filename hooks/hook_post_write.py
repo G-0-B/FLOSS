@@ -66,11 +66,20 @@ CANON_EXTENSIONS = (".md", ".json")
 # Even within substantive paths, skip these — they're routine noise.
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
 MUTATING_TOOL_NAMES = {
+    # Claude Code
     "write",
     "edit",
     "multiedit",
+    # Gemini
     "write_file",
     "replace",
+    # Hermes. `patch` is Hermes's own file-editing tool name -- the hook
+    # manifest matches `write_file|patch` for both Hermes events and was
+    # confirmed against tools/file_tools.py -- but it was missing here, so every
+    # Hermes patch returned immediately at is_mutating_tool(): no checkpoint, no
+    # Claim, while `hermes hooks list` reported the hook installed and allowed.
+    # An installed hook that silently does nothing is worse than an absent one.
+    "patch",
 }
 
 
@@ -111,6 +120,32 @@ def finish() -> int:
     return 0
 
 
+def _is_inside_repo(path_str: str) -> bool:
+    """Only edits within THIS checkout may become Claims.
+
+    The `claude_user` hook target installs this hook at user scope, so it runs
+    for every Claude project on the machine -- not just this one. The path
+    predicate matched on segments alone, so editing `/other-project/packages/
+    foo.py` in an unrelated repository was judged substantive and submitted that
+    project's path, plus bounded source snippets, into FLOSS's DURABLE Claim
+    chain, and opened a consensus round on it.
+
+    A permanent, append-only provenance chain is exactly the wrong place to
+    discover a cross-project leak, so containment is checked before anything
+    else. Relative paths resolve against the current directory, which is the
+    project the hook actually fired in.
+    """
+    try:
+        candidate = Path(path_str).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        resolved = candidate.resolve()
+        root = REPO_ROOT.resolve()
+    except (OSError, ValueError):
+        return False
+    return resolved == root or root in resolved.parents
+
+
 def is_substantive(path_str: str) -> bool:
     """True if this edit is worth submitting as a Claim.
 
@@ -120,6 +155,8 @@ def is_substantive(path_str: str) -> bool:
     by SKIP_SEGMENTS and by not matching either rule set.
     """
     if not path_str:
+        return False
+    if not _is_inside_repo(path_str):
         return False
     norm = "/" + path_str.replace("\\", "/").lstrip("/").lower()
     if any(skip in norm for skip in SKIP_SEGMENTS):

@@ -199,7 +199,16 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
         fails.append(f"{rel}: reuse search_date {raw_date!r} is not YYYY-MM-DD")
     else:
         window = int(reuse.get("evidence_window_days", EVIDENCE_WINDOW_DAYS))
-        if age > window:
+        if age < 0:
+            # A future date produces a negative age, which can never exceed the
+            # window until that date arrives -- `2099-01-01` would keep the
+            # evidence classified as fresh for decades. Freshness has to be
+            # bounded on both sides.
+            fails.append(
+                f"{rel}: reuse search_date {raw_date!r} is in the future "
+                f"({-age}d ahead); evidence cannot predate its own search"
+            )
+        elif age > window:
             fails.append(
                 f"{rel}: reuse evidence stale ({age}d > {window}d window) — "
                 f"re-run the scan"
@@ -324,11 +333,26 @@ def run_add(
     if "load_error" in registry:
         print(f"spec-gate: registry unreadable: {registry['load_error']}")
         return 1
+    if tier is None:
+        # Omitting --tier used to register the artifact as untiered, and
+        # _reuse_problems returns immediately for anything not tier 1 or 2 --
+        # so the omission silently exempted the entry from ADR-18 entirely.
+        # 106 of the 107 entries already in the registry are untiered, which is
+        # why `--check` reports 0 reuse violations across the whole surface.
+        #
+        # Fail closed for anything NEW. The existing 106 are not retroactively
+        # broken -- see REUSE_TIER_GRANDFATHERED below -- but nothing else joins
+        # them.
+        print(
+            f"spec-gate: {rel} needs an explicit --tier (1 = evidence record, "
+            "2 = + independent reuse review). ADR-18 has no untiered category; "
+            "an omitted tier is an exemption, not a default."
+        )
+        return 1
     entry: dict = {"spec": spec.strip()}
     if spec_ref:
         entry["spec_ref"] = spec_ref
-    if tier is not None:
-        entry["tier"] = tier
+    entry["tier"] = tier
     registry.setdefault("entries", {})[rel] = entry
     registry["entries"] = dict(sorted(registry["entries"].items()))
     REGISTRY_PATH.write_text(
