@@ -655,8 +655,8 @@ def _require_exact_bool(value: object, field_name: str) -> None:
 
 __all__ = [
     "CORE_CHECK_NAME",
-    "Evidence",
     "PRESERVATION_CHECK_NAME",
+    "Evidence",
     "render_check_summary",
     "render_stop_merge_comment",
 ]

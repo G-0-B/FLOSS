@@ -238,3 +238,108 @@ def test_failed_intent_write_leaves_nothing_behind(tmp_path, monkeypatch):
         "a failed intent write must clean up after itself, or the next "
         "append and the next load both fail forever"
     )
+
+
+# ---------------------------------------------------------------------------
+# Round two: mixed quoted/unquoted headers, and ambient Git routing
+# ---------------------------------------------------------------------------
+
+
+def test_mixed_quoted_and_unquoted_header_parses(repo):
+    """Git quotes each path field on its own merits.
+
+    A rename from an ASCII name to a non-ASCII one emits
+
+        diff --git a/ascii.txt "b/\\303\\251.txt"
+
+    The first fix branched on whether the FIRST field was quoted and handled
+    both the same way, so a mixed header fell into the unquoted path, found no
+    bare " b/" delimiter, and raised "diff header is malformed" -- aborting the
+    capture. The two fields are tokenised independently now.
+    """
+    (repo / "ascii.txt").write_text("hello" + chr(10), encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "base")
+    (repo / "ascii.txt").rename(repo / "é.txt")
+    _git(repo, "add", "-A")
+
+    content = _git(repo, "diff", "--binary", "--full-index", "--cached")
+    assert b'"b/' in content, "fixture must actually produce a mixed header"
+
+    atoms = manifest._diff_atoms(content, PlaneId.LOCAL_INDEX, SOURCE_DIGEST)
+    paths = {(atom["path_before"], atom["path_after"]) for atom in atoms}
+    assert ("ascii.txt", "é.txt") in paths
+
+
+def test_header_shapes_round_trip(repo):
+    """The four shapes that matter, in one place, so a future rewrite has a net."""
+    cases = {
+        "plain.txt": "plain.txt",
+        "a b.txt": "a b.txt",
+        "é.txt": "é.txt",
+    }
+    for name in cases:
+        (repo / name).write_text("a" + chr(10), encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "base")
+    for name in cases:
+        (repo / name).write_text("b" + chr(10), encoding="utf-8")
+    _git(repo, "add", "-A")
+
+    content = _git(repo, "diff", "--binary", "--full-index", "--cached")
+    atoms = manifest._diff_atoms(content, PlaneId.LOCAL_INDEX, SOURCE_DIGEST)
+    got = {atom["path_after"] for atom in atoms}
+    assert got == set(cases), f"expected {set(cases)}, got {got}"
+
+
+def test_capture_ignores_ambient_git_routing(repo, tmp_path, monkeypatch):
+    """A set GIT_DIR must not redirect capture away from --repo.
+
+    Copying os.environ wholesale let GIT_DIR, GIT_INDEX_FILE and
+    GIT_OBJECT_DIRECTORY override the repository chosen by `git -C`. Under a Git
+    hook -- a plausible place to trigger a capture -- all three are set, so
+    history and index queries would read a DIFFERENT repository while worktree
+    paths still came from --repo, yielding a hybrid capsule that claims to
+    preserve the requested source.
+    """
+    from packages.preservation_spine import git_capture
+
+    (repo / "f.txt").write_text("x" + chr(10), encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "base")
+    expected = _git(repo, "rev-parse", "HEAD").decode().strip()
+
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    _git(decoy, "init", "-q")
+    _git(decoy, "config", "user.email", "d@d")
+    _git(decoy, "config", "user.name", "d")
+    (decoy / "other.txt").write_text("y" + chr(10), encoding="utf-8")
+    _git(decoy, "add", "-A")
+    _git(decoy, "commit", "-qm", "decoy")
+    decoy_head = _git(decoy, "rev-parse", "HEAD").decode().strip()
+    assert decoy_head != expected
+
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git" / "index"))
+
+    got = git_capture.run_git(repo, "rev-parse", "HEAD").decode().strip()
+    assert got == expected, (
+        "ambient GIT_DIR redirected the capture: read "
+        f"{got} (decoy {decoy_head}) instead of {expected}"
+    )
+
+
+def test_git_environment_strips_routing_but_keeps_the_rest():
+    from packages.preservation_spine import git_capture
+
+    env = git_capture._git_environment()
+    leaked = [key for key in env if key.upper().startswith("GIT_")]
+    assert sorted(leaked) == ["GIT_OPTIONAL_LOCKS", "GIT_TERMINAL_PROMPT"], (
+        f"unexpected GIT_* variables survived: {leaked}"
+    )
+    assert "GIT_CONFIG_GLOBAL" not in env, (
+        "capture must read the source AS CONFIGURED -- core.autocrlf, "
+        "gitattributes and clean/smudge filters are part of what the bytes are. "
+        "That is restore's clean-room behaviour, not capture's."
+    )

@@ -593,45 +593,75 @@ def _split_diff_header(line: bytes) -> tuple[str, str]:
         raise CapsuleVerificationError("diff header is malformed")
     payload = line[len(prefix) :].rstrip(b"\r\n")
 
-    # A quoted pair is unambiguous: Git quotes when core.quotePath applies
-    # (non-ASCII, control characters). Tokenise those normally.
-    if payload.startswith(b'"'):
-        tokens = _split_quoted_header_tokens(payload)
-        if len(tokens) != 2:
-            raise CapsuleVerificationError("diff header is malformed")
-        return _decode_git_path(tokens[0]), _decode_git_path(tokens[1])
-
-    # Unquoted: Git does NOT quote an ordinary space, so `a/a b.txt b/a b.txt`
-    # is a single valid header with four space-separated words. Splitting on
-    # every space produced "diff header is malformed" and, because `capture`
-    # calls `inventory_change_universe` immediately, aborted the entire capture
-    # after leaving a partial state directory behind. That is not a corner
-    # case here: this repository tracks 186 paths containing spaces, so the
-    # spine could not capture the tree it exists to preserve.
+    # The two path fields are tokenised INDEPENDENTLY, because Git quotes each
+    # side on its own merits. A rename from an ASCII name to a non-ASCII one
+    # emits a mixed header:
     #
-    # The prefixes disambiguate it. The header is always `a/<path> b/<path>`
-    # with the SAME path on both sides unless it is a rename, and a rename
-    # carries explicit `rename from`/`rename to` lines that the caller already
-    # prefers over this parse. So: find the ` b/` that splits the payload into
-    # two halves whose prefixes are `a/` and `b/`, taking the split that
-    # consumes the whole payload.
-    if not payload.startswith(b"a/"):
+    #     diff --git a/ascii.txt "b/\\303\\251.txt"
+    #
+    # An earlier version branched on whether the FIRST field was quoted and then
+    # handled both the same way, so a mixed header fell into the unquoted path,
+    # found no bare " b/" delimiter, and raised "diff header is malformed" --
+    # which aborts the whole capture, since `capture` inventories immediately.
+    before, index = _take_header_field(payload, 0, b"a/")
+    while index < len(payload) and payload[index] == ord(" "):
+        index += 1
+    after, index = _take_header_field(payload, index, b"b/")
+    if index != len(payload):
         raise CapsuleVerificationError("diff header is malformed")
-    search_from = 0
-    while True:
-        index = payload.find(b" b/", search_from)
-        if index == -1:
-            raise CapsuleVerificationError("diff header is malformed")
-        before = payload[:index]
-        after = payload[index + 1 :]
-        # Prefer the split where both sides name the same path, which is the
-        # non-rename case and by far the common one. Otherwise accept the first
-        # structurally valid split.
-        if before[2:] == after[2:]:
-            return _decode_git_path(before), _decode_git_path(after)
-        search_from = index + 1
-        if payload.find(b" b/", search_from) == -1:
-            return _decode_git_path(before), _decode_git_path(after)
+    return _decode_git_path(before), _decode_git_path(after)
+
+
+def _take_header_field(payload: bytes, start: int, prefix: bytes) -> tuple[bytes, int]:
+    """Consume one `a/...` or `b/...` field, quoted or not.
+
+    Quoted is unambiguous. Unquoted is not: Git does NOT quote an ordinary
+    space, so `a/a b.txt b/a b.txt` is one valid header with four words. For the
+    `a/` field the end is found by locating the following ` b/` or ` "b/`
+    delimiter; for the trailing `b/` field it simply runs to the end.
+    """
+    if start >= len(payload):
+        raise CapsuleVerificationError("diff header is malformed")
+    if payload[start] == ord('"'):
+        index = start + 1
+        escaped = False
+        while index < len(payload):
+            current = payload[index]
+            if current == ord('"') and not escaped:
+                return payload[start : index + 1], index + 1
+            escaped = current == ord("\\") and not escaped
+            index += 1
+        raise CapsuleVerificationError("diff header is malformed")
+
+    if not payload[start:].startswith(prefix):
+        raise CapsuleVerificationError("diff header is malformed")
+
+    if prefix == b"b/":
+        return payload[start:], len(payload)
+
+    # Unquoted `a/` field: find the delimiter that begins the `b/` field.
+    # Prefer the split where both sides name the same path -- the non-rename
+    # case, and the common one -- and otherwise take the first structurally
+    # valid split.
+    candidates: list[int] = []
+    for delimiter in (b' "b/', b" b/"):
+        offset = start
+        while True:
+            found = payload.find(delimiter, offset)
+            if found == -1:
+                break
+            candidates.append(found)
+            offset = found + 1
+    if not candidates:
+        raise CapsuleVerificationError("diff header is malformed")
+    for candidate in sorted(candidates):
+        left = payload[start:candidate]
+        right = payload[candidate + 1 :]
+        if right.startswith(b'"'):
+            continue
+        if left[len(prefix) :] == right[len(b"b/") :]:
+            return left, candidate
+    return payload[start : min(candidates)], min(candidates)
 
 
 def _split_quoted_header_tokens(payload: bytes) -> list[bytes]:
