@@ -138,12 +138,28 @@ jobs:
             echo "rust=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Both required jobs below run with `!cancelled()` and fail closed on a
+  # detector that did not succeed. Reason: GitHub reports a job skipped by a
+  # conditional -- including one skipped because a job it `needs` FAILED -- with
+  # a conclusion of Success, and a required check in that state does not block
+  # the merge. (This is the opposite of a workflow skipped by path filtering,
+  # which stays Pending and blocks; the two are easy to conflate.) So without
+  # this, any failure in `changes` -- checkout, the base-ref guard, the diff --
+  # would take both required checks down with it and report both as passing, on
+  # exactly the PRs where detection could not decide.
   fmt:
     name: Format (cargo fmt --check)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: changes
+    if: ${{ !cancelled() }}
     steps:
+      - name: Detector must have succeeded
+        if: needs.changes.result != 'success'
+        run: |
+          echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Set up Rust toolchain (stable + rustfmt)
@@ -166,7 +182,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: changes
+    # See the note on `fmt`: skipped required check == Success == merges.
+    if: ${{ !cancelled() }}
     steps:
+      - name: Detector must have succeeded
+        if: needs.changes.result != 'success'
+        run: |
+          echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Cache cargo registry + build
