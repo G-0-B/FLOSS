@@ -421,7 +421,14 @@ def _atomic_write_fixed(
             raise CapsuleVerificationError(
                 "fixed output pending file cannot be created"
             ) from exc
-        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+        try:
+            stream = os.fdopen(descriptor, "wb", closefd=True)
+        except OSError as exc:
+            os.close(descriptor)
+            raise CapsuleVerificationError(
+                "fixed output pending file cannot be created"
+            ) from exc
+        with stream:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())

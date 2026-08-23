@@ -253,7 +253,7 @@ def _list_bundle_heads(bundle: Path) -> tuple[tuple[str, str], ...]:
             fields = line.decode("ascii", errors="strict").split(" ", 1)
         except UnicodeDecodeError as exc:
             raise CapsuleVerificationError(
-                "history bundle head is not ASCII"
+                "history bundle head is malformed"
             ) from exc
         if len(fields) != 2:
             raise CapsuleVerificationError("history bundle head is malformed")
