@@ -16,7 +16,7 @@ edition = "2021"
 hdi = { workspace = true }
 serde = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
-thiserror = "1.0"
+thiserror = "2.0"
 
 # HDK 0.6 / HDI 0.7 transitively depends on getrandom 0.3.x, which requires
 # the `wasm_js` feature to be enabled for wasm32-unknown-unknown builds.
