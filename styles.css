@@ -470,6 +470,32 @@ p {
   line-height: 1.65;
 }
 
+/* ------------------------------ Evidence key ------------------------------ */
+
+.evidence-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.2rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.evidence-key .eyebrow {
+  margin: 0;
+  color: var(--teal);
+}
+
+.evidence-key strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* ------------------------------ Timeline ------------------------------ */
 
 .timeline {
