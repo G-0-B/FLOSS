@@ -7,7 +7,29 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 RUNNER = Path(__file__).resolve().parents[1] / "scripts" / "refresh_agent_surfaces.py"
+
+# The materializer steps run against the WORKSPACE, which is the parent of this
+# repository -- `.mcp.json`, `.claude/`, `.gemini/` and the OpenCode roster all
+# live there, in a different repository. Tests that actually execute a step
+# therefore need that two-repo layout to exist.
+#
+# CI checks out FLOSS alone, so the parent directory is bare and the ai-roster
+# step fails with `AIRosterError: Missing file: .../.mcp.json`. That is the
+# step behaving correctly on an incomplete workspace, not a regression, so
+# these skip rather than fail. The twelve pure-function and argument-parsing
+# tests in this file are unaffected and still run everywhere.
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+HAS_WORKSPACE = (WORKSPACE_ROOT / ".mcp.json").exists()
+requires_workspace = pytest.mark.skipif(
+    not HAS_WORKSPACE,
+    reason=(
+        f"needs the workspace layout: no .mcp.json at {WORKSPACE_ROOT}. "
+        "Run from a checkout nested inside the FLOSSI0ULLK workspace."
+    ),
+)
 
 
 def run(*args: str) -> subprocess.CompletedProcess:
@@ -51,6 +73,7 @@ def test_only_rejects_unknown_step():
     assert "nope" in (result.stderr + result.stdout)
 
 
+@requires_workspace
 def test_dry_run_only_exits_zero_and_names_the_step():
     """A pure --dry-run run (no --check) always exits 0: materializers report
     their plan without erroring, regardless of whether writes are pending."""
@@ -59,6 +82,7 @@ def test_dry_run_only_exits_zero_and_names_the_step():
     assert "ai-roster" in result.stdout
 
 
+@requires_workspace
 def test_dry_run_only_summary_says_planned_not_clean():
     """Regression test: a --dry-run-only run must not claim to be 'clean'
     when it has pending writes it never applied — it must say 'planned'."""
@@ -67,6 +91,7 @@ def test_dry_run_only_summary_says_planned_not_clean():
     assert "clean" not in result.stdout
 
 
+@requires_workspace
 def test_check_and_dry_run_together_uses_check_semantics():
     """--check takes precedence over --dry-run when both are given.
 
