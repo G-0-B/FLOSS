@@ -96,11 +96,21 @@ jobs:
             echo "rust=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # The predicate must cover everything that can change the BUILD, not
+          # just sources. ARF/.cargo/config.toml carries
+          #     [target.wasm32-unknown-unknown]
+          #     rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
+          # which is the flag that makes the wasm build work at all -- its own
+          # comment records the failure without it. A PR editing only that file
+          # was reported rust=false, so both required checks took their no-op
+          # success path and the gate went green on the single change most
+          # certain to break it. Same for rust-toolchain.toml, the legacy
+          # `.cargo/config`, and `.rustfmt.toml`.
           base="origin/${{ github.base_ref }}"
           git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
           changed=$(git diff --name-only "$base"...HEAD)
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          if echo "$changed" | grep -qE '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)rustfmt\.toml$|\.github/workflows/rust-ci\.yml$'; then
+          if echo "$changed" | grep -qE '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.?rustfmt\.toml$|(^|/)rust-toolchain(\.toml)?$|(^|/)\.cargo/config(\.toml)?$|\.github/workflows/rust-ci\.yml$'; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           else
             echo "rust=false" >> "$GITHUB_OUTPUT"

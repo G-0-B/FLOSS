@@ -36,9 +36,16 @@ updates:
   # root entry already reaches ARF/requirements.txt on its own; `directories`
   # adds the pwnies file that only the /ARF entry was picking up.
   #
-  # One group means one PR per cycle across the whole Python surface, which is
-  # also what makes the green-set gate meaningful: the CI set and the app set
-  # move together or not at all.
+  # The point of one entry is that ONE config owns all three paths, so no two
+  # entries can propose conflicting edits to the same file again. How Dependabot
+  # then shapes the PRs across `directories` -- a single grouped PR, or one per
+  # directory -- I have not verified, and the honest note is that it does not
+  # matter here: either shape is conflict-free, because there is no second entry
+  # to conflict with.
+  #
+  # Review suggested adding `group-by: dependency-name`. Declined: by its own
+  # description that produces one PR PER DEPENDENCY, which is further from the
+  # single-PR-per-cycle intent than the current setting, not closer.
   - package-ecosystem: pip
     directories:
       - "/"
@@ -120,7 +127,12 @@ updates:
       # clean on origin/main, broken on that PR. Native `cargo check` passes on
       # both, which is why it looks harmless.
       #
-      # It moves when the Holochain line moves, not before.
+      # Scoped to the MAJOR jump, not the whole crate. A blanket
+      # `dependency-name: getrandom` would also suppress security updates, and
+      # 0.3.x patch releases are exactly what should still flow: they unify with
+      # what hdi already requires, so they carry no risk of the split above.
+      # Only 0.4+ does.
       - dependency-name: "getrandom"
+        versions: [">=0.4"]
     commit-message:
       prefix: "chore(deps)"
