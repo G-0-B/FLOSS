@@ -637,3 +637,89 @@ def test_capture_cleans_up_output_dir_on_failure(
     )
 
     assert not output.exists(), "output dir must be removed on capture failure"
+
+
+def test_verify_dedupes_restore_verified(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, main_sha, pr_sha = _build_repo(tmp_path)
+    state_dir = tmp_path / "dedupe-state"
+    assert (
+        main(
+            [
+                "capture",
+                "--repo",
+                str(repo),
+                "--remote-main-sha",
+                main_sha,
+                "--pr-head-sha",
+                pr_sha,
+                "--output",
+                str(state_dir),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    captured = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+
+    def pass_verification(capsule: Path, restore: Path, **_: object):
+        record = replace(
+            _verification(remote_main_sha=main_sha, pr_head_sha=pr_sha),
+            provenance_root=captured.capsule_root,
+        )
+        (capsule / "verification.json").write_bytes(canonical_json_bytes(record))
+        return record
+
+    monkeypatch.setattr(cli_module, "restore_and_verify", pass_verification)
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "dedupe-restore"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    first = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+    assert first.completed_actions.count("restore-verified") == 1
+
+    # Miss the digest short-circuit so verify appends again.
+    current = cli_module._load_verification(state_dir)
+    mutated = replace(current, blockers=("repeat-verify",))
+    (state_dir / "capsule" / "verification.json").write_bytes(
+        canonical_json_bytes(mutated)
+    )
+
+    def pass_again(capsule: Path, restore: Path, **_: object):
+        record = replace(mutated, blockers=())
+        (capsule / "verification.json").write_bytes(canonical_json_bytes(record))
+        return record
+
+    monkeypatch.setattr(cli_module, "restore_and_verify", pass_again)
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "dedupe-restore-2"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    second = load_latest_checkpoint(state_dir / "checkpoints.jsonl")
+    assert second.sequence == first.sequence + 1
+    assert second.completed_actions.count("restore-verified") == 1

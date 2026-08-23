@@ -504,10 +504,18 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
             ) from ctypes.WinError()
         try:
             descriptor = msvcrt.open_osfhandle(handle, getattr(os, "O_BINARY", 0))
-        except OSError:
+        except OSError as exc:
             ctypes.windll.kernel32.CloseHandle(handle)
-            raise
-    stream = os.fdopen(descriptor, "r+b", closefd=True)
+            raise CheckpointIntegrityError(
+                "checkpoint file cannot be opened safely"
+            ) from exc
+    try:
+        stream = os.fdopen(descriptor, "r+b", closefd=True)
+    except OSError as exc:
+        os.close(descriptor)
+        raise CheckpointIntegrityError(
+            "checkpoint file cannot be opened safely"
+        ) from exc
     try:
         handle_state = os.fstat(stream.fileno())
         _assert_regular_metadata(handle_state)
@@ -517,6 +525,7 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
                 raise CheckpointIntegrityError(
                     "checkpoint file changed while acquiring append handle"
                 )
+            _fsync_parent_directory(path)
         else:
             before = _validated_file_state(path)
             if _node_identity(before) != _node_identity(handle_state):
@@ -627,6 +636,33 @@ def _fsync_descriptor(fd: int) -> None:
     os.fsync(fd)
 
 
+def _fsync_parent_directory(path: Path) -> None:
+    """Make a create or unlink durable by fsyncing the parent directory.
+
+    POSIX requires a directory fsync after creating or unlinking a name;
+    Windows does not expose an equivalent, so this is a no-op there.
+    """
+
+    if os.name == "nt":
+        return
+    parent = _parent_directory(path)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(parent, flags)
+    except OSError as exc:
+        raise CheckpointIntegrityError(
+            "checkpoint parent directory fsync failed"
+        ) from exc
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise CheckpointIntegrityError(
+            "checkpoint parent directory fsync failed"
+        ) from exc
+    finally:
+        os.close(descriptor)
+
+
 def _intent_path(path: Path) -> Path:
     return path.with_name(_INTENT_NAME_TEMPLATE.format(name=path.name))
 
@@ -686,12 +722,17 @@ def _write_pending_intent(path: Path, intent: _PendingAppendIntent) -> None:
             raise CheckpointIntegrityError(
                 "checkpoint append intent verification failed"
             )
+        _fsync_parent_directory(pending)
     except BaseException:
         # Best-effort cleanup, including on KeyboardInterrupt: an interrupted
         # write is exactly the case that used to leave the wedging fragment.
         try:
             pending.unlink(missing_ok=True)
         except OSError:
+            pass
+        try:
+            _fsync_parent_directory(pending)
+        except Exception:
             pass
         raise
 
@@ -736,9 +777,11 @@ def _open_exclusive_output_descriptor(path: Path) -> int:
         ) from ctypes.WinError()
     try:
         return msvcrt.open_osfhandle(handle, getattr(os, "O_BINARY", 0))
-    except OSError:
+    except OSError as exc:
         ctypes.windll.kernel32.CloseHandle(handle)
-        raise
+        raise CheckpointIntegrityError(
+            "checkpoint append intent cannot be created safely"
+        ) from exc
 
 
 def _write_exact_descriptor(descriptor: int, content: bytes) -> None:
@@ -768,6 +811,7 @@ def _clear_pending_intent(path: Path) -> None:
         raise CheckpointIntegrityError(
             "checkpoint append intent could not be cleared"
         ) from exc
+    _fsync_parent_directory(pending)
 
 
 def _recover_pending_append(path: Path) -> None:
@@ -834,6 +878,7 @@ def _remove_empty_checkpoint_file(path: Path) -> None:
         raise CheckpointIntegrityError(
             "checkpoint recovery could not clear the empty target"
         ) from exc
+    _fsync_parent_directory(path)
 
 
 def _read_pending_intent(path: Path) -> _PendingAppendIntent | None:

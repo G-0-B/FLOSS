@@ -731,3 +731,51 @@ def test_verification_digest_cannot_regress_or_change_once_bound(
 
     with pytest.raises(CheckpointIntegrityError, match=match):
         load_latest_checkpoint(path)
+
+
+def test_parent_directory_is_fsynced_after_create_and_unlink_on_posix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("parent-directory fsync is a POSIX durability step")
+    path = tmp_path / "checkpoints.jsonl"
+    calls: list[str] = []
+    original = checkpoint_module._fsync_parent_directory
+
+    def tracking(target: Path) -> None:
+        calls.append(target.name)
+        original(target)
+
+    monkeypatch.setattr(checkpoint_module, "_fsync_parent_directory", tracking)
+
+    first = _checkpoint()
+    append_checkpoint(path, first)
+
+    assert "checkpoints.jsonl" in calls
+    intent_calls = [
+        name for name in calls if name.endswith(".append-intent.json")
+    ]
+    assert intent_calls, "intent create and unlink must fsync the parent directory"
+    assert calls.count(intent_calls[0]) >= 2
+
+
+def test_fdopen_failure_closes_the_raw_checkpoint_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "checkpoints.jsonl"
+    leaked: dict[str, int] = {}
+
+    def failing_fdopen(fd: int, mode: str = "r", *args: object, **kwargs: object):
+        leaked["fd"] = fd
+        raise OSError("injected fdopen failure")
+
+    monkeypatch.setattr(checkpoint_module.os, "fdopen", failing_fdopen)
+
+    with pytest.raises(CheckpointIntegrityError, match="opened safely|fdopen|checkpoint"):
+        append_checkpoint(path, _checkpoint())
+
+    assert "fd" in leaked
+    with pytest.raises(OSError):
+        os.fstat(leaked["fd"])
