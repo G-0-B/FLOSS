@@ -24,11 +24,21 @@ name: Rust CI
 on:
   push:
     branches: [ "main" ]
+    # Must list every file that can change the BUILD, not just sources, and must
+    # stay in step with the `changes` job's predicate below. A push of only
+    # ARF/.cargo/config.toml -- the file that selects the wasm getrandom backend
+    # -- matched nothing here, so main could take that change with no Rust job
+    # running at all.
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "rustfmt.toml"
+      - "**/rustfmt.toml"
+      - "**/.rustfmt.toml"
+      - "**/rust-toolchain"
+      - "**/rust-toolchain.toml"
+      - "**/.cargo/config"
+      - "**/.cargo/config.toml"
       - ".github/workflows/rust-ci.yml"
   # Deliberately NOT path-filtered, for the same reason python-ci.yml is not --
   # see the comment on its `pull_request` trigger.
@@ -106,11 +116,23 @@ jobs:
           # success path and the gate went green on the single change most
           # certain to break it. Same for rust-toolchain.toml, the legacy
           # `.cargo/config`, and `.rustfmt.toml`.
+          # The checkout above uses fetch-depth: 0, which fetches all history for
+          # all branches, so origin/<base> is already present. No extra fetch --
+          # and deliberately no `|| true` anywhere in here: every failure mode of
+          # this step must fail the job. A masked failure produces rust=false,
+          # which is the answer that SKIPS the required checks.
           base="origin/${{ github.base_ref }}"
-          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
+          git rev-parse --verify --quiet "$base^{commit}" >/dev/null \
+            || { echo "::error::base ref $base not fetched; cannot decide"; exit 1; }
           changed=$(git diff --name-only "$base"...HEAD)
-          echo "changed files:"; echo "$changed" | sed 's/^/  /'
-          if echo "$changed" | grep -qE '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.?rustfmt\.toml$|(^|/)rust-toolchain(\.toml)?$|(^|/)\.cargo/config(\.toml)?$|\.github/workflows/rust-ci\.yml$'; then
+          echo "changed files:"
+          sed 's/^/  /' <<< "$changed"
+          # Not `... | grep -q ...`: grep -q exits at the first match, the writer
+          # upstream of it takes SIGPIPE, and under `set -o pipefail` the whole
+          # pipeline reports non-zero -- so a large diff that DOES contain Rust
+          # changes could select rust=false and skip the required checks. A
+          # here-string has no pipeline and no such race.
+          if grep -Eq '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.?rustfmt\.toml$|(^|/)rust-toolchain(\.toml)?$|(^|/)\.cargo/config(\.toml)?$|\.github/workflows/rust-ci\.yml$' <<< "$changed"; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           else
             echo "rust=false" >> "$GITHUB_OUTPUT"
