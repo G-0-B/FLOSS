@@ -1,5 +1,7 @@
 use holochain::prelude::{AgentPubKey, DnaFile, SerializedBytes, Timestamp};
-use holochain::sweettest::{SweetCell, SweetConductorBatch, SweetDnaFile, SweetZome};
+use holochain::sweettest::{
+    await_consistency, SweetCell, SweetConductorBatch, SweetDnaFile, SweetZome,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -73,6 +75,55 @@ pub struct AssertTripleInput {
     pub predicate: String,
     pub object: String,
     pub confidence: f32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct QueryTriplesInput {
+    pub subject: Option<String>,
+    pub predicate: Option<String>,
+}
+
+impl QueryTriplesInput {
+    pub fn subject(subject: &str) -> Self {
+        Self {
+            subject: Some(subject.into()),
+            predicate: None,
+        }
+    }
+
+    pub fn predicate(predicate: &str) -> Self {
+        Self {
+            subject: None,
+            predicate: Some(predicate.into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TripleResult {
+    pub hash: holochain::prelude::ActionHash,
+    pub subject: String,
+    pub predicate: String,
+    pub object: String,
+    pub confidence: f32,
+    pub author: AgentPubKey,
+    pub created_at: Timestamp,
+}
+
+pub async fn await_two_agent_consistency(app: &TestApp) {
+    await_consistency([&app.alice, &app.bob])
+        .await
+        .expect("both DHT databases must integrate every published op");
+}
+
+pub fn mutated_missing_hash(
+    real: &holochain::prelude::ActionHash,
+) -> holochain::prelude::ActionHash {
+    let mut bytes = real.get_raw_39().to_vec();
+    for byte in &mut bytes[3..35] {
+        *byte ^= 0xa5;
+    }
+    holochain::prelude::ActionHash::from_raw_39(bytes)
 }
 
 impl AssertTripleInput {
