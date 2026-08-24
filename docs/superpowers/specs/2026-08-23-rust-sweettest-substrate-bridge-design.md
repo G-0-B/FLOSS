@@ -1,7 +1,7 @@
 # Rust Sweettest Substrate Bridge Design
 
-**Date:** 2026-08-23  
-**Status:** Approved for implementation  
+**Date:** 2026-08-23
+**Status:** Approved for implementation
 **Truth status:** Specified until the tests execute successfully
 
 ## Purpose
