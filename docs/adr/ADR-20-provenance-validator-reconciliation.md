@@ -1,0 +1,354 @@
+# ADR-20: Provenance Validator Reconciliation — Evidence Vocabulary Drift and Ancestor Supersession
+
+## Status
+Proposed — 2026-08-23. No code change accompanies this ADR; it records the defect
+analysis and the proposed contract correction for review.
+
+## Date
+2026-08-23
+
+## Truth Status
+✅ Verified — both defects are reproduced against the working tree at this head.
+⚠️ Specified — the proposed remedies (D-A1, D-B1, D-B2) are unimplemented.
+
+## Context
+
+The provenance spine has been running in its pilot configuration (Claude hooks plus
+the consensus gateway) since 2026-08-10. It has never landed a single claim.
+
+`$HOME/.floss_agent/hook.log` (576 KB) records the full pilot history. Every hook
+invocation completes: pre-write checkpoints are taken, post-write hashline
+verification returns `VERIFIED`, and a signed provenance packet is created. Every
+subsequent `submit_claim` is then rejected:
+
+```
+[hook] provenance packet EjHrNH9GOJcU8SChlt6yF37FFEUlI5oDByAcIQVGvZEE for packages\mcp_daemon.py
+[hook] submit_claim error for packages\mcp_daemon.py: E_SUBMIT_CLAIM_INVALID_PROVENANCE: E_PROVENANCE_ARTIFACT_HASH_MISMATCH;E_PROVENANCE_EVIDENCE_REF_INVALID
+```
+
+Error tally across the log's lifetime:
+
+| Error | Count |
+|---|---|
+| `E_SUBMIT_CLAIM_INVALID_PROVENANCE` | 54 |
+| `E_PROVENANCE_ARTIFACT_HASH_MISMATCH` | 50 |
+| `E_PROVENANCE_EVIDENCE_REF_INVALID` | 25 |
+| `E_PROVENANCE_PRIOR_NOT_FOUND` | 4 |
+| `E_PROVENANCE_ARTIFACT_MISSING` | 3 |
+
+The rejection rate is 100%. The provenance record for the pilot period is empty not
+because the hooks failed to fire, but because the validator rejected everything they
+produced. This ADR names the two independent causes.
+
+A prior diagnosis in the same session concluded that the hooks were not being
+invoked at all. That conclusion was wrong and is retracted here: it rested on
+looking for `hook.log` under `.agent-surface/` when `hook_post_write.py:43-44`
+places it at `$HOME/.floss_agent/hook.log`.
+
+### Defect A — a third, undocumented evidence-type allow-list
+
+`docs/specs/provenance-packet.spec.md` records the v1.5 D3 widening as applied in
+three places:
+
+> **D3 — evidence-type extension.** `file`, `log`, `activity`, `source_chain`
+> added to the evidence-root vocabulary, in this spec, in
+> `provenance-packet.schema.json`, and in `EVIDENCE_TYPES` in
+> `packages/orchestrator/claim_schema.py`.
+
+All three are correct at this head. `provenance-packet.schema.json` carries the
+ten-value enum, and `claim_schema.EVIDENCE_TYPES` (line 75) carries all ten with an
+explanatory comment citing ADR-19.
+
+A fourth allow-list exists and was not updated, because D3's author did not know it
+was there — `packages/activity_log/provenance.py:564`:
+
+```python
+_EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
+```
+
+This constant is the one `_payload_entry_errors` actually enforces (line 594). A
+packet using any D3 type is schema-valid, passes `claim_schema` validation, and is
+then rejected by `validate_packet` with `E_PROVENANCE_EVIDENCE_REF_INVALID`.
+
+This is the second instance of the same failure mode in this subsystem. The first
+was `spec_gate.GATED_SURFACES`, a hardcoded tuple that had drifted from the
+`gated_surfaces` field in `docs/specs/spec-registry.json` — where the registry field
+turned out to be documentation-only and the tuple was the real authority. In both
+cases a specification was edited, a nearby constant was treated as the
+implementation of that specification, and a second constant elsewhere was the thing
+with actual force.
+
+### Defect B — ancestor hash mismatch is fatal, and supersession is unimplemented
+
+`docs/specs/provenance-packet.spec.md` §Audit Disposition already anticipates the
+staleness problem and resolves it:
+
+> Strict packet validation and operator-facing daily audit are separate views.
+> `validate_packet()` remains strict: if an artifact ref no longer hashes to the
+> packet's recorded `sha256`, the packet is not valid current evidence.
+>
+> Daily Plane A audit MAY classify a strict `E_PROVENANCE_ARTIFACT_HASH_MISMATCH`
+> as `superseded` instead of active `invalid` when the packet is historical
+> evidence for mutable generated outputs or when a newer valid packet from the
+> same agent covers the same claim/artifact surface.
+
+Strict re-hashing of the packet under submission is therefore correct and intended,
+not a defect. Two things around it are not.
+
+**B1 — the supersession view does not exist.** The string `superseded` appears
+nowhere in non-test code under `packages/`. The spec defines three operator-facing
+audit statuses (`valid`, `superseded`, `invalid`); the implementation provides only
+the strict boolean. The escape hatch the spec designed for exactly this situation
+was never built.
+
+**B2 — ancestor packets are held to current-truth standards.** `validate_packet`
+follows the `p` prior chain by default (`_follow_prior: bool = True`, line 672) and
+applies `_artifact_errors` to each ancestor. Lines 756-761:
+
+```python
+    # Ancestor artifacts may legitimately be gone (scratch probes, renames,
+    # relocated intake). Only absence is downgraded; hash mismatch stays fatal.
+    for problem in _artifact_errors(packet, root):
+        if _is_ancestor and problem == "E_PROVENANCE_ARTIFACT_MISSING":
+            warnings.append(problem)
+        else:
+            errors.append(problem)
+```
+
+The asymmetry is deliberate and documented: a missing ancestor artifact is
+downgraded to a warning, a mismatched one stays fatal. The consequence was not
+intended. Editing any file twice permanently invalidates every earlier packet naming
+it, and because those packets remain in the `p` chain, they invalidate every future
+packet from the same agent. The chain does not degrade — it dies at the first
+re-edit and stays dead.
+
+This is why the observed mismatches cluster on `packages/activity_log/provenance.py`
+and `packages/mcp_daemon.py`, the two files edited most often during the pilot. A
+freshly created packet hashes its own artifact correctly; a round-trip probe at this
+head confirms `artifact_ref` → `_resolve_workspace_ref` → `sha256_file` agrees
+exactly, and the workspace roots used by the hook (`REPO_ROOT.parent`) and the
+gateway (`tools.py:408`, `_REPO_ROOT.parent`) both resolve to `C:\~shit`. The fresh
+packet is fine. Its ancestors are what fail it.
+
+The spec's own language argues against the current behaviour: superseded packets
+"are preserved and reported, but they do not satisfy governed-claim evidence
+requirements and must not be treated as current truth." Treating an ancestor's stale
+artifact hash as a fatal error on a descendant's submission is precisely treating a
+superseded packet as current truth — inverted, so that its staleness propagates
+forward rather than being contained.
+
+## Decision
+
+⚠️ Specified — proposed, not implemented. Three changes, separable and independently
+reviewable.
+
+**D-A1 — collapse the evidence-type vocabulary to one authority.** Import the
+evidence-type set in `provenance.py` from a single shared definition rather than
+restating it. `claim_schema.EVIDENCE_TYPES` is the natural home; it is already
+correct, already carries the rationale comment, and is already the set enforced at
+claim-construction time. `_EVIDENCE_REF_TYPES` becomes an alias or is deleted. Any
+future widening then has one edit site, and the spec's "added in three places"
+phrasing becomes "added in one."
+
+**D-B1 — implement the audit disposition view.** Provide the three statuses the spec
+defines. Strict `validate_packet` is unchanged; the audit layer sits above it and
+classifies a strict `E_PROVENANCE_ARTIFACT_HASH_MISMATCH` as `superseded` under the
+two conditions the spec already names — mutable generated outputs, or coverage by a
+newer valid packet from the same agent over the same claim/artifact surface.
+
+**D-B2 — downgrade ancestor hash mismatch to a warning, symmetric with absence.**
+⚠️ Superseded by D-B3 following the adversarial audit below; retained for the
+record. Extend the existing `_is_ancestor` downgrade at line 758 to cover
+`E_PROVENANCE_ARTIFACT_HASH_MISMATCH` alongside `E_PROVENANCE_ARTIFACT_MISSING`. The
+justification is the same one already written in the comment above it and now
+strengthened: an ancestor's artifact refs describe the workspace as it was, and the
+descendant makes no claim about their current state. Strictness is retained where it
+carries meaning — at depth 0, on the packet actually under submission, where a
+mismatch means the submitter is claiming a hash the workspace does not have.
+
+**D-B3 — stop running artifact validation on `p` ancestors at all.** Added
+2026-08-23 in response to the audit, which was unanimous that D-B2 patches a
+symptom. The spec's obligation for the `p` pointer is existence and continuity; it
+says explicitly that `p` "does not consume the evidence-DAG recursion budget," a
+narrower contract than the full `_artifact_errors` pass the implementation performs
+on every ancestor. Validate `p` ancestors for existence, signature validity, and
+sequence continuity only. Run `_artifact_errors` at depth 0 exclusively.
+
+D-B3 subsumes D-B2: with no ancestor artifact pass, there is no ancestor hash
+mismatch to downgrade, and the existing `_is_ancestor` special case for
+`E_PROVENANCE_ARTIFACT_MISSING` becomes dead code that should be removed with it.
+D-B3 is also the smaller behavioural claim — it aligns the implementation to the
+spec rather than relaxing a rule the spec imposes.
+
+## Consequences
+
+Under D-A1, D3 becomes fully effective and packets may honestly cite `file`, `log`,
+`activity`, and `source_chain` roots. ADR-19's evidence table, which motivated the
+widening, stops having to flatten script output and live smoke runs into `url`.
+
+Under D-B3, provenance chains survive ordinary editing. This is the change that
+makes the spine usable at all: without it, the pilot's 100% rejection rate is
+structural and no amount of correct hook behaviour can produce a landed claim.
+
+The cost of D-B3 is a genuine reduction in what a valid packet asserts. Today a
+validating packet implies its entire ancestry still hashes true — an assertion that
+is strictly stronger, and which the pilot demonstrates is unsatisfiable in a live
+workspace. After D-B3 a valid packet asserts that *it* hashes true and that its
+ancestry is structurally intact and correctly signed. Historical artifact state
+becomes the audit view's responsibility (D-B1), which is where the spec put it.
+
+Neither of these is sufficient on its own to restore the spine. Governed
+System/Substrate claims additionally require a resolvable
+`consent_ref.decision_action_hash`, and per ADR-12 the current check accepts any
+non-empty string without resolving it. D-A1 and D-B3 clear the provenance-side
+rejections; the consent-side blocker is ADR-12's to close.
+
+D-B1 and D-B3 land separately, D-B3 first. An earlier draft argued they were a
+pair — that D-B3 without D-B1 drops the staleness signal rather than relocating it.
+The audit rejected that argument 2-1 and it is withdrawn: the staleness condition is
+observable from the packet store whether or not the reporting view exists, and
+holding the usability fix hostage to a reporting surface is the kind of bundling
+that leaves both unshipped.
+
+## Open Questions For Review
+
+Questions 3 and 5 were settled by the audit below and are marked accordingly.
+
+1. **Blast radius. Open.** Filed as System — a cross-module change to validation
+   behaviour, not to an invariant. The counterargument is that relaxing ancestor
+   validation loosens a fail-closed governance gate, and `provenance_first` is a
+   stated non-negotiable, which would make it Substrate (0.85, override forbidden).
+   The distinction turns on whether "an ancestor's artifacts still hash true" was
+   ever part of the invariant or is an implementation artifact of the strict walk.
+   The audit split 4-1 for System with one non-answer; the dissent is recorded
+   below. D-B3 weakens the Substrate reading further, since aligning code to the
+   spec's stated `p` contract is not a loosening. Ratify explicitly at the gate.
+
+2. **Does relaxing ancestor validation open a laundering path? Open, and this ADR
+   does not close it.** An agent could submit a packet whose ancestry cites
+   artifacts it has since rewritten. The signature chain and SAID digests are
+   unaffected, so the *history* is not forgeable — but the artifact bindings in that
+   history become unverifiable-in-place. The audit majority read this as hollow; one
+   voter refused, on the grounds that the ADR never enumerates who reads ancestor
+   artifact refs. That objection is correct. **Exit condition: enumerate every
+   consumer of ancestor artifact refs and confirm none treats them as current
+   evidence.** Until that list exists the question stays open.
+
+3. **Should `p`-chain artifact validation run at all? Settled — no.** The audit was
+   unanimous among voters who answered. The spec's `p` obligation is existence and
+   continuity, narrower than the full `_artifact_errors` pass the implementation
+   performs. This became D-B3, which supersedes D-B2.
+
+4. **Is there a fourth allow-list? Open.** Defect A is the second instance of this
+   pattern. A deliberate sweep for other constants that restate a specification —
+   rather than another incidental discovery — is warranted before this closes.
+
+5. **Are D-B1 and the B-track code change a pair? Settled — no.** The audit split
+   2-1 against the pairing. Withdrawn; see Consequences.
+
+6. **Does the consent-side blocker gate this ADR's value? Open, owned by ADR-12.**
+   The audit was unanimous that D-A1 plus the B-track change is insufficient to
+   land a governed claim while `entry_has_consent()` accepts an unresolved
+   `decision_action_hash`. One voter proposed an `E_CONSENT_HASH_UNRESOLVED` code
+   for the condition. Tracked here so this ADR is not mistaken for a full restoration
+   of the spine.
+
+## Adversarial Audit — 2026-08-23
+
+Run through the reasoning-ensemble MCP in forced `ensemble` mode against the five
+open questions above, with the prompt instructing voters to attack the ADR rather
+than summarize it. Draft:
+`.agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json`.
+
+Six voters across five provider surfaces and six model families, satisfying the
+≥3-surface / ≥4-family diversity policy: `groq/openai/gpt-oss-120b`,
+`groq/qwen/qwen3.6-27b`, `huggingface/deepseek-ai/DeepSeek-V4-Flash`,
+`mistral/devstral-small-latest`,
+`nvidia/nvidia/llama-3.3-nemotron-super-49b-v1`, `openrouter/openai/gpt-4o-mini`.
+
+**The synthesizer reported this as Tier-1, 6/6 unanimous. That label is wrong**, and
+the error matters more than any single finding. Reading the individual voter
+responses rather than the synthesis:
+
+- `groq/qwen/qwen3.6-27b` did not answer. Its 2291-character response restates the
+  prompt back as a structured summary and reaches no position on any of the five
+  questions. It was embedded and clustered as agreement.
+- `groq/openai/gpt-oss-120b` returned 359 characters — a fragment, roughly a sixth
+  the length of the others — and it **dissents on Q1**, arguing D-B2 "relaxes a
+  fail-closed invariant that the substrate declares non-negotiable" and that any
+  later edit "instantly re-opens the whole p-chain for the originating agent."
+- Q5 splits three ways among the three voters who reached it: `mistral` calls the
+  pairing "rationalization," `openrouter/gpt-4o-mini` calls it "not sound," and
+  `nvidia/nemotron` calls it "mechanistically justified."
+
+Clustering runs on whole-response embeddings, so responses that agree on tone,
+vocabulary and structure cluster together even when they hold opposite positions on
+a specific sub-question, and a response that answers nothing at all clusters with
+everything. The similarity matrix bears this out: the three tightest pairs (0.953,
+0.954, 0.957) are deepseek/mistral/gpt-4o-mini, which are the three most similarly
+*formatted* answers, not the three most similarly *concluded* ones. **A 100%
+largest-cluster fraction on an adversarial prompt should be read as a signal to
+open the individual responses, not as confirmation.** This is a defect in the
+ensemble's Tier classification, not in this ADR, and it is filed here because it
+was found here.
+
+Findings, taken from the individual responses:
+
+**Q1 — blast radius. 4 System, 1 Substrate, 1 no-answer.** The majority principle:
+blast radius follows which invariant a change alters, not whether a nearby label
+reads "non-negotiable." Depth-0 strictness is untouched, so the `provenance_first`
+core — a current packet must carry valid current evidence — survives; only
+historical artifact consistency relaxes. The dissent is not frivolous and is
+recorded rather than outvoted. Note that D-B3, which the same audit prefers, makes
+the question substantially easier: aligning the implementation to the spec's stated
+`p` contract is not a loosening at all.
+
+**Q2 — laundering. Split, and the split is the useful part.** The majority reads the
+worry as hollow: no downstream consumer treats ancestor artifact refs as current
+evidence today, the `p` chain is used for continuity and signature verification, and
+the new packet's own depth-0 hash stays strict. `mistral` refuses to close it on
+those terms — "Missing: ADR doesn't identify who/what reads ancestor artifact refs."
+That is correct and this ADR does not close it. Open Question 2 stands, with the
+enumeration of ancestor-ref consumers as its explicit exit condition.
+
+**Q3 — over-validation. Unanimous among voters who answered, and this changed the
+ADR.** D-B2 is a symptom patch; the root defect is that the implementation performs
+a full artifact pass on ancestors where the spec asks only for existence and
+continuity. D-B3 above is the result.
+
+**Q4 — sufficiency. Unanimous: not sufficient.** Independently of the prompt's own
+mention, multiple voters land on the same next blocker — `entry_has_consent()`
+checks that `consent_ref.decision_action_hash` is a non-empty string and never
+resolves it, so governed System/Substrate claims will keep failing after D-A1 and
+D-B3 land. `mistral` proposes an `E_CONSENT_HASH_UNRESOLVED` error code for the
+condition. That work belongs to ADR-12, not here, but this ADR should not be read as
+restoring the spine on its own.
+
+**Q5 — sequencing. 2-1 against the pairing.** The majority holds that D-B1 and the
+B-track code change are independently landable and that bundling them is
+rationalization. This is accepted: the pairing argument is withdrawn. D-B1 (the
+audit view) and D-B3 (the validation-scope correction) land separately, D-B3 first,
+since D-B3 is what makes the spine capable of landing a claim and D-B1 is the
+reporting surface for a condition that will still exist after it.
+
+## Evidence
+
+- `$HOME/.floss_agent/hook.log` — pilot history, 576 KB, error tally above.
+- `packages/activity_log/provenance.py:564` — `_EVIDENCE_REF_TYPES`, six values.
+- `packages/activity_log/provenance.py:594` — the enforcement site.
+- `packages/activity_log/provenance.py:672` — `_follow_prior` default.
+- `packages/activity_log/provenance.py:756-761` — the ancestor downgrade asymmetry.
+- `packages/orchestrator/claim_schema.py:75` — `EVIDENCE_TYPES`, ten values.
+- `docs/specs/provenance-packet.schema.json` — evidence-type enum, ten values.
+- `docs/specs/provenance-packet.spec.md` §Audit Disposition — the supersession policy.
+- Absence check: `superseded` does not occur in non-test code under `packages/`.
+
+## Related
+
+- ADR-15 — author–provenance binding in the integrity zome. Different layer: ADR-15
+  governs Plane B zome validation, this ADR governs the Plane A packet validator.
+- ADR-19 — the evidence table that motivated the D3 widening.
+- `docs/specs/provenance-packet.spec.md` — the contract this ADR proposes correcting
+  the implementation against. Note that D-A1 and D-B2 are implementation corrections
+  toward the existing spec, not spec changes; D-B1 implements a spec section that
+  was never built.

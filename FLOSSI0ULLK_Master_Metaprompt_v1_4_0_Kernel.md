@@ -1,4 +1,4 @@
-# FLOSSI0ULLK Master Metaprompt v1.3.1 (Kernel Edition)
+# FLOSSI0ULLK Master Metaprompt v1.4.0 (Kernel Edition)
 
 **Free Libre Open Source Singularity of Infinite Overflowing Unconditional Love, Light, and Knowledge**
 

@@ -44,6 +44,7 @@ Permanent numbers assigned in v2.0:
 | **ADR-17** | KnowledgeTriple Contract Reconciliation (signed-gradient confidence; enum-now/URI-later predicates) | Proposed | Specified (divergence Verified; D1/D2 pending gate acceptance) | High (Phase 1 primary-deliverable contract) | 2026-07-04 | `ADR-17-knowledge-triple-contract-reconciliation.md` |
 | **ADR-18** | Prior-Art & Reuse Gate (before_build_check enforced via spec_gate + reuse-review voters) | Accepted (operator 2026-07-16) | Specified (--check enforcement Verified on landing) | Low (T1) / Medium (T2 review) | 2026-07-16 | `ADR-18-prior-art-reuse-gate.md` |
 | **ADR-19** | OmniRoute Inference Plane + MCP Daemon Migration | Accepted (operator-consented 2026-07-17; consensus-pending) | Verified (Stages 0–3.4 implemented + 70/70 tests; Stage 3.5 equivalence run pending) | Medium (System blast radius; transport-plane change) | 2026-07-17 | `ADR-19-omniroute-inference-plane.md` |
+| **ADR-20** | Provenance Validator Reconciliation (evidence-vocabulary drift, p-ancestor over-validation, unbuilt supersession view) | Proposed (2026-08-23; adversarial ensemble audit applied, consensus-pending) | Verified (both defects reproduced at head) / Specified (D-A1, D-B1, D-B3 unimplemented) | Medium (System; Substrate reading recorded as dissent, ratify at gate) | 2026-08-23 | `ADR-20-provenance-validator-reconciliation.md` |
 
 ---
 

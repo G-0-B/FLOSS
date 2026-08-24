@@ -8,7 +8,7 @@
     "FLOSS/docs/specs",
     "FLOSS/docs/adr"
   ],
-  "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated \u2014 continuation/seed artifacts are pre-spec by definition.",
+  "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated — continuation/seed artifacts are pre-spec by definition.",
   "entries": {
     "FLOSS/docs/adr/ADR-0-recognition-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-0: Recognition Protocol - First Coherent Transmission)",
@@ -31,7 +31,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-12 \u2014 Consent Gate Protocol)",
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
@@ -60,6 +60,66 @@
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
       "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-20-provenance-validator-reconciliation.md": {
+      "spec": "Provenance validator reconciliation: evidence-type allow-list drift (D-A1), unimplemented audit supersession view (D-B1), and p-ancestor over-validation (D-B3)",
+      "tier": 1,
+      "spec_ref": "docs/specs/provenance-packet.spec.md",
+      "reuse": {
+        "capability": "Correct the Plane A provenance validator so signed packets can pass submit_claim: one evidence-type authority, spec-scoped p-ancestor validation, and the audit supersession view the spec already defines",
+        "search_date": "2026-08-23",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "packages/orchestrator/claim_schema.EVIDENCE_TYPES",
+            "version": "repo 2026-08-10 (v1.5 D3 applied)",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23: carries all ten D3 values with rationale comment citing ADR-19; already enforced at claim-construction time. Adopt as the single authority for D-A1.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "docs/specs/provenance-packet.spec.md §Audit Disposition",
+            "version": "v1.4 + v1.5 D2/D3",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23: already specifies valid/superseded/invalid and the two supersession conditions. D-B1 implements an existing spec section rather than designing a new policy.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "existing _is_ancestor downgrade in provenance.py:756-761",
+            "version": "repo at head",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23; artifact_ref -> _resolve_workspace_ref -> sha256_file round-trip executed live against packages/mcp_daemon.py, hashes agree, workspace roots agree. Mechanism confirmed: ancestor MISSING warns, ancestor MISMATCH is fatal.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "in-toto / sigstore attestation as replacement spine",
+            "version": "docs 2024-12",
+            "license": "Apache-2.0",
+            "maintenance": "CNCF active",
+            "platform_fit": "adds runtime deps",
+            "probe": "not_probed: rejected on the same grounds ADR-18 rejected it as a gate mechanism — dependency weight for a defect that is four lines of allow-list drift plus a scope mismatch against an existing spec.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "content-addressed artifact snapshots (store the bytes, not just the hash)",
+            "probe": "not_probed: would make ancestor artifact hashes verifiable-in-place and dissolve the staleness problem entirely, at the cost of a blob store. Deferred, not rejected — revisit if Open Question 2 finds a real consumer of ancestor artifact refs.",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "No new surface. D-A1 replaces a six-value literal with an import. D-B3 narrows an existing ancestor validation branch to existence/signature/continuity. D-B1 is the only additive piece and implements a spec section verbatim; it gets its own tier-2 registration when built.",
+        "rejected_because": [
+          "in-toto/sigstore: dependency weight disproportionate to a constant-drift plus scope-mismatch defect (Specified)"
+        ],
+        "reviewer": "adversarial ensemble audit 2026-08-23, 6 voters / 5 provider surfaces / 6 model families; synthesis .agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json. Not a consensus-gate decision.",
+        "expiry_or_retest_date": "2026-12-21"
+      }
     },
     "FLOSS/docs/adr/ADR-3-metaprompt-kernelization.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-003: Metaprompt Kernelization)",
@@ -98,7 +158,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF \u2014 Upgraded ADR Suite v2.0)",
+      "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF — Upgraded ADR Suite v2.0)",
       "grandfathered": true
     },
     "FLOSS/docs/specs/TERNARY_COMPATIBILITY.md": {
@@ -170,7 +230,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
-      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 \u2014 needs owner review)"
+      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)"
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
@@ -220,7 +280,7 @@
           },
           {
             "name": "documentation checklist only",
-            "probe": "not_probed: rejected by design analysis \u2014 trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
             "truth_status": "Specified"
           },
           {
@@ -353,7 +413,7 @@
       "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
     },
     "FLOSS/scripts/major_consolidation_sweep.py": {
-      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub \u2014 needs owner review)"
+      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
