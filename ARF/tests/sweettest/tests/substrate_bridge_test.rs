@@ -153,13 +153,22 @@ async fn criterion_4_bob_discovers_by_subject_and_predicate_without_hash() {
     let app = setup_two_agent_app().await;
     let alice_zome = rose_zome(&app.alice);
     let bob_zome = rose_zome(&app.bob);
-    let _: ActionHash = app.conductors[0]
+    let hash: ActionHash = app.conductors[0]
         .call(
             &alice_zome,
             "assert_triple",
             AssertTripleInput::new("holochain", "supports", "agent_centric_apps", 0.94),
         )
         .await;
+    let published_record: Option<Record> = app.conductors[0]
+        .call(&alice_zome, "get_triple_record", hash.clone())
+        .await;
+    let published_record = published_record.expect("Alice must resolve the published triple");
+    let published_triple = published_record
+        .entry()
+        .to_app_option::<KnowledgeTriple>()
+        .expect("published entry must decode")
+        .expect("published entry must be present");
 
     await_two_agent_consistency(&app).await;
 
@@ -178,13 +187,24 @@ async fn criterion_4_bob_discovers_by_subject_and_predicate_without_hash() {
         )
         .await;
 
-    let expected = |result: &TripleResult| {
-        result.subject == "holochain"
-            && result.predicate == "supports"
-            && result.object == "agent_centric_apps"
-    };
-    assert!(by_subject.iter().any(expected));
-    assert!(by_predicate.iter().any(expected));
+    let subject_result = by_subject
+        .iter()
+        .find(|result| result.hash == hash)
+        .expect("Bob's subject query must contain Alice's returned action hash");
+    let predicate_result = by_predicate
+        .iter()
+        .find(|result| result.hash == hash)
+        .expect("Bob's predicate query must contain Alice's returned action hash");
+    for result in [subject_result, predicate_result] {
+        assert_eq!(result.hash, hash);
+        assert_eq!(result.subject, published_triple.subject);
+        assert_eq!(result.predicate, published_triple.predicate);
+        assert_eq!(result.object, published_triple.object);
+        assert!((result.confidence - published_triple.confidence).abs() < f32::EPSILON);
+        assert_eq!(result.author, *app.alice.agent_pubkey());
+        assert_eq!(result.author, published_triple.source);
+        assert_eq!(result.created_at, published_triple.created_at);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
