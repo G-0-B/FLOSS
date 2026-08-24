@@ -23,7 +23,7 @@ No coordinator or integrity-zome logic changes are in scope. No ADR changes, can
 
 ## Architecture
 
-`ARF/tests/sweettest` is a workspace member and native-only test package. Its Cargo manifest pins `holochain = "=0.6.1"` with `test_utils`, uses Tokio's multi-thread runtime, and depends on the existing zome crates only for serializable public types where that does not introduce duplicate export symbols.
+**As-executed deviation from the original member-workspace sketch:** `ARF/tests/sweettest` is a standalone native child workspace, not a member of `ARF/Cargo.toml`. This prevents conductor-runtime dependencies from entering the guest/WASM workspace and gives the native harness an independent lock boundary. Its manifest pins the official Holochain repository at immutable requested revision `b1d40b24ab19d81f7563b0cf66b933a138f556a0`; the committed child lock resolves that source to `3bdeaccd1c54fa351e76f7347601dfbc061d5bd4` on the Holochain 0.6.1 / HDK 0.6.1 / HDI 0.7.1 line. `ARF/tests/sweettest/Cargo.lock`, not `ARF/Cargo.lock`, records the native resolution. The package uses Tokio's multi-thread runtime and local serializable wire mirrors rather than linking zome crates, avoiding duplicate Holochain export symbols.
 
 Each test binary performs the following setup:
 
@@ -35,16 +35,14 @@ Each test binary performs the following setup:
 6. Call the relevant coordinator zome.
 7. Use `await_consistency` before every cross-agent read. In Holochain 0.6.1 this waits until every op published by each tested cell is integrated by every tested node.
 
-The build-and-run sequence is explicit rather than hidden inside test code:
+The build-and-run sequence is explicit rather than hidden inside test code. Run it from `ARF/` through the durable runner:
 
 ```text
-cargo build --workspace --exclude rose_forest_sweettest --release --target wasm32-unknown-unknown
-hc dna pack dnas/rose_forest/workdir/
-cargo test -p rose_forest_sweettest --test substrate_bridge_test
-cargo test -p rose_forest_sweettest --test consent_zome_test
+nix develop path:. --command ./tests/sweettest/run.sh --test substrate_bridge_test
+nix develop path:. --command ./tests/sweettest/run.sh --test consent_zome_test
 ```
 
-The native Sweettest package is excluded from the WASM build because it depends on the conductor runtime and is not a zome. Inside a Windows-created Git worktree, WSL invokes the flake as `nix develop path:.` so Nix does not try to resolve the worktree's Windows-form Git metadata path.
+The runner uses `cargo build --workspace --locked --release --target wasm32-unknown-unknown`, packs immediately afterward, and invokes the child manifest with `--locked`. It defaults `RUST_TEST_THREADS=1` for the recorded resource-isolated serial mode; an operator may override that environment variable deliberately. The native Sweettest package is outside the parent WASM workspace because it depends on the conductor runtime and is not a zome. Inside a Windows-created Git worktree, WSL invokes the flake as `nix develop path:.` so Nix does not try to resolve the worktree's Windows-form Git metadata path.
 
 ## Substrate Bridge Test
 
@@ -83,7 +81,7 @@ The DNA manifest already names exactly these zomes:
 - `rose_forest`
 - `consent`
 
-Tests load the packed DNA created after the release WASM build. Acceptance output records the four compiled WASM filenames, successful `hc dna pack`, and the exact test commands. A committed historical `.dna` file alone is not acceptable evidence.
+Tests load the packed DNA created after the release WASM build. Acceptance output records the four compiled WASM filenames, successful `hc dna pack`, and the exact runner command. A committed historical `.dna` file alone is not acceptable evidence.
 
 ## Failure Handling
 
@@ -108,7 +106,7 @@ Ensemble output remains advisory and noncanonical.
 
 Implementation is complete only when all gates pass from the isolated worktree:
 
-1. Existing four-zome workspace unit tests pass unchanged.
+1. The parent four-zome workspace unit suite passes unchanged (40 tests in the recorded baseline); the isolated child suite is run separately (2 consent tests plus 7 substrate tests).
 2. All four active zomes compile for `wasm32-unknown-unknown` in release mode.
 3. `hc dna pack` succeeds using those four current WASM files.
 4. Six substrate criteria plus the missing-hash negative case pass against two distinct agents.

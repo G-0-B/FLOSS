@@ -236,20 +236,28 @@ async fn criterion_5_conflicting_triples_remain_fork_visible() {
             QueryTriplesInput::subject("claim"),
         )
         .await;
-    let visible: BTreeMap<String, AgentPubKey> = results
+    let visible: BTreeMap<String, (ActionHash, AgentPubKey)> = results
         .into_iter()
         .filter(|result| {
             result.subject == "claim"
                 && result.predicate == "contradicts"
                 && (result.object == "affirmed" || result.object == "disputed")
         })
-        .map(|result| (result.object, result.author))
+        .map(|result| (result.object, (result.hash, result.author)))
         .collect();
 
     assert_ne!(alice_hash, bob_hash);
     assert_eq!(visible.len(), 2);
-    assert_eq!(visible.get("affirmed"), Some(app.alice.agent_pubkey()));
-    assert_eq!(visible.get("disputed"), Some(app.bob.agent_pubkey()));
+    let affirmed = visible
+        .get("affirmed")
+        .expect("Alice's conflicting assertion must remain query-visible");
+    let disputed = visible
+        .get("disputed")
+        .expect("Bob's conflicting assertion must remain query-visible");
+    assert_eq!(&affirmed.0, &alice_hash);
+    assert_eq!(&affirmed.1, app.alice.agent_pubkey());
+    assert_eq!(&disputed.0, &bob_hash);
+    assert_eq!(&disputed.1, app.bob.agent_pubkey());
 }
 
 #[tokio::test(flavor = "multi_thread")]
