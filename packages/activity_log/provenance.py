@@ -24,6 +24,8 @@ import jcs
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
+from packages.orchestrator.claim_schema import EVIDENCE_TYPES
+
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 
 VERSION_PREFIX = "FLOSSI10JSON"
@@ -561,7 +563,12 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
 _SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
-_EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
+# D-A1 (ADR-20). This used to restate the evidence vocabulary as a literal, which
+# made it a fourth allow-list nobody knew existed: the v1.5 D3 widening was applied
+# to the spec, the schema and claim_schema.EVIDENCE_TYPES, but not here — and this
+# is the set actually enforced, so schema-valid packets were rejected. One
+# authority now. Widen EVIDENCE_TYPES and every enforcement point follows.
+_EVIDENCE_REF_TYPES = EVIDENCE_TYPES
 
 
 def _payload_entry_errors(entries: list[Any]) -> list[str]:
@@ -660,8 +667,9 @@ def validate_packet(
     _seen: set[str] | None = None,
     _depth: int = 0,
     # Two independent recursion flags kept side by side (merge 2026-08-17):
-    #   _is_ancestor            — ours: suppress E_PROVENANCE_ARTIFACT_MISSING for
-    #                             historical ancestor packets whose artifacts moved.
+    #   _is_ancestor            — ours: this packet is a `p` ancestor, not the one
+    #                             under validation. Skips the artifact pass
+    #                             entirely per D-B3 (ADR-20); see the note there.
     #   _ignored_chain_position — PR38's: exclude one chain position from the
     #                             duplicate-position check.
     _is_ancestor: bool = False,
@@ -749,16 +757,36 @@ def validate_packet(
         errors.append("E_PROVENANCE_TYPE_INVALID")
     if not isinstance(packet.get("a"), list) or not packet["a"]:
         errors.append("E_PROVENANCE_PAYLOAD_EMPTY")
-    else:
+    elif not _is_ancestor:
+        # Per-entry field contract is checked on the packet under validation
+        # only — see the D-B3 note below. A signed ancestor cannot be repaired:
+        # correcting a malformed field would break its signature, so enforcing
+        # this contract against history means one bad packet blocks its whole
+        # chain forever. Found in the wild at chain position 51, which carries a
+        # 63-character sha256 (a dropped leading zero) and by itself accounted
+        # for every remaining rejection after the artifact pass was scoped.
         errors.extend(_payload_entry_errors(packet["a"]))
 
-    # Ancestor artifacts may legitimately be gone (scratch probes, renames,
-    # relocated intake). Only absence is downgraded; hash mismatch stays fatal.
-    for problem in _artifact_errors(packet, root):
-        if _is_ancestor and problem == "E_PROVENANCE_ARTIFACT_MISSING":
-            warnings.append(problem)
-        else:
-            errors.append(problem)
+    # D-B3 (ADR-20). Artifact refs are checked on the packet under validation
+    # only, never on a `p` ancestor.
+    #
+    # The spec's obligation for `p` is existence and continuity — it says
+    # explicitly that the prior pointer "does not consume the evidence-DAG
+    # recursion budget" — while this code used to run the full artifact pass on
+    # every ancestor, downgrading a missing artifact to a warning but keeping a
+    # hash mismatch fatal. That asymmetry killed the spine: editing any file
+    # twice permanently invalidated every earlier packet naming it, those
+    # packets stayed in the chain, and so every future packet from the same
+    # agent failed too. 100% of pilot submissions were rejected this way.
+    #
+    # An ancestor's artifact refs describe the workspace as it was. The
+    # descendant makes no claim about their current state, and nothing
+    # downstream reads them as current evidence. Historical artifact state is
+    # the audit view's job (D-B1, spec "Audit Disposition"), not the gate's.
+    # Ancestors are still validated for signature, SAID, payload shape,
+    # evidence DAG and chain continuity — see the walk below.
+    if not _is_ancestor:
+        errors.extend(_artifact_errors(packet, root))
 
     prov_root = explicit_provenance_root or _infer_provenance_root(packet_path)
     prior_digest = packet.get("p")
@@ -871,17 +899,22 @@ def validate_packet(
                 child_sequence = prior_packet.get("s")
                 cursor = next_path
 
-    errors.extend(
-        _recursive_evidence_errors(
-            packet,
-            workspace_root=root,
-            provenance_root=prov_root,
-            seen=seen,
-            depth=_depth,
-            max_depth=max_depth,
-            ignored_chain_position=_ignored_chain_position,
+    # Evidence-DAG recursion, likewise depth-0 only (D-B3). An ancestor's
+    # evidence DAG resolves packet files that may since have been pruned,
+    # relocated, or written before a contract change; walking it from a
+    # descendant re-litigates history the descendant is not asserting.
+    if not _is_ancestor:
+        errors.extend(
+            _recursive_evidence_errors(
+                packet,
+                workspace_root=root,
+                provenance_root=prov_root,
+                seen=seen,
+                depth=_depth,
+                max_depth=max_depth,
+                ignored_chain_position=_ignored_chain_position,
+            )
         )
-    )
 
     chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
     if (

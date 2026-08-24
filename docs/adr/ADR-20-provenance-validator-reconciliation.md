@@ -1,15 +1,25 @@
 # ADR-20: Provenance Validator Reconciliation — Evidence Vocabulary Drift and Ancestor Supersession
 
 ## Status
-Proposed — 2026-08-23. No code change accompanies this ADR; it records the defect
-analysis and the proposed contract correction for review.
+Accepted (operator, 2026-08-24) — D-A1 and D-B3 implemented; D-B1 still unbuilt.
+Drafted 2026-08-23 as Proposed with no code, audited, then implemented on operator
+approval.
 
 ## Date
-2026-08-23
+2026-08-23 (implemented 2026-08-24)
 
 ## Truth Status
-✅ Verified — both defects are reproduced against the working tree at this head.
-⚠️ Specified — the proposed remedies (D-A1, D-B1, D-B2) are unimplemented.
+✅ Verified — both defects reproduced against the working tree, then fixed. D-A1
+and D-B3 are implemented with regression tests; 267 tests pass. End-to-end proof:
+the hook now lands claims. A Local `CodeChange` on
+`packages/activity_log/provenance.py` produced
+`[hook] claimed packages\activity_log\provenance.py → 01a0321a-2546-7fba-b67f-c8717d478060`
+followed by a spawned consensus round — the first claim to land in the pilot's
+history. A governed `AdrChange` now fails at `E_GOVERNED_PROVENANCE_REQUIRED`
+instead of `E_SUBMIT_CLAIM_INVALID_PROVENANCE`, which is the consent-ref blocker
+the audit predicted (Open Question 6), not a provenance failure.
+
+⚠️ Specified — D-B1 (the audit disposition view) is unimplemented.
 
 ## Context
 
@@ -330,6 +340,62 @@ rationalization. This is accepted: the pairing argument is withdrawn. D-B1 (the
 audit view) and D-B3 (the validation-scope correction) land separately, D-B3 first,
 since D-B3 is what makes the spine capable of landing a claim and D-B1 is the
 reporting surface for a condition that will still exist after it.
+
+## Implementation Record — 2026-08-24
+
+D-A1 and D-B3 landed on operator approval. D-B1 was not built.
+
+**D-A1.** `provenance.py` imports `EVIDENCE_TYPES` from
+`packages.orchestrator.claim_schema`; `_EVIDENCE_REF_TYPES` is now bound to it
+rather than restating it. No circular-import risk — `claim_schema` imports nothing
+from `packages/`, and `orchestrator` does not import `activity_log`. Regression
+test parametrized over all four D3 types, which also asserts the identity
+`provenance._EVIDENCE_REF_TYPES is EVIDENCE_TYPES` so a future re-fork of the
+literal fails loudly.
+
+**D-B3, wider than drafted.** The draft scoped it to the artifact pass. Landing
+that alone cleared every `E_PROVENANCE_ARTIFACT_HASH_MISMATCH` and left
+`E_PROVENANCE_EVIDENCE_REF_INVALID` still failing every submission. Walking the
+chain found why, and it is worth recording because it settles the scope question
+the draft left open:
+
+> Chain position 51 carries an evidence ref whose `sha256` is **63 characters** —
+> a dropped leading zero. The packet is signed. It cannot be repaired: correcting
+> the field breaks the signature. Every descendant of position 51 was therefore
+> permanently unable to submit, and there was no action any agent could take to
+> recover.
+
+That is the same failure shape as the artifact staleness, from a different
+direction, and it demonstrates that scoping only the artifact pass was still too
+narrow. Depth-0 now owns three passes, not one:
+
+- `_artifact_errors` — artifact refs
+- `_payload_entry_errors` — the per-entry field contract
+- `_recursive_evidence_errors` — the evidence DAG
+
+Ancestors retain signature verification, SAID/digest, version, envelope type,
+non-empty payload, sequence continuity, and the duplicate-chain-position fork
+check. That is the "existence, signature validity, and sequence continuity"
+contract D-B3 named, now applied consistently rather than to one pass.
+
+The general principle, which the draft did not state: **a signed historical packet
+cannot be corrected, so any contract enforced against ancestors is a contract that
+can permanently and irrecoverably kill a chain.** Enforcement belongs at the point
+of authorship, where a failure is actionable.
+
+**Test changes.** `test_deleted_ancestor_artifact_warns_but_does_not_fail_descendant`
+previously asserted the ancestor `E_PROVENANCE_ARTIFACT_MISSING` warning; under
+D-B3 ancestor artifacts are not inspected at all, so it now asserts neither error
+nor warning. Its depth-0 strictness assertion is unchanged. Added
+`test_edited_ancestor_artifact_does_not_fail_descendant`, which covers the actual
+defect — mutation, not deletion — and confirms depth 0 still rejects a stale hash.
+
+**Not done.** D-B1 remains unbuilt, so there is currently no `superseded` reporting
+for the historical packets this change stops failing on. Open Questions 1, 2, 4 and
+6 all remain open; in particular Question 2's exit condition (enumerate every
+consumer of ancestor artifact refs) was not satisfied before landing — the change
+went in on the audit majority's reading plus operator approval, not on a completed
+enumeration. That is a known, accepted gap, not an oversight.
 
 ## Evidence
 

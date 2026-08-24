@@ -665,9 +665,7 @@ def test_public_eight_wrapper_root_uses_independent_competitor_depth(
 
     wrapped_path = first_path
     for index in range(8):
-        wrapped_ref = (
-            wrapped_path.resolve().relative_to(tmp_path.resolve()).as_posix()
-        )
+        wrapped_ref = wrapped_path.resolve().relative_to(tmp_path.resolve()).as_posix()
         _wrapper, wrapped_path = provenance.create_packet(
             [
                 entry(
@@ -1035,8 +1033,13 @@ def test_deleted_ancestor_artifact_warns_but_does_not_fail_descendant(
     )
 
     assert result.ok is True, f"descendant must stay valid, got {result.errors}"
+    # D-B3 (ADR-20): ancestor artifacts are not inspected at all any more, so the
+    # missing scratch probe produces neither an error nor a warning. Before D-B3
+    # this raised a warning, because ancestors ran the full artifact pass with
+    # only absence downgraded — the same pass whose fatal hash-mismatch branch
+    # rejected 100% of pilot submissions.
     assert "E_PROVENANCE_ARTIFACT_MISSING" not in result.errors
-    assert "E_PROVENANCE_ARTIFACT_MISSING" in result.warnings
+    assert "E_PROVENANCE_ARTIFACT_MISSING" not in result.warnings
 
     # The descendant's OWN missing artifact is still fatal.
     survivor.unlink()
@@ -1045,6 +1048,118 @@ def test_deleted_ancestor_artifact_warns_but_does_not_fail_descendant(
     )
     assert own.ok is False
     assert "E_PROVENANCE_ARTIFACT_MISSING" in own.errors
+
+
+def test_edited_ancestor_artifact_does_not_fail_descendant(tmp_path, monkeypatch):
+    """D-B3 (ADR-20): re-editing a file must not kill the chain.
+
+    This is the defect that produced a 100% rejection rate across the entire
+    provenance pilot. An ancestor packet records the hash a file had when it was
+    written; the next edit makes that hash stale forever. Ancestors stay in the
+    `p` chain, so before D-B3 one re-edit invalidated every future packet the
+    same agent could ever produce.
+
+    Distinct from the deleted-artifact case above: deletion was already
+    downgraded to a warning, mutation was fatal, and mutation is what ordinary
+    work does constantly.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    identity_dir = tmp_path / "identity"
+    output_root = tmp_path / "packets"
+
+    def entry(artifact):
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": "2026-08-24T00:00:00Z",
+            "human_collision_node": "anthony",
+            "artifact_refs": [
+                provenance.artifact_ref(artifact, workspace_root=tmp_path)
+            ],
+            "evidence_refs": [{"type": "test", "ref": "unit"}],
+            "risks": [],
+            "benefits": [],
+            "next_action": "none",
+        }
+
+    module = tmp_path / "module_under_work.py"
+    module.write_text("VALUE = 1\n", encoding="utf-8")
+    provenance.create_packet(
+        [entry(module)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    # Second edit to the same file, then a second packet — the exact shape of a
+    # hook firing twice on one module during a work session.
+    module.write_text("VALUE = 2\n", encoding="utf-8")
+    _child, child_path = provenance.create_packet(
+        [entry(module)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    result = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is True, f"descendant must stay valid, got {result.errors}"
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" not in result.errors
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" not in result.warnings
+
+    # Depth 0 stays strict: the packet under validation must still hash true.
+    module.write_text("VALUE = 3\n", encoding="utf-8")
+    own = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+    assert own.ok is False
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" in own.errors
+
+
+@pytest.mark.parametrize("evidence_type", ["file", "log", "activity", "source_chain"])
+def test_d3_evidence_types_are_accepted(tmp_path, monkeypatch, evidence_type):
+    """D-A1 (ADR-20): one evidence-type authority, so D3 actually takes effect.
+
+    The v1.5 D3 widening reached the spec, the schema and
+    claim_schema.EVIDENCE_TYPES but missed the literal in provenance.py, which
+    is the set validate_packet enforces. Packets using a D3 type were
+    schema-valid and then rejected with E_PROVENANCE_EVIDENCE_REF_INVALID.
+    """
+    from packages.activity_log import provenance
+    from packages.orchestrator.claim_schema import EVIDENCE_TYPES
+
+    assert evidence_type in EVIDENCE_TYPES
+    assert provenance._EVIDENCE_REF_TYPES is EVIDENCE_TYPES
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.py"
+    artifact.write_text("VALUE = 1\n", encoding="utf-8")
+
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-24T00:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": evidence_type, "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+
+    result = provenance.validate_packet(
+        packet_path, workspace_root=tmp_path, provenance_root=tmp_path / "packets"
+    )
+    assert result.ok is True, f"{evidence_type} rejected: {result.errors}"
+    assert "E_PROVENANCE_EVIDENCE_REF_INVALID" not in result.errors
 
 
 @pytest.mark.parametrize(
