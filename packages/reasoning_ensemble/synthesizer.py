@@ -198,6 +198,12 @@ MIN_VOTERS = 3
 # serialization can stretch the slowest voter when models are swapping.
 VOTER_TIMEOUT_SECONDS = 180
 EMBED_TIMEOUT_SECONDS = 90
+# Health-probe timeout for the local embedder, distinct from the real embed
+# timeout above. resolve_embedder() probes local Ollama before any voter is
+# dispatched; at 90s a machine where Ollama accepts the connection but stalls on
+# the embedding endpoint blocked the whole run past the 120s reasoning-MCP
+# timeout, even though the cloud fallback was sitting right there.
+EMBED_PROBE_TIMEOUT_SECONDS = 5
 
 # Cluster-similarity threshold for grouping voter responses into the same cluster.
 # Cosine similarity > THRESHOLD → same cluster.
@@ -229,6 +235,10 @@ class VoterResponse:
     response_embedding: Optional[list[float]]
     duration_seconds: float
     error: Optional[str] = None
+    # Which wire this voter actually went over ("ollama" / "litellm" /
+    # "flowith"), carried through so the staged Action can name the real
+    # provider instead of guessing from the model id.
+    transport_name: str = "litellm"
 
     @property
     def is_coherent(self) -> bool:
@@ -279,17 +289,41 @@ def _ollama_request(path: str, payload: dict, timeout: int) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def ollama_embed(text: str) -> list[float]:
+def ollama_embed(text: str, timeout: int = EMBED_TIMEOUT_SECONDS) -> list[float]:
     """Get a 1024-d mxbai embedding for text. Raises on failure."""
     response = _ollama_request(
         "/api/embeddings",
         {"model": EMBED_MODEL, "prompt": text},
-        timeout=EMBED_TIMEOUT_SECONDS,
+        timeout=timeout,
     )
     emb = response.get("embedding", [])
     if not emb:
         raise RuntimeError(f"Empty embedding from {EMBED_MODEL}")
     return emb
+
+
+def _local_embed_probe(text: str) -> list[float]:
+    """Health-probe the local embedder under a short, separate timeout."""
+    return ollama_embed(text, timeout=EMBED_PROBE_TIMEOUT_SECONDS)
+
+
+def _provider_label(response: "VoterResponse") -> str:
+    """Name the transport a voter's call actually went over.
+
+    The staged Action used to read the model id's prefix, so with
+    FLOSS_MODEL_BACKEND=omniroute every online voter was recorded as `groq`,
+    `mistral`, and so on -- the model's vendor, not the wire the request took.
+    scripts/autonomous_synthesis_loop.py already records this correctly via
+    active_model_backend(); the two paths disagreed about the same run, which is
+    exactly what provider-level audit and migration comparison cannot tolerate.
+    """
+    if response.transport_name == "ollama":
+        return "ollama-local"
+    if response.transport_name == "flowith":
+        return "flowith"
+    if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+        return "omniroute"
+    return "litellm"
 
 
 def ollama_generate(
@@ -323,6 +357,7 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
     """
     started = time.perf_counter()
     try:
+        voter_transport = str(voter.get("transport") or "litellm")
         text = transport.generate(voter, prompt, VOTER_TIMEOUT_SECONDS, ollama_generate)
         duration = time.perf_counter() - started
         if not text:
@@ -335,6 +370,7 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
                 response_embedding=None,
                 duration_seconds=duration,
                 error="empty_response",
+                transport_name=voter_transport,
             )
         # Embed in this voter's thread to keep things parallel-friendly
         try:
@@ -353,6 +389,7 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
             response_embedding=emb,
             duration_seconds=round(duration, 3),
             error=embed_err,
+            transport_name=voter_transport,
         )
     except Exception as e:  # noqa: BLE001 -- deliberate, see below
         # Catch EVERYTHING. This function's contract, stated in its own
@@ -694,7 +731,12 @@ def synthesize(
     p_hash = prompt_hash(prompt)
 
     # Resolve the single embedder for this run (shared vector space required).
-    _embed_name, embed_fn = transport.resolve_embedder(ollama_embed)
+    # The local probe is bounded separately from the real embed timeout: see
+    # EMBED_PROBE_TIMEOUT_SECONDS. Once resolved, the returned embedder uses the
+    # full timeout for actual work.
+    _embed_name, embed_fn = transport.resolve_embedder(
+        _local_embed_probe, local_embed_fn=ollama_embed
+    )
 
     # 1-3: dispatch + embed (embed is inside _dispatch_voter)
     responses = dispatch_parallel(pool, prompt, embed_fn)
@@ -813,7 +855,7 @@ def _log_synthesis_action(
     llm_calls = [
         {
             "model": r.model,
-            "provider": (r.model.split("/", 1)[0] if "/" in r.model else "ollama-local"),
+            "provider": _provider_label(r),
             "voter_id": r.voter_id,
             "family": r.family,
             "prompt_hash": p_hash,

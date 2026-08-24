@@ -46,9 +46,12 @@ if str(_REPO_ROOT) not in sys.path:
 
 # Reuse the gateway's roster resolution + Flowith helpers (transport only).
 from packages.metacoordinator_mcp.voters import (  # noqa: E402
+    _CREDENTIAL_ENV_BY_PREFIX,
+    _credential_state_for_model,
     _flowith_endpoint,
     _load_flowith_api_key,
     _parse_flowith_models,
+    assert_roster_is_independent,
     resolve_default_voter_specs,
 )
 
@@ -59,6 +62,15 @@ CLOUD_EMBED_ENV = "FLOSS_ENSEMBLE_EMBED_MODEL"
 DEFAULT_MODE = "online"
 DEFAULT_ONLINE_PROFILE = "diverse"
 DEFAULT_CLOUD_EMBED_MODEL = "mistral/mistral-embed"
+# Cloud embedders tried in order when no FLOSS_ENSEMBLE_EMBED_MODEL is set, each
+# gated on its provider credential by _credential_state_for_model. Mistral stays
+# first so a credentialled Mistral configuration behaves exactly as before.
+_CLOUD_EMBED_CANDIDATES: tuple[str, ...] = (
+    "mistral/mistral-embed",
+    "openai/text-embedding-3-small",
+    "huggingface/BAAI/bge-large-en-v1.5",
+    "gemini/text-embedding-004",
+)
 
 # Local pool used for mode=local / mode=mixed. Mirrors synthesizer's historical
 # DEFAULT_VOTER_POOL so the local path is unchanged from v0.1.
@@ -112,6 +124,14 @@ def _online_pool(profile: str | None) -> list[dict]:
     """Resolve the online voter pool from the gateway roster (credential-gated)."""
     prof = profile or os.environ.get(ONLINE_PROFILE_ENV, DEFAULT_ONLINE_PROFILE)
     specs = resolve_default_voter_specs(profile=prof, include_unavailable=False)
+    # The same independence bar the consensus path enforces, on the same roster
+    # after the same credential filtering. `synthesize()` only ever checked
+    # MIN_VOTERS, so `diverse` with just Groq and Mistral credentials produced
+    # three voters across TWO provider surfaces, passed, and reported an
+    # ensemble result that assert_roster_is_independent() would have refused --
+    # two views of one roster disagreeing about whether it counts as
+    # independent. Honours FLOSS_ALLOW_DEGRADED_ROSTER like the consensus path.
+    assert_roster_is_independent(prof, specs)
     pool: list[dict] = []
     for voter_id, model in specs.items():
         transport = _transport_for_model(model)
@@ -135,8 +155,18 @@ def resolve_voter_pool(mode: str | None = None, online_profile: str | None = Non
         return list(LOCAL_VOTER_POOL), resolved_mode
     if resolved_mode == "mixed":
         return _online_pool(online_profile) + list(LOCAL_VOTER_POOL), resolved_mode
-    # default: online
-    return _online_pool(online_profile), "online"
+    if resolved_mode in {"", "online"}:
+        return _online_pool(online_profile), "online"
+    # An unknown mode is a configuration error, not a request for the default.
+    # `FLOSS_ENSEMBLE_VOTER_MODE=locla` -- one transposition away from `local`,
+    # the mode an operator picks specifically to keep prompts off the network --
+    # used to fall through this branch and send the prompt to cloud voters.
+    # Silently doing the opposite of what the operator asked, at cost and with
+    # disclosure, is the one outcome worth failing for.
+    raise ValueError(
+        f"Unknown voter mode {resolved_mode!r} (from {MODE_ENV} or the `mode` "
+        "argument). Expected 'online', 'local', or 'mixed'."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -228,17 +258,57 @@ def _cloud_embed_fn(model: str):
     return embed
 
 
-def resolve_embedder(local_embed_fn) -> tuple[str, object]:
+def resolve_embedder(probe_fn, local_embed_fn=None) -> tuple[str, object]:
     """Pick the run's single embedder: local mxbai if it answers, else cloud.
 
-    `local_embed_fn(text) -> list[float]` is the synthesizer's ollama_embed.
+    `probe_fn(text) -> list[float]` is the HEALTH PROBE and should carry a short
+    timeout: it runs before any voter is dispatched, and a local Ollama that
+    accepts the connection but stalls on the embedding endpoint used to block
+    the whole run for the full 90s embed timeout -- past the 120s reasoning-MCP
+    timeout -- with a working cloud fallback available the entire time.
+
+    `local_embed_fn` is the embedder actually used for work once the probe
+    succeeds, under the normal timeout. It defaults to `probe_fn` so a caller
+    that passes one callable keeps the old single-argument behaviour.
+
     Returns (embedder_name, embed_callable).
     """
+    working_fn = local_embed_fn or probe_fn
     try:
-        vec = local_embed_fn("healthcheck")
+        vec = probe_fn("healthcheck")
         if vec:
-            return "mxbai-embed-large", local_embed_fn
+            return "mxbai-embed-large", working_fn
     except Exception:  # noqa: BLE001 — fall through to cloud
         pass
-    cloud_model = os.environ.get(CLOUD_EMBED_ENV, DEFAULT_CLOUD_EMBED_MODEL)
+    cloud_model = _available_cloud_embed_model()
     return cloud_model, _cloud_embed_fn(cloud_model)
+
+
+# Re-exported for tests that need to know which env vars gate each candidate.
+_CREDENTIAL_ENV_BY_PREFIX_FOR_TESTS = _CREDENTIAL_ENV_BY_PREFIX
+
+
+def _available_cloud_embed_model() -> str:
+    """Pick a cloud embedder whose credentials are actually present.
+
+    The fallback was unconditionally `mistral/mistral-embed`. A perfectly valid
+    online configuration -- enough independent Groq, Hugging Face, NVIDIA and
+    OpenRouter voters, no Mistral key -- therefore completed every generation
+    call and then failed every embedding call, so `synthesize()` returned
+    DEGRADED after paying for the generations. An explicit
+    FLOSS_ENSEMBLE_EMBED_MODEL is still honoured verbatim; it is an operator
+    instruction, not a guess.
+    """
+    explicit = os.environ.get(CLOUD_EMBED_ENV, "").strip()
+    if explicit:
+        return explicit
+
+    for candidate in _CLOUD_EMBED_CANDIDATES:
+        available, _reason = _credential_state_for_model(candidate)
+        if available:
+            return candidate
+
+    # Nothing is credentialled. Return the historical default so the failure
+    # says "no Mistral credential" at the call site rather than disappearing
+    # into a None, and so behaviour is unchanged for a caller that has neither.
+    return DEFAULT_CLOUD_EMBED_MODEL

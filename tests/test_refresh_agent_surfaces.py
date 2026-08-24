@@ -116,9 +116,17 @@ def test_build_command_includes_user_scope_for_agent_surface():
 
 
 def test_build_command_excludes_user_scope_for_other_steps():
+    # `skill` used to be the example here, because that materializer had no
+    # scope support. It has both the flag and two user-scope targets now
+    # (~/.codex/skills, the Hermes skills directory), so the example moved to a
+    # step that genuinely does not accept the flag -- forwarding it there would
+    # just fail with an argparse error.
+    # scripts/tests/test_refresh_runner_forwards_user_scope.py derives the whole
+    # set from the materializer sources, so this stays honest as they change.
     runner = _load_runner()
-    command = runner.build_command("skill", "x.py", False, False, True)
+    command = runner.build_command("context", "x.py", False, False, True)
     assert "--include-user-scope" not in command
+    assert "context" not in runner.USER_SCOPE_STEPS
 
 
 def test_build_command_composes_check_and_dry_run_flags():

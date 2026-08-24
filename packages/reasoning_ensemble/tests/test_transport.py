@@ -45,6 +45,11 @@ def test_transport_for_model():
 
 
 def test_resolve_voter_pool_modes(monkeypatch):
+    # This test is about transport MAPPING, not roster independence. The pool
+    # now carries the same independence bar the consensus path enforces, and
+    # this three-voter fixture is deliberately below it, so opt out explicitly
+    # rather than widening the fixture and losing the routing cases.
+    monkeypatch.setenv("FLOSS_ALLOW_DEGRADED_ROSTER", "1")
     fake_roster = {
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
         "flowith-gemini": "flowith/gemini-2.5-flash",
@@ -81,10 +86,11 @@ def test_resolve_embedder_prefers_local():
     assert fn("x") == [0.1, 0.2, 0.3]
 
 
-def test_resolve_embedder_falls_back_to_cloud(monkeypatch):
-    def dead_local(_text):
-        raise RuntimeError("ollama down")
+def _dead_local(_text):
+    raise RuntimeError("ollama down")
 
+
+def _capture_cloud_fn(monkeypatch):
     captured = {}
 
     def fake_cloud_fn(model):
@@ -92,10 +98,101 @@ def test_resolve_embedder_falls_back_to_cloud(monkeypatch):
         return lambda t: [0.9]
 
     monkeypatch.setattr(transport, "_cloud_embed_fn", fake_cloud_fn)
-    name, fn = transport.resolve_embedder(dead_local)
+    return captured
+
+
+def _clear_embed_credentials(monkeypatch):
+    monkeypatch.delenv(transport.CLOUD_EMBED_ENV, raising=False)
+    for candidate in transport._CLOUD_EMBED_CANDIDATES:
+        prefix = candidate.split("/", 1)[0] + "/"
+        for _prefix, env_vars in transport._CREDENTIAL_ENV_BY_PREFIX_FOR_TESTS:
+            if _prefix == prefix:
+                for env_var in env_vars:
+                    monkeypatch.delenv(env_var, raising=False)
+
+
+def test_resolve_embedder_falls_back_to_cloud(monkeypatch):
+    """Mistral first when its credential is present -- unchanged from before."""
+    _clear_embed_credentials(monkeypatch)
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    captured = _capture_cloud_fn(monkeypatch)
+
+    name, fn = transport.resolve_embedder(_dead_local)
+
     assert name == transport.DEFAULT_CLOUD_EMBED_MODEL
     assert captured["model"] == transport.DEFAULT_CLOUD_EMBED_MODEL
     assert fn("x") == [0.9]
+
+
+def test_the_cloud_embedder_skips_providers_with_no_credential(monkeypatch):
+    """A valid roster without Mistral must not embed against Mistral.
+
+    The fallback was unconditionally mistral/mistral-embed. A configuration with
+    enough independent Groq/HuggingFace/NVIDIA/OpenRouter voters but no Mistral
+    key completed every generation call and failed every embedding call, so
+    synthesize() returned DEGRADED after paying for the generations.
+    """
+    _clear_embed_credentials(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    captured = _capture_cloud_fn(monkeypatch)
+
+    name, _fn = transport.resolve_embedder(_dead_local)
+
+    assert name == "openai/text-embedding-3-small"
+    assert captured["model"] == name
+
+
+def test_an_explicit_embed_model_is_honoured_verbatim(monkeypatch):
+    """An operator instruction is not a guess to be second-guessed."""
+    _clear_embed_credentials(monkeypatch)
+    monkeypatch.setenv(transport.CLOUD_EMBED_ENV, "someprovider/custom-embed")
+    captured = _capture_cloud_fn(monkeypatch)
+
+    name, _fn = transport.resolve_embedder(_dead_local)
+
+    assert name == "someprovider/custom-embed"
+    assert captured["model"] == name
+
+
+def test_with_no_credentials_the_historical_default_is_kept(monkeypatch):
+    """Failing at the call site beats disappearing into a None."""
+    _clear_embed_credentials(monkeypatch)
+    _capture_cloud_fn(monkeypatch)
+
+    name, _fn = transport.resolve_embedder(_dead_local)
+
+    assert name == transport.DEFAULT_CLOUD_EMBED_MODEL
+
+
+def test_an_unknown_voter_mode_is_refused(monkeypatch):
+    """`locla` must not silently mean `online`.
+
+    The catch-all default sent the prompt to cloud voters when the operator had
+    asked -- with one transposed letter -- for the mode that keeps prompts off
+    the network entirely.
+    """
+    import pytest
+
+    monkeypatch.setenv(transport.MODE_ENV, "locla")
+    with pytest.raises(ValueError, match="Unknown voter mode"):
+        transport.resolve_voter_pool()
+
+
+def test_the_online_pool_enforces_independence(monkeypatch):
+    """The ensemble must not report a roster the consensus path would refuse."""
+    import pytest
+
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setattr(
+        transport,
+        "resolve_default_voter_specs",
+        lambda **kw: {
+            "groq-a": "groq/openai/gpt-oss-120b",
+            "groq-b": "groq/qwen/qwen3.6-27b",
+        },
+    )
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        transport.resolve_voter_pool(mode="online")
 
 
 def test_generate_routes_by_transport(monkeypatch):
