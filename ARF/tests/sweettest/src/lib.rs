@@ -146,3 +146,113 @@ pub struct KnowledgeTriple {
     pub source: AgentPubKey,
     pub created_at: Timestamp,
 }
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PatternType {
+    Kernel,
+    Adr,
+    FrameTranslation,
+    VoterPersona,
+    Constitution,
+    Claim,
+    Skill,
+    MemoryEntry,
+    Other,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum BlastRadius {
+    Local,
+    Module,
+    System,
+    Substrate,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConsentScope {
+    ReadOnly,
+    Integrate,
+    Propagate,
+    Bind,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RefusalMode {
+    Reject,
+    BoundedAccept,
+    TouristObserve,
+    CounterPropose,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    Accepted,
+    BoundedAccept,
+    TouristObserve,
+    CounterPropose,
+    Rejected,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CreateConsentPayloadInput {
+    pub payload_id: String,
+    pub pattern_id: String,
+    pub pattern_type: PatternType,
+    pub pattern_hash: String,
+    pub proposer_did: String,
+    pub recipient_did: String,
+    pub blast_radius: BlastRadius,
+    pub consent_scope: Vec<ConsentScope>,
+    pub refusal_modes: Option<Vec<RefusalMode>>,
+    pub refusable_until: Option<Timestamp>,
+    pub parent_consent_id: Option<holochain::prelude::ActionHash>,
+    pub rationale: Option<String>,
+    pub submitted_at: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct ConsentPayload {
+    pub payload_id: String,
+    pub pattern_id: String,
+    pub pattern_type: PatternType,
+    pub pattern_hash: String,
+    pub proposer_did: String,
+    pub recipient_did: String,
+    pub blast_radius: BlastRadius,
+    pub consent_scope: Vec<ConsentScope>,
+    pub refusal_modes: Vec<RefusalMode>,
+    pub refusable_until: Option<Timestamp>,
+    pub parent_consent_id: Option<holochain::prelude::ActionHash>,
+    pub rationale: Option<String>,
+    pub submitted_at: Timestamp,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct CreateConsentDecisionInput {
+    pub decision_id: String,
+    pub payload_action_hash: holochain::prelude::ActionHash,
+    pub decider_did: String,
+    pub outcome: Outcome,
+    pub scope_granted: Vec<ConsentScope>,
+    pub rationale: Option<String>,
+    pub counter_frame_ref: Option<holochain::prelude::ActionHash>,
+    pub expires_at: Option<Timestamp>,
+    pub decided_at: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct ConsentDecision {
+    pub decision_id: String,
+    pub payload_action_hash: holochain::prelude::ActionHash,
+    pub decider_did: String,
+    pub outcome: Outcome,
+    pub scope_granted: Vec<ConsentScope>,
+    pub rationale: Option<String>,
+    pub counter_frame_ref: Option<holochain::prelude::ActionHash>,
+    pub expires_at: Option<Timestamp>,
+    pub decided_at: Timestamp,
+}
