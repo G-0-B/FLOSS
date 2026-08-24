@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -90,7 +91,14 @@ def resolve_skill_entry(workspace_root: Path, entry: dict[str, Any]) -> dict[str
         raise SkillSurfaceError(
             "Every skill entry must contain a non-empty string `path`"
         )
-    skill_dir = (workspace_root / raw_path).resolve()
+    # Normalize separators before joining. A manifest entry written as
+    # `FLOSS/skill-corpus\superpowers-brainstorming` is a single literal
+    # filename component on POSIX -- pathlib does not treat a backslash as a
+    # separator there -- so resolve_skill_entry raised SkillSurfaceError and the
+    # whole skill step failed on Linux and macOS before any projection was
+    # written. The manifest is fixed too; this keeps one bad entry from taking
+    # the step down again.
+    skill_dir = (workspace_root / raw_path.replace("\\", "/")).resolve()
     skill_md = skill_dir / "SKILL.md"
     if not skill_dir.is_dir():
         raise SkillSurfaceError(f"Skill path is not a directory: {skill_dir}")
@@ -114,18 +122,101 @@ def collect_source_snapshot(skill_dir: Path) -> dict[str, str]:
 
 
 def resolve_install_path(workspace_root: Path, raw_path: str) -> Path:
-    expanded = Path(raw_path).expanduser()
-    if expanded.is_absolute():
-        return expanded
-    return (workspace_root / raw_path).resolve()
+    """Resolve a target's `install_path` through the one shared resolver.
+
+    This used to be `Path(raw_path).expanduser()` plus a workspace join, which
+    expands `~` but NOT `%LOCALAPPDATA%`/`$VAR`. A manifest path like
+    `%LOCALAPPDATA%/hermes/skills` is not absolute before expansion, so it was
+    joined to the workspace and the materializer created a literal
+    `<workspace>/%LOCALAPPDATA%/hermes/skills` tree. The hermes target dodged
+    that only by hardcoding one machine's absolute Windows path, which on POSIX
+    is not absolute either and produced a literal `C:/Users/kalis/...` directory
+    inside the repo.
+
+    `resolve_manifest_path` in the sibling agent-surface module already handles
+    `~`, `%VAR%`, and `$VAR`, and fails loudly on an undefined variable rather
+    than passing the literal through. Imported lazily for the same reason
+    `materialize_shared_hook_surface.resolve_target_path` does it lazily: the
+    agent-surface module imports the hook module at load time, and routing all
+    three through one resolver is worth more than avoiding the deferred import.
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import (  # noqa: E402
+        resolve_manifest_path,
+    )
+
+    return resolve_manifest_path(workspace_root, raw_path)
+
+
+def skill_target_in_scope(
+    target_name: str, target_cfg: dict[str, Any], include_user_scope: bool
+) -> bool:
+    """Repo-scope targets always; user-scope targets only on the explicit opt-in.
+
+    This module had no scope gate at all while its siblings did, and two of its
+    targets write outside the repository -- `~/.codex/skills` and the Hermes
+    skills directory. An ordinary `refresh_agent_surfaces.py` with no
+    `--include-user-scope` therefore rewrote machine-wide state from a
+    repo-scope run, which is exactly the hole that was closed for the hook and
+    agent surfaces.
+
+    A target with no declared `scope` is treated as `repo`, matching the
+    sibling modules.
+    """
+    scope = str(target_cfg.get("scope", "repo")).strip().lower() or "repo"
+    if scope not in {"repo", "user"}:
+        raise SkillSurfaceError(
+            f"Target {target_name!r} declares unknown scope {scope!r}; "
+            "expected 'repo' or 'user'"
+        )
+    return scope == "repo" or include_user_scope
+
+
+def assert_repo_scope_stays_inside(
+    target_name: str, target_cfg: dict[str, Any], resolved: Path, workspace_root: Path
+) -> None:
+    """A `scope: "repo"` target must resolve inside the workspace.
+
+    The declared scope and the resolved path have to agree, or `scope: "repo"`
+    plus an absolute install path would be a way to write user-scope locations
+    from a run that never asked for user scope.
+    """
+    if str(target_cfg.get("scope", "repo")).strip().lower() not in {"", "repo"}:
+        return
+    root = workspace_root.resolve()
+    try:
+        resolved.resolve().relative_to(root)
+    except ValueError:
+        raise SkillSurfaceError(
+            f"Target {target_name!r} declares scope 'repo' but its install_path "
+            f"resolves to {resolved}, outside {root}. Writing outside the "
+            "repository is user scope: declare `\"scope\": \"user\"` and pass "
+            "--include-user-scope."
+        ) from None
 
 
 def build_target_roots(
-    manifest: dict[str, Any], workspace_root: Path
+    manifest: dict[str, Any],
+    workspace_root: Path,
+    *,
+    skipped: list[str] | None = None,
 ) -> dict[str, str]:
+    """Resolved roots for every enabled target, scope-independent.
+
+    Deliberately NOT filtered by `--include-user-scope`: these roots go into the
+    generated registry, and a generated artifact whose contents depend on a
+    runtime flag would drift back and forth between a plain refresh and a
+    user-scope one, with `--check` calling each of them dirty in turn. The flag
+    decides what gets WRITTEN (`writable_targets` below), not what the manifest
+    says exists.
+    """
     targets = manifest.get("targets", {})
     if not isinstance(targets, dict):
         raise SkillSurfaceError("Manifest `targets` must be a JSON object")
+    if skipped is None:
+        skipped = []
 
     roots: dict[str, str] = {}
     for target_name, target_cfg in targets.items():
@@ -138,8 +229,46 @@ def build_target_roots(
             raise SkillSurfaceError(
                 f"Enabled target {target_name!r} must define `install_path`"
             )
-        roots[target_name] = str(resolve_install_path(workspace_root, install_path))
+        try:
+            resolved = resolve_install_path(workspace_root, install_path)
+        except Exception as exc:  # SharedSurfaceError from the shared resolver
+            # A user-scope target whose variable is undefined on this platform
+            # is skipped, not fatal: a POSIX run has no %LOCALAPPDATA%, and the
+            # whole skill step failing there would take every repo-scope
+            # projection down with it. A repo-scope target still raises.
+            if str(target_cfg.get("scope", "repo")).strip().lower() == "user":
+                skipped.append(f"skip {target_name}: unresolvable here ({exc})")
+                continue
+            raise
+        assert_repo_scope_stays_inside(
+            target_name, target_cfg, resolved, workspace_root
+        )
+        roots[target_name] = str(resolved)
     return roots
+
+
+def writable_targets(
+    manifest: dict[str, Any],
+    target_roots: dict[str, str],
+    *,
+    include_user_scope: bool,
+    skipped: list[str] | None = None,
+) -> dict[str, str]:
+    """The subset of resolved roots this run is allowed to write."""
+    if skipped is None:
+        skipped = []
+    targets = manifest.get("targets", {})
+    writable: dict[str, str] = {}
+    for target_name, root in target_roots.items():
+        target_cfg = targets.get(target_name) or {}
+        if skill_target_in_scope(target_name, target_cfg, include_user_scope):
+            writable[target_name] = root
+        else:
+            skipped.append(
+                f"skip {target_name}: user-scope target "
+                "(pass --include-user-scope to write it)"
+            )
+    return writable
 
 
 def build_registry(
@@ -333,13 +462,21 @@ def materialize(
     *,
     check: bool,
     dry_run: bool,
+    include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = load_manifest(manifest_path)
-    target_roots = build_target_roots(manifest, workspace_root)
+    skipped: list[str] = []
+    target_roots = build_target_roots(manifest, workspace_root, skipped=skipped)
     registry = build_registry(manifest, workspace_root, target_roots)
+    writable = writable_targets(
+        manifest,
+        target_roots,
+        include_user_scope=include_user_scope,
+        skipped=skipped,
+    )
     index = build_index(registry)
 
-    results: list[str] = []
+    results: list[str] = list(skipped)
     drift_found = False
 
     registry_path = output_dir / "skill-registry.json"
@@ -354,7 +491,7 @@ def materialize(
     results.append(message)
     drift_found = drift_found or changed
 
-    for target_name, root in target_roots.items():
+    for target_name, root in writable.items():
         target_root = Path(root)
         for skill in registry["skills"]:
             messages, changed = install_skill_projection(
@@ -380,6 +517,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--include-user-scope",
+        action="store_true",
+        help=(
+            "also write targets declaring `\"scope\": \"user\"`, which live "
+            "outside the repository (e.g. ~/.codex/skills)"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -391,6 +536,7 @@ def main() -> int:
         output_dir=args.output_dir.resolve(),
         check=args.check,
         dry_run=args.dry_run,
+        include_user_scope=args.include_user_scope,
     )
     for line in results:
         print(line)

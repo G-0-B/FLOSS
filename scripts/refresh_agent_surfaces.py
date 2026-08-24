@@ -58,12 +58,13 @@ STEPS: list[tuple[str, str]] = [
 # this set was written, and nothing tied the two together: running the supported
 # `--only hook --include-user-scope` silently dropped the flag, skipped both
 # targets, and still exited 0 -- an operator asking for a user-scope refresh got
-# a clean report and no refresh.
+# a clean report and no refresh. The skill materializer joined them when its own
+# scope gate landed (`~/.codex/skills`, the Hermes skills directory).
 #
 # test_refresh_runner_forwards_user_scope.py derives this same set from the
 # materializer sources, so the next script to grow the flag fails a test instead
 # of silently doing nothing.
-USER_SCOPE_STEPS = {"agent-surface", "hook"}
+USER_SCOPE_STEPS = {"agent-surface", "hook", "skill"}
 
 
 def build_command(

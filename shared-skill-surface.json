@@ -35,22 +35,26 @@
   "codex": {
    "enabled": true,
    "mode": "materialized-copy",
-   "install_path": "~/.codex/skills"
+   "install_path": "~/.codex/skills",
+   "scope": "user"
   },
   "claude": {
    "enabled": true,
    "mode": "materialized-copy",
-   "install_path": ".claude/skills"
+   "install_path": ".claude/skills",
+   "scope": "repo"
   },
   "gemini": {
    "enabled": true,
    "mode": "materialized-copy",
-   "install_path": ".gemini/skills"
+   "install_path": ".gemini/skills",
+   "scope": "repo"
   },
   "opencode": {
    "enabled": true,
    "mode": "materialized-copy",
-   "install_path": "opworkers/.opencode/skills"
+   "install_path": "opworkers/.opencode/skills",
+   "scope": "repo"
   },
   "cowork": {
    "enabled": false,
@@ -61,7 +65,8 @@
   "hermes": {
    "enabled": true,
    "mode": "materialized-copy",
-   "install_path": "C:/Users/kalis/AppData/Local/hermes/skills"
+   "install_path": "%LOCALAPPDATA%/hermes/skills",
+   "scope": "user"
   }
  },
  "skills": [
@@ -175,7 +180,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-brainstorming",
+   "path": "FLOSS/skill-corpus/superpowers-brainstorming",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -183,7 +188,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-dispatching-parallel-agents",
+   "path": "FLOSS/skill-corpus/superpowers-dispatching-parallel-agents",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -191,7 +196,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-executing-plans",
+   "path": "FLOSS/skill-corpus/superpowers-executing-plans",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -199,7 +204,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-finishing-a-development-branch",
+   "path": "FLOSS/skill-corpus/superpowers-finishing-a-development-branch",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -207,7 +212,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-receiving-code-review",
+   "path": "FLOSS/skill-corpus/superpowers-receiving-code-review",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -215,7 +220,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-requesting-code-review",
+   "path": "FLOSS/skill-corpus/superpowers-requesting-code-review",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -223,7 +228,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-subagent-driven-development",
+   "path": "FLOSS/skill-corpus/superpowers-subagent-driven-development",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -231,7 +236,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-systematic-debugging",
+   "path": "FLOSS/skill-corpus/superpowers-systematic-debugging",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -239,7 +244,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-test-driven-development",
+   "path": "FLOSS/skill-corpus/superpowers-test-driven-development",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -247,7 +252,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-using-git-worktrees",
+   "path": "FLOSS/skill-corpus/superpowers-using-git-worktrees",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -255,7 +260,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-using-superpowers",
+   "path": "FLOSS/skill-corpus/superpowers-using-superpowers",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -263,7 +268,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-verification-before-completion",
+   "path": "FLOSS/skill-corpus/superpowers-verification-before-completion",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -271,7 +276,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-writing-plans",
+   "path": "FLOSS/skill-corpus/superpowers-writing-plans",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
@@ -279,7 +284,7 @@
    ]
   },
   {
-   "path": "FLOSS/skill-corpus\\superpowers-writing-skills",
+   "path": "FLOSS/skill-corpus/superpowers-writing-skills",
    "category": "superpowers",
    "summary": "Superpowers agentic framework skill.",
    "upstreams": [
