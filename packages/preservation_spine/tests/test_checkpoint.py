@@ -296,10 +296,9 @@ def test_load_missing_and_empty_path_behavior_is_explicit(tmp_path: Path) -> Non
 
     empty = tmp_path / "empty.jsonl"
     empty.write_bytes(b"")
-    with pytest.raises(CheckpointIntegrityError, match="empty"):
+    with pytest.raises(FileNotFoundError):
         load_latest_checkpoint(empty)
-    with pytest.raises(CheckpointIntegrityError, match="empty"):
-        append_checkpoint(empty, _checkpoint())
+    assert not empty.exists()
 
 
 @pytest.mark.parametrize(
@@ -779,3 +778,41 @@ def test_fdopen_failure_closes_the_raw_checkpoint_descriptor(
     assert "fd" in leaked
     with pytest.raises(OSError):
         os.fstat(leaked["fd"])
+
+def test_empty_no_intent_genesis_is_unpublished_and_appendable(tmp_path: Path) -> None:
+    path = tmp_path / "checkpoints.jsonl"
+    path.write_bytes(b"")
+    first = _checkpoint()
+    append_checkpoint(path, first)
+    assert load_latest_checkpoint(path) == first
+
+
+def test_empty_no_intent_genesis_is_absent_on_load(tmp_path: Path) -> None:
+    path = tmp_path / "checkpoints.jsonl"
+    path.write_bytes(b"")
+    with pytest.raises(FileNotFoundError):
+        load_latest_checkpoint(path)
+    assert not path.exists()
+
+
+def test_genesis_fsyncs_empty_target_only_after_intent_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("parent-directory fsync is a POSIX durability step")
+    path = tmp_path / "checkpoints.jsonl"
+    intent = checkpoint_module._intent_path(path)
+    seen: list[bool] = []
+    original = checkpoint_module._fsync_parent_directory
+
+    def tracking(target: Path) -> None:
+        if target.name == path.name:
+            seen.append(intent.exists())
+        original(target)
+
+    monkeypatch.setattr(checkpoint_module, "_fsync_parent_directory", tracking)
+    append_checkpoint(path, _checkpoint())
+    assert seen, "empty genesis target must be published after the intent"
+    assert all(seen)
+
