@@ -24,20 +24,36 @@ name: Rust CI
 on:
   push:
     branches: [ "main" ]
+    # Must list every file that can change the BUILD, not just sources, and must
+    # stay in step with the `changes` job's predicate below. A push of only
+    # ARF/.cargo/config.toml -- the file that selects the wasm getrandom backend
+    # -- matched nothing here, so main could take that change with no Rust job
+    # running at all.
     paths:
       - "**/*.rs"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "rustfmt.toml"
+      - "**/rustfmt.toml"
+      - "**/.rustfmt.toml"
+      - "**/rust-toolchain"
+      - "**/rust-toolchain.toml"
+      - "**/.cargo/config"
+      - "**/.cargo/config.toml"
       - ".github/workflows/rust-ci.yml"
+  # Deliberately NOT path-filtered, for the same reason python-ci.yml is not --
+  # see the comment on its `pull_request` trigger.
+  #
+  # GitHub leaves a required check PENDING, not passing, when its workflow is
+  # skipped by path filtering. `fmt` and `wasm-check` are meant to be required,
+  # so a filter here would hang every PR that happens to touch no Rust. Six of
+  # the seven PRs open when this was written match zero Rust paths, so that is
+  # measured, not hypothetical.
+  #
+  # I made this exact mistake here after documenting it one file over. The jobs
+  # below therefore always RUN and always report; what they skip is the
+  # expensive work, decided per-PR by the `changes` job.
   pull_request:
     branches: [ "main" ]
-    paths:
-      - "**/*.rs"
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
-      - "rustfmt.toml"
-      - ".github/workflows/rust-ci.yml"
   merge_group:
     types: [checks_requested]
   schedule:
@@ -68,21 +84,152 @@ env:
   CARGO_WORKSPACE: ARF
 
 jobs:
+  # Decides whether the Rust work is worth doing on this ref, without deciding
+  # whether the CHECKS report -- those always do.
+  changes:
+    name: Detect Rust changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.detect.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect
+        id: detect
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            # push, schedule, merge_group, manual: always do the work.
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The predicate must cover everything that can change the BUILD, not
+          # just sources. ARF/.cargo/config.toml carries
+          #     [target.wasm32-unknown-unknown]
+          #     rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
+          # which is the flag that makes the wasm build work at all -- its own
+          # comment records the failure without it. A PR editing only that file
+          # was reported rust=false, so both required checks took their no-op
+          # success path and the gate went green on the single change most
+          # certain to break it. Same for rust-toolchain.toml, the legacy
+          # `.cargo/config`, and `.rustfmt.toml`.
+          # The checkout above uses fetch-depth: 0, which fetches all history for
+          # all branches, so origin/<base> is already present. No extra fetch --
+          # and deliberately no `|| true` anywhere in here: every failure mode of
+          # this step must fail the job. A masked failure produces rust=false,
+          # which is the answer that SKIPS the required checks.
+          base="origin/${{ github.base_ref }}"
+          git rev-parse --verify --quiet "$base^{commit}" >/dev/null \
+            || { echo "::error::base ref $base not fetched; cannot decide"; exit 1; }
+          changed=$(git diff --name-only "$base"...HEAD)
+          echo "changed files:"
+          sed 's/^/  /' <<< "$changed"
+          # Not `... | grep -q ...`: grep -q exits at the first match, the writer
+          # upstream of it takes SIGPIPE, and under `set -o pipefail` the whole
+          # pipeline reports non-zero -- so a large diff that DOES contain Rust
+          # changes could select rust=false and skip the required checks. A
+          # here-string has no pipeline and no such race.
+          if grep -Eq '\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.?rustfmt\.toml$|(^|/)rust-toolchain(\.toml)?$|(^|/)\.cargo/config(\.toml)?$|\.github/workflows/rust-ci\.yml$' <<< "$changed"; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Both required jobs below run with `!cancelled()` and fail closed on a
+  # detector that did not succeed. Reason: GitHub reports a job skipped by a
+  # conditional -- including one skipped because a job it `needs` FAILED -- with
+  # a conclusion of Success, and a required check in that state does not block
+  # the merge. (This is the opposite of a workflow skipped by path filtering,
+  # which stays Pending and blocks; the two are easy to conflate.) So without
+  # this, any failure in `changes` -- checkout, the base-ref guard, the diff --
+  # would take both required checks down with it and report both as passing, on
+  # exactly the PRs where detection could not decide.
   fmt:
     name: Format (cargo fmt --check)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: changes
+    if: ${{ !cancelled() }}
     steps:
+      - name: Detector must have succeeded
+        if: needs.changes.result != 'success'
+        run: |
+          echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
+          exit 1
+
       - uses: actions/checkout@v4
 
       - name: Set up Rust toolchain (stable + rustfmt)
+        if: needs.changes.outputs.rust == 'true'
         uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c  # `stable` branch head, 2026-08-21
         with:
           components: rustfmt
 
       - name: Cargo fmt (check only)
+        if: needs.changes.outputs.rust == 'true'
         working-directory: ${{ env.CARGO_WORKSPACE }}
         run: cargo fmt --all -- --check
+
+      - name: No Rust changes
+        if: needs.changes.outputs.rust != 'true'
+        run: echo "No Rust files changed; nothing to format-check. Reporting success."
+
+  wasm-check:
+    name: Compile check (wasm32)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    # See the note on `fmt`: skipped required check == Success == merges.
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Detector must have succeeded
+        if: needs.changes.result != 'success'
+        run: |
+          echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry + build
+        if: needs.changes.outputs.rust == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ARF/target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('ARF/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
+
+      - name: Set up Rust toolchain (stable + wasm32)
+        if: needs.changes.outputs.rust == 'true'
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c  # `stable` branch head, 2026-08-21
+        with:
+          targets: wasm32-unknown-unknown
+
+      # NOT part of the `clippy`/`test` hold. Those are held because the full
+      # Holochain build and test surface is not expected to pass yet. This is a
+      # type-check of the zomes against the target they actually ship to, and it
+      # is the only thing that can catch a dependency bump breaking the wasm
+      # backend.
+      #
+      # It exists because it was needed: dependabot PR #46 bumped getrandom
+      # 0.3 -> 0.4 and every check on that PR passed -- green set, CodeQL,
+      # semgrep, cargo fmt -- while `cargo check --target wasm32-unknown-unknown`
+      # failed outright. `cargo fmt` does not compile, and clippy and test are
+      # held, so nothing in CI could see it. Native `cargo check` passes too, so
+      # the target matters.
+      - name: Cargo check (wasm32)
+        if: needs.changes.outputs.rust == 'true'
+        working-directory: ${{ env.CARGO_WORKSPACE }}
+        run: cargo check --workspace --target wasm32-unknown-unknown
+
+      - name: No Rust changes
+        if: needs.changes.outputs.rust != 'true'
+        run: echo "No Rust files changed; nothing to compile-check. Reporting success."
 
   clippy:
     name: Lint (cargo clippy) [HELD -- manual only]
