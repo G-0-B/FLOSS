@@ -38,13 +38,13 @@ Each test binary performs the following setup:
 The build-and-run sequence is explicit rather than hidden inside test code:
 
 ```text
-cargo build --release --target wasm32-unknown-unknown
+cargo build --workspace --exclude rose_forest_sweettest --release --target wasm32-unknown-unknown
 hc dna pack dnas/rose_forest/workdir/
 cargo test -p rose_forest_sweettest --test substrate_bridge_test
 cargo test -p rose_forest_sweettest --test consent_zome_test
 ```
 
-Inside a Windows-created Git worktree, WSL invokes the flake as `nix develop path:.` so Nix does not try to resolve the worktree's Windows-form Git metadata path.
+The native Sweettest package is excluded from the WASM build because it depends on the conductor runtime and is not a zome. Inside a Windows-created Git worktree, WSL invokes the flake as `nix develop path:.` so Nix does not try to resolve the worktree's Windows-form Git metadata path.
 
 ## Substrate Bridge Test
 
