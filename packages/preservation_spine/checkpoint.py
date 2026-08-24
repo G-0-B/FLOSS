@@ -204,6 +204,7 @@ def append_checkpoint(path: Path, checkpoint: Checkpoint) -> None:
     try:
         with _locked_directory(parent):
             _recover_pending_append(target)
+            _discard_unpublished_genesis(target)
             if target.exists():
                 with _open_checkpoint_stream(target, create=False) as stream:
                     existing = _read_stream_bytes(stream, target)
@@ -240,6 +241,7 @@ def load_latest_checkpoint(path: Path) -> Checkpoint:
     try:
         with _locked_directory(parent):
             _recover_pending_append(target)
+            _discard_unpublished_genesis(target)
             if not target.exists():
                 raise FileNotFoundError(target)
             with _open_checkpoint_stream(target, create=False) as stream:
@@ -257,6 +259,9 @@ def _append_with_intent(
 ) -> None:
     intent = _build_intent(path, committed_bytes, checkpoint)
     _write_pending_intent(path, intent)
+    if intent.committed_size == 0:
+        # Intent is durable first. Only then publish the empty target name.
+        _fsync_parent_directory(path)
     content = canonical_json_bytes(checkpoint)
     try:
         _append_bytes(
@@ -574,7 +579,9 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
                 raise CheckpointIntegrityError(
                     "checkpoint file changed while acquiring append handle"
                 )
-            _fsync_parent_directory(path)
+            # Do not fsync the parent here. Publishing an empty genesis file
+            # before the append intent exists leaves a durable empty log that
+            # later load/append treat as irrecoverable.
         else:
             before = _validated_file_state(path)
             if _node_identity(before) != _node_identity(handle_state):
@@ -911,6 +918,27 @@ def _recover_pending_append(path: Path) -> None:
     if remove_target:
         _remove_empty_checkpoint_file(path)
     _clear_pending_intent(path)
+
+
+
+def _discard_unpublished_genesis(path: Path) -> None:
+    """Remove a leftover empty genesis file that has no recovery intent.
+
+    A crash after creating `checkpoints.jsonl` and before writing the append
+    intent used to leave a durable empty file. Load then failed with
+    `checkpoint file is empty`, and append took the existing-file path and
+    failed the same way. An empty file with no intent is unpublished, not a
+    committed chain.
+    """
+
+    if not path.exists():
+        return
+    if _intent_path(path).exists():
+        return
+    metadata = _validated_file_state(path)
+    if metadata.st_size != 0:
+        return
+    _remove_empty_checkpoint_file(path)
 
 
 def _remove_empty_checkpoint_file(path: Path) -> None:
