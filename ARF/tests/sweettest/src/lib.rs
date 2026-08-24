@@ -17,17 +17,34 @@ pub async fn setup_two_agent_app() -> TestApp {
         .join("../../dnas/rose_forest/workdir/rose_forest.dna");
     assert!(
         bundle_path.is_file(),
-        "fresh DNA bundle missing: {}",
+        "DNA bundle missing: {}",
         bundle_path.display()
     );
     let dna: DnaFile = SweetDnaFile::from_bundle(&bundle_path)
         .await
-        .expect("fresh four-zome DNA bundle must load");
+        .expect("DNA bundle must load");
+    let integrity_zomes: Vec<_> = dna
+        .dna_def()
+        .integrity_zomes
+        .iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+    let coordinator_zomes: Vec<_> = dna
+        .dna_def()
+        .coordinator_zomes
+        .iter()
+        .map(|(name, _)| name.to_string())
+        .collect();
+    assert_eq!(
+        integrity_zomes,
+        ["rose_forest_integrity", "consent_integrity"]
+    );
+    assert_eq!(coordinator_zomes, [ROSE_ZOME, CONSENT_ZOME]);
     let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let apps = conductors
         .setup_app("rose-forest-sweettest", &[dna])
         .await
-        .expect("four-zome DNA must install on both conductors");
+        .expect("DNA must install on both conductors");
     let ((alice,), (bob,)) = apps.into_tuples();
     assert_ne!(
         alice.agent_pubkey(),
