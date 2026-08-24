@@ -244,7 +244,7 @@ criterion_6_distinct_agents_have_equal_publish_query_and_verify_access
 
 Each test creates a fresh `TestApp`. Criterion 2 bounds `record.action().timestamp()` between timestamps captured before and after the zome call, asserts `record.action().author() == alice.agent_pubkey()`, asserts `record.signed_action().signature.0.len() == 64`, and decodes exact entry content. Criterion 3 calls `await_consistency` before Bob's read and compares Bob's record action hash, action author, action timestamp, signature, and decoded content to Alice's record. Criterion 3b XOR-mutates bytes `3..35` of a real hash via `ActionHash::from_raw_39` and expects `None` for the mutation while the real hash still resolves.
 
-Criterion 4 discards the create return from its assertion, converges, queries Bob first by subject and then by predicate, and finds the expected `TripleResult` by `(subject, predicate, object)` rather than position. Criterion 5 has Alice and Bob publish different objects for identical subject and predicate, converges, requires two distinct hashes, and compares an object-to-author map containing both claims. Criterion 6 has both agents publish with identical `related_to` calls, converges, compares result sets as `BTreeSet<ActionHash>`, and retrieves each record from the opposite conductor.
+Criterion 4 retains the create return, converges, queries Bob first by subject and then by predicate, and binds each matching `TripleResult` to the exact action hash, content, confidence, author, and entry timestamp rather than relying on result position. Criterion 5 has Alice and Bob publish different objects for identical subject and predicate, converges, requires two distinct hashes, and compares an object-to-`(ActionHash, AgentPubKey)` map containing both exact claims. Criterion 6 has both agents publish with identical `related_to` calls, converges, compares result sets as `BTreeSet<ActionHash>`, and retrieves each record from the opposite conductor.
 
 - [ ] **Step 2: Run the complete target and verify RED**
 
@@ -406,8 +406,8 @@ target/wasm32-unknown-unknown/release/consent.wasm
 Run:
 
 ```bash
-nix develop path:. --command RUST_TEST_THREADS=1 ./tests/sweettest/run.sh --test substrate_bridge_test --test consent_zome_test
-nix develop path:. --command RUST_TEST_THREADS=1 ./tests/sweettest/run.sh --test substrate_bridge_test --test consent_zome_test
+nix develop path:. --command ./tests/sweettest/run.sh
+nix develop path:. --command ./tests/sweettest/run.sh
 ```
 
 Expected: each runner invocation performs a locked parent build and fresh pack, then passes the isolated child suite serially with identical test counts.
