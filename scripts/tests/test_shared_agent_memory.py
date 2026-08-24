@@ -136,3 +136,48 @@ def test_materializes_registry_shared_index_and_claude_projection(tmp_path):
     assert "feedback-pressure-helps" in (
         workspace / ".claude" / "projects" / "C---shit" / "memory" / "MEMORY.md"
     ).read_text(encoding="utf-8")
+
+
+def test_index_gists_are_complete_sentences():
+    """The index line must not stop where the source file happened to wrap.
+
+    Canonical memory files are hard-wrapped at ~80 columns and the index used to
+    take the first physical LINE, so entries ended mid-sentence -- "does not gate
+    on the full pytest suite," -- which reads as the whole rule while dropping
+    the half that carries the reason.
+    """
+    module = load_memory_module()
+
+    body = (
+        "`.github/workflows/python-ci.yml` (PR #44) does not gate on the full\n"
+        "pytest suite, because the full suite is red and gating on red produces\n"
+        "a required check everyone learns to ignore.\n"
+        "\nA second paragraph that must not appear.\n"
+    )
+    gist = module.first_sentence(body)
+
+    assert gist.endswith("learns to ignore.")
+    assert "second paragraph" not in gist
+    assert "\n" not in gist
+
+
+def test_index_gists_skip_headings_and_blank_leaders():
+    module = load_memory_module()
+    body = "\n# A heading\n\nThe first real sentence. And a second one.\n"
+    assert module.first_sentence(body) == "The first real sentence."
+
+
+def test_a_very_long_single_sentence_is_capped_with_an_ellipsis():
+    """An ellipsis must mean 'genuinely longer', never 'the author wrapped here'."""
+    module = load_memory_module()
+    body = "word " * 200
+    gist = module.first_sentence(body)
+
+    assert len(gist) <= module._INDEX_GIST_MAX_CHARS + 1
+    assert gist.endswith("…")
+
+
+def test_an_empty_body_produces_no_gist():
+    module = load_memory_module()
+    assert module.first_sentence("") == ""
+    assert module.first_sentence("\n\n# only a heading\n") == ""

@@ -20,9 +20,10 @@ changelog_1_4_0: >
   shared-training-distribution skepticism, and scope-stated negatives;
   11f research guidelines. Section 12 self-check updated to match.
   Source: docs/research/intake_raw/2026-06-08-root/reports/FLOSSI0ULLK-operating-instructions-v2.md
-  NOTE: the filename still reads v1_3_1 while this header reads 1.4.0. Renaming the
-  canonical kernel ripples through LOADING_ORDER.md, both CLAUDE.md files, INDEX.md
-  and the context surface — deferred as an explicit operator decision.
+  RENAME COMPLETE: the file is FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md and the
+  header reads 1.4.0. The earlier note recording the filename/version mismatch as a
+  deferred operator decision is retired; LOADING_ORDER.md, both CLAUDE.md files,
+  INDEX.md, the context surface and index.html now point at the current name.
 truth_status: "verified"  # This kernel is in active production use
 evidence_sources:
   - "ADR-3: Metaprompt Kernelization (rationale for v1.2)"

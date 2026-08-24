@@ -284,16 +284,56 @@ def build_shared_index(entries: list[MemoryEntry]) -> str:
             continue
         lines.extend([f"## {memory_type.title()}", ""])
         for entry in typed:
-            first_line = next(
-                (line.strip() for line in entry.body.splitlines() if line.strip()),
-                "",
-            )
-            if first_line.startswith("#"):
-                first_line = ""
-            suffix = f" — {first_line}" if first_line else ""
+            gist = first_sentence(entry.body)
+            suffix = f" — {gist}" if gist else ""
             lines.append(f"- `{entry.memory_id}`: {entry.title}{suffix}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s")
+_INDEX_GIST_MAX_CHARS = 400
+
+
+def first_sentence(body: str) -> str:
+    """One COMPLETE sentence of an entry's body, for the index line.
+
+    This used to take the first physical LINE. The canonical memory files are
+    hard-wrapped at ~80 columns, so that produced index entries ending
+    mid-sentence -- "does not gate on the full pytest suite," -- which is worse
+    than no gist at all: it reads as the whole rule while omitting the half that
+    carries the reason.
+
+    The first paragraph is unwrapped, then cut at the first sentence boundary.
+    A first paragraph that is one very long sentence is capped, and only then
+    does an ellipsis appear -- so an ellipsis in the index always means
+    "genuinely longer", never "the author happened to wrap here".
+    """
+    paragraph: list[str] = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if paragraph:
+                break
+            continue
+        if stripped.startswith("#"):
+            if paragraph:
+                break
+            continue
+        paragraph.append(stripped)
+    if not paragraph:
+        return ""
+
+    text = " ".join(paragraph)
+    match = _SENTENCE_END.search(text)
+    if match:
+        sentence = text[: match.start()].strip()
+    else:
+        sentence = text.strip()
+    if len(sentence) > _INDEX_GIST_MAX_CHARS:
+        sentence = sentence[:_INDEX_GIST_MAX_CHARS].rstrip() + "…"
+    return sentence
 
 
 def build_claude_memory_index(entries: list[MemoryEntry]) -> str:

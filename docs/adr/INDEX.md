@@ -12,8 +12,14 @@
 ADRs use sequential integers. Sub-ADRs (e.g., ADR-0.1) extend a parent without replacing it. Supersession is explicit via `supersedes` field.
 
 Permanent numbers assigned in v2.0:
-- `ADR-MCP-ORCHESTRATOR` → **ADR-10** (file kept under historical name to avoid breaking inbound links; cross-reference both).
-- `ADR-N` (IPFS) → **ADR-11** (file kept under historical name pending a rename pass; cross-reference both).
+- `ADR-MCP-ORCHESTRATOR` → **ADR-10**, file `ADR-10-local-agent-node.md`. The rename has happened; the old
+  filename no longer exists. Prose that cites the historical identifier alongside the number is accurate and
+  intentional, but any *link* to `ADR-MCP-ORCHESTRATOR.md` is dead and should be repointed.
+- `ADR-N` (IPFS) → **ADR-11**, file `ADR-11-ipfs-large-file-integration.md`. Same: renamed, old filename gone.
+
+These two lines previously claimed the files were "kept under historical name to avoid breaking inbound links".
+That stopped being true when the files were renamed, and the stale claim outlived the rename in
+`docs/specs/spec-registry.json`, which carried duplicate entries for both old paths until 2026-08-24.
 
 **Namespace separation — FLOSSI U curriculum ADRs:** the FLOSSI U Founding Kit defines a *separate* curriculum-ADR series using the zero-padded `001`–`019` namespace (containing-scope / curriculum layer). These do **not** share numbering with the repo's integer `ADR-0 … ADR-N` engineering ADRs indexed below; the two series are intentionally distinct and must not be cross-numbered.
 

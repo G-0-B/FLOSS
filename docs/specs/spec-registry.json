@@ -149,14 +149,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
       "grandfathered": true
     },
-    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (Status)",
-      "grandfathered": true
-    },
-    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
-      "grandfathered": true
-    },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
       "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF — Upgraded ADR Suite v2.0)",
       "grandfathered": true
@@ -403,15 +395,6 @@
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
     },
-    "FLOSS/scripts/hook_bg_round.py": {
-      "spec": "Detached background consensus-round runner spawned by hook_post_write"
-    },
-    "FLOSS/scripts/hook_post_write.py": {
-      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
-    },
-    "FLOSS/scripts/hook_pre_write.py": {
-      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
-    },
     "FLOSS/scripts/major_consolidation_sweep.py": {
       "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
     },
@@ -459,9 +442,6 @@
     },
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
-    },
-    "FLOSS/scripts/session_start_inject.py": {
-      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/smoke_test_gateway.py": {
       "spec": "Smoke test: consensus gateway end-to-end"

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -43,15 +44,45 @@ LOG_FILE = AGENT_DIR / "hook.log"
 # failure already happened in this project with Hermes), so both the
 # interpreter and the script are resolved to absolute paths, never via
 # `agentmemory-mcp` on PATH. Overridable via env var for testing and for any
-# future machine where these paths differ.
-NODE_PATH = Path(
-    os.environ.get("AGENTMEMORY_NODE_PATH", r"C:\Program Files\nodejs\node.exe")
-)
+# machine where these paths differ.
+#
+# The defaults used to be those Windows paths unconditionally. On Linux and
+# macOS `C:\Program Files\nodejs\node.exe` is a literal relative filename, so
+# every spawn failed and session recall plus both detached saves were silently
+# dead by default -- silently, because this module's cardinal rule is to
+# swallow failures and return `False`/`[]`. The manifest carries platform Node
+# defaults but only expands them into command strings; it never exports them to
+# this Python child. So resolve per platform here, preferring PATH off Windows.
+
+
+def _default_node_path() -> str:
+    if sys.platform == "win32":
+        return r"C:\Program Files\nodejs\node.exe"
+    return shutil.which("node") or "node"
+
+
+def _default_mcp_server_path() -> str:
+    if sys.platform == "win32":
+        return r"C:\Users\kalis\AppData\Roaming\npm\node_modules\@agentmemory\mcp\bin.mjs"
+    # npm's global prefix differs by platform and installation
+    # (/usr/local, /usr/lib, ~/.npm-global, nvm, homebrew...), so try the
+    # common layouts and fall back to the most standard one. A caller on an
+    # unusual layout sets AGENTMEMORY_MCP_BIN, which is checked first anyway.
+    candidates = [
+        Path.home() / ".npm-global/lib/node_modules/@agentmemory/mcp/bin.mjs",
+        Path("/usr/local/lib/node_modules/@agentmemory/mcp/bin.mjs"),
+        Path("/usr/lib/node_modules/@agentmemory/mcp/bin.mjs"),
+        Path("/opt/homebrew/lib/node_modules/@agentmemory/mcp/bin.mjs"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return str(candidates[1])
+
+
+NODE_PATH = Path(os.environ.get("AGENTMEMORY_NODE_PATH") or _default_node_path())
 MCP_SERVER_PATH = Path(
-    os.environ.get(
-        "AGENTMEMORY_MCP_BIN",
-        r"C:\Users\kalis\AppData\Roaming\npm\node_modules\@agentmemory\mcp\bin.mjs",
-    )
+    os.environ.get("AGENTMEMORY_MCP_BIN") or _default_mcp_server_path()
 )
 
 _PROTOCOL_VERSION = "2024-11-05"

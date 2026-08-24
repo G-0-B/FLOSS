@@ -19,7 +19,16 @@ import os
 import sys
 from pathlib import Path
 
-WORKSPACE_ROOT = Path("C:/~shit")
+# Derived from this file's location, not hardcoded. This hook lives at
+# <workspace>/FLOSS/hooks/, so the workspace root is two levels up. The literal
+# `Path("C:/~shit")` it used to carry meant that in any other clone -- a
+# worktree, another machine, a contributor's checkout -- the hook silently
+# injected the ORIGINAL tree's startup contract, or none at all, while
+# reporting success. FLOSS_WORKSPACE_ROOT still overrides for the case where
+# the surface genuinely lives elsewhere.
+WORKSPACE_ROOT = Path(
+    os.environ.get("FLOSS_WORKSPACE_ROOT", Path(__file__).resolve().parents[2])
+)
 CONTRACT = WORKSPACE_ROOT / ".agent-surface" / "STARTUP_CONTRACT.md"
 
 # Hard cap on the memory-recall detour so a slow/unavailable agentmemory can
