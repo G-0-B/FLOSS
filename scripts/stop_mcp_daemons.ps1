@@ -2,7 +2,12 @@
 # Kills: consensus (:7331), ensemble (:7332), OmniRoute (:20128).
 # Removes PID files so next start is clean.
 
-$flossAgent = "$env:USERPROFILE\.floss_agent"
+# Same resolution mcp_daemon.py uses when it WRITES these files
+# (`Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() / ".floss_agent"))`).
+# Reading only ~/.floss_agent meant that under the supported override this
+# script found no PID files, reported "All daemons stopped", and left every
+# daemon running.
+$flossAgent = if ($env:FLOSS_AGENT_DIR) { $env:FLOSS_AGENT_DIR } else { "$env:USERPROFILE\.floss_agent" }
 
 # Kill FLOSS MCP daemons via PID files
 $pidFiles = @("consensus.pid", "reasoning_ensemble.pid")

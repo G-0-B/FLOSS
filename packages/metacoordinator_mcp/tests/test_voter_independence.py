@@ -201,3 +201,77 @@ def test_the_full_balanced_profile_passes_at_runtime(monkeypatch):
     monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
     _aliases, profiles = voters._load_builtin_registry()
     voters.assert_roster_is_independent("balanced", dict(profiles["balanced"]))
+
+
+# A roster nobody has probed. Four providers, four vendors, none of them in the
+# registry's `_probe.verified_working` index -- which is the shape an operator
+# gets the moment they use the documented FLOSS_VOTER_ROSTER override with
+# anything other than the registry's own hardcoded ids.
+CUSTOM_WIDE = {
+    "a": "openrouter/meta-llama/llama-4-70b",
+    "b": "together/deepseek-ai/deepseek-v4",
+    "c": "fireworks/mistralai/mixtral-8x22b",
+    "d": "anyscale/google/gemma-3-27b",
+}
+
+CUSTOM_NARROW = {
+    "a": "openrouter/meta-llama/llama-4-70b",
+    "b": "openrouter/deepseek-ai/deepseek-v4",
+    "c": "openrouter/mistralai/mixtral-8x22b",
+    "d": "openrouter/google/gemma-3-27b",
+}
+
+
+def test_a_custom_roster_of_unprobed_models_is_not_refused(monkeypatch):
+    """The documented override must work with models the registry never listed.
+
+    Filtering unknown models out of the accounting counted this roster as zero
+    surfaces and zero families, so `build_default_voters()` refused a perfectly
+    wide four-provider roster and the override was usable only with the
+    registry's hardcoded ids.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    voters.assert_roster_is_independent("balanced", CUSTOM_WIDE)
+
+
+def test_a_custom_roster_on_one_surface_is_still_refused(monkeypatch):
+    """Counting unknown models must not become a way to launder a narrow roster.
+
+    Same four vendors as above, all routed through one provider. The surface bar
+    is derivable without the probe index, so this still fails.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", CUSTOM_NARROW)
+
+
+def test_unprobed_models_are_reported_as_unverified(monkeypatch, capsys):
+    """A weaker guarantee has to be visible, not silent.
+
+    An unprobed model counts as its own family because nothing can parse lineage
+    out of an id. Two ids could be one model behind two vendors, so the operator
+    is told which models were counted that way.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    voters.assert_roster_is_independent("balanced", CUSTOM_WIDE)
+
+    warning = capsys.readouterr().err
+    assert "absent from the registry probe index" in warning
+    for model in CUSTOM_WIDE.values():
+        assert model in warning, "every unverified model must be named"
+
+
+def test_the_refusal_names_the_unverified_models(monkeypatch):
+    """The refusal message must say which models it could not classify."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        voters.assert_roster_is_independent("balanced", CUSTOM_NARROW)
+
+    message = str(excinfo.value)
+    assert "openrouter" in message, "the single surface must be named"
+    assert "unverified" in message

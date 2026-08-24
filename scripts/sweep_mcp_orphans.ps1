@@ -28,8 +28,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Load protected PIDs from FLOSS daemon PID files
-$flossAgent = "$env:USERPROFILE\.floss_agent"
+# Load protected PIDs from FLOSS daemon PID files.
+#
+# FLOSS_AGENT_DIR is where mcp_daemon.py actually writes them
+# (packages/mcp_daemon.py: `Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() /
+# ".floss_agent"))`), so reading only ~/.floss_agent meant that under the
+# supported override this sweep loaded ZERO protected PIDs. The daemons it was
+# written to protect run as `python -m packages.*`, which matches the orphan
+# signature below, and their PowerShell parent is normally gone once
+# start_mcp_daemons.ps1 exits -- so the scheduled sweep would classify the live
+# HTTP daemons as orphans and kill them every 15 minutes.
+$flossAgent = if ($env:FLOSS_AGENT_DIR) { $env:FLOSS_AGENT_DIR } else { "$env:USERPROFILE\.floss_agent" }
 $protectedPids = @()
 foreach ($pidFile in @("consensus.pid", "reasoning_ensemble.pid")) {
     $p = Join-Path $flossAgent $pidFile

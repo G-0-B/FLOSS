@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1295,3 +1296,93 @@ def test_chain_validation_cost_stays_roughly_linear(tmp_path, monkeypatch):
         f"chain validation looks superlinear: {short_elapsed:.3f}s for 60 links "
         f"vs {long_elapsed:.3f}s for 240"
     )
+
+
+def test_a_hole_below_the_head_fails_the_chain(tmp_path, monkeypatch):
+    """Deleting a mid-chain packet must not make the chain valid again.
+
+    The walk used to downgrade an unreachable ancestor to a warning once it was
+    deeper than the immediate prior. That made pruning a way to conceal a break:
+    remove the link that fails and every descendant validates. The spec is
+    unqualified -- "a `p` reference to a nonexistent prior packet is invalid" --
+    and ADR-20 D-B3 keeps existence and continuity as ancestor obligations even
+    though it drops the artifact pass.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+
+    paths = []
+    for index in range(5):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-24T10:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    # Prune a packet two links below the head -- deep enough that the old code
+    # took the "truncate the walk" path rather than the immediate-prior path.
+    paths[2].unlink()
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert result.ok is False
+    assert "E_PROVENANCE_PRIOR_NOT_FOUND" in result.errors
+
+
+def test_an_abandoned_lock_is_reclaimed(tmp_path, monkeypatch):
+    """A lock nobody will ever release must not wedge the chain forever.
+
+    `_release_lock` gives up on a Windows PermissionError and a crashed writer
+    never releases at all. The acquire loop only retried until its deadline and
+    then raised, so one transient sharing violation blocked every later write to
+    that chain permanently -- the comment claimed the timeout was reclamation,
+    and nothing reclaimed anything.
+    """
+    from packages.activity_log import provenance
+
+    lock_path = tmp_path / ".identity.lock"
+    lock_path.write_text("abandoned-token", encoding="utf-8")
+    stale_mtime = time.time() - (provenance._LOCK_STALE_SECONDS + 5)
+    os.utime(lock_path, (stale_mtime, stale_mtime))
+
+    token = provenance._acquire_lock(lock_path)
+
+    assert lock_path.read_text(encoding="utf-8") == token
+    provenance._release_lock(lock_path, token)
+    assert not lock_path.exists()
+
+
+def test_a_fresh_lock_is_not_stolen(tmp_path):
+    """Reclamation must not become a way to walk through a live lock."""
+    from packages.activity_log import provenance
+
+    lock_path = tmp_path / ".identity.lock"
+    lock_path.write_text("live-token", encoding="utf-8")
+
+    with pytest.raises(TimeoutError):
+        provenance._acquire_lock(lock_path)
+
+    assert lock_path.read_text(encoding="utf-8") == "live-token"

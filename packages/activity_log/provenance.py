@@ -35,6 +35,10 @@ SIGNATURE_PLACEHOLDER = "0B" + ("A" * 86)
 
 _AUTO_PRIOR = object()
 _LOCK_TIMEOUT_SECONDS = 5.0
+# A lock older than this is treated as abandoned and reclaimed. The critical
+# section it guards is a couple of small local file writes -- milliseconds -- so
+# an order of magnitude above the acquire timeout cannot be a live slow holder.
+_LOCK_STALE_SECONDS = 60.0
 
 
 @dataclass
@@ -144,8 +148,21 @@ def load_or_create_identity(identity_dir: Path | str) -> Identity:
         _release_lock(lock_path, token)
 
 
+def _lock_age_seconds(lock_path: Path) -> float | None:
+    """Seconds since the lock file was created, or None if it is gone."""
+    try:
+        return max(0.0, time.time() - lock_path.stat().st_mtime)
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+
+
 def _acquire_lock(lock_path: Path) -> str:
     deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
+    # Real stale reclamation, because there was none. `_release_lock` gives up
+    # on a Windows PermissionError, and a crashed writer never releases at all;
+    # in both cases the lock file simply stays, and an acquire loop that only
+    # retried until its deadline wedged every later write to that chain
+    # permanently after one transient sharing violation.
     while True:
         token = _b64url_encode(os.urandom(18))
         try:
@@ -170,23 +187,50 @@ def _acquire_lock(lock_path: Path) -> str:
             # they were genesis) and was in fact this. It reproduced only under
             # full-suite CPU load on Windows, and never on the Linux CI runner,
             # which is why the required gate stayed green while local runs did not.
+            age = _lock_age_seconds(lock_path)
+            if age is not None and age >= _LOCK_STALE_SECONDS:
+                # Nothing ever touches a lock file after creation, so its mtime
+                # age IS the time the current holder has held it. Past the stale
+                # window that holder is gone -- a crashed writer, or a release
+                # whose unlink lost to a Windows sharing violation -- and the
+                # lock is reclaimed here instead of wedging the chain forever.
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except (FileNotFoundError, PermissionError):
+                    pass
+                continue
             if time.monotonic() >= deadline:
-                raise TimeoutError(f"timed out acquiring provenance lock {lock_path}")
+                raise TimeoutError(
+                    f"timed out acquiring provenance lock {lock_path} after "
+                    f"{_LOCK_TIMEOUT_SECONDS:.0f}s; holder age "
+                    f"{'unknown' if age is None else format(age, '.1f') + 's'}, "
+                    f"stale reclamation at {_LOCK_STALE_SECONDS:.0f}s"
+                )
             time.sleep(0.05)
 
 
 def _release_lock(lock_path: Path, token: str) -> None:
-    try:
-        if lock_path.read_text(encoding="utf-8") == token:
-            lock_path.unlink(missing_ok=True)
-    except FileNotFoundError:
-        pass
-    except PermissionError:
-        # Same Windows sharing semantics as the acquire side: another writer may
-        # hold a transient handle on the lock file. Releasing is best-effort --
-        # a lock we failed to remove is reclaimed by the next acquirer's timeout
-        # rather than by raising here and unwinding a completed chain write.
-        pass
+    # Retry the unlink before giving up. Same Windows sharing semantics as the
+    # acquire side: another process may hold a transient handle on the lock
+    # file, and a single PermissionError here used to be swallowed outright --
+    # which left the lock in place with nothing to remove it, because the
+    # acquire side only retried until its deadline and then raised. One
+    # transient sharing violation therefore wedged every later write to that
+    # chain. Releasing stays best-effort rather than raising into a completed
+    # chain write, but a lock this fails to remove is now genuinely reclaimed by
+    # _acquire_lock's stale-age path instead of nominally.
+    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
+    while True:
+        try:
+            if lock_path.read_text(encoding="utf-8") == token:
+                lock_path.unlink(missing_ok=True)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                return
+            time.sleep(0.05)
 
 
 def _state_path(identity_dir: Path, aid: str) -> Path:
@@ -809,14 +853,14 @@ def validate_packet(
     if prior_digest is not None and _follow_prior:
         prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
         if prior_path is None:
-            # Depth 0 = the packet under submission; its own immediate prior
-            # missing is a real break and stays fatal. Deeper in, an unreachable
-            # ancestor truncates the walk instead of failing the descendant —
-            # otherwise one pruned packet kills every future claim on the chain.
-            if not _is_ancestor:
-                errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
-            else:
-                warnings.append("E_PROVENANCE_PRIOR_UNAVAILABLE")
+            # Fatal at every depth. The spec is unqualified -- "a `p` reference
+            # to a nonexistent prior packet is invalid" -- and ADR-20 D-B3 keeps
+            # existence, signature validity, and sequence continuity as exactly
+            # what an ancestor is still held to while dropping the artifact
+            # pass. Downgrading a missing ancestor to a warning made pruning any
+            # packet below the head a way to hide a broken chain: delete the
+            # link and every descendant validates again.
+            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
         else:
             # The prior chain is walked ITERATIVELY, not recursively.
             #
@@ -891,9 +935,12 @@ def validate_packet(
                     prov_root, key
                 )
                 if next_path is None:
-                    # Deeper than the immediate prior, an unreachable ancestor
-                    # truncates the walk rather than failing the descendant.
-                    warnings.append("E_PROVENANCE_PRIOR_UNAVAILABLE")
+                    # Same rule as the immediate prior above: an ancestor that
+                    # cannot be found breaks continuity, and continuity is one
+                    # of the three things ADR-20 D-B3 still holds ancestors to.
+                    # Truncating the walk here let a hole anywhere below the
+                    # head pass as a valid chain.
+                    errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
                     break
                 child_packet = prior_packet
                 child_sequence = prior_packet.get("s")

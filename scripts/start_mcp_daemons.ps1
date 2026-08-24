@@ -3,9 +3,27 @@
 # Register as a Scheduled Task:
 #   schtasks /Create /TN "FLOSS-MCP-Daemons" /TR "powershell -WindowStyle Hidden -File C:\~shit\FLOSS\scripts\start_mcp_daemons.ps1" /SC ONLOGON /RU "MSI\kalis" /RL LIMITED /F
 
-$py = "C:\Python313\python.exe"
-$env:PYTHONPATH = "C:/~shit/FLOSS"
-$workspace = "C:\~shit\FLOSS"
+# Derive everything from where THIS script lives. The hardcoded
+# C:\~shit\FLOSS and C:\Python313\python.exe worked on exactly one machine and
+# one checkout: from a clone at any other path this started daemons whose
+# PYTHONPATH pointed at a different working tree than the one being developed,
+# with no error to say so, and on a machine without that interpreter it failed
+# outright. $PSScriptRoot is scripts/, so the repository root is its parent.
+$workspace = Split-Path -Parent $PSScriptRoot
+$env:PYTHONPATH = $workspace
+
+# Honour an explicit interpreter, then a venv inside the checkout, then PATH.
+if ($env:FLOSS_PYTHON) {
+    $py = $env:FLOSS_PYTHON
+} elseif (Test-Path (Join-Path $workspace "venv\Scripts\python.exe")) {
+    $py = Join-Path $workspace "venv\Scripts\python.exe"
+} else {
+    $py = (Get-Command python -ErrorAction SilentlyContinue)?.Source
+}
+if (-not $py -or -not (Test-Path $py)) {
+    Write-Error "[FLOSS MCP] No usable Python found. Set FLOSS_PYTHON to an interpreter, or create $workspace\venv."
+    exit 1
+}
 
 # Start consensus gateway daemon (port 7331)
 Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.metacoordinator_mcp.server"

@@ -53,8 +53,17 @@ STEPS: list[tuple[str, str]] = [
     ("ai-roster", "materialize_shared_ai_roster.py"),
 ]
 
-# Only the agent-surface materializer understands user-scope targets.
-USER_SCOPE_STEPS = {"agent-surface"}
+# Materializers that understand `--include-user-scope`. The hook materializer
+# grew the flag and two user-scope targets (`claude_user`, `hermes_user`) after
+# this set was written, and nothing tied the two together: running the supported
+# `--only hook --include-user-scope` silently dropped the flag, skipped both
+# targets, and still exited 0 -- an operator asking for a user-scope refresh got
+# a clean report and no refresh.
+#
+# test_refresh_runner_forwards_user_scope.py derives this same set from the
+# materializer sources, so the next script to grow the flag fails a test instead
+# of silently doing nothing.
+USER_SCOPE_STEPS = {"agent-surface", "hook"}
 
 
 def build_command(

@@ -842,6 +842,17 @@ ALLOW_DEGRADED_ENV = "FLOSS_ALLOW_DEGRADED_ROSTER"
 DEGRADED_OK_PROFILES = frozenset({"fast", "mistral", "local"})
 
 
+def _derive_surface(model: str) -> str:
+    """Provider surface for a model the probe index has never seen.
+
+    Every model id here is a litellm route, so the text before the first `/` is
+    the provider: `groq/openai/gpt-oss-120b` -> `groq`. That is enough to judge
+    the surface half of the independence rule without the registry, which is
+    what makes a custom `FLOSS_VOTER_ROSTER` judgeable at all.
+    """
+    return model.strip().lower().split("/", 1)[0] or model.strip().lower()
+
+
 def _model_index() -> dict[str, dict[str, str]]:
     """Model id -> {family, surface} from the registry's probe record."""
     try:
@@ -875,13 +886,35 @@ def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None
         return
 
     index = _model_index()
-    if not index:
-        # No probe data to judge against. Do not invent a verdict either way.
-        return
+    models = list(resolved.values())
 
-    known = [model for model in resolved.values() if model in index]
-    surfaces = {index[model]["surface"] for model in known}
-    families = {index[model]["family"] for model in known}
+    # Models the probe index has never seen are NOT dropped from the accounting.
+    # Dropping them meant a four-provider custom FLOSS_VOTER_ROSTER counted zero
+    # surfaces and zero families and was refused outright, so the documented
+    # override only ever worked with the registry's own hardcoded model ids.
+    unclassified = sorted({model for model in models if model not in index})
+
+    surfaces = {
+        index[model]["surface"] if model in index else _derive_surface(model)
+        for model in models
+    }
+    # Family is a claim about the model's lineage and cannot be parsed out of an
+    # id, so an unclassified model counts as its own family and is named as
+    # unverified. That is weaker than a probed family -- two ids could be the
+    # same model behind two vendors -- which is exactly why the warning below
+    # exists and why the refusal message lists them.
+    families = {index[model]["family"] for model in models if model in index}
+    families |= {f"unverified:{model}" for model in unclassified}
+
+    if unclassified:
+        print(
+            f"[voters] independence check: {len(unclassified)} model(s) absent "
+            f"from the registry probe index, counted as distinct unverified "
+            f"families: {', '.join(unclassified)}. Probe them into "
+            f"{VOTER_REGISTRY_PATH.name} to have their real family counted.",
+            file=sys.stderr,
+        )
+
     if (
         len(surfaces) >= MIN_INDEPENDENT_SURFACES
         and len(families) >= MIN_INDEPENDENT_FAMILIES
@@ -894,7 +927,9 @@ def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None
         f"{len(families)} model family/families {sorted(families)}, against a "
         f"bar of >={MIN_INDEPENDENT_SURFACES} surfaces and "
         f">={MIN_INDEPENDENT_FAMILIES} families. Voters resolved: "
-        f"{sorted(resolved)}. Load the missing provider credentials, choose a "
+        f"{sorted(resolved)}. Models absent from the probe index, counted as "
+        f"unverified families: {unclassified or 'none'}. "
+        f"Load the missing provider credentials, choose a "
         f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
         "accept that the result is not independent consensus."
     )
