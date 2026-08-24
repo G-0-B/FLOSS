@@ -125,6 +125,18 @@ async fn consent_rejects_unrequested_scope_without_creating_a_decision() {
 
     await_two_agent_consistency(&app).await;
 
+    let decisions_before: Vec<(ActionHash, ConsentDecision)> = app.conductors[1]
+        .call(
+            &bob_zome,
+            "get_consent_decisions_for_payload",
+            payload_hash.clone(),
+        )
+        .await;
+    assert!(
+        decisions_before.is_empty(),
+        "new payload must have no decision links before the rejected call"
+    );
+
     let error = app.conductors[1]
         .call_fallible::<_, ActionHash>(
             &bob_zome,
