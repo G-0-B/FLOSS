@@ -434,6 +434,12 @@ def main() -> int:
     else:
         log(f"[hook] no pre-write checkpoint for {rel_path}")
 
+    # Classified BEFORE the body and the packet, not after. The packet is signed
+    # and permanent: recording every canon edit as a local CodeChange while the
+    # Claim submitted AdrChange/System left the durable evidence contradicting
+    # the claim it was evidence for, and told voters the wrong threshold applied.
+    proposal_type, blast_radius = classify_change(rel_path)
+
     summary = (
         f"{surface}:{tool_name}:{verification.get('status', 'UNKNOWN').lower()} "
         f"→ {Path(file_path).name}"
@@ -452,22 +458,25 @@ def main() -> int:
         f"existing conventions in the surrounding code, and carries no "
         f"obvious security or correctness risks. Treat a verification status "
         f"other than VERIFIED as a trust reduction signal for later automation. "
-        f"Blast radius is Local — the hook never auto-escalates."
+        f"This is a {proposal_type} at {blast_radius} blast radius — the hook "
+        f"classifies by surface and never auto-escalates beyond that."
     )
 
     evidence: list[dict] = []
     try:
         # Deferred here (not in the GatewayTools import block above) so that on
         # lean installs without the provenance extras (blake3/jcs/nacl) the
-        # ImportError is caught locally and the hook still submits the Local
-        # CodeChange claim with empty evidence — provenance packets are
-        # best-effort and Local claims don't require them.
+        # ImportError is caught locally and the hook still submits the claim
+        # with empty evidence — provenance packets are best-effort, and Local
+        # claims don't require them. A governed canon claim without one is
+        # refused by the gateway, which is the correct outcome; see the
+        # E_GOVERNED_PROVENANCE_REQUIRED note below.
         from packages.activity_log import provenance
 
         edited_path = Path(file_path).resolve()
         if edited_path.exists():
             packet_entry = {
-                "claim_type": "CodeChange",
+                "claim_type": proposal_type,
                 "truth_status": "specified",
                 "source_systems": [surface, "hook_post_write.py"],
                 "created_at": datetime.now(timezone.utc)
@@ -491,7 +500,7 @@ def main() -> int:
                 ],
                 "risks": [],
                 "benefits": [],
-                "next_action": "submit local code-change claim",
+                "next_action": f"submit {proposal_type} claim at {blast_radius} radius",
             }
             packet, packet_path = provenance.create_packet(
                 [packet_entry],
@@ -514,7 +523,6 @@ def main() -> int:
             f"{type(exc).__name__}: {exc}"
         )
 
-    proposal_type, blast_radius = classify_change(rel_path)
     if (
         proposal_type in GOVERNED_TYPES
         and blast_radius in GOVERNED_RADII
