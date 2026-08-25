@@ -4,7 +4,13 @@
   "title": "Reuse block for spec-registry entries (ADR-18 Prior-Art & Reuse Gate)",
   "description": "Optional per-entry block in FLOSS/docs/specs/spec-registry.json. Required (fail-closed) for entries with tier 1 or 2, unless emergency=true, in which case it is required before promotion/generalization.",
   "type": "object",
-  "required": ["capability", "search_date", "candidates", "verdict", "irreducible_delta"],
+  "required": [
+    "capability",
+    "search_date",
+    "candidates",
+    "verdict",
+    "irreducible_delta"
+  ],
   "properties": {
     "capability": {
       "type": "string",
@@ -25,34 +31,104 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["name", "truth_status"],
+        "required": [
+          "name",
+          "truth_status"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "version": { "type": "string" },
-          "license": { "type": "string" },
-          "maintenance": { "type": "string" },
-          "platform_fit": { "type": "string" },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "maintenance": {
+            "type": "string"
+          },
+          "platform_fit": {
+            "type": "string"
+          },
           "probe": {
             "type": "string",
             "description": "Result of a direct probe, or 'not_probed: <reason>'. Tier-2 compose/build verdicts require >=1 probed candidate."
           },
-          "truth_status": { "enum": ["Verified", "Specified", "Unverified"] }
+          "truth_status": {
+            "enum": [
+              "Verified",
+              "Specified",
+              "Unverified"
+            ]
+          }
         }
       }
     },
-    "verdict": { "enum": ["adopt", "extend", "compose", "build"] },
+    "verdict": {
+      "enum": [
+        "adopt",
+        "extend",
+        "compose",
+        "build"
+      ]
+    },
     "irreducible_delta": {
       "type": "string",
       "description": "What remains custom, stated as capability subtraction; <=5 sentences; must be testable."
     },
     "rejected_because": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Requirement-by-candidate gaps, each carrying its truth status inline."
     },
     "reviewer": {
-      "type": "string",
-      "description": "Tier 2: reviewing surface + model family, distinct from proposer's family. Use voter profile 'reuse-review'."
+      "type": "object",
+      "description": "Tier 2: structured evidence that an INDEPENDENT reuse review happened. A string was accepted until 2026-08-25, which let any non-placeholder prose satisfy a gate claiming to enforce >=3 provider surfaces and >=4 model families. Enforced by scripts/spec_gate.py:_reviewer_problems; keep the two in step.",
+      "required": [
+        "surfaces",
+        "families",
+        "record",
+        "outcome",
+        "date"
+      ],
+      "properties": {
+        "surfaces": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Distinct provider surfaces polled (e.g. groq, mistral, nvidia). Counted distinctly: same-surface endpoints are not independence."
+        },
+        "families": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Distinct model families polled. Same-family endpoints across different providers do not count as independent."
+        },
+        "record": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repo-relative path to the poll record or synthesis. Must resolve on disk -- an unresolvable record is not evidence."
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Verdict of the review, e.g. APPROVED / REJECTED / CONFLICT."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date the review concluded (YYYY-MM-DD)."
+        }
+      }
     },
     "expiry_or_retest_date": {
       "type": "string",
