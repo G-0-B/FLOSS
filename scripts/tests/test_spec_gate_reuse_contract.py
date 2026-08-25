@@ -452,3 +452,46 @@ def test_probe_object_schema_demands_what_the_gate_demands(gate, schema):
     assert obj["properties"]["detail"]["minLength"] >= 1
     assert obj["properties"]["date"]["format"] == "date"
     assert set(obj["properties"]["status"]["enum"]) == set(gate.PROBE_STATUSES)
+
+
+@pytest.mark.parametrize(
+    "bad_date",
+    [20260825, "20260825", "2026-8-25", "2026/08/25", " 2026-08-25 ", None, True],
+)
+def test_every_date_field_rejects_untyped_or_compact_forms(gate, bad_date):
+    """One helper, three fields, because this is the fourth date defect here.
+
+    `str(20260825)` is `"20260825"`, which `date.fromisoformat()` happily
+    accepts as 2026-08-25 — so a JSON number, and the compact string form,
+    both cleared a check advertising `YYYY-MM-DD`. The same stringify-then-parse
+    shape was fixed in `reviewer.date` and `probe.date` separately; fixing it a
+    third time in isolation would have guaranteed a fourth.
+    """
+    assert gate._iso_date_problems("x.md: field", bad_date), f"{bad_date!r} must fail"
+
+
+def test_a_dashed_iso_date_passes(gate):
+    assert gate._iso_date_problems("x.md: field", "2026-08-25") == []
+
+
+@pytest.mark.parametrize("bad_date", [20260825, "20260825", "2026-8-25"])
+def test_reuse_search_date_uses_the_shared_date_rule(gate, bad_date):
+    entry = {
+        "tier": 1,
+        "reuse": {
+            "capability": "c",
+            "search_date": bad_date,
+            "candidates": [{"name": "n", "truth_status": "Verified"}],
+            "verdict": "extend",
+            "irreducible_delta": "d",
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("search_date" in f for f in fails), fails
+
+
+def test_registration_guidance_is_a_command_that_actually_works(gate, tmp_path):
+    """`--add` requires `--tier`, so guidance omitting it sent operators in circles."""
+    note = gate.advisory_note("FLOSS/scripts/spec_gate.py")
+    guidance = note or gate._registration_hint("FLOSS/scripts/unregistered_example.py")
+    assert "--tier" in guidance, guidance

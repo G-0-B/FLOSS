@@ -227,11 +227,31 @@ def iter_domain_files(spec: WatchSpec) -> Iterable[Path]:
         return sorted(files)
 
     if spec.mode == "recursive":
-        return sorted(
-            path
-            for path in root.rglob("*")
-            if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES
-        )
+        # Pruned DURING the walk, not filtered after it.
+        #
+        # `root.rglob("*")` descends into every directory before anything gets
+        # to reject it, so the broad FLOSS/ spec paid the full stat-and-
+        # materialize cost of node_modules, target/ and every build tree on
+        # each watcher pass, only to discard the results in should_include().
+        # os.walk lets the excluded names be removed from `dirnames` in place,
+        # which stops the descent instead of unwinding it.
+        #
+        # The names are the same EXCLUDED_DIR_NAMES should_include() uses, so
+        # this is an optimisation and not a second policy: anything that slips
+        # through here is still filtered there.
+        found: list[Path] = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if name not in EXCLUDED_DIR_NAMES
+                and name not in (".git", ".agent-surface")
+            ]
+            base = Path(dirpath)
+            for name in filenames:
+                if Path(name).suffix.lower() in TEXT_SUFFIXES:
+                    found.append(base / name)
+        return sorted(found)
 
     return []
 

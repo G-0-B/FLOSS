@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -80,6 +81,48 @@ REUSE_VERDICTS = ("adopt", "extend", "compose", "build")
 # the project's own truth-label vocabulary minus Blocked (a blocked candidate is
 # not prior art you evaluated, it is one you could not).
 REUSE_TRUTH_STATUSES = ("Verified", "Specified", "Unverified")
+
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _iso_date_problems(label: str, value: Any) -> list[str]:
+    """One rule for every date the gate reads. Fourth time is the charm.
+
+    `str(20260825)` is `"20260825"`, and `date.fromisoformat()` accepts that as
+    2026-08-25 -- so a JSON number, and the compact string form, both cleared a
+    check advertising YYYY-MM-DD. That defect was fixed in `reviewer.date`, then
+    again in `probe.date`, then found a third time in `reuse.search_date`.
+    Fixing it once more in isolation would have guaranteed a fourth site.
+
+    The type is checked before the shape, and the shape before the parse:
+    `bool` is an `int` in Python and would otherwise stringify to "True".
+    """
+    if isinstance(value, bool) or not isinstance(value, str):
+        return [f"{label} must be a YYYY-MM-DD string, got {type(value).__name__}"]
+    if not _ISO_DATE_RE.match(value):
+        return [f"{label} {value!r} is not YYYY-MM-DD"]
+    try:
+        _dt.date.fromisoformat(value)
+    except ValueError:
+        return [f"{label} {value!r} is not a real date"]
+    return []
+
+
+def _registration_hint(rel: str) -> str:
+    """The remediation command, which must be one an operator can actually run.
+
+    `--add` refuses to register without an explicit `--tier` -- an omitted tier
+    is an exemption, not a default -- so guidance that omitted it pointed at a
+    command guaranteed to fail. Tier 1 is the evidence-record default; anything
+    architecture-class wants tier 2 and an independent review.
+    """
+    script_path = Path(__file__).resolve()
+    return (
+        f'python "{script_path}" --add "{rel}" --spec "<one-line intent>" '
+        f"--tier 1   (use --tier 2 for architecture-class work: adds an "
+        f"independent reuse review)"
+    )
 
 
 def _normalize(path_str: str | Path) -> str | None:
@@ -153,11 +196,10 @@ def advisory_note(path_str: str | Path) -> str | None:
                     f"spec-registry.json (schema: docs/specs/reuse-gate.schema.json)"
                 )
             return None
-        script_path = Path(__file__).resolve()
         return (
             f"spec-gate: `{rel}` is on a gated surface but has no spec stub in "
             f"docs/specs/spec-registry.json — register it before it ossifies: "
-            f'python "{script_path}" --add "{rel}" --spec "<one-line intent>"'
+            + _registration_hint(rel)
         )
     except Exception:  # noqa: BLE001 — advisory must never break a hook
         return None
@@ -237,16 +279,9 @@ def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
         if not isinstance(outcome, str) or not outcome.strip():
             problems.append(f"{rel}: reuse.reviewer.outcome must be a non-empty string")
     if "date" in reviewer:
-        raw_date = reviewer.get("date")
-        if not isinstance(raw_date, str):
-            problems.append(f"{rel}: reuse.reviewer.date must be a YYYY-MM-DD string")
-        else:
-            try:
-                _dt.date.fromisoformat(raw_date.strip())
-            except ValueError:
-                problems.append(
-                    f"{rel}: reuse.reviewer.date {raw_date!r} is not YYYY-MM-DD"
-                )
+        problems.extend(
+            _iso_date_problems(f"{rel}: reuse.reviewer.date", reviewer.get("date"))
+        )
     if "record" in reviewer:
         record = reviewer.get("record")
         if not isinstance(record, str) or not record.strip():
@@ -277,14 +312,10 @@ def _probe_shape_problems(rel: str, position: int, probe: Any) -> list[str]:
     status = probe.get("status")
     if status not in PROBE_STATUSES:
         problems.append(f"{where}.status {status!r} not in {'/'.join(PROBE_STATUSES)}")
-    for field in ("detail", "date"):
-        if field in probe and not isinstance(probe[field], str):
-            problems.append(f"{where}.{field} must be a string")
-    if isinstance(probe.get("date"), str):
-        try:
-            _dt.date.fromisoformat(probe["date"].strip())
-        except ValueError:
-            problems.append(f"{where}.date {probe['date']!r} is not YYYY-MM-DD")
+    if "detail" in probe and not isinstance(probe["detail"], str):
+        problems.append(f"{where}.detail must be a string")
+    if "date" in probe:
+        problems.extend(_iso_date_problems(f"{where}.date", probe["date"]))
     return problems
 
 
@@ -463,12 +494,12 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
     verdict = reuse.get("verdict")
     if verdict is not None and verdict not in REUSE_VERDICTS:
         fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")
-    raw_date = str(reuse.get("search_date", ""))
-    try:
-        age = (_dt.date.today() - _dt.date.fromisoformat(raw_date)).days
-    except ValueError:
-        fails.append(f"{rel}: reuse search_date {raw_date!r} is not YYYY-MM-DD")
+    raw_date = reuse.get("search_date")
+    date_problems = _iso_date_problems(f"{rel}: reuse search_date", raw_date)
+    if date_problems:
+        fails.extend(date_problems)
     else:
+        age = (_dt.date.today() - _dt.date.fromisoformat(raw_date)).days
         window = int(reuse.get("evidence_window_days", EVIDENCE_WINDOW_DAYS))
         if age < 0:
             # A future date produces a negative age, which can never exceed the
@@ -585,7 +616,9 @@ def run_check() -> int:
         if missing:
             parts.append(
                 f"{len(missing)} unregistered gated artifact(s) — register with: "
-                f'python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>"'
+                f'python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>" '
+                f"--tier 1   (--tier 2 for architecture-class work). The tier is "
+                f"required: an omitted tier is an exemption, not a default."
             )
         if reuse_fails:
             parts.append(
