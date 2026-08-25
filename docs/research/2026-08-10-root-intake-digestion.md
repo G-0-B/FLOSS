@@ -111,7 +111,7 @@ One authoritative destination per cluster. **Net new canonical docs: 2** (items 
 | **C3 Context continuation** | `CONTEXT.yaml` v0.4.0 (root, tracked) | — | #11–17 → `bundles/`, `reports/` |
 | **C4a Build spine** | **NEW** `docs/governance/FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md` | #19 | original → `reports/` |
 | **C4b Harness patches** | `FLOSS/shared-agent-surface.json` (source, not the projections) | #20's two patches | #20 → `reports/` |
-| **C4c Process stack** | `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (L1) + **NEW** `docs/governance/uop-v2.1.md` (L3) | 6 clauses from the Operating Instructions v2.0 already sitting in `intake_raw/2026-06-08-root/reports/`; #18 lands as L3 | `docs/governance/kernel-v1.2.md` **deleted** |
+| **C4c Process stack** | `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` (L1) + **NEW** `docs/governance/uop-v2.1.md` (L3) | 6 clauses from the Operating Instructions v2.0 already sitting in `intake_raw/2026-06-08-root/reports/`; #18 lands as L3 | `docs/governance/kernel-v1.2.md` **deleted** |
 | **C5 Context daemon** | `docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md` (existing) | #21's ratified commitments as an unratified section | #21, #22 → `reports/` |
 | **C6 Reuse gate** | `docs/adr/ADR-18-prior-art-reuse-gate.md` + `docs/specs/reuse-gate.spec.md` (existing, now committed `9f18f07`) | — (fully absorbed) | #26 → `reports/`; repoint ADR-18's `design_record:` |
 | **C7 Undigested research** | none — holding area only | — | #23, #24, #25 → `reports/`; #27 → `reference/` |
@@ -126,7 +126,7 @@ The three live layers are **different layers, not versions of each other**:
 
 | Layer | Artifact | Date |
 |---|---|---|
-| L1 always-on constraints | `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` | 2026-07-16 — **newest** |
+| L1 always-on constraints | `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` | 2026-07-16 — **newest** |
 | L2 high-level reply contract | `docs/research/intake_raw/2026-06-08-root/reports/FLOSSI0ULLK-operating-instructions-v2.md` | 2026-06-08 |
 | L3 execution gate loop | root `flossi0ullk-uop-v2.1.md` | 2026-08-03 |
 

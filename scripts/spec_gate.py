@@ -40,6 +40,7 @@ import argparse
 import datetime as _dt
 import json
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO_ROOT / "docs" / "specs" / "spec-registry.json"
@@ -178,6 +179,72 @@ def _gated_artifacts() -> list[str]:
     return found
 
 
+REVIEWER_REQUIRED_KEYS = ("surfaces", "families", "record", "outcome", "date")
+# From docs/specs/reuse-gate.spec.md. Same numbers the consensus gateway's
+# independence rule uses: same-family endpoints do not count as independence.
+REVIEWER_MIN_SURFACES = 3
+REVIEWER_MIN_FAMILIES = 4
+
+
+def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
+    """Validate tier-2 independent-review evidence (ADR-18).
+
+    A string is no longer accepted. The review either happened -- in which case
+    naming the surfaces, the families, the outcome, the date, and a record that
+    exists on disk costs nothing -- or it did not, in which case the entry
+    should fail rather than read as done.
+    """
+    if reviewer is None or (isinstance(reviewer, str) and not reviewer.strip()):
+        return [
+            f"{rel}: tier 2 requires an independent reuse review "
+            f"(`reuse.reviewer`), ADR-18"
+        ]
+    if not isinstance(reviewer, dict):
+        return [
+            f"{rel}: tier 2 `reuse.reviewer` must be an object with "
+            f"{', '.join(REVIEWER_REQUIRED_KEYS)} — prose does not establish "
+            f"that a >={REVIEWER_MIN_SURFACES}-surface / "
+            f">={REVIEWER_MIN_FAMILIES}-family review happened, ADR-18"
+        ]
+    problems: list[str] = []
+    missing = [k for k in REVIEWER_REQUIRED_KEYS if k not in reviewer]
+    if missing:
+        problems.append(f"{rel}: reuse.reviewer missing keys: {', '.join(missing)}")
+    for key, minimum in (
+        ("surfaces", REVIEWER_MIN_SURFACES),
+        ("families", REVIEWER_MIN_FAMILIES),
+    ):
+        if key not in reviewer:
+            continue
+        values = reviewer.get(key)
+        if not isinstance(values, list) or not all(
+            isinstance(v, str) and v.strip() for v in values
+        ):
+            problems.append(f"{rel}: reuse.reviewer.{key} must be a list of names")
+            continue
+        distinct = {v.strip().lower() for v in values}
+        if len(distinct) < minimum:
+            problems.append(
+                f"{rel}: reuse.reviewer.{key} has {len(distinct)} distinct, "
+                f"needs >={minimum} (ADR-18 independence rule)"
+            )
+    for key in ("outcome", "date"):
+        if key in reviewer and not str(reviewer.get(key, "")).strip():
+            problems.append(f"{rel}: reuse.reviewer.{key} must be non-empty")
+    record = reviewer.get("record")
+    if "record" in reviewer:
+        if not isinstance(record, str) or not record.strip():
+            problems.append(f"{rel}: reuse.reviewer.record must be a path or ref")
+        else:
+            resolved = _physical_path(record) or (REPO_ROOT / record)
+            if not resolved.exists():
+                problems.append(
+                    f"{rel}: reuse.reviewer.record {record!r} does not exist — "
+                    f"an unresolvable record is not evidence"
+                )
+    return problems
+
+
 def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
     """Validate an entry's reuse block (ADR-18). Returns (fails, warns)."""
     tier = entry.get("tier")
@@ -280,7 +347,7 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
                 f"{rel}: reuse evidence stale ({age}d > {window}d window) — "
                 f"re-run the scan"
             )
-    if tier == 2 and rel not in REVIEWER_GRANDFATHERED:
+    if tier == 2 and not _is_reviewer_grandfathered(rel):
         # ADR-18 / reuse-gate.spec.md require an INDEPENDENT reuse review for
         # every tier-2 entry, not only for compose/build. Nothing enforced it,
         # and the registry demonstrated the bypass: the one entry carrying a
@@ -288,21 +355,13 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
         # while run_check reported 0 reuse violations. A placeholder that
         # satisfies a gate is worse than an empty field, because it reads as
         # done.
-        reviewer = str(reuse.get("reviewer") or "").strip()
-        if not reviewer:
-            fails.append(
-                f"{rel}: tier 2 requires an independent reuse review "
-                f"(`reuse.reviewer`), ADR-18"
-            )
-        elif any(
-            marker in reviewer.lower()
-            for marker in ("pending", "tbd", "todo", "not_reviewed", "placeholder")
-        ):
-            fails.append(
-                f"{rel}: tier 2 `reuse.reviewer` is a placeholder ({reviewer!r}); "
-                f"run the reuse-review poll (>=3 provider surfaces, >=4 model "
-                f"families) and record its outcome, ADR-18"
-            )
+        # Prose is not evidence. Rejecting a list of placeholder words left
+        # `"reviewer": "done"` passing a gate that claims to enforce a
+        # >=3-surface / >=4-family independent review -- it names no reviewing
+        # surface, no family, no poll, no outcome. Structured evidence is
+        # required instead, and the `record` must actually resolve on disk, so
+        # the claim is checkable rather than merely well-worded.
+        fails.extend(_reviewer_problems(rel, reuse.get("reviewer")))
     if tier == 2 and verdict in ("compose", "build"):
         candidates = reuse.get("candidates") or []
         probed = [
@@ -335,9 +394,31 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
 #
 # To clear this entry: re-run the poll with provenance evidence attached, then
 # record the outcome in `reuse.reviewer` and delete the line below.
+#
+# PINNED TO CONTENT. A path-only exemption covers the artifact forever, so any
+# future rewrite of reuse-gate.spec.md would inherit an exemption granted to
+# text nobody has read. The hash is the version that was grandfathered; edit the
+# file and the exemption lapses, which is the correct moment to require the
+# review that was deferred.
 REVIEWER_GRANDFATHERED = {
-    "FLOSS/docs/specs/reuse-gate.spec.md",
+    "FLOSS/docs/specs/reuse-gate.spec.md": (
+        "f76512e63dd6ff6975424aa37c7aa0580ab4940844d01824542bf417e778b06e"
+    ),
 }
+
+
+def _is_reviewer_grandfathered(rel: str) -> bool:
+    """True only while the artifact still hashes to the grandfathered version."""
+    expected = REVIEWER_GRANDFATHERED.get(rel)
+    if expected is None:
+        return False
+    physical = _physical_path(rel)
+    if physical is None or not physical.exists():
+        return False
+    import hashlib
+
+    digest = hashlib.sha256(physical.read_bytes()).hexdigest()
+    return digest == expected
 
 
 def run_check() -> int:

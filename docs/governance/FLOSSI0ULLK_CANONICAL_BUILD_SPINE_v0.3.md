@@ -98,7 +98,7 @@ Two committed, simultaneously-live documents assert opposite answers to "what is
 **Conflict:** v0.2's C5 flagged that README says "Compassion Clause + Apache-2.0/GPL-compatible" and that this may create OSI/FSF funding friction. This session found the conflict is worse than a two-way tension between README wording and funder expectations — it is a **three-way disagreement between three different files, all currently committed**:
 
 1. Root `/LICENSE` — plain **GNU GPLv3** text, verbatim FSF boilerplate. No AGPL network clause. No Compassion Clause rider present as a file.
-2. `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` header + `README.md` footer — **"Compassion Clause + Apache-2.0/GPL-compatible."**
+2. `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` header + `README.md` footer — **"Compassion Clause + Apache-2.0/GPL-compatible."**
 3. `docs/adr/ADR-7-agpl-cascade.md` ("Embracing AGPL-3.0 Copyleft Cascade," Accepted, 2026-04-15) + `docs/governance/LEGAL_DEFINITIONS.md` ("Carrier Equivalence Addendum") — **AGPL-3.0-or-later** governs, with the addendum explicitly subordinate to it.
 
 None of these three matches either of the other two. The root `LICENSE` file — the one that is legally operative regardless of what any markdown file says — is GPLv3, not AGPL and not Apache-dual. ADR-7 postdates the current `LICENSE` file's apparent content and was never applied to it.

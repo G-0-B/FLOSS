@@ -63,7 +63,7 @@ language. Distilled executable shape:
 
 ### Priority instruction surfaces (from distilled plan)
 
-- Master metaprompt kernel (`FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`)
+- Master metaprompt kernel (`FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`)
 - `userPreferences` surface (wherever currently authoritative)
 - Perplexity instruction set (CORE + EXTENDED)
 - `AGENTS.md`
