@@ -101,7 +101,58 @@ consistent with holes and doubled origins appearing under concurrent writers.
   on whole-response embeddings, so shared formatting outranks opposed conclusions.
   **Any reviewer relying on ensemble output should read `voter_responses[]` directly.**
 
-## 6. Claims I want falsified
+## 6. Claims I wanted falsified — ADJUDICATED 2026-08-25
+
+Four independent audits (ox-alpha, Gemini, DeepSeek, Mistral) were aggregated by a
+review board. Results below, against the original ranking. **Two of the five went
+against me and both rulings are accepted.**
+
+| # | Claim | Verdict |
+|---|---|---|
+| 1 | Enumeration makes a hole undeniable | ❌ **Refuted.** Not against a host-level adversary. |
+| 2 | Bypassed is distinguishable from lost | ❌ **Refuted by ordering.** Bypass then delete converts fatal to warning. |
+| 3 | Identity rotation is the right remedy | ✅ **Upheld** over one dissent; pair with signed lineage + key rotation. |
+| 4 | Blast radius is System | ❌ **Overturned to Substrate**, override-forbidden. |
+| 5 | Spec and code should not stay divergent | ✅ **Unanimous**; spec amended in-PR. |
+
+**On #1 — the attack I could not construct.** All four auditors found it
+independently; the board rates it the highest-confidence finding in the corpus. It
+does not lower any sequence number, which is why my reasoning missed it:
+
+> **Wholesale head truncation.** Delete every packet above sequence *n* and present
+> *n* as current. Enumeration finds gaps only relative to the highest sequence still
+> present, so there is no gap to find. Nothing inside a self-signed chain
+> distinguishes truncation from an agent that has not written since *n*.
+
+**On #4.** The board: "the question is whether the change alters what the governance
+substrate will accept for governed claims. It does — by design." The lone dissenter
+in the original ensemble audit reached this first, in a fragment the synthesizer
+clustered as agreement. The minority was right.
+
+Both refuted claims are now reproducible tests
+(`test_KNOWN_LIMIT_head_truncation_is_undetectable`,
+`test_KNOWN_LIMIT_bypass_then_delete_downgrades_a_refusal`) that assert the
+limitation, so the day an anchor lands they fail and must be rewritten rather than
+quietly continuing to pass. Both are documented in the packet spec under "Known
+Limits Of Gap Enumeration".
+
+**The board's structural conclusion:** the missing primitive is an external anchor.
+Nothing outside the packet store witnesses what the store contained, so every
+integrity claim here is scoped to a buggy-but-honest writer. Minimum viable close is
+a periodically published signed Merkle root on a protected git ref; Rekor or a
+SCITT-class receipt service later. Until then, "governed claim" overstates what the
+gate provides.
+
+**A process finding the board raised, which this project should adopt:** two of the
+four audits carried confabulation-suspect citations — RFC numbers, ratification
+dates and arXiv IDs that could not be corroborated. The findings survived on
+independent reasoning and the citations were struck. AI-authored audits entering the
+governance pipeline should be held to the same truth-status discipline as anything
+else, with citation-resolvability required for a Verified tag.
+
+### Original ranking, retained for the record
+
+
 
 Ranked by how much damage a wrong answer does.
 

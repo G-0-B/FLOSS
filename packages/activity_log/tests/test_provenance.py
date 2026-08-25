@@ -1469,3 +1469,124 @@ def test_garbage_in_a_vacated_slot_does_not_declare_a_fork(tmp_path, monkeypatch
     ), "unsigned garbage must not establish that a slot is occupied"
     assert result.ok is True, result.errors
     assert "E_PROVENANCE_CHAIN_GAP:2" in result.warnings
+
+
+def _chain(provenance, tmp_path, identity_dir, output_root, count):
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    paths = []
+    for index in range(count):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-25T12:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+    return paths
+
+
+def test_KNOWN_LIMIT_head_truncation_is_undetectable(tmp_path, monkeypatch):
+    """F-01, rated Critical by the 2026-08-25 external meta-audit.
+
+    This test asserts a LIMITATION, not a guarantee. It exists so the limit is
+    reproducible and so the day an external anchor lands, this test fails loudly
+    and has to be rewritten rather than quietly continuing to pass.
+
+    Gap enumeration finds holes relative to the highest sequence number still
+    present. An adversary who can write to the packet store deletes everything
+    above sequence n and presents n as current; there is no gap to find, because
+    the evidence that higher sequences existed was in the deleted packets.
+    Nothing inside a self-signed chain distinguishes this from an agent that
+    simply has not written since n.
+
+    Closing it requires a periodically published, externally observed commitment
+    to the chain head. See docs/specs/provenance-packet.spec.md, "Known Limits
+    Of Gap Enumeration", and ADR-20's trust boundary section.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 6)
+
+    assert provenance.validate_packet(paths[-1], workspace_root=tmp_path).ok is True
+
+    # The adversary rolls the store back to sequence 2.
+    for path in paths[3:]:
+        path.unlink()
+
+    truncated = provenance.validate_packet(paths[2], workspace_root=tmp_path)
+    assert truncated.ok is True, truncated.errors
+    assert (
+        truncated.warnings == []
+    ), "no warning is raised, and that is the finding: truncation is silent"
+
+
+def test_KNOWN_LIMIT_bypass_then_delete_downgrades_a_refusal(tmp_path, monkeypatch):
+    """F-02, rated High by the 2026-08-25 external meta-audit.
+
+    Also asserts a LIMITATION. The fatal/enumerated distinction is evaluated
+    against occupancy at VALIDATION time, so the ordering matters: bypass a live
+    packet (refused) and delete it afterwards (enumerated). Closing this needs a
+    second, append-only occupancy record that deletion cannot reach.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 2)
+    genesis = json.loads(paths[0].read_text(encoding="utf-8"))
+
+    # Sequence 2 points past the live sequence-1 packet, straight at genesis.
+    _bypass, bypass_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T12:09:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=genesis["d"],
+    )
+
+    refused = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert refused.ok is False
+    assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in refused.errors
+
+    # Same packet, unchanged and still signed. Only the store changed.
+    paths[1].unlink()
+
+    downgraded = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert downgraded.ok is True, downgraded.errors
+    assert "E_PROVENANCE_CHAIN_GAP:1" in downgraded.warnings

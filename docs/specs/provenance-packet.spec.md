@@ -106,9 +106,56 @@ Evidence references form a DAG, not a tree. Validation rules:
 - Max recursion depth is 8.
 - Cycles are invalid.
 - A packet whose evidence DAG contains no non-packet evidence root is invalid.
-- A `p` reference to a nonexistent prior packet is invalid.
 - `p` is a linear per-agent sequence pointer. It is checked for existence and
   continuity but does not consume the evidence-DAG recursion budget.
+
+### Missing Priors — Lost Versus Bypassed
+
+Amended 2026-08-25 per ADR-20's D-B3 addendum, after a four-audit external review.
+The previous sentence — "a `p` reference to a nonexistent prior packet is invalid"
+— is **superseded**. It was unqualified, and enforcing it literally rejected 100%
+of submissions from any agent whose chain had ever lost a packet. A signed packet
+cannot be re-derived, so a hole is permanent: a rule refusing chains that contain
+one refuses that agent forever.
+
+Sequence numbers are per-agent and monotonic, so a deleted packet leaves an
+arithmetic gap whether or not its file survives. Validation resolves each break
+against the per-identity sequence index:
+
+| Condition | Verdict |
+|---|---|
+| Expected slot holds a **valid signed** packet the child does not point at | `E_PROVENANCE_CHAIN_FORK` — invalid |
+| Expected slot empty | `E_PROVENANCE_CHAIN_GAP:<n>` warning, enumerated by sequence number; the walk resumes below the gap and continues verifying |
+| Prior exists further back, skipped slots **empty** | Enumerated as a gap |
+| Prior exists further back, any skipped slot **occupied** | `E_PROVENANCE_SEQUENCE_DISCONTINUOUS` — invalid |
+| Chain does not reach sequence 0, or genesis is not sequence 0 | Invalid |
+
+The rule: **enumerate what is lost, refuse what is merely bypassed.** Only a valid
+signature establishes that a slot is occupied; unsigned or malformed JSON naming a
+position does not.
+
+### Known Limits Of Gap Enumeration
+
+Stated here because an unstated limit reads as a guarantee. Both were confirmed by
+independent external audit (2026-08-25) and neither is closed by this contract.
+
+1. **Wholesale head truncation is not detected.** Enumeration finds gaps relative
+   to the highest sequence number still present. An adversary with write access to
+   the packet store can delete everything above sequence *n* and present *n* as
+   current; nothing inside a self-signed chain distinguishes that from an agent
+   that has simply not written since *n*. Detection requires an **external anchor**
+   — a periodically published, externally observed commitment to the chain head.
+   Until one exists, this spec's integrity claims hold only against a
+   buggy-but-honest writer, not against control of the store.
+
+2. **Bypass-then-delete downgrades a refusal to a warning.** The fatal/enumerated
+   distinction is evaluated against occupancy *at validation time*. An adversary
+   who first points past a live packet and later deletes it converts
+   `E_PROVENANCE_SEQUENCE_DISCONTINUOUS` into `E_PROVENANCE_CHAIN_GAP`. Closing
+   this needs a second, append-only record of occupancy that deletion cannot reach.
+
+Both limits are the same missing primitive: nothing outside the packet store
+witnesses what the store contained. See ADR-20's trust boundary section.
 - Plane B MUST re-run all packet validation steps; it never trusts a cached packet
   digest or a caller-provided hash.
 

@@ -3,7 +3,8 @@
 ## Status
 Accepted (operator, 2026-08-24) — D-A1 and D-B3 implemented; D-B1 still unbuilt.
 Drafted 2026-08-23 as Proposed with no code, audited, then implemented on operator
-approval.
+approval. **Blast radius reclassified System → Substrate on 2026-08-25** following
+external meta-audit; see the Meta-Audit Reclassification section.
 
 ## Date
 2026-08-23 (implemented 2026-08-24)
@@ -452,6 +453,94 @@ outcome rather than something to weaken validation for.
 The likely cause is the concurrency defects fixed in the same sweep — the
 `_acquire_lock` stale-reclamation bug and the daemon singleton races — which is
 consistent with holes and doubled origins appearing under concurrent writers.
+
+## Meta-Audit Reclassification And Trust Boundary — 2026-08-25
+
+Four independent external audits (ox-alpha, Gemini, DeepSeek, Mistral) were
+aggregated by a review board into a meta-audit. Its rulings are recorded here, and
+two of them go against positions this ADR took.
+
+### Blast radius is Substrate, not System
+
+This ADR filed the change as System. Three of four auditors, the review board, and
+the original dissenting ensemble voter say **Substrate** (0.85, override-forbidden).
+The board's reasoning, which I accept:
+
+> the question is whether the change alters what the *governance substrate* will
+> accept for governed claims. It does — by design. A fail-closed gate being relaxed
+> is precisely the class of change override-forbidden review exists for. That the
+> change is also well-motivated doesn't downgrade its blast radius.
+
+Open Question 1 is closed as **Substrate**. Worth recording that the lone dissenter
+in the 2026-08-23 ensemble audit, `groq/openai/gpt-oss-120b`, reached this
+conclusion first, in a 359-character fragment that the synthesizer clustered as
+agreement. The minority was right.
+
+### Open Question 2 is closed, against this ADR's reasoning
+
+The ADR asked whether enumeration truly makes a hole undeniable, and reasoned that
+a head's own signed `s` could not be lowered. **That reasoning was incomplete and
+the conclusion was wrong.** The attack does not lower any sequence number:
+
+> **Wholesale head truncation.** An adversary with write access deletes every
+> packet above sequence *n* and presents *n* as current. Enumeration finds gaps
+> only relative to the highest sequence still present, so there is no gap to find.
+> Nothing inside a self-signed chain distinguishes truncation from an agent that
+> simply has not written since *n*.
+
+All four audits identified this independently; the board rates it Critical/P0 and
+calls it the highest-confidence finding in the corpus. **Enumeration is undeniable
+only against an adversary who cannot delete the evidence of deletion.**
+
+The bypass-then-delete ordering exploit (Open Question 2's second half) is likewise
+confirmed: occupancy is evaluated at validation time, so bypassing a live packet and
+deleting it afterwards converts a fatal discontinuity into an enumerated gap.
+
+Both are the same missing primitive — nothing outside the packet store witnesses
+what the store contained — and both are now documented as known limits in
+`docs/specs/provenance-packet.spec.md`.
+
+### Trust boundary, stated explicitly
+
+Flagged P0 by the board because leaving it unstated lets the spine read as
+stronger than it is. **The provenance spine defends against a buggy-but-honest
+writer. It does not defend against control of the packet store, host compromise,
+or theft of the signing key.** A single Ed25519 key sits unencrypted on disk;
+whoever holds it can author any history they like, and whoever can write to
+`.agent-surface/provenance/` can truncate it. Every integrity claim in ADR-20 and
+in the packet spec is scoped to the honest-writer model until an external anchor
+exists.
+
+### Retrospective vote re-tally (M-3)
+
+The board asked whether decisions resting on the ensemble synthesizer should be
+re-tallied from raw `voter_responses[]`, since that synthesizer mislabels dissent
+as agreement. For this ADR the re-tally was already performed and is recorded in
+the Adversarial Audit section above: 4 System / 1 Substrate / 1 non-answer on
+blast radius, 2-1 against the D-B1 pairing, unanimous on over-validation and
+insufficiency. The synthesizer's "Tier-1, 6/6 unanimous" was false. **The
+corrected tally is what this ADR was decided on, and the Substrate
+reclassification above now follows the minority position.** Other tiered decisions
+in the repository have not been re-tallied and should be.
+
+### Accepted but not implemented here
+
+External anchoring (P0-strategic), closing the ADR-12 consent gate, replacing the
+ensemble aggregation, `filelock` adoption, the KERI-versus-DSSE fork decision, and
+identity rotation with a signed lineage statement. Identity rotation was
+challenged by one auditor as "not standard practice"; the board upheld it, on the
+grounds that witnessing prevents future concealment but cannot repair an existing
+false-genesis packet.
+
+### Note on the audit inputs
+
+Two of the four external audits carried confabulation-suspect citations — RFC
+numbers, ratification dates and arXiv IDs that could not be corroborated. The
+board struck those citations while retaining the findings, which stood on
+independent reasoning. The board's own process finding applies to this project
+directly: **AI-authored audits entering the governance pipeline should be held to
+the same truth-status discipline as anything else, with citation-resolvability
+required for a Verified tag.**
 
 ## Evidence
 
