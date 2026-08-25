@@ -1408,3 +1408,64 @@ def test_a_fresh_lock_is_not_stolen(tmp_path):
         provenance._acquire_lock(lock_path)
 
     assert lock_path.read_text(encoding="utf-8") == "live-token"
+
+
+def test_garbage_in_a_vacated_slot_does_not_declare_a_fork(tmp_path, monkeypatch):
+    """A fork claim needs a VALID occupant, not any JSON that names the slot.
+
+    `_build_position_index` reads every JSON file under the provenance root
+    before anything is validated, so an unsigned object asserting some agent's
+    identity and sequence lands in the index. Treating that as an occupant let
+    unrelated corruption -- or a hand-written file -- turn an enumerable gap
+    into a fatal fork on every later packet in a chain that is otherwise fine.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+
+    paths = []
+    for index in range(5):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-25T10:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+
+    head = paths[-1]
+    identity = json.loads(head.read_text(encoding="utf-8"))["i"]
+
+    # Vacate slot 2, then drop unsigned garbage that claims it.
+    paths[2].unlink()
+    (output_root / "garbage.json").write_text(
+        json.dumps(
+            {"t": "prov", "i": identity, "s": "2", "p": None, "d": "E" + "z" * 43}
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert (
+        "E_PROVENANCE_CHAIN_FORK" not in result.errors
+    ), "unsigned garbage must not establish that a slot is occupied"
+    assert result.ok is True, result.errors
+    assert "E_PROVENANCE_CHAIN_GAP:2" in result.warnings

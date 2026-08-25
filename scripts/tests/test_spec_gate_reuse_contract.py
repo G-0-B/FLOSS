@@ -143,3 +143,42 @@ def test_grandfathering_is_pinned_to_content(gate, tmp_path, monkeypatch):
     )
     monkeypatch.setitem(gate.REVIEWER_GRANDFATHERED, rel, "0" * 64)
     assert not gate._is_reviewer_grandfathered(rel)
+
+
+def test_reviewer_record_must_be_a_file_inside_the_repository(gate):
+    """`exists()` alone accepted directories and paths outside the checkout.
+
+    `.` is a directory that exists; `/etc/passwd` exists on most hosts and is
+    not a poll record. An evidence pointer that can resolve to either is not
+    evidence, it is a truthy string with extra steps.
+    """
+    base = {
+        "surfaces": ["groq", "mistral", "nvidia"],
+        "families": ["gpt", "qwen", "deepseek", "llama"],
+        "outcome": "APPROVED",
+        "date": "2026-08-25",
+    }
+    for bad in (".", "docs", "../../etc/passwd", "/etc/passwd", "C:/Windows/win.ini"):
+        problems = gate._reviewer_problems("x.md", {**base, "record": bad})
+        assert problems, f"{bad!r} must not satisfy the evidence gate"
+
+
+def test_reviewer_outcome_and_date_must_be_typed(gate):
+    """Same defect as the candidate fields, repeated one function later.
+
+    `str(7).strip()` is non-empty, so `{"outcome": 7, "date": 20260825}` cleared
+    a check whose whole purpose was to establish that a review happened.
+    """
+    base = {
+        "surfaces": ["groq", "mistral", "nvidia"],
+        "families": ["gpt", "qwen", "deepseek", "llama"],
+        "record": "docs/specs/reuse-gate.spec.md",
+    }
+    problems = gate._reviewer_problems("x.md", {**base, "outcome": 7, "date": 20260825})
+    assert any("outcome" in p for p in problems)
+    assert any("date" in p for p in problems)
+
+    malformed = gate._reviewer_problems(
+        "x.md", {**base, "outcome": "APPROVED", "date": "25-08-2026"}
+    )
+    assert any("date" in p for p in malformed), "date must parse as YYYY-MM-DD"

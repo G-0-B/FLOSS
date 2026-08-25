@@ -496,6 +496,51 @@ def _build_position_index(
     return index
 
 
+def _slot_is_genuinely_occupied(
+    occupant_path: Path | None,
+    *,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    seen: set[str],
+    depth: int,
+    max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> bool:
+    """True only when a VALID signed packet holds the sequence slot.
+
+    `_build_position_index` reads every JSON file under the provenance root
+    before anything has been validated, so an unsigned object that merely names
+    an identity and a sequence lands in the index. Declaring a fork on that
+    basis let unrelated corruption -- or one hand-written file -- convert an
+    enumerable gap into a fatal error on every later packet of a chain that is
+    otherwise sound.
+
+    A fork is a claim that someone signed a competing history. Only a signature
+    can establish it.
+    """
+    if occupant_path is None:
+        return False
+    try:
+        result = validate_packet(
+            occupant_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            # A copy: this is a side probe, and marking digests in the caller's
+            # traversal set would make a later legitimate visit look like a cycle.
+            _seen=set(seen),
+            _depth=depth,
+            max_depth=max_depth,
+            _is_ancestor=True,
+            _ignored_chain_position=ignored_chain_position,
+            _follow_prior=False,
+            _position_index=position_index,
+        )
+    except (OSError, ValueError):
+        return False
+    return result.ok
+
+
 def _sequence_index(
     position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
 ) -> tuple[dict[Any, dict[int, Path]], dict[Any, dict[int, Any]]]:
@@ -965,9 +1010,19 @@ def validate_packet(
                     errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
                     break
                 occupant = seq_digests.get(identity, {}).get(expected_sequence)
-                if occupant is not None:
-                    # Something is signed into that slot and the child does not
-                    # point at it. A rewrite or a fork, never a prune.
+                occupant_path = seq_paths.get(identity, {}).get(expected_sequence)
+                if occupant is not None and _slot_is_genuinely_occupied(
+                    occupant_path,
+                    workspace_root=root,
+                    provenance_root=prov_root,
+                    seen=seen,
+                    depth=_depth,
+                    max_depth=max_depth,
+                    ignored_chain_position=_ignored_chain_position,
+                    position_index=_position_index,
+                ):
+                    # Something VALID is signed into that slot and the child
+                    # does not point at it. A rewrite or a fork, never a prune.
                     errors.append("E_PROVENANCE_CHAIN_FORK")
                     break
                 below = [

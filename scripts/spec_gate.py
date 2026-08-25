@@ -228,21 +228,69 @@ def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
                 f"{rel}: reuse.reviewer.{key} has {len(distinct)} distinct, "
                 f"needs >={minimum} (ADR-18 independence rule)"
             )
-    for key in ("outcome", "date"):
-        if key in reviewer and not str(reviewer.get(key, "")).strip():
-            problems.append(f"{rel}: reuse.reviewer.{key} must be non-empty")
-    record = reviewer.get("record")
+    # Typed, not stringified. This is the same defect as the candidate fields
+    # one function above, repeated while fixing them: `str(7).strip()` is
+    # non-empty, so `{"outcome": 7, "date": 20260825}` cleared a check whose
+    # entire purpose is establishing that a review happened.
+    if "outcome" in reviewer:
+        outcome = reviewer.get("outcome")
+        if not isinstance(outcome, str) or not outcome.strip():
+            problems.append(f"{rel}: reuse.reviewer.outcome must be a non-empty string")
+    if "date" in reviewer:
+        raw_date = reviewer.get("date")
+        if not isinstance(raw_date, str):
+            problems.append(f"{rel}: reuse.reviewer.date must be a YYYY-MM-DD string")
+        else:
+            try:
+                _dt.date.fromisoformat(raw_date.strip())
+            except ValueError:
+                problems.append(
+                    f"{rel}: reuse.reviewer.date {raw_date!r} is not YYYY-MM-DD"
+                )
     if "record" in reviewer:
+        record = reviewer.get("record")
         if not isinstance(record, str) or not record.strip():
             problems.append(f"{rel}: reuse.reviewer.record must be a path or ref")
         else:
-            resolved = _physical_path(record) or (REPO_ROOT / record)
-            if not resolved.exists():
-                problems.append(
-                    f"{rel}: reuse.reviewer.record {record!r} does not exist — "
-                    f"an unresolvable record is not evidence"
-                )
+            problems.extend(_record_problems(rel, record))
     return problems
+
+
+def _record_problems(rel: str, record: str) -> list[str]:
+    """A reviewer record must be a regular file inside this repository.
+
+    Checking `exists()` alone accepted `.` (a directory that exists) and
+    `/etc/passwd` (a file that exists and is not a poll record). Absolute paths
+    and `..` traversal both escaped the checkout, because joining an absolute
+    path onto REPO_ROOT discards REPO_ROOT entirely. An evidence pointer that
+    can resolve to any of those is a truthy string with extra steps.
+    """
+    candidate = record.strip()
+    if PurePosixPath(candidate.replace("\\", "/")).is_absolute() or (
+        len(candidate) > 1 and candidate[1] == ":"
+    ):
+        return [f"{rel}: reuse.reviewer.record {record!r} must be repository-relative"]
+    try:
+        resolved = (_physical_path(candidate) or (REPO_ROOT / candidate)).resolve()
+        root = REPO_ROOT.resolve()
+    except (OSError, ValueError):
+        return [f"{rel}: reuse.reviewer.record {record!r} is not a usable path"]
+    if root not in resolved.parents:
+        return [
+            f"{rel}: reuse.reviewer.record {record!r} resolves outside the "
+            f"repository — evidence must live in the repository it governs"
+        ]
+    if not resolved.exists():
+        return [
+            f"{rel}: reuse.reviewer.record {record!r} does not exist — "
+            f"an unresolvable record is not evidence"
+        ]
+    if not resolved.is_file():
+        return [
+            f"{rel}: reuse.reviewer.record {record!r} is not a regular file — "
+            f"a directory identifies no poll record"
+        ]
+    return []
 
 
 def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
