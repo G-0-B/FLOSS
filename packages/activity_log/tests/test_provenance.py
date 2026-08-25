@@ -1590,3 +1590,77 @@ def test_KNOWN_LIMIT_bypass_then_delete_downgrades_a_refusal(tmp_path, monkeypat
     downgraded = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
     assert downgraded.ok is True, downgraded.errors
     assert "E_PROVENANCE_CHAIN_GAP:1" in downgraded.warnings
+
+
+def test_invalid_file_sorting_first_does_not_hide_a_valid_occupant(
+    tmp_path, monkeypatch
+):
+    """The index kept only the FIRST path per slot, so garbage could mask a fork.
+
+    `_build_position_index` walks candidates sorted by path. Retaining one entry
+    per (identity, sequence) meant an unsigned file whose name sorts earlier
+    became the sole occupant of that slot; the validity probe then checked only
+    that file, read the slot as empty, and a child bypassing the real signed
+    packet escaped E_PROVENANCE_CHAIN_FORK.
+
+    The occupancy question is "does ANY valid packet hold this slot", not "is
+    the first thing I happened to find valid".
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 2)
+    genesis = json.loads(paths[0].read_text(encoding="utf-8"))
+    live = json.loads(paths[1].read_text(encoding="utf-8"))
+
+    # Unsigned decoy at the same (identity, sequence) as the live packet, named
+    # so it sorts before the digest-named real one.
+    (output_root / "0000-decoy.json").write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": live["i"],
+                "s": live["s"],
+                "p": live["p"],
+                "d": "E" + "z" * 43,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # A child at sequence 2 whose prior digest resolves to nothing, so the walk
+    # takes the GAP path and consults the sequence index for slot 1. A valid
+    # packet holds that slot, so this must be a FORK, not an enumerated gap.
+    assert genesis["d"]  # genesis exists; the child simply does not point at it
+    _bypass, bypass_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T13:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest="E" + ("q" * 43),
+    )
+
+    result = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert (
+        "E_PROVENANCE_CHAIN_GAP:1" not in result.warnings
+    ), "a decoy sorting first must not make an occupied slot read as a gap"
+    assert "E_PROVENANCE_CHAIN_FORK" in result.errors, result.errors

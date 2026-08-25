@@ -257,6 +257,35 @@ def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
 
 
 PROBE_POSITIVE_PREFIX = "probed:"
+PROBE_STATUSES = ("passed", "failed")
+
+
+def _probe_shape_problems(rel: str, position: int, probe: Any) -> list[str]:
+    """Validate a probe against BOTH documented shapes.
+
+    reuse-gate.schema.json declares `probe` as a string or an object with a
+    required `status` in passed/failed. Keeping the string-only field rule while
+    teaching `_is_direct_probe` the object form made the two disagree, so no
+    structured probe could satisfy both the schema and `--check`.
+    """
+    where = f"{rel}: reuse.candidates[{position}].probe"
+    if isinstance(probe, str):
+        return []
+    if not isinstance(probe, dict):
+        return [f"{where} must be a string or a {{status, detail, date}} object"]
+    problems: list[str] = []
+    status = probe.get("status")
+    if status not in PROBE_STATUSES:
+        problems.append(f"{where}.status {status!r} not in {'/'.join(PROBE_STATUSES)}")
+    for field in ("detail", "date"):
+        if field in probe and not isinstance(probe[field], str):
+            problems.append(f"{where}.{field} must be a string")
+    if isinstance(probe.get("date"), str):
+        try:
+            _dt.date.fromisoformat(probe["date"].strip())
+        except ValueError:
+            problems.append(f"{where}.date {probe['date']!r} is not YYYY-MM-DD")
+    return problems
 
 
 def _is_direct_probe(candidate: Any) -> bool:
@@ -396,13 +425,20 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
                     "license",
                     "maintenance",
                     "platform_fit",
-                    "probe",
                 ):
                     if field in candidate and not isinstance(candidate[field], str):
                         fails.append(
                             f"{rel}: reuse.candidates[{position}].{field} must "
                             f"be a string"
                         )
+                # `probe` is deliberately NOT in that list: the schema documents
+                # two shapes and this check knew only one, so a structured probe
+                # satisfied `_is_direct_probe` and was rejected here in the same
+                # pass -- no value could satisfy both.
+                if "probe" in candidate:
+                    fails.extend(
+                        _probe_shape_problems(rel, position, candidate["probe"])
+                    )
     verdict = reuse.get("verdict")
     if verdict is not None and verdict not in REUSE_VERDICTS:
         fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")

@@ -497,7 +497,7 @@ def _build_position_index(
 
 
 def _slot_is_genuinely_occupied(
-    occupant_path: Path | None,
+    occupant_paths: list[Path] | None,
     *,
     workspace_root: Path,
     provenance_root: Path | None,
@@ -519,8 +519,32 @@ def _slot_is_genuinely_occupied(
     A fork is a claim that someone signed a competing history. Only a signature
     can establish it.
     """
-    if occupant_path is None:
-        return False
+    for occupant_path in occupant_paths or []:
+        if _packet_validates(
+            occupant_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            seen=seen,
+            depth=depth,
+            max_depth=max_depth,
+            ignored_chain_position=ignored_chain_position,
+            position_index=position_index,
+        ):
+            return True
+    return False
+
+
+def _packet_validates(
+    occupant_path: Path,
+    *,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    seen: set[str],
+    depth: int,
+    max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> bool:
     try:
         result = validate_packet(
             occupant_path,
@@ -543,7 +567,7 @@ def _slot_is_genuinely_occupied(
 
 def _sequence_index(
     position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
-) -> tuple[dict[Any, dict[int, Path]], dict[Any, dict[int, Any]]]:
+) -> tuple[dict[Any, dict[int, list[Path]]], dict[Any, dict[int, list[Any]]]]:
     """Per-identity sequence -> (path, digest) maps, from the position index.
 
     Used by the prior walk to tell a genuine gap (nothing occupies the expected
@@ -551,16 +575,22 @@ def _sequence_index(
     points elsewhere). Derived rather than rescanned: the position index has
     already read every packet once.
     """
-    paths: dict[Any, dict[int, Path]] = {}
-    digests: dict[Any, dict[int, Any]] = {}
+    paths: dict[Any, dict[int, list[Path]]] = {}
+    digests: dict[Any, dict[int, list[Any]]] = {}
     for (identity, _prior, sequence), entries in (position_index or {}).items():
         try:
             slot = int(sequence)
         except (TypeError, ValueError):
             continue
         for path, digest in entries:
-            paths.setdefault(identity, {}).setdefault(slot, path)
-            digests.setdefault(identity, {}).setdefault(slot, digest)
+            # EVERY occupant, not the first one found. The index walks candidates
+            # in path order, so keeping one entry per slot let an unsigned file
+            # whose name sorts earlier become the sole occupant: the validity
+            # probe then checked only the decoy, the slot read as empty, and a
+            # child bypassing the real signed packet escaped the fork check. The
+            # question is whether ANY valid packet holds the slot.
+            paths.setdefault(identity, {}).setdefault(slot, []).append(path)
+            digests.setdefault(identity, {}).setdefault(slot, []).append(digest)
     return paths, digests
 
 
@@ -1009,10 +1039,10 @@ def validate_packet(
                     # something that cannot exist, not reaching the bottom.
                     errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
                     break
-                occupant = seq_digests.get(identity, {}).get(expected_sequence)
-                occupant_path = seq_paths.get(identity, {}).get(expected_sequence)
-                if occupant is not None and _slot_is_genuinely_occupied(
-                    occupant_path,
+                occupants = seq_digests.get(identity, {}).get(expected_sequence)
+                occupant_paths = seq_paths.get(identity, {}).get(expected_sequence)
+                if occupants and _slot_is_genuinely_occupied(
+                    occupant_paths,
                     workspace_root=root,
                     provenance_root=prov_root,
                     seen=seen,
@@ -1039,7 +1069,28 @@ def validate_packet(
                 # holes (this workspace has 36 and 37 adjacent) otherwise
                 # collapsed into a single report and under-stated the loss.
                 gap_sequences.extend(range(resume_sequence + 1, expected_sequence + 1))
-                cursor = seq_paths[identity][resume_sequence]
+                # A slot can hold several files now that the index retains every
+                # occupant. Resume on one that actually validates; fall back to
+                # the first so the walk still reports its errors rather than
+                # silently stopping.
+                resume_candidates = seq_paths[identity][resume_sequence]
+                cursor = next(
+                    (
+                        candidate
+                        for candidate in resume_candidates
+                        if _packet_validates(
+                            candidate,
+                            workspace_root=root,
+                            provenance_root=prov_root,
+                            seen=seen,
+                            depth=_depth,
+                            max_depth=max_depth,
+                            ignored_chain_position=_ignored_chain_position,
+                            position_index=_position_index,
+                        )
+                    ),
+                    resume_candidates[0],
+                )
                 child_packet = {"i": identity, "s": resume_sequence + 1}
                 child_sequence = resume_sequence + 1
                 skip_adjacency = True
@@ -1100,10 +1151,21 @@ def validate_packet(
                         # deliberately so. The rule is: enumerate what is LOST,
                         # refuse what is merely BYPASSED.
                         skipped = range(prior_sequence + 1, child_number)
+                        # Same standard as the gap branch: a slot counts as
+                        # occupied only if something VALID sits in it.
                         occupied = [
                             s
                             for s in skipped
-                            if s in seq_paths.get(child_packet.get("i"), {})
+                            if _slot_is_genuinely_occupied(
+                                seq_paths.get(child_packet.get("i"), {}).get(s),
+                                workspace_root=root,
+                                provenance_root=prov_root,
+                                seen=seen,
+                                depth=_depth,
+                                max_depth=max_depth,
+                                ignored_chain_position=_ignored_chain_position,
+                                position_index=_position_index,
+                            )
                         ]
                         if occupied:
                             errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")

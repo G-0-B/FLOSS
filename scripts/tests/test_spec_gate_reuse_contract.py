@@ -284,6 +284,68 @@ def test_a_positive_probe_counts(gate):
     assert not any("direct probe" in f for f in fails), fails
 
 
+def test_a_structured_probe_satisfies_every_check_not_just_the_probe_rule(gate):
+    """The probe rule accepting a shape the field rule rejects is not acceptance.
+
+    `_is_direct_probe` was taught the documented object form while the generic
+    candidate field check still required `probe` to be a string, so a structured
+    probe satisfied neither the schema nor `--check`. The earlier test only
+    asserted the absence of the 'direct probe' message and passed anyway; it was
+    too narrow. Assert the WHOLE result.
+    """
+    entry = {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {
+                    "name": "thing",
+                    "truth_status": "Verified",
+                    "probe": {
+                        "status": "passed",
+                        "detail": "ran it",
+                        "date": "2026-08-25",
+                    },
+                }
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert fails == [], fails
+
+
+def test_a_malformed_structured_probe_is_still_rejected(gate):
+    """Accepting the object shape must not mean accepting any object."""
+    entry = {
+        "tier": 1,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {
+                    "name": "thing",
+                    "truth_status": "Verified",
+                    "probe": {"status": "maybe", "detail": 7},
+                }
+            ],
+            "verdict": "extend",
+            "irreducible_delta": "d",
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("probe" in f for f in fails), fails
+
+
 def test_a_structured_probe_counts(gate):
     entry = {
         "tier": 2,
