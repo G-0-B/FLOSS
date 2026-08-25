@@ -287,8 +287,18 @@ def should_include(path: Path, workspace_root: Path) -> bool:
         return False
     # Prune dependency/build trees at any depth. Checked against the parent
     # parts only, so a file legitimately *named* e.g. "dist" is still watched.
-    if EXCLUDED_DIR_NAMES.intersection(path.parts[:-1]):
-        return False
+    #
+    # Matched against the path RELATIVE to the workspace, not the absolute one:
+    # `path.parts` includes ancestors above the checkout, so a workspace living
+    # under any directory that happens to be called `vendor`, `target`, `dist`
+    # or `build` would exclude every file it watches and silently stop intake.
+    # When the path is outside the workspace, rel_posix is None and there is
+    # nothing meaningful to prune against, so the check is skipped — such paths
+    # are already rejected by the subtree checks above.
+    if rel_posix is not None:
+        rel_parents = Path(rel_posix).parts[:-1]
+        if EXCLUDED_DIR_NAMES.intersection(rel_parents):
+            return False
     if path.suffix.lower() in EXCLUDED_FILE_SUFFIXES:
         return False
     if path.name.startswith("deepsource-"):

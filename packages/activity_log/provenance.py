@@ -483,7 +483,16 @@ def _build_position_index(
         if not isinstance(candidate, dict):
             continue
         position = (candidate.get("i"), candidate.get("p"), candidate.get("s"))
-        index.setdefault(position, []).append((candidate_path, candidate.get("d")))
+        # A packet is arbitrary JSON until it has been validated, and this index
+        # is built BEFORE validation. A list or dict in `i`, `p` or `s` makes the
+        # tuple unhashable, so one malformed or half-written file under the
+        # provenance root would raise TypeError out of setdefault and take every
+        # chain validation down with it. Skip it instead — it will be reported
+        # as invalid on its own account if anything references it.
+        try:
+            index.setdefault(position, []).append((candidate_path, candidate.get("d")))
+        except TypeError:
+            continue
     return index
 
 

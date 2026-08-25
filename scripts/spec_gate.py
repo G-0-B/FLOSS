@@ -88,7 +88,9 @@ def _normalize(path_str: str | Path) -> str | None:
             resolved = physical_path.resolve()
         else:
             candidate = Path(path_str)
-            resolved = (candidate if candidate.is_absolute() else REPO_ROOT / candidate).resolve()
+            resolved = (
+                candidate if candidate.is_absolute() else REPO_ROOT / candidate
+            ).resolve()
     except OSError:
         return None
     try:
@@ -189,6 +191,47 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
     missing_keys = [k for k in REUSE_REQUIRED_KEYS if k not in reuse]
     if missing_keys:
         fails.append(f"{rel}: reuse block missing keys: {', '.join(missing_keys)}")
+    # Key PRESENCE is not evidence. `{"capability": "", "candidates": [],
+    # "irreducible_delta": ""}` satisfied the check above while violating
+    # reuse-gate.schema.json, which requires a non-empty candidate array and
+    # `name`/`truth_status` on each candidate. A gate that accepts an empty
+    # reuse block enforces paperwork, not prior art.
+    #
+    # These constraints are restated here rather than validated with a
+    # jsonschema library on purpose: adding a runtime dependency to the gate
+    # that enforces ADR-18 would itself need to clear ADR-18, and this repo has
+    # already been bitten by jsonschema `format` keywords silently no-opping
+    # without the format extra installed. The authority is still
+    # docs/specs/reuse-gate.schema.json; keep the two in step.
+    for key in ("capability", "irreducible_delta"):
+        value = reuse.get(key)
+        if key in reuse and (not isinstance(value, str) or not value.strip()):
+            fails.append(f"{rel}: reuse.{key} must be a non-empty string")
+    if "candidates" in reuse:
+        candidates = reuse.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            fails.append(
+                f"{rel}: reuse.candidates must list >=1 prior-art candidate "
+                f"(reuse-gate.schema.json minItems: 1) — an empty search is not "
+                f"a search, ADR-18"
+            )
+        else:
+            for position, candidate in enumerate(candidates):
+                if not isinstance(candidate, dict):
+                    fails.append(
+                        f"{rel}: reuse.candidates[{position}] is not an object"
+                    )
+                    continue
+                absent = [
+                    field
+                    for field in ("name", "truth_status")
+                    if not str(candidate.get(field, "")).strip()
+                ]
+                if absent:
+                    fails.append(
+                        f"{rel}: reuse.candidates[{position}] missing "
+                        f"{', '.join(absent)}"
+                    )
     verdict = reuse.get("verdict")
     if verdict is not None and verdict not in REUSE_VERDICTS:
         fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")
@@ -282,7 +325,11 @@ def run_check() -> int:
     missing = [rel for rel in _gated_artifacts() if rel not in entries]
     # PR38's worktree-aware resolution: _physical_path handles registry keys that
     # do not map into this checkout, which WORKSPACE_ROOT / rel mis-resolved.
-    stale = [rel for rel in entries if (path := _physical_path(rel)) is None or not path.exists()]
+    stale = [
+        rel
+        for rel in entries
+        if (path := _physical_path(rel)) is None or not path.exists()
+    ]
     reuse_fails: list[str] = []
     reuse_warns: list[str] = []
     for rel, entry in entries.items():
@@ -364,7 +411,9 @@ def run_add(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Spec-gate (-1 layer) check")
-    parser.add_argument("--check", action="store_true", help="Fail-closed audit (default)")
+    parser.add_argument(
+        "--check", action="store_true", help="Fail-closed audit (default)"
+    )
     parser.add_argument("--path", help="Print advisory for one path; always exit 0")
     parser.add_argument("--add", help="Register a gated artifact")
     parser.add_argument("--spec", help="One-line spec stub for --add")
@@ -385,7 +434,7 @@ def main() -> int:
         return 0
     if args.add:
         if not args.spec:
-            print("spec-gate: --add requires --spec \"<one-line intent>\"")
+            print('spec-gate: --add requires --spec "<one-line intent>"')
             return 1
         return run_add(args.add, args.spec, args.spec_ref, args.tier)
     if args.list:
