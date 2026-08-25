@@ -495,3 +495,45 @@ def test_registration_guidance_is_a_command_that_actually_works(gate, tmp_path):
     note = gate.advisory_note("FLOSS/scripts/spec_gate.py")
     guidance = note or gate._registration_hint("FLOSS/scripts/unregistered_example.py")
     assert "--tier" in guidance, guidance
+
+
+@pytest.mark.parametrize(
+    "window", ["999999", 999999.9, True, None, "soon", [], {"days": 5}]
+)
+def test_evidence_window_must_be_a_real_integer(gate, window):
+    """A coerced window silently widens the freshness gate, or crashes the audit.
+
+    `int("999999")` and `int(999999.9)` both succeed, so a schema-invalid value
+    let arbitrarily old prior art pass `--check`; `int("soon")` raised ValueError
+    out of the audit instead of producing a reuse violation. Same untyped-input
+    class as the dates and the probe fields.
+    """
+    entry = {
+        "tier": 1,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2020-01-01",
+            "candidates": [{"name": "n", "truth_status": "Verified"}],
+            "verdict": "extend",
+            "irreducible_delta": "d",
+            "evidence_window_days": window,
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("evidence_window_days" in f for f in fails), fails
+
+
+def test_a_valid_window_still_governs_freshness(gate):
+    entry = {
+        "tier": 1,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2020-01-01",
+            "candidates": [{"name": "n", "truth_status": "Verified"}],
+            "verdict": "extend",
+            "irreducible_delta": "d",
+            "evidence_window_days": 30,
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("stale" in f for f in fails), fails

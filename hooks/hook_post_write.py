@@ -101,6 +101,7 @@ def _is_root_kernel(path_str: str) -> bool:
     name = resolved.name.lower()
     return name.startswith(CANON_ROOT_PREFIX) and name.endswith(CANON_ROOT_SUFFIX)
 
+
 # Even within substantive paths, skip these — they're routine noise.
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
 MUTATING_TOOL_NAMES = {
@@ -182,6 +183,22 @@ def _is_inside_repo(path_str: str) -> bool:
     except (OSError, ValueError):
         return False
     return resolved == root or root in resolved.parents
+
+
+def _verification_evidence_ref(verification: dict) -> dict:
+    """Type the hashline result honestly.
+
+    `test` asserts something was checked and held. A SKIPPED verification
+    asserts the opposite, and emitting it as `test` is the same defect as a
+    probe that says "done": naming the conclusion instead of showing the work.
+    D3 added `log` to the evidence vocabulary for exactly this -- a record of
+    what happened, carrying no claim that it passed.
+    """
+    status = str(verification.get("status", "UNKNOWN")).upper()
+    return {
+        "type": "test" if status == "VERIFIED" else "log",
+        "ref": f"hashline:{status}",
+    }
 
 
 def is_substantive(path_str: str) -> bool:
@@ -540,12 +557,14 @@ def main() -> int:
                         workspace_root=REPO_ROOT.parent,
                     )
                 ],
-                "evidence_refs": [
-                    {
-                        "type": "test",
-                        "ref": f"hashline:{verification.get('status', 'UNKNOWN')}",
-                    }
-                ],
+                # Only a VERIFIED hashline is `test` evidence. Anything else --
+                # SKIPPED because the tool has no deterministic verifier,
+                # MISMATCH, UNKNOWN -- is a log line about verification not
+                # having happened, and typing it as `test` told voters a check
+                # passed when none ran. Hermes `patch` reaches this path and
+                # always SKIPPEDs, because hashline handles only edit/replace,
+                # write/write_file and multiedit.
+                "evidence_refs": [_verification_evidence_ref(verification)],
                 "risks": [],
                 "benefits": [],
                 "next_action": f"submit {proposal_type} claim at {blast_radius} radius",

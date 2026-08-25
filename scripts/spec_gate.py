@@ -500,7 +500,26 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
         fails.extend(date_problems)
     else:
         age = (_dt.date.today() - _dt.date.fromisoformat(raw_date)).days
-        window = int(reuse.get("evidence_window_days", EVIDENCE_WINDOW_DAYS))
+        # `int()` was doing double duty as a parser and a validator, and it is
+        # bad at the second job: int("999999") and int(999999.9) both succeed,
+        # so a schema-invalid window silently widened the freshness gate until
+        # any prior art was fresh, while int("soon") raised out of the audit
+        # instead of reporting a violation. Same untyped-input class as the
+        # dates and the probe fields; validate before computing.
+        raw_window = reuse.get("evidence_window_days", EVIDENCE_WINDOW_DAYS)
+        if isinstance(raw_window, bool) or not isinstance(raw_window, int):
+            fails.append(
+                f"{rel}: reuse.evidence_window_days must be an integer, got "
+                f"{type(raw_window).__name__}"
+            )
+            return fails, []
+        if raw_window <= 0:
+            fails.append(
+                f"{rel}: reuse.evidence_window_days must be positive, got "
+                f"{raw_window}"
+            )
+            return fails, []
+        window = raw_window
         if age < 0:
             # A future date produces a negative age, which can never exceed the
             # window until that date arrives -- `2099-01-01` would keep the
