@@ -1717,3 +1717,86 @@ def test_decoy_claiming_an_ancestor_digest_does_not_poison_the_walk(
         f"a decoy copying an ancestor digest must not poison the walk: "
         f"{result.errors}"
     )
+
+
+def test_unresolved_consent_is_reported_not_silent(tmp_path, monkeypatch):
+    """The consent gate accepts any non-empty string. Say so, in the result.
+
+    `entry_has_consent()` checks that `decision_action_hash` is a non-empty
+    string and never resolves it against a real ConsentDecision, so a governed
+    System/Substrate claim is admitted on the strength of a string somebody
+    typed. Four independent audits rated this Critical.
+
+    It stays a WARNING rather than an error deliberately: making it fatal today
+    would block every governed claim in the repository, which is the b0de2fe
+    mistake -- correct by the letter of the contract, and it bricks the system.
+    The point is that the hole is no longer invisible.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "AdrChange",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T14:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "consent_ref": {"decision_action_hash": "totally-made-up"},
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+
+    # The gate still admits it -- that is the defect being made visible.
+    assert result.ok is True, result.errors
+    assert any(
+        provenance.CONSENT_UNRESOLVED in warning for warning in result.warnings
+    ), result.warnings
+
+
+def test_a_packet_without_consent_raises_no_consent_warning(tmp_path, monkeypatch):
+    """Only packets CLAIMING consent get the marker; ordinary ones stay quiet."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "CodeChange",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T14:01:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+    assert not any(
+        provenance.CONSENT_UNRESOLVED in warning for warning in result.warnings
+    ), result.warnings

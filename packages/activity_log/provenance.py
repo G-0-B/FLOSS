@@ -1248,6 +1248,12 @@ def validate_packet(
                 ignored_chain_position=_ignored_chain_position,
             )
         )
+        # Depth 0 only: an ancestor's consent state is history, and re-reporting
+        # it on every descendant would bury the packet actually under
+        # submission. A governed claim now carries a visible marker that its
+        # consent reference was never resolved, instead of the gate silently
+        # accepting any non-empty string.
+        warnings.extend(consent_resolution_problems(packet))
 
     chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
     if (
@@ -1365,14 +1371,61 @@ def validated_non_packet_evidence_refs(
     return refs, truncated
 
 
+CONSENT_UNRESOLVED = "E_CONSENT_GATE_UNRESOLVED"
+
+
 def entry_has_consent(entry: dict[str, Any]) -> bool:
-    """Return True when a payload entry carries a consent decision reference."""
+    """Return True when a payload entry carries a consent decision reference.
+
+    WHAT THIS DOES NOT DO: resolve the hash. It checks that
+    `consent_ref.decision_action_hash` is a non-empty string and nothing more.
+    Any non-empty string satisfies it -- there is no lookup against a real
+    `ConsentDecision` action, no existence check, no signature check.
+
+    That is the whole consent gate today. A governed System/Substrate claim is
+    admitted on the strength of a string somebody typed. Four independent audits
+    rated this Critical; it is ADR-12's to close, and until it is closed the
+    word "governed" in this codebase means "carries a consent-shaped field",
+    not "was consented to".
+
+    The boolean contract is deliberately unchanged -- packages/metacoordinator_mcp
+    depends on it and is under a do-not-modify rule. `consent_resolution_problems`
+    below is the honest companion: it reports the unresolved state so a caller
+    that wants to know can, rather than the hole staying silent.
+    """
 
     consent_ref = entry.get("consent_ref")
     if not isinstance(consent_ref, dict):
         return False
     decision_hash = consent_ref.get("decision_action_hash")
     return isinstance(decision_hash, str) and bool(decision_hash.strip())
+
+
+def consent_resolution_problems(packet: dict[str, Any]) -> list[str]:
+    """Report that a packet's consent references were never resolved.
+
+    Returns one `E_CONSENT_GATE_UNRESOLVED` marker per entry claiming consent.
+    Emitted as a WARNING rather than an error on purpose: making it fatal today
+    would block every governed claim in the repository, which is the same
+    mistake as `b0de2fe` -- correct by the letter of the contract, and it bricks
+    the system. The point is that the hole stops being invisible.
+
+    Remove this function when ADR-12 lands real resolution. Its presence in a
+    validation result is the marker that ADR-12 has NOT landed.
+    """
+
+    problems: list[str] = []
+    for index, entry in enumerate(packet.get("a", []) or []):
+        if not entry_has_consent(entry):
+            continue
+        consent_ref = entry.get("consent_ref") or {}
+        digest = str(consent_ref.get("decision_action_hash", "")).strip()
+        problems.append(
+            f"{CONSENT_UNRESOLVED}: a[{index}].consent_ref.decision_action_hash "
+            f"{digest[:24]!r} was accepted without being resolved against any "
+            f"ConsentDecision record (ADR-12 unimplemented)"
+        )
+    return problems
 
 
 def packet_has_consent(packet: dict[str, Any]) -> bool:
