@@ -311,10 +311,31 @@ def _is_direct_probe(candidate: Any) -> bool:
         return False
     probe = candidate.get("probe")
     if isinstance(probe, dict):
-        return str(probe.get("status", "")).strip().lower() == "passed"
+        if str(probe.get("status", "")).strip().lower() != "passed":
+            return False
+        # `status: passed` is an assertion, not evidence of one. Without a
+        # detail and a real date the object says a probe happened while
+        # identifying neither what was exercised nor when -- the same shape as
+        # `"probe": "done"`, one layer up.
+        detail = probe.get("detail")
+        if not isinstance(detail, str) or not detail.strip():
+            return False
+        date = probe.get("date")
+        if not isinstance(date, str):
+            return False
+        try:
+            _dt.date.fromisoformat(date.strip())
+        except ValueError:
+            return False
+        return True
     if not isinstance(probe, str):
         return False
-    return probe.strip().lower().startswith(PROBE_POSITIVE_PREFIX)
+    # The prefix is a marker, not the evidence. `probed:` with nothing after it
+    # is the string-form equivalent of a bare `status: passed`.
+    text = probe.strip()
+    if not text.lower().startswith(PROBE_POSITIVE_PREFIX):
+        return False
+    return bool(text[len(PROBE_POSITIVE_PREFIX) :].strip())
 
 
 def _record_problems(rel: str, record: str) -> list[str]:

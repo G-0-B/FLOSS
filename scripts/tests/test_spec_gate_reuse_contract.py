@@ -376,3 +376,79 @@ def test_a_structured_probe_counts(gate):
     }
     fails, _warns = gate._reuse_problems("x.md", entry)
     assert not any("direct probe" in f for f in fails), fails
+
+
+def _tier2_entry(probe):
+    return {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {"name": "thing", "truth_status": "Verified", "probe": probe}
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "probe",
+    [
+        {"status": "passed"},
+        {"status": "passed", "detail": ""},
+        {"status": "passed", "detail": "   ", "date": "2026-08-25"},
+        {"status": "passed", "detail": "ran it"},
+        {"status": "passed", "detail": "ran it", "date": "not-a-date"},
+        "probed:",
+        "probed:    ",
+        "PROBED:",
+    ],
+)
+def test_a_passed_probe_without_evidence_does_not_count(gate, probe):
+    """`status: passed` is an assertion, not evidence of one.
+
+    Accepting the object form left `detail` and `date` optional, so
+    `{"status": "passed"}` discharged the tier-2 anti-gaming obligation without
+    saying what was exercised or when. The string form had the same hole: the
+    bare prefix `probed:` carried no payload.
+
+    This is the same defect as the placeholder probes, the stringified reviewer
+    metadata, and the prose reviewer before them — a check satisfied by naming
+    the conclusion rather than showing the work.
+    """
+    fails, _warns = gate._reuse_problems("x.md", _tier2_entry(probe))
+    assert any("direct probe" in f for f in fails), f"{probe!r} must not count"
+
+
+@pytest.mark.parametrize(
+    "probe",
+    [
+        {"status": "passed", "detail": "ran --check live", "date": "2026-08-25"},
+        "probed: ran --check live 2026-08-25, fail-closed path verified",
+    ],
+)
+def test_a_probe_with_evidence_counts(gate, probe):
+    fails, _warns = gate._reuse_problems("x.md", _tier2_entry(probe))
+    assert fails == [], fails
+
+
+def test_probe_object_schema_demands_what_the_gate_demands(gate, schema):
+    """Schema and enforcement must agree on what a passed probe has to carry.
+
+    Every previous instance of this drift was found in review rather than here.
+    """
+    probe = schema["properties"]["candidates"]["items"]["properties"]["probe"]
+    obj = next(form for form in probe["oneOf"] if form.get("type") == "object")
+    assert set(obj["required"]) == {"status", "detail", "date"}
+    assert obj["properties"]["detail"]["minLength"] >= 1
+    assert obj["properties"]["date"]["format"] == "date"
+    assert set(obj["properties"]["status"]["enum"]) == set(gate.PROBE_STATUSES)

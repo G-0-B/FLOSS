@@ -59,7 +59,9 @@
               {
                 "type": "object",
                 "required": [
-                  "status"
+                  "status",
+                  "detail",
+                  "date"
                 ],
                 "properties": {
                   "status": {
@@ -69,7 +71,8 @@
                     ]
                   },
                   "detail": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "date": {
                     "type": "string",
@@ -78,7 +81,7 @@
                 }
               }
             ],
-            "description": "What was actually exercised. A tier-2 compose/build verdict requires at least one candidate carrying POSITIVE probe evidence: either a string beginning with 'probed:' or an object with status 'passed'. Anything else -- including every honest 'not_probed:' declaration -- is a candidate reasoned about rather than run, which belongs in the block but does not discharge the probe obligation. Enforced by scripts/spec_gate.py:_is_direct_probe; keep the two in step."
+            "description": "What was actually exercised. A tier-2 compose/build verdict requires at least one candidate carrying POSITIVE probe evidence: a string beginning 'probed:' WITH text after the prefix, or an object with status 'passed' carrying a non-empty detail and a YYYY-MM-DD date. The marker is not the evidence -- a bare 'probed:' or a bare {status: passed} asserts that a probe happened while identifying neither what was exercised nor when. Anything else, including every honest 'not_probed:' declaration, belongs in the block but does not discharge the probe obligation. Enforced by scripts/spec_gate.py:_is_direct_probe; keep the two in step."
           },
           "truth_status": {
             "enum": [
