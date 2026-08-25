@@ -1664,3 +1664,56 @@ def test_invalid_file_sorting_first_does_not_hide_a_valid_occupant(
         "E_PROVENANCE_CHAIN_GAP:1" not in result.warnings
     ), "a decoy sorting first must not make an occupied slot read as a gap"
     assert "E_PROVENANCE_CHAIN_FORK" in result.errors, result.errors
+
+
+def test_decoy_claiming_an_ancestor_digest_does_not_poison_the_walk(
+    tmp_path, monkeypatch
+):
+    """The digest index was last-write-wins where the slot index was fixed.
+
+    `_sequence_index` was taught to retain every occupant, but `chain_index` --
+    built from the same scan, keyed on each packet's internal `d` -- kept only
+    the last entry seen. A malformed file that copies a genuine ancestor's `d`
+    and sorts after it replaced that ancestor's path, so the walk validated the
+    decoy and every descendant inherited its errors, while the correctly named
+    signed packet sat untouched on disk.
+
+    Fixing one reader of a scan and not its sibling is the same mistake twice.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 3)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    # Genesis, not the immediate prior: the first hop resolves by FILENAME via
+    # _find_packet_by_digest, so only a deeper ancestor is reached through
+    # chain_index and can be shadowed by it.
+    middle = json.loads(paths[0].read_text(encoding="utf-8"))
+
+    # Same claimed digest, garbage content, name sorts last.
+    (output_root / "zzzz-decoy.json").write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": middle["i"],
+                "s": middle["s"],
+                "p": middle["p"],
+                "d": middle["d"],
+                "v": middle["v"],
+                "a": [],
+                "sigs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert result.ok is True, (
+        f"a decoy copying an ancestor digest must not poison the walk: "
+        f"{result.errors}"
+    )

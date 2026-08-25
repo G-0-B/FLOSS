@@ -996,12 +996,18 @@ def validate_packet(
         gap_sequences: list[int] = []
         reached_genesis = False
         # Derived from the position index above -- no second scan.
-        chain_index = {
-            digest: path
-            for entries in (_position_index or {}).values()
-            for path, digest in entries
-            if isinstance(digest, str)
-        }
+        # EVERY path per digest, for the same reason the sequence index keeps
+        # every occupant per slot. This was a dict comprehension, so it was
+        # last-write-wins: a malformed file copying a genuine ancestor's `d` and
+        # sorting after it replaced that ancestor's path, and the walk validated
+        # the decoy while the correctly named signed packet sat untouched on
+        # disk. Two readers of one scan; fixing only the first was the same
+        # mistake twice.
+        chain_index: dict[str, list[Path]] = {}
+        for entries in (_position_index or {}).values():
+            for path, digest in entries:
+                if isinstance(digest, str):
+                    chain_index.setdefault(digest, []).append(path)
 
         # The prior chain is walked ITERATIVELY, not recursively.
         #
@@ -1193,7 +1199,28 @@ def validate_packet(
             walked.add(key)
             child_packet = prior_packet
             child_sequence = prior_packet.get("s")
-            cursor = chain_index.get(key) or _find_packet_by_digest(prov_root, key)
+            # A digest is a SAID over the packet's own content, so a file
+            # merely claiming one cannot also satisfy it. Prefer a candidate
+            # that validates; fall back to the first so a genuinely broken
+            # ancestor still reports its errors instead of vanishing.
+            candidates_for_digest = chain_index.get(key) or []
+            cursor = next(
+                (
+                    candidate
+                    for candidate in candidates_for_digest
+                    if _packet_validates(
+                        candidate,
+                        workspace_root=root,
+                        provenance_root=prov_root,
+                        seen=seen,
+                        depth=_depth,
+                        max_depth=max_depth,
+                        ignored_chain_position=_ignored_chain_position,
+                        position_index=_position_index,
+                    )
+                ),
+                candidates_for_digest[0] if candidates_for_digest else None,
+            ) or _find_packet_by_digest(prov_root, key)
 
         if gap_sequences:
             # Enumerated, not summarised. An auditor reading this result can
