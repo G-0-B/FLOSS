@@ -397,6 +397,62 @@ consumer of ancestor artifact refs) was not satisfied before landing — the cha
 went in on the audit majority's reading plus operator approval, not on a completed
 enumeration. That is a known, accepted gap, not an oversight.
 
+## D-B3 Addendum — Chain Gaps Are Enumerated, Not Concealed Or Refused
+
+Operator-approved 2026-08-24, landed in `61cdd5c`. This settles Open Question 2.
+
+D-B3 as first landed said nothing about an *unreachable* ancestor, only about
+artifact refs. A parallel agent then closed the resulting hole in the opposite
+direction (`b0de2fe`), making a missing ancestor fatal at every depth on the
+strength of the spec sentence "a `p` reference to a nonexistent prior packet is
+invalid." Both changes are individually defensible. Together they moved the spine
+from 100% rejection to working to 100% rejection again inside an hour, decided
+twice in opposite directions by two agents who could not see each other.
+
+The framing both missed: **a signed packet cannot be re-derived once lost.** A
+hole is therefore permanent, and any rule that refuses a chain containing one
+refuses that agent forever. Meanwhile the property actually being protected is
+not that holes be impossible — it is that they be *undeniable*.
+
+Sequence numbers are per-agent and monotonic, so a deleted packet leaves an
+arithmetic gap whether or not its file survives. The walk now uses that:
+
+| Condition | Verdict |
+|---|---|
+| Expected slot occupied, child points elsewhere | `E_PROVENANCE_CHAIN_FORK` — fatal. A rewrite. |
+| Expected slot empty | Enumerate the exact sequence numbers, resume below the gap, keep verifying |
+| Prior exists further back, skipped slots **empty** | Enumerate — the packets are gone |
+| Prior exists further back, any skipped slot **occupied** | `E_PROVENANCE_SEQUENCE_DISCONTINUOUS` — fatal. Bypassed, not lost. |
+| Chain does not reach sequence 0, or genesis is not sequence 0 | Fatal |
+
+The rule in one line: **enumerate what is lost, refuse what is merely bypassed.**
+Gaps surface as `E_PROVENANCE_CHAIN_GAP:<n>,<n>` in `warnings`, enumerated rather
+than summarised, so an auditor can name exactly which packets to go looking for.
+Silence was the actual defect in the original behaviour; refusal was the defect in
+its replacement.
+
+### What this found in the live chain
+
+Running it against identity `DkuYPguG98HM2nyR` (97 packets, sequences 0..100)
+surfaced three defects, none introduced by this work and none previously visible:
+
+1. **Four packets absent** — sequences 3, 36, 37, 39. Now enumerated.
+2. **Sequence 2 points at sequence 0** while sequence 1 is present on disk. A
+   bypass, not a loss. Fatal under the rule above.
+3. **Sequence 5 carries `p: null`**, claiming to be genesis at position 5. The
+   chain asserts a false origin.
+
+Defects 2 and 3 are unrepairable — the packets are signed, so correcting a field
+breaks the signature. The remedy is **identity rotation**: start a fresh chain at
+sequence 0 and retain the existing packets as an audit record with their defects
+enumerated. That is an operator action and has not been taken here. Until it is,
+this identity cannot produce a valid governed claim, and that is the correct
+outcome rather than something to weaken validation for.
+
+The likely cause is the concurrency defects fixed in the same sweep — the
+`_acquire_lock` stale-reclamation bug and the daemon singleton races — which is
+consistent with holes and doubled origins appearing under concurrent writers.
+
 ## Evidence
 
 - `$HOME/.floss_agent/hook.log` — pilot history, 576 KB, error tally above.
