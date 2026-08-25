@@ -496,6 +496,29 @@ def _build_position_index(
     return index
 
 
+def _sequence_index(
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> tuple[dict[Any, dict[int, Path]], dict[Any, dict[int, Any]]]:
+    """Per-identity sequence -> (path, digest) maps, from the position index.
+
+    Used by the prior walk to tell a genuine gap (nothing occupies the expected
+    sequence number) from a fork or rewrite (something does, and the child
+    points elsewhere). Derived rather than rescanned: the position index has
+    already read every packet once.
+    """
+    paths: dict[Any, dict[int, Path]] = {}
+    digests: dict[Any, dict[int, Any]] = {}
+    for (identity, _prior, sequence), entries in (position_index or {}).items():
+        try:
+            slot = int(sequence)
+        except (TypeError, ValueError):
+            continue
+        for path, digest in entries:
+            paths.setdefault(identity, {}).setdefault(slot, path)
+            digests.setdefault(identity, {}).setdefault(slot, digest)
+    return paths, digests
+
+
 def _has_valid_same_position_competitor(
     packet: dict[str, Any],
     *,
@@ -860,100 +883,210 @@ def validate_packet(
         _position_index = _build_position_index(prov_root)
 
     if prior_digest is not None and _follow_prior:
-        prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
-        if prior_path is None:
-            # Fatal at every depth. The spec is unqualified -- "a `p` reference
-            # to a nonexistent prior packet is invalid" -- and ADR-20 D-B3 keeps
-            # existence, signature validity, and sequence continuity as exactly
-            # what an ancestor is still held to while dropping the artifact
-            # pass. Downgrading a missing ancestor to a warning made pruning any
-            # packet below the head a way to hide a broken chain: delete the
-            # link and every descendant validates again.
-            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
-        else:
-            # The prior chain is walked ITERATIVELY, not recursively.
-            #
-            # `_depth` is deliberately not incremented for prior links —
-            # `max_depth` bounds the evidence DAG, while a linear prior chain is
-            # bounded by cycle detection — but that left the chain bounded only
-            # by Python's own stack. Measured: ~1.1 stack frames per link, so a
-            # ~900-link chain exhausted the default 1000 limit, and a 1000-link
-            # honest chain reproducibly raised RecursionError instead of
-            # returning a PacketValidation. Provenance validation gates
-            # substrate claims, so past that length the gate stopped returning
-            # verdicts at all rather than returning a negative one.
-            #
-            # Each ancestor is validated with `_follow_prior=False` so it checks
-            # its own signature/SAID/artifacts/evidence but leaves its prior to
-            # this loop. Continuity is then asserted between each adjacent pair,
-            # which is exactly what the recursive version did one frame down.
-            child_packet: dict[str, Any] = packet
-            child_sequence: Any = sequence
-            cursor: Path | None = prior_path
-            walked: set[str] = set()
-            # Derived from the position index above -- no second scan.
-            chain_index = {
-                digest: path
-                for entries in (_position_index or {}).values()
-                for path, digest in entries
-                if isinstance(digest, str)
-            }
+        # D-B3 addendum (ADR-20, operator-approved 2026-08-24). A hole in the
+        # prior chain is DETECTED AND ENUMERATED - not silently truncated, and
+        # not blanket-fatal.
+        #
+        # Both earlier behaviours were wrong in opposite directions. Truncating
+        # on an unreachable ancestor let anyone hide a packet by deleting it:
+        # remove the file and every descendant validates again, with nothing in
+        # the result saying anything was gone. Making it fatal at every depth
+        # made concealment impossible but also made an honest chain with a hole
+        # permanently unable to submit - and a hole cannot be repaired, because
+        # the missing packets are signed and cannot be re-derived. This
+        # workspace already had four (identity DkuYPguG98HM2nyR, sequence
+        # numbers 3, 36, 37 and 39 absent from a 0..98 range), so the fatal rule
+        # rejected 100% of submissions the day it landed.
+        #
+        # What actually matters for concealment is that the hole be UNDENIABLE.
+        # Sequence numbers are per-agent and monotonic, so a deleted packet
+        # leaves an arithmetically visible gap whether or not its file exists.
+        # The walk therefore consults the per-identity sequence index at every
+        # break:
+        #
+        #   * another packet already occupies the expected position - the child
+        #     points somewhere else, which is a fork or a rewrite, and stays
+        #     FATAL (E_PROVENANCE_CHAIN_FORK);
+        #   * the position is empty - a genuine gap. It is recorded by exact
+        #     sequence number, the walk RESUMES below it, and the rest of
+        #     history is still verified down to genesis.
+        #
+        # The chain must still reach sequence 0. A gap plus an unreachable
+        # remainder is a truncated chain and stays fatal. What this buys is the
+        # honest middle: the deleted content cannot be recovered, but its
+        # absence is enumerated in the validation result instead of passing
+        # unmentioned, and a chain with a known hole can still carry current
+        # work.
+        seq_paths, seq_digests = _sequence_index(_position_index)
+        gap_sequences: list[int] = []
+        reached_genesis = False
+        # Derived from the position index above -- no second scan.
+        chain_index = {
+            digest: path
+            for entries in (_position_index or {}).values()
+            for path, digest in entries
+            if isinstance(digest, str)
+        }
 
-            while cursor is not None:
-                prior_result = validate_packet(
-                    cursor,
-                    workspace_root=root,
-                    provenance_root=prov_root,
-                    _seen=seen,
-                    _depth=_depth,
-                    max_depth=max_depth,
-                    _is_ancestor=True,
-                    _ignored_chain_position=_ignored_chain_position,
-                    _follow_prior=False,
-                    _position_index=_position_index,
-                )
-                if not prior_result.ok:
-                    errors.extend(prior_result.errors)
-                warnings.extend(prior_result.warnings)
+        # The prior chain is walked ITERATIVELY, not recursively.
+        #
+        # `_depth` is deliberately not incremented for prior links -
+        # `max_depth` bounds the evidence DAG, while a linear prior chain is
+        # bounded by cycle detection - but that left the chain bounded only by
+        # Python's own stack. Measured: ~1.1 stack frames per link, so a
+        # ~900-link chain exhausted the default 1000 limit, and a 1000-link
+        # honest chain reproducibly raised RecursionError instead of returning
+        # a PacketValidation. Provenance validation gates substrate claims, so
+        # past that length the gate stopped returning verdicts at all rather
+        # than returning a negative one.
+        #
+        # Each ancestor is validated with `_follow_prior=False` so it checks
+        # its own signature/SAID/evidence but leaves its prior to this loop.
+        child_packet: dict[str, Any] = packet
+        child_sequence: Any = sequence
+        cursor: Path | None = _find_packet_by_digest(prov_root, str(prior_digest))
+        walked: set[str] = {str(prior_digest)}
+        # True for the one link immediately after a gap, where the adjacency
+        # assertion must not fire: non-adjacency IS the gap, already recorded.
+        skip_adjacency = False
 
-                # Per-agent chain continuity: the prior must belong to the same
-                # author and its sequence must directly precede its child.
-                # Without this, a signed packet could point at another agent's
-                # packet or skip/fork its sequence while still validating.
-                prior_packet = prior_result.packet or {}
-                if prior_packet.get("i") != child_packet.get("i"):
-                    errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
+        while True:
+            if cursor is None:
+                identity = child_packet.get("i")
                 try:
-                    if int(prior_packet.get("s")) != int(child_sequence) - 1:
-                        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                    expected_sequence = int(child_sequence) - 1
                 except (TypeError, ValueError):
                     errors.append("E_PROVENANCE_SEQUENCE_INVALID")
-
-                # Advance to the next ancestor.
-                next_digest = prior_packet.get("p")
-                if next_digest is None:
                     break
-                key = str(next_digest)
-                if key in walked:
-                    # Defensive: a cycle among priors would otherwise spin
-                    # forever now that the stack no longer bounds this walk.
-                    errors.append("E_PROVENANCE_PRIOR_CYCLE")
-                    break
-                walked.add(key)
-                next_path = chain_index.get(key) or _find_packet_by_digest(
-                    prov_root, key
-                )
-                if next_path is None:
-                    # Same rule as the immediate prior above: an ancestor that
-                    # cannot be found breaks continuity, and continuity is one
-                    # of the three things ADR-20 D-B3 still holds ancestors to.
-                    # Truncating the walk here let a hole anywhere below the
-                    # head pass as a valid chain.
+                if expected_sequence < 0:
+                    # Sequence 0 is genesis and must carry `p: null`. A packet
+                    # that names a prior while sitting at 0 is pointing at
+                    # something that cannot exist, not reaching the bottom.
                     errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
                     break
-                child_packet = prior_packet
-                child_sequence = prior_packet.get("s")
-                cursor = next_path
+                occupant = seq_digests.get(identity, {}).get(expected_sequence)
+                if occupant is not None:
+                    # Something is signed into that slot and the child does not
+                    # point at it. A rewrite or a fork, never a prune.
+                    errors.append("E_PROVENANCE_CHAIN_FORK")
+                    break
+                below = [
+                    s for s in seq_paths.get(identity, {}) if s < expected_sequence
+                ]
+                if not below:
+                    # Nothing survives beneath the gap: the chain is truncated
+                    # rather than holed, and genesis is unreachable.
+                    gap_sequences.append(expected_sequence)
+                    errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+                    break
+                resume_sequence = max(below)
+                # The WHOLE skipped span, not just its first slot. Consecutive
+                # holes (this workspace has 36 and 37 adjacent) otherwise
+                # collapsed into a single report and under-stated the loss.
+                gap_sequences.extend(range(resume_sequence + 1, expected_sequence + 1))
+                cursor = seq_paths[identity][resume_sequence]
+                child_packet = {"i": identity, "s": resume_sequence + 1}
+                child_sequence = resume_sequence + 1
+                skip_adjacency = True
+                continue
+
+            prior_result = validate_packet(
+                cursor,
+                workspace_root=root,
+                provenance_root=prov_root,
+                _seen=seen,
+                _depth=_depth,
+                max_depth=max_depth,
+                _is_ancestor=True,
+                _ignored_chain_position=_ignored_chain_position,
+                _follow_prior=False,
+                _position_index=_position_index,
+            )
+            if not prior_result.ok:
+                errors.extend(prior_result.errors)
+            warnings.extend(prior_result.warnings)
+
+            # Per-agent chain continuity: the prior must belong to the same
+            # author and its sequence must directly precede its child. Without
+            # this, a signed packet could point at another agent's packet or
+            # skip/fork its sequence while still validating.
+            prior_packet = prior_result.packet or {}
+            if prior_packet.get("i") != child_packet.get("i"):
+                errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
+            if skip_adjacency:
+                skip_adjacency = False
+            else:
+                try:
+                    prior_sequence = int(prior_packet.get("s"))
+                    child_number = int(child_sequence)
+                except (TypeError, ValueError):
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                else:
+                    if prior_sequence >= child_number:
+                        # Sequence must strictly decrease toward genesis. A
+                        # prior at or above its child is a loop or a rewrite,
+                        # and no amount of enumeration makes that walkable.
+                        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                    elif prior_sequence < child_number - 1:
+                        # The prior EXISTS but sits further back than one step.
+                        # Whether that is acceptable turns on ONE question: are
+                        # the skipped slots empty, or occupied?
+                        #
+                        # Empty means those packets are gone. Nothing can point
+                        # at what does not exist, so this is the same
+                        # unavoidable loss as an unreachable prior: enumerate it
+                        # and keep walking.
+                        #
+                        # Occupied means the child skipped a packet sitting
+                        # right there on disk. There is no honest reason to do
+                        # that -- the link was available and was not taken --
+                        # and accepting it would turn the chain into a partial
+                        # order any writer could route around. Fatal, and
+                        # deliberately so. The rule is: enumerate what is LOST,
+                        # refuse what is merely BYPASSED.
+                        skipped = range(prior_sequence + 1, child_number)
+                        occupied = [
+                            s
+                            for s in skipped
+                            if s in seq_paths.get(child_packet.get("i"), {})
+                        ]
+                        if occupied:
+                            errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                        else:
+                            gap_sequences.extend(skipped)
+
+            next_digest = prior_packet.get("p")
+            if next_digest is None:
+                # Genesis has no prior. It must also be sequence 0, or the
+                # chain claims to start somewhere it did not.
+                try:
+                    if int(prior_packet.get("s")) != 0:
+                        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                    else:
+                        reached_genesis = True
+                except (TypeError, ValueError):
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                break
+            key = str(next_digest)
+            if key in walked:
+                # Defensive: a cycle among priors would otherwise spin forever
+                # now that the stack no longer bounds this walk.
+                errors.append("E_PROVENANCE_PRIOR_CYCLE")
+                break
+            walked.add(key)
+            child_packet = prior_packet
+            child_sequence = prior_packet.get("s")
+            cursor = chain_index.get(key) or _find_packet_by_digest(prov_root, key)
+
+        if gap_sequences:
+            # Enumerated, not summarised. An auditor reading this result can
+            # name exactly which packets are missing and go looking for them.
+            warnings.append(
+                "E_PROVENANCE_CHAIN_GAP:"
+                + ",".join(str(s) for s in sorted(gap_sequences))
+            )
+        if not reached_genesis and not errors:
+            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
 
     # Evidence-DAG recursion, likewise depth-0 only (D-B3). An ancestor's
     # evidence DAG resolves packet files that may since have been pruned,

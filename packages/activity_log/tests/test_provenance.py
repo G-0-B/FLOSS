@@ -1298,15 +1298,21 @@ def test_chain_validation_cost_stays_roughly_linear(tmp_path, monkeypatch):
     )
 
 
-def test_a_hole_below_the_head_fails_the_chain(tmp_path, monkeypatch):
-    """Deleting a mid-chain packet must not make the chain valid again.
+def test_a_hole_below_the_head_is_enumerated_not_concealed(tmp_path, monkeypatch):
+    """Deleting a mid-chain packet must leave an undeniable, named trace.
 
-    The walk used to downgrade an unreachable ancestor to a warning once it was
-    deeper than the immediate prior. That made pruning a way to conceal a break:
-    remove the link that fails and every descendant validates. The spec is
-    unqualified -- "a `p` reference to a nonexistent prior packet is invalid" --
-    and ADR-20 D-B3 keeps existence and continuity as ancestor obligations even
-    though it drops the artifact pass.
+    Three behaviours have been tried here. Truncating the walk on an
+    unreachable ancestor made pruning a way to CONCEAL a break: remove the link
+    and every descendant validates with nothing in the result mentioning it.
+    Making it fatal at every depth stopped concealment but bricked honest
+    chains, because a signed packet cannot be re-derived once lost, so a hole is
+    permanent and every future packet inherits it.
+
+    The D-B3 addendum (ADR-20, operator-approved 2026-08-24) keeps the property
+    that actually matters: the hole is DETECTED AND ENUMERATED by sequence
+    number. Sequence numbers are per-agent and monotonic, so a deleted packet
+    leaves an arithmetic gap whether or not its file survives. The walk resumes
+    below the gap and still verifies the rest of history down to genesis.
     """
     from packages.activity_log import provenance
 
@@ -1348,8 +1354,24 @@ def test_a_hole_below_the_head_fails_the_chain(tmp_path, monkeypatch):
     paths[2].unlink()
 
     result = provenance.validate_packet(head, workspace_root=tmp_path)
-    assert result.ok is False
-    assert "E_PROVENANCE_PRIOR_NOT_FOUND" in result.errors
+    # The head still carries current work...
+    assert result.ok is True, result.errors
+    # ...but the loss is named, by the exact sequence number, so an auditor can
+    # go looking for what is missing. Silence here would be the actual defect.
+    assert "E_PROVENANCE_CHAIN_GAP:2" in result.warnings
+
+    # A fork is a different animal and stays fatal: something IS signed into
+    # the vacated slot and the child points elsewhere, which is a rewrite, not
+    # a loss. Build one by re-signing a surviving packet into sequence 2.
+    forged = json.loads(paths[1].read_text(encoding="utf-8"))
+    forged["s"] = "2"
+    forged["a"][0]["next_action"] = "substituted"
+    forged_bytes = _resign_packet(forged, identity_dir=identity_dir)
+    (output_root / "forged.json").write_bytes(forged_bytes)
+
+    forked = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert forked.ok is False
+    assert "E_PROVENANCE_CHAIN_FORK" in forked.errors
 
 
 def test_an_abandoned_lock_is_reclaimed(tmp_path, monkeypatch):
