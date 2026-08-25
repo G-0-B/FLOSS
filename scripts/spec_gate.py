@@ -118,11 +118,7 @@ def _registration_hint(rel: str) -> str:
     architecture-class wants tier 2 and an independent review.
     """
     script_path = Path(__file__).resolve()
-    return (
-        f'python "{script_path}" --add "{rel}" --spec "<one-line intent>" '
-        f"--tier 1   (use --tier 2 for architecture-class work: adds an "
-        f"independent reuse review)"
-    )
+    return f'python "{script_path}" --add "{rel}" --spec "<one-line intent>" --tier 1'
 
 
 def _normalize(path_str: str | Path) -> str | None:
@@ -196,10 +192,14 @@ def advisory_note(path_str: str | Path) -> str | None:
                     f"spec-registry.json (schema: docs/specs/reuse-gate.schema.json)"
                 )
             return None
+        # The tier-2 note sits BEFORE the command, not after it: the command is
+        # the last thing in the string so it stays copy-pasteable, and callers
+        # that parse the advisory can take everything after the colon.
         return (
             f"spec-gate: `{rel}` is on a gated surface but has no spec stub in "
-            f"docs/specs/spec-registry.json — register it before it ossifies: "
-            + _registration_hint(rel)
+            f"docs/specs/spec-registry.json — register it (use --tier 2 for "
+            f"architecture-class work, which adds an independent reuse review) "
+            f"before it ossifies: " + _registration_hint(rel)
         )
     except Exception:  # noqa: BLE001 — advisory must never break a hook
         return None
@@ -615,10 +615,11 @@ def run_check() -> int:
         parts = []
         if missing:
             parts.append(
-                f"{len(missing)} unregistered gated artifact(s) — register with: "
-                f'python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>" '
-                f"--tier 1   (--tier 2 for architecture-class work). The tier is "
-                f"required: an omitted tier is an exemption, not a default."
+                f"{len(missing)} unregistered gated artifact(s) — the tier is "
+                f"required (an omitted tier is an exemption, not a default; use "
+                f"--tier 2 for architecture-class work). Register with: "
+                f"python FLOSS/scripts/spec_gate.py --add <path> "
+                f'--spec "<one-liner>" --tier 1'
             )
         if reuse_fails:
             parts.append(

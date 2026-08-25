@@ -37,7 +37,6 @@ def _pin_model_backend(monkeypatch):
     monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
 
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "docs" / "specs" / "yumeichan-watch-capabilities.schema.json"
 SMOKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "smoke_test_gateway.py"
@@ -53,18 +52,20 @@ def test_adr_13_substrate_bridge_matches_live_ternary_model() -> None:
     assert "carries continuous `[-1.0,+1.0]` attestation" not in text
 
 
-def test_adr_13_records_provenance_binding_evidence_and_pending_conductor_proof() -> None:
+def test_adr_13_records_provenance_binding_evidence_and_pending_conductor_proof() -> (
+    None
+):
     text = ADR_13_PATH.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
 
     assert "open Semgrep finding on missing authorship validation" not in text
-    assert "✅ `ThoughtCredential.provenance` is bound to the action author" in normalized
+    assert (
+        "✅ `ThoughtCredential.provenance` is bound to the action author" in normalized
+    )
     assert "`validate_thought_credential`" in normalized
     assert "`thought_rejects_provenance_mismatch`" in normalized
     assert "`thought_accepts_self_authored`" in normalized
-    assert (
-        "⚠️ Conductor-level two-agent enforcement remains Specified" in normalized
-    )
+    assert "⚠️ Conductor-level two-agent enforcement remains Specified" in normalized
 
 
 def valid_capability() -> dict[str, object]:
@@ -92,7 +93,9 @@ def _ast_to_data(node: ast.AST) -> object:
         raise AssertionError(f"Unsupported constant: {type(node.value).__name__}")
 
     if isinstance(node, ast.Dict):
-        assert all(key is not None for key in node.keys), "Dict unpacking is unsupported"
+        assert all(
+            key is not None for key in node.keys
+        ), "Dict unpacking is unsupported"
         return {
             _ast_to_data(key): _ast_to_data(value)
             for key, value in zip(node.keys, node.values)
@@ -110,7 +113,9 @@ def _ast_to_data(node: ast.AST) -> object:
         and isinstance(node.operand, ast.Constant)
         and type(node.operand.value) in {int, float}
     ):
-        return -node.operand.value if isinstance(node.op, ast.USub) else node.operand.value
+        return (
+            -node.operand.value if isinstance(node.op, ast.USub) else node.operand.value
+        )
 
     if (
         isinstance(node, ast.BinOp)
@@ -172,9 +177,9 @@ def _extract_valid_capability_from_source(source: ast.Module) -> dict[str, objec
             for target in node.targets
         )
     ]
-    assert len(assignments) == 1, (
-        "Expected exactly one direct valid_capability assignment in main()"
-    )
+    assert (
+        len(assignments) == 1
+    ), "Expected exactly one direct valid_capability assignment in main()"
     capability = _ast_to_data(assignments[0].value)
     assert isinstance(capability, dict), "valid_capability must be a dict"
     return capability
@@ -225,9 +230,9 @@ def test_capability_schema_callers_enable_format_checking(script_path: Path) -> 
             ),
             None,
         )
-        assert format_checker is not None, (
-            f"{script_path} validates schema formats without a FormatChecker"
-        )
+        assert (
+            format_checker is not None
+        ), f"{script_path} validates schema formats without a FormatChecker"
         assert (
             isinstance(format_checker, ast.Call)
             and isinstance(format_checker.func, ast.Attribute)
@@ -276,27 +281,23 @@ def test_smoke_fixture_rejects_unsupported_executable_ast() -> None:
 
 
 def test_smoke_fixture_requires_one_direct_main_assignment() -> None:
-    source = ast.parse(
-        """
+    source = ast.parse("""
 def main():
     valid_capability = {}
     valid_capability = {}
-"""
-    )
+""")
 
     with pytest.raises(AssertionError, match="exactly one"):
         _extract_valid_capability_from_source(source)
 
 
 def test_smoke_fixture_ignores_module_level_decoy_assignment() -> None:
-    source = ast.parse(
-        """
+    source = ast.parse("""
 valid_capability = {"source": "module"}
 def main():
     with open("fixture"):
         valid_capability = {"source": "main"}
-"""
-    )
+""")
 
     assert _extract_valid_capability_from_source(source) == {"source": "main"}
 
@@ -417,7 +418,9 @@ def test_semantic_validator_rejects_inverted_threshold_bounds() -> None:
     capability = valid_capability()
     capability["analog_threshold_bounds"] = [0.8, -0.5]
 
-    with pytest.raises(jsonschema.ValidationError, match="minimum must not exceed maximum"):
+    with pytest.raises(
+        jsonschema.ValidationError, match="minimum must not exceed maximum"
+    ):
         validate_capability(capability)
 
 
@@ -519,9 +522,10 @@ def test_empty_existing_uppercase_togetherai_key_is_preserved() -> None:
         assert environment["TOGETHERAI_API_KEY"] == ""
 
 
-@pytest.mark.parametrize(
-    ("legacy", "expected"), [("legacy", "legacy"), ("", None)])
-def test_legacy_togetherai_key_is_copied_only_when_appropriate(legacy, expected) -> None:
+@pytest.mark.parametrize(("legacy", "expected"), [("legacy", "legacy"), ("", None)])
+def test_legacy_togetherai_key_is_copied_only_when_appropriate(
+    legacy, expected
+) -> None:
     from scripts import major_consolidation_sweep
 
     environment = {"togetherai_API_key": legacy}
@@ -548,7 +552,9 @@ def test_extraction_result_reports_file_read_failure_without_external_call() -> 
     source_path = REPO_ROOT / "unreadable.md"
 
     with (
-        patch.object(Path, "read_text", side_effect=PermissionError("permission denied")),
+        patch.object(
+            Path, "read_text", side_effect=PermissionError("permission denied")
+        ),
         patch.object(major_consolidation_sweep.litellm, "completion") as completion,
         patch.object(major_consolidation_sweep.time, "sleep") as sleep,
     ):
@@ -556,10 +562,7 @@ def test_extraction_result_reports_file_read_failure_without_external_call() -> 
             source_path, "test-model"
         )
 
-    assert (
-        result.status
-        is major_consolidation_sweep.ExtractionStatus.FILE_READ_FAILURE
-    )
+    assert result.status is major_consolidation_sweep.ExtractionStatus.FILE_READ_FAILURE
     assert result.insights == "Error reading file: permission denied"
     completion.assert_not_called()
     sleep.assert_not_called()
@@ -590,7 +593,9 @@ def test_rate_limit_stops_remaining_extraction_chunks() -> None:
             source_path, "test-model"
         )
 
-    assert result.status is major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE
+    assert (
+        result.status is major_consolidation_sweep.ExtractionStatus.RATE_LIMIT_FAILURE
+    )
     assert completion.call_count == 1
     sleep.assert_not_called()
 
@@ -917,7 +922,9 @@ def test_consolidation_successful_retry_may_discuss_failure_marker() -> None:
     assert sleep.call_args_list == [call(60), call(5)]
 
 
-def test_consolidation_hard_error_remains_skipped_without_retry_or_side_effects() -> None:
+def test_consolidation_hard_error_remains_skipped_without_retry_or_side_effects() -> (
+    None
+):
     from scripts import major_consolidation_sweep
 
     source_path = REPO_ROOT / "hard-error.md"
@@ -1004,10 +1011,17 @@ def test_spec_gate_advisory_command_resolves_in_all_worktree_layouts(
 
     advisory = spec_gate.advisory_note(advisory_target)
     assert advisory is not None
-    command = advisory.rsplit("register it before it ossifies: ", 1)[1]
+    # Anchored on the shorter phrase: the sentence now carries a tier-2 note
+    # between "register it" and "before it ossifies", and the command is
+    # deliberately last so everything after this colon is runnable as-is.
+    command = advisory.rsplit("before it ossifies: ", 1)[1]
+    # The emitted command now carries `--tier 1`. It has to: `--add` refuses
+    # to register without an explicit tier, so the guidance this test pins was
+    # pointing operators at a command guaranteed to fail. The tier-2 note lives
+    # earlier in the sentence so the command stays last and copy-pasteable.
     command_match = re.fullmatch(
         r'python "(?P<script_path>[^"]+)" --add "(?P<add_path>[^"]+)" '
-        r'--spec "<one-line intent>"',
+        r'--spec "<one-line intent>" --tier 1',
         command,
     )
     assert command_match is not None
@@ -1024,14 +1038,12 @@ def test_spec_gate_advisory_command_resolves_in_all_worktree_layouts(
     # rather than exercising the exemption.
     assert spec_gate.run_add(advisory_argument, "advisory target", None, tier=1) == 0
     assert (
-        spec_gate.run_add(
-            "scripts/physical_target.py", "physical target", None, tier=1
-        )
+        spec_gate.run_add("scripts/physical_target.py", "physical target", None, tier=1)
         == 0
     )
-    assert spec_gate.run_add(advisory_argument, "advisory target", None) == 1, (
-        "omitting --tier must be refused, not treated as an exemption"
-    )
+    assert (
+        spec_gate.run_add(advisory_argument, "advisory target", None) == 1
+    ), "omitting --tier must be refused, not treated as an exemption"
     assert spec_gate._normalize(tmp_path / "outside.py") is None
     assert spec_gate.run_add(str(tmp_path / "outside.py"), "outside", None, tier=1) == 1
 
