@@ -182,3 +182,135 @@ def test_reviewer_outcome_and_date_must_be_typed(gate):
         "x.md", {**base, "outcome": "APPROVED", "date": "25-08-2026"}
     )
     assert any("date" in p for p in malformed), "date must parse as YYYY-MM-DD"
+
+
+REGISTRY_SCHEMA_PATH = REPO_ROOT / "docs" / "specs" / "spec-registry.schema.json"
+REGISTRY_PATH = REPO_ROOT / "docs" / "specs" / "spec-registry.json"
+
+
+@pytest.fixture(scope="module")
+def registry_schema():
+    return json.loads(REGISTRY_SCHEMA_PATH.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def registry():
+    return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+
+
+def test_registry_schema_admits_every_key_the_registry_uses(registry_schema, registry):
+    """The fifth instance of the drift, and the first found in the registry itself.
+
+    The entry schema set `additionalProperties: false` over spec/spec_ref/
+    grandfathered, so adding `tier` and `reuse` made the canonical registry
+    invalid against its own declared schema. Any consumer that validates would
+    reject exactly the entries the reuse gate depends on.
+    """
+    entry_schema = registry_schema["properties"]["entries"]["additionalProperties"]
+    declared = set(entry_schema.get("properties", {}))
+    used = set()
+    for entry in registry["entries"].values():
+        used.update(entry.keys())
+    assert used <= declared, f"registry uses undeclared keys: {sorted(used - declared)}"
+
+
+def test_registry_schema_points_at_the_reuse_block_schema(registry_schema):
+    entry_schema = registry_schema["properties"]["entries"]["additionalProperties"]
+    reuse = entry_schema["properties"]["reuse"]
+    assert "reuse-gate.schema.json" in json.dumps(reuse), (
+        "the reuse block has its own schema; the registry should reference it "
+        "rather than restate or ignore it"
+    )
+
+
+@pytest.mark.parametrize(
+    "probe",
+    ["not probed: unavailable", "pending", "done", "TBD", "", "   ", "n/a"],
+)
+def test_placeholder_probes_do_not_count_as_direct_probes(gate, probe):
+    """Anti-gaming requires POSITIVE evidence, not the absence of one prefix.
+
+    Counting any truthy string that does not literally start with `not_probed`
+    meant `"probe": "done"` satisfied the tier-2 compose/build requirement.
+    """
+    entry = {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {"name": "thing", "truth_status": "Verified", "probe": probe}
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("direct probe" in f for f in fails), f"{probe!r} must not count"
+
+
+def test_a_positive_probe_counts(gate):
+    entry = {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {
+                    "name": "thing",
+                    "truth_status": "Verified",
+                    "probe": "probed: ran --check live 2026-08-25, fail-closed path verified",
+                }
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert not any("direct probe" in f for f in fails), fails
+
+
+def test_a_structured_probe_counts(gate):
+    entry = {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {
+                    "name": "thing",
+                    "truth_status": "Verified",
+                    "probe": {
+                        "status": "passed",
+                        "detail": "ran it",
+                        "date": "2026-08-25",
+                    },
+                }
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert not any("direct probe" in f for f in fails), fails

@@ -52,8 +52,33 @@
             "type": "string"
           },
           "probe": {
-            "type": "string",
-            "description": "Result of a direct probe, or 'not_probed: <reason>'. Tier-2 compose/build verdicts require >=1 probed candidate."
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "passed",
+                      "failed"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            ],
+            "description": "What was actually exercised. A tier-2 compose/build verdict requires at least one candidate carrying POSITIVE probe evidence: either a string beginning with 'probed:' or an object with status 'passed'. Anything else -- including every honest 'not_probed:' declaration -- is a candidate reasoned about rather than run, which belongs in the block but does not discharge the probe obligation. Enforced by scripts/spec_gate.py:_is_direct_probe; keep the two in step."
           },
           "truth_status": {
             "enum": [

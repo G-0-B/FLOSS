@@ -256,6 +256,38 @@ def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
     return problems
 
 
+PROBE_POSITIVE_PREFIX = "probed:"
+
+
+def _is_direct_probe(candidate: Any) -> bool:
+    """True only for POSITIVE evidence that a probe actually ran.
+
+    The old test was negative -- any truthy string not literally beginning with
+    `not_probed` counted -- so `"probe": "done"`, `"pending"`, `"TBD"` and even
+    `"not probed: unavailable"` (a space instead of the underscore) all
+    satisfied the tier-2 anti-gaming requirement. A rule that can be passed by
+    typing a word is not an anti-gaming rule.
+
+    Two accepted shapes, both asserting rather than merely failing to deny:
+
+      {"probe": "probed: ran --check live 2026-08-25, fail-closed verified"}
+      {"probe": {"status": "passed", "detail": "...", "date": "2026-08-25"}}
+
+    Everything else, including every honest `not_probed:` declaration, is a
+    candidate that was reasoned about rather than exercised. Those belong in the
+    block -- ADR-18 wants the rejected alternatives recorded -- they just do not
+    discharge the compose/build probe obligation.
+    """
+    if not isinstance(candidate, dict):
+        return False
+    probe = candidate.get("probe")
+    if isinstance(probe, dict):
+        return str(probe.get("status", "")).strip().lower() == "passed"
+    if not isinstance(probe, str):
+        return False
+    return probe.strip().lower().startswith(PROBE_POSITIVE_PREFIX)
+
+
 def _record_problems(rel: str, record: str) -> list[str]:
     """A reviewer record must be a regular file inside this repository.
 
@@ -412,13 +444,7 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
         fails.extend(_reviewer_problems(rel, reuse.get("reviewer")))
     if tier == 2 and verdict in ("compose", "build"):
         candidates = reuse.get("candidates") or []
-        probed = [
-            c
-            for c in candidates
-            if isinstance(c, dict)
-            and c.get("probe")
-            and not str(c["probe"]).strip().lower().startswith("not_probed")
-        ]
+        probed = [c for c in candidates if _is_direct_probe(c)]
         if not probed:
             fails.append(
                 f"{rel}: tier 2 {verdict!r} verdict requires >=1 direct probe "
