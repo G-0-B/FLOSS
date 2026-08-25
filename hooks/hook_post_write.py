@@ -63,6 +63,44 @@ SUBSTANTIVE_EXTENSIONS = (".py", ".rs", ".toml")
 CANON_PATH_SEGMENTS = ("/docs/adr/", "/docs/specs/", "/docs/governance/")
 CANON_EXTENSIONS = (".md", ".json")
 
+# The kernel lives at the repository ROOT, so it matches no directory segment
+# above and was invisible to a widening whose whole point was to make canon
+# edits visible. It is the project's primary invariant document; edits to it
+# were the only canon changes still producing no Claim and no packet.
+#
+# Matched on shape rather than an exact filename because the version is IN the
+# name (`..._v1_4_0_Kernel.md`) and it gets renamed on every bump -- 1.3.1 to
+# 1.4.0 happened during this same review cycle. A hardcoded name would have
+# silently stopped matching at the next one, which is the failure mode this
+# constant exists to prevent.
+CANON_ROOT_PREFIX = "flossi0ullk_master_metaprompt"
+CANON_ROOT_SUFFIX = "_kernel.md"
+
+
+def _is_root_kernel(path_str: str) -> bool:
+    """True for the repo-root master metaprompt kernel, at any version.
+
+    Resolved against REPO_ROOT rather than pattern-matched on the string: hooks
+    receive ABSOLUTE paths, so a "one slash means repository root" test never
+    fired. Segment matching survives absolute paths by accident because
+    "/docs/adr/" is a substring either way; a root-level file has no segment to
+    match, so it needs the real comparison.
+    """
+    try:
+        candidate = Path(path_str).expanduser()
+        if not candidate.is_absolute():
+            # Relative against REPO_ROOT, not cwd: classify_change() is called
+            # with the repo-relative path and the hook's cwd is whatever the
+            # editing agent happened to be in.
+            candidate = REPO_ROOT / candidate
+        resolved = candidate.resolve()
+    except (OSError, ValueError):
+        return False
+    if resolved.parent != REPO_ROOT.resolve():
+        return False
+    name = resolved.name.lower()
+    return name.startswith(CANON_ROOT_PREFIX) and name.endswith(CANON_ROOT_SUFFIX)
+
 # Even within substantive paths, skip these — they're routine noise.
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
 MUTATING_TOOL_NAMES = {
@@ -169,6 +207,8 @@ def is_substantive(path_str: str) -> bool:
         part in norm for part in CANON_PATH_SEGMENTS
     ):
         return True
+    if _is_root_kernel(path_str):
+        return True
     return False
 
 
@@ -188,6 +228,9 @@ CANON_CLAIM_CLASS: tuple[tuple[str, str, str], ...] = (
     ("/docs/governance/", "SpecChange", "System"),
     ("/docs/specs/", "SpecChange", "Module"),
 )
+# The kernel is not on any of those surfaces and is more load-bearing than all
+# of them: it states the project's invariants. System, matching governance.
+CANON_ROOT_CLAIM_CLASS = ("SpecChange", "System")
 GOVERNED_TYPES = frozenset({"SpecChange", "ConfigChange", "AdrChange"})
 GOVERNED_RADII = frozenset({"System", "Substrate"})
 
@@ -199,6 +242,8 @@ def classify_change(path_str: str) -> tuple[str, str]:
     actually is, so the gateway applies the threshold that matches the risk.
     """
     norm = "/" + (path_str or "").replace("\\", "/").lstrip("/").lower()
+    if _is_root_kernel(path_str):
+        return CANON_ROOT_CLAIM_CLASS
     for segment, proposal_type, radius in CANON_CLAIM_CLASS:
         if segment in norm:
             return proposal_type, radius
@@ -340,13 +385,16 @@ def main() -> int:
         log(f"[hook] stdin parse error: {exc}")
         return finish()
 
-    tool_name = payload.get("tool_name", "")
-    tool_input = payload.get("tool_input", {}) or {}
+    tool_call = payload.get("toolCall") or {}
+    tool_name = payload.get("tool_name", "") or tool_call.get("name", "")
+    tool_input = payload.get("tool_input", {}) or tool_call.get("args", {}) or {}
     file_path = (
         tool_input.get("file_path")
         or tool_input.get("filePath")
         or tool_input.get("path")
         or tool_input.get("target_file")
+        or tool_input.get("TargetFile")
+        or tool_input.get("targetFile")
         or ""
     )
 

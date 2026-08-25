@@ -33,6 +33,16 @@ EMIT_STDOUT_JSON = "--stdout-json" in sys.argv[1:]
 
 SUBSTANTIVE_PATH_SEGMENTS = ("/packages/",)
 SUBSTANTIVE_EXTENSIONS = (".py", ".rs", ".toml")
+# Mirrors hook_post_write.py. The post-write hook was widened to canon surfaces
+# on 2026-08-10 and this predicate was not, so every ADR, spec and governance
+# edit reached claim_pre_write_checkpoint() with no checkpoint to consume. The
+# post hook then fell back to a snippet-presence check and could still label the
+# result VERIFIED without ever deriving the exact post-image -- which is the one
+# thing a checkpoint exists to prove. Keep the two in step.
+CANON_PATH_SEGMENTS = ("/docs/adr/", "/docs/specs/", "/docs/governance/")
+CANON_EXTENSIONS = (".md", ".json")
+CANON_ROOT_PREFIX = "flossi0ullk_master_metaprompt"
+CANON_ROOT_SUFFIX = "_kernel.md"
 SKIP_SEGMENTS = ("/tests/", "/__pycache__/", "/.venv/", "/venv/", "/archive/")
 MUTATING_TOOL_NAMES = {
     # Claude Code
@@ -71,15 +81,69 @@ def finish() -> int:
     return 0
 
 
+def _is_inside_repo(path_str: str) -> bool:
+    """Only edits within THIS checkout may be checkpointed.
+
+    The `claude_user` target installs this hook at user scope, so it runs for
+    every project on the machine. Without containment, editing
+    `/other-project/packages/secret.py` wrote that unrelated file's path and
+    bounded old/new source previews into ~/.floss_agent/checkpoints/pre_write.
+    The post-write hook's own containment check does not undo that disclosure --
+    it happens after the write is already on disk.
+    """
+    try:
+        candidate = Path(path_str).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        resolved = candidate.resolve()
+        root = REPO_ROOT.resolve()
+    except (OSError, ValueError):
+        return False
+    return resolved == root or root in resolved.parents
+
+
+def _is_root_kernel(path_str: str) -> bool:
+    """True for the repo-root master metaprompt kernel, at any version.
+
+    Resolved against REPO_ROOT rather than pattern-matched on the string: hooks
+    receive ABSOLUTE paths, so a "one slash means repository root" test never
+    fired. Segment matching survives absolute paths by accident because
+    "/docs/adr/" is a substring either way; a root-level file has no segment to
+    match, so it needs the real comparison.
+    """
+    try:
+        candidate = Path(path_str).expanduser()
+        if not candidate.is_absolute():
+            # Relative against REPO_ROOT, not cwd: classify_change() is called
+            # with the repo-relative path and the hook's cwd is whatever the
+            # editing agent happened to be in.
+            candidate = REPO_ROOT / candidate
+        resolved = candidate.resolve()
+    except (OSError, ValueError):
+        return False
+    if resolved.parent != REPO_ROOT.resolve():
+        return False
+    name = resolved.name.lower()
+    return name.startswith(CANON_ROOT_PREFIX) and name.endswith(CANON_ROOT_SUFFIX)
+
+
 def is_substantive(path_str: str) -> bool:
     if not path_str:
+        return False
+    if not _is_inside_repo(path_str):
         return False
     norm = "/" + path_str.replace("\\", "/").lstrip("/").lower()
     if any(skip in norm for skip in SKIP_SEGMENTS):
         return False
-    if not norm.endswith(SUBSTANTIVE_EXTENSIONS):
-        return False
-    return any(part in norm for part in SUBSTANTIVE_PATH_SEGMENTS)
+    if norm.endswith(SUBSTANTIVE_EXTENSIONS) and any(
+        part in norm for part in SUBSTANTIVE_PATH_SEGMENTS
+    ):
+        return True
+    if norm.endswith(CANON_EXTENSIONS) and any(
+        part in norm for part in CANON_PATH_SEGMENTS
+    ):
+        return True
+    return _is_root_kernel(path_str)
 
 
 def is_mutating_tool(tool_name: str) -> bool:
@@ -109,13 +173,16 @@ def main() -> int:
         log(f"[hook-pre] stdin parse error: {exc}")
         return finish()
 
-    tool_name = payload.get("tool_name", "")
-    tool_input = payload.get("tool_input", {}) or {}
+    tool_call = payload.get("toolCall") or {}
+    tool_name = payload.get("tool_name", "") or tool_call.get("name", "")
+    tool_input = payload.get("tool_input", {}) or tool_call.get("args", {}) or {}
     file_path = (
         tool_input.get("file_path")
         or tool_input.get("filePath")
         or tool_input.get("path")
         or tool_input.get("target_file")
+        or tool_input.get("TargetFile")
+        or tool_input.get("targetFile")
         or ""
     )
 
