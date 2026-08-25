@@ -75,6 +75,10 @@ REUSE_REQUIRED_KEYS = (
     "irreducible_delta",
 )
 REUSE_VERDICTS = ("adopt", "extend", "compose", "build")
+# Mirrors the `truth_status` enum in docs/specs/reuse-gate.schema.json, which is
+# the project's own truth-label vocabulary minus Blocked (a blocked candidate is
+# not prior art you evaluated, it is one you could not).
+REUSE_TRUTH_STATUSES = ("Verified", "Specified", "Unverified")
 
 
 def _normalize(path_str: str | Path) -> str | None:
@@ -222,16 +226,36 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
                         f"{rel}: reuse.candidates[{position}] is not an object"
                     )
                     continue
-                absent = [
-                    field
-                    for field in ("name", "truth_status")
-                    if not str(candidate.get(field, "")).strip()
-                ]
-                if absent:
+                # Types and the enum, not just presence. Stringifying first
+                # meant {"name": 7, "truth_status": "Trusted"} passed: 7 has a
+                # non-empty str() and "Trusted" is not one of the three truth
+                # labels this project actually uses. Malformed prior-art
+                # evidence that type-checks as present is still not evidence.
+                name = candidate.get("name")
+                if not isinstance(name, str) or not name.strip():
                     fails.append(
-                        f"{rel}: reuse.candidates[{position}] missing "
-                        f"{', '.join(absent)}"
+                        f"{rel}: reuse.candidates[{position}].name must be a "
+                        f"non-empty string"
                     )
+                truth_status = candidate.get("truth_status")
+                if truth_status not in REUSE_TRUTH_STATUSES:
+                    fails.append(
+                        f"{rel}: reuse.candidates[{position}].truth_status "
+                        f"{truth_status!r} not in "
+                        f"{'/'.join(REUSE_TRUTH_STATUSES)}"
+                    )
+                for field in (
+                    "version",
+                    "license",
+                    "maintenance",
+                    "platform_fit",
+                    "probe",
+                ):
+                    if field in candidate and not isinstance(candidate[field], str):
+                        fails.append(
+                            f"{rel}: reuse.candidates[{position}].{field} must "
+                            f"be a string"
+                        )
     verdict = reuse.get("verdict")
     if verdict is not None and verdict not in REUSE_VERDICTS:
         fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")
