@@ -169,6 +169,44 @@ command.
 
 ---
 
+### FM-7 - A borrowed shape read as borrowed compatibility
+
+The packet envelope borrows KERI's field names, its SAID dummy-character algorithm,
+its version-string shape, and its code letters at CESR-correct lengths. Every one of
+those is a real, deliberate borrowing. None of them makes the packets CESR primitives.
+
+The encoding underneath diverges: CESR prepends pad bytes *before* base64 conversion
+("mid-padding"), and this envelope base64-encodes the raw value, strips the trailing
+`=`, and prepends the code. Both produce 44 characters. They are different 44
+characters, and a conforming CESR decoder reading ours does not raise - it returns a
+plausible 32 bytes that are a two-bit shift of the true value.
+
+```
+raw   = bytes(range(32))
+here  = EAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8
+CESR  = EAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f
+```
+
+Two smaller divergences travel with it: JCS sorts keys, so the version string is not
+at the head of the frame where a KERI stream parser looks for it, and signatures live
+inside the body and are computed over the body with `sigs` emptied, where KERI signs
+the serialized event and attaches signatures outside it.
+
+The repository is internally consistent - `_b64url_decode` is the exact inverse of
+`_b64url_encode`, so we always read back what we wrote, and nothing is corrupted
+today. What was missing was any statement that outside readers cannot do the same.
+The shipped schema had carried "Code correctness UNVERIFIED - see spec section
+9.1/9.2/9.4" against a spec with no section 9, so the question had been *asked*, in
+writing, and left open long enough to stop being read as a question.
+
+**Rule:** when an artifact borrows a standard's vocabulary, the divergences must be
+written down at the same time, in the same document, and pinned by tests that assert
+the divergence. Silence about a divergence is indistinguishable from a compatibility
+claim. The tests in `packages/activity_log/tests/test_keri_divergence.py` fail if
+someone makes the envelope CESR-correct, which is the intended signal that a
+substrate-class migration - every SAID, identifier and signature in the chain - has
+begun.
+
 ## 3. Coordination and process failures
 
 ### CF-1 — The same governance question decided twice, in opposite directions, within an hour
@@ -224,6 +262,21 @@ answers, not the three most similarly *concluded*.
 `voter_responses[]`, never confirmation. Check response LENGTH — one far shorter than
 its peers is usually a truncation or non-answer counted as a vote.
 
+**Quantified 2026-08-25.** This is worse than a bad run. All six syntheses in
+`.agent-surface/reasoning/ensemble/` report `largest_cluster_fraction = 1.0` with an
+empty minority set, across four prompts written to provoke dissent. The lowest
+off-diagonal cosine similarity in the entire corpus is **0.791**, against a clustering
+threshold of **0.75**. Not one pair, in any run, has ever fallen below the threshold -
+a single cluster was the only reachable outcome, so the tier was never a finding about
+the voters. Raising the threshold does not repair it: at 0.79 it still separates
+nothing, and by 0.90 it splits on register rather than on claims.
+
+`separation_diagnostics()` now marks such a run `E_CONSENSUS_NOT_MEASURED` and the
+writeup leads with "This run did not measure consensus ... Do not cite this run as
+corroboration". The threshold was left at 0.75 on purpose - a tuned-looking number
+would hide the defect. Measuring agreement properly requires claim-level extraction,
+which is a different design and still unbuilt.
+
 ### CF-5 — Skepticism defaulting to rejection under missing tool access
 
 A meta-audit struck several citations as "confabulation-suspect" using a plausibility
@@ -235,6 +288,32 @@ the access it is a rejection machine.
 **Rule:** before striking a claim as unverifiable, attempt retrieval. Only strike if
 retrieval fails or contradicts. "Could not retrieve" and "does not exist" are different
 findings and must be labelled differently.
+
+### CF-6 - A decision inherited from a resemblance
+
+The instruction was "we definitely want keripy, right? because Holochain uses it."
+Holochain does not use KERI, ACDC, or CESR anywhere: a code search across
+`holochain/holochain` returns zero, and the repository's own built zomes (hdi 0.7.1 /
+hdk 0.6.1) use only `agent_info()`, `AgentPubKey`, and `ActionHash`. Holochain has its
+own identity model - a per-install Ed25519 keypair in lair-keystore, a `holo_hash`
+`AgentPubKey`, an Action source chain, and DeepKey for rotation. The two systems solve
+the same problem with independent, non-interoperable designs, which is exactly why one
+reads as the other.
+
+The repository's own KERI-Holochain bridge is not a counterexample. `identity_integrity`
+is excluded from the Cargo workspace as a pre-migration dev artifact, absent from
+`dna.yaml`, and its validation carries the literal comment "TODO: Actual cryptographic
+verification would happen here" while checking only that signature byte vectors are
+non-empty. The corresponding spec was archived.
+
+The premise being false does not make keripy the wrong choice - witness receipts and
+pre-rotation are real answers to the head-truncation attack. It makes "because
+Holochain uses it" the wrong *reason*, and a stated reason is what a later reader
+audits the decision against.
+
+**Rule:** verify the premise of a dependency decision before designing against it,
+especially when the premise is a resemblance between two things that solve the same
+problem. Record the reason that actually holds, not the one that motivated the ask.
 
 ---
 
@@ -254,6 +333,16 @@ findings and must be labelled differently.
    caught the next instance; "`tier` and `reuse` must be declared" would not have.
 6. **An unstated limit reads as a guarantee.** The packet spec now names both confirmed
    attacks explicitly, because silence about them was itself a claim.
+7. **A metric that never fires is not evidence of the thing it measures.** Before
+   citing an agreement number, check whether disagreement was reachable. Six unanimous
+   panels under adversarial instruction described the instrument, not the panels.
+8. **A warning nothing reads is the same as no warning.** `E_CONSENT_GATE_UNRESOLVED`
+   was generated correctly and returned on a dataclass field no caller touched.
+   Surfacing it in the audit script immediately exposed 73 chain-gap warnings that had
+   been produced and discarded for weeks.
+9. **Verify the premise, not just the plan.** The most expensive kind of correct work
+   is work that is correct against a false premise, and the premise is the one part
+   nobody re-reads once implementation starts.
 
 ---
 
