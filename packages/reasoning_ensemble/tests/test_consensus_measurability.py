@@ -32,6 +32,7 @@ from packages.reasoning_ensemble.synthesizer import (  # noqa: E402
     CONSENSUS_NOT_MEASURED,
     SIMILARITY_FLOOR_OBSERVED,
     TierClassification,
+    degenerate_voters,
     separation_diagnostics,
     write_synthesis,
 )
@@ -182,3 +183,145 @@ def test_writeup_still_reports_unanimity_when_it_was_measurable():
 
     assert "Unanimous consensus" in text
     assert "did not measure consensus" not in text
+
+
+# ---------------------------------------------------------------------------
+# A response can be present, long, and carry no position at all.
+# ---------------------------------------------------------------------------
+
+
+def _resp(voter_id: str, text: str, **kw) -> VoterResponse:
+    return VoterResponse(
+        voter_id=voter_id,
+        model=f"m/{voter_id}",
+        family=voter_id,
+        response=text,
+        response_hash=voter_id,
+        response_embedding=[1.0],
+        duration_seconds=1.0,
+        **kw,
+    )
+
+
+def test_an_unclosed_reasoning_block_is_not_an_answer():
+    """Measured: one voter did this in 5 of 5 runs and counted as converged.
+
+    It also defeats the "shorter response = non-answer" heuristic -- in one run
+    it was the SECOND-LONGEST response in the file.
+    """
+    flagged = degenerate_voters(
+        [
+            _resp("thinker", "<think>The user is asking me to " + "restate. " * 60),
+            _resp("real-a", "The answer is Substrate. Override forbidden."),
+            _resp("real-b", "The answer is System, for these reasons."),
+        ]
+    )
+    assert set(flagged) == {"thinker"}
+    assert "restatement" in flagged["thinker"]
+
+
+def test_a_truncated_fragment_is_not_an_answer():
+    """Measured: one voter was cut mid-sentence in 5 of 5 runs, 212-1466 chars."""
+    flagged = degenerate_voters(
+        [
+            _resp("cut", "The blast radius should probably be"),
+            _resp("real-a", "The answer is Substrate. " * 20),
+            _resp("real-b", "The answer is System. " * 20),
+        ]
+    )
+    assert set(flagged) == {"cut"}
+    assert "mid-sentence" in flagged["cut"]
+
+
+def test_a_short_but_finished_answer_is_not_flagged():
+    """Brevity is not a defect. Only an unfinished sentence is."""
+    flagged = degenerate_voters(
+        [
+            _resp("terse", "Substrate."),
+            _resp("verbose-a", "The answer is Substrate, because " * 20 + "yes."),
+            _resp("verbose-b", "The answer is Substrate, given " * 20 + "so."),
+        ]
+    )
+    assert flagged == {}
+
+
+def test_a_closed_reasoning_block_is_fine():
+    flagged = degenerate_voters(
+        [
+            _resp("thinker", "<think>weighing it</think> The answer is Substrate."),
+            _resp("real-a", "The answer is Substrate. Override forbidden."),
+            _resp("real-b", "The answer is System, for these reasons."),
+        ]
+    )
+    assert flagged == {}
+
+
+def test_errored_and_empty_voters_are_not_double_reported():
+    """They are already named in the dropped-voter line; do not flag them twice."""
+    flagged = degenerate_voters(
+        [
+            _resp("dead", "", error="TimeoutError: timed out"),
+            _resp("real-a", "The answer is Substrate. " * 10),
+            _resp("real-b", "The answer is System. " * 10),
+        ]
+    )
+    assert flagged == {}
+
+
+def test_the_writeup_names_voters_that_were_dispatched_but_not_counted():
+    """Headers read "Voters: 5" while voter_count said 6, and nothing said why."""
+    counted = [
+        _resp("alpha", "Alpha says the bridge is fine. It is fine."),
+        _resp("beta", "Beta says the bridge is fine too. It is fine. Longer."),
+    ]
+    dropped = VoterResponse(
+        voter_id="gamma",
+        model="m/gamma",
+        family="gamma",
+        response="",
+        response_hash="",
+        response_embedding=None,
+        duration_seconds=90.0,
+        error="ReadTimeout: timed out",
+    )
+    text = write_synthesis(
+        "does the bridge work?",
+        counted,
+        _tier1(
+            separation_diagnostics(
+                [[1.0, 0.9, 0.3], [0.9, 1.0, 0.31], [0.3, 0.31, 1.0]],
+                CLUSTER_SIMILARITY_THRESHOLD,
+            )
+        ),
+        all_responses=counted + [dropped],
+    )
+
+    assert "Dispatched but not counted:** 1 of 3" in text
+    assert "gamma" in text
+    assert "ReadTimeout" in text
+
+
+def test_the_writeup_says_when_counted_voters_took_no_position():
+    counted = [
+        _resp("thinker", "<think>The user is asking me to " + "restate. " * 60),
+        _resp("real-a", "The answer is Substrate. Override forbidden."),
+        _resp("real-b", "The answer is System, for these reasons here."),
+    ]
+    tier = TierClassification(
+        tier="tier1",
+        cluster_assignments={"thinker": 0, "real-a": 0, "real-b": 0},
+        cluster_sizes={0: 3},
+        largest_cluster_id=0,
+        largest_cluster_fraction=1.0,
+        minority_coherent_voters=[],
+        similarity_matrix=[],
+        separation=separation_diagnostics(
+            [[1.0, 0.9, 0.3], [0.9, 1.0, 0.31], [0.3, 0.31, 1.0]],
+            CLUSTER_SIMILARITY_THRESHOLD,
+        ),
+    )
+    text = write_synthesis("what is the blast radius?", counted, tier)
+
+    assert "no position" in text
+    assert "`thinker`" in text
+    assert "agrees with nothing" in text

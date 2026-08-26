@@ -587,6 +587,53 @@ def greedy_cluster(
     return assignments
 
 
+# A response can be present, long, and still contain no position. Two of the
+# six voters in the 2026-08-24 campaign were non-functional in every run and
+# were counted as converged voters in all of them: one emitted a bare `<think>`
+# restatement of the prompt (5/5 runs), the other was truncated mid-sentence
+# (5/5, 212-1466 chars against 2000-3200 for peers). The "≥3 provider surfaces /
+# ≥4 model families" diversity policy was therefore satisfied on paper by voters
+# that produced no positions.
+#
+# Length alone does not catch this -- the restating voter was the SECOND-LONGEST
+# response in one run. These checks are shape-based and deliberately
+# conservative: they flag, they do not exclude, because a wrong exclusion loses
+# a real vote while a wrong flag costs a line of output.
+DEGENERATE_TRUNCATION_RATIO = 0.4
+THINK_OPENERS = ("<think>", "<thinking>", "<reasoning>")
+SENTENCE_ENDINGS = (".", "!", "?", "`", ")", "]", '"', "'")
+
+
+def degenerate_voters(responses: list[VoterResponse]) -> dict[str, str]:
+    """Name voters whose text is present but carries no position.
+
+    Returns voter_id -> reason. Empty when every response looks substantive.
+    """
+
+    scored = [r for r in responses if r.response and not r.error]
+    if not scored:
+        return {}
+    lengths = sorted(len(r.response) for r in scored)
+    median = lengths[len(lengths) // 2]
+
+    flagged: dict[str, str] = {}
+    for response in scored:
+        text = response.response.strip()
+        lowered = text.lower()
+        if lowered.startswith(THINK_OPENERS) and "</" not in lowered:
+            flagged[response.voter_id] = (
+                "opens a reasoning block that never closes -- prompt "
+                "restatement, not an answer"
+            )
+            continue
+        if not text.endswith(SENTENCE_ENDINGS) and len(text) < median:
+            flagged[response.voter_id] = (
+                f"ends mid-sentence at {len(text)} chars against a "
+                f"{median}-char median -- truncated, not concluded"
+            )
+    return flagged
+
+
 def separation_diagnostics(
     similarity: list[list[float]], threshold: float
 ) -> dict[str, object]:
@@ -717,9 +764,20 @@ def classify_tier(
 
 
 def write_synthesis(
-    prompt: str, responses: list[VoterResponse], tier_class: TierClassification
+    prompt: str,
+    responses: list[VoterResponse],
+    tier_class: TierClassification,
+    all_responses: list[VoterResponse] | None = None,
 ) -> str:
-    """Produce the human-readable synthesis. Tier-aware formatting."""
+    """Produce the human-readable synthesis. Tier-aware formatting.
+
+    `responses` are the voters that produced an embedding and were therefore
+    clusterable. `all_responses` is every voter that was dispatched. They differ
+    whenever a voter times out, and the difference used to vanish: the header
+    printed `len(responses)`, so a file could read "Voters: 5" while its own
+    `voter_count` field said 6 and no line anywhere said a voter was lost.
+    """
+    dispatched = all_responses if all_responses is not None else responses
     voter_by_id = {r.voter_id: r for r in responses}
     largest_cluster_voters = [
         v_id
@@ -738,6 +796,14 @@ def write_synthesis(
     lines.append(
         f"**Voters:** {len(responses)} ({', '.join(r.family for r in responses)})"
     )
+    lost = [r for r in dispatched if r.voter_id not in voter_by_id]
+    if lost:
+        lines.append(
+            f"**Dispatched but not counted:** {len(lost)} of {len(dispatched)} — "
+            + ", ".join(
+                f"{r.voter_id} ({r.error or 'no embedding'})" for r in lost
+            )
+        )
     lines.append(
         f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
         f"({100 * tier_class.largest_cluster_fraction:.0f}%)"
@@ -764,6 +830,21 @@ def write_synthesis(
         lines.append(
             "> Treat the cluster numbers above as diagnostics of the metric, not "
             "as agreement between voters. Do not cite this run as corroboration."
+        )
+    degenerate = degenerate_voters(responses)
+    if degenerate:
+        lines.append("")
+        lines.append(
+            f"> **{len(degenerate)} of {len(responses)} counted voters returned "
+            f"no position.**"
+        )
+        for voter_id, reason in degenerate.items():
+            lines.append(f">   - `{voter_id}`: {reason}")
+        lines.append(">")
+        lines.append(
+            "> These were clustered as agreement. A voter that restates the "
+            "prompt or stops mid-sentence agrees with nothing; count the "
+            "diversity policy against the voters that actually answered."
         )
     lines.append("")
 
@@ -954,7 +1035,7 @@ def synthesize(
     tier_class = classify_tier(embedded, sim, assignments)
 
     # 6: synthesis writeup
-    final = write_synthesis(prompt, embedded, tier_class)
+    final = write_synthesis(prompt, embedded, tier_class, all_responses=responses)
 
     # 7: stage artifact
     staging_path: Optional[str] = None
@@ -978,6 +1059,7 @@ def synthesize(
                         "minority_coherent_voters": tier_class.minority_coherent_voters,
                         "similarity_matrix": tier_class.similarity_matrix,
                         "separation": tier_class.separation,
+                        "degenerate_voters": degenerate_voters(embedded),
                         "voter_responses": [asdict(r) for r in responses],
                         "final_synthesis": final,
                     },
