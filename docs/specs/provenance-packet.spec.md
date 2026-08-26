@@ -202,6 +202,106 @@ Conflict precedence is:
 
 `agentmemory` never participates in packet verification.
 
+## 9. KERI And CESR Divergence
+
+Truth Status: ✅ Verified (empirically demonstrated 2026-08-25).
+
+This envelope is **KERI-shaped, not KERI-compatible**. The resemblance is
+deliberate — the field set, the SAID dummy-character algorithm, the version
+string with an embedded length, and the code letters are all borrowed from KERI
+so that a future migration has somewhere to land. But the encoding underneath
+those borrowed names diverges from CESR in ways that are not cosmetic, and this
+section states exactly where, so that nobody builds an interoperability
+assumption on top of a resemblance.
+
+Every divergence below is a property of the implementation as it stands, not a
+defect report against it. The packets are internally consistent: `_b64url_decode`
+in `packages/activity_log/provenance.py` is the exact inverse of
+`_b64url_encode`, so this repository always reads back what it wrote. What is
+lost is the ability of an *outside* KERI implementation to read these packets
+correctly.
+
+### 9.1 Identifier codes (`i`)
+
+`i` is `"D"` or `"B"` followed by the base64url encoding of a 32-byte Ed25519
+verify key with `=` padding stripped. The total length (44 characters) matches
+the CESR primitive for the same code, and the code letter carries the same
+meaning. The *encoding* does not match: see 9.3.
+
+### 9.2 SAID code (`d`)
+
+`d` is `"E"` followed by the base64url encoding of a 32-byte BLAKE3-256 digest
+with `=` padding stripped, total length 44. The dummy-character pre-image
+algorithm (substitute a placeholder of the final length into `d`, canonicalize,
+digest, substitute the result back) is genuine KERI practice and is implemented
+faithfully. The code letter, the digest algorithm, and the length are all
+CESR-correct. The *encoding* is not: see 9.3.
+
+### 9.3 CESR uses mid-padding; this envelope uses post-padding
+
+This is the substantive divergence, and it is silent.
+
+CESR requires that pad bytes be prepended to the value *before* base64
+conversion, so that the padding lands after the framing code but before the
+value — "mid-padding". For a 32-byte raw value, `ps = (3 - (32 % 3)) % 3 = 1`,
+so a conforming encoder base64-encodes `b" " + raw` (33 bytes, 44 characters,
+no `=` padding) and then overwrites the first `ps` characters with the code.
+
+This envelope instead base64-encodes `raw` directly, strips the trailing `=`,
+and prepends the code. Both produce 44 characters. They do not produce the same
+44 characters:
+
+```
+raw   = bytes(range(32))
+here  = EAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8
+CESR  = EAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f
+```
+
+The consequence is worse than incompatibility. A CESR decoder reading the string
+this envelope produces does not raise — it returns a valid-looking 32-byte value
+that is a two-bit shift of the true one (`0004080c1014181c…` instead of
+`000102030405060708…`). **Silent corruption, not rejection.** The same applies
+to the `0B` signature code with `ps = 2`.
+
+Nothing in this repository decodes these strings with a CESR decoder, so nothing
+is currently corrupted. The rule this section establishes is that nothing may
+start to.
+
+### 9.4 Signature placement and signed-payload definition (`sigs`)
+
+KERI signs the fully serialized event and carries signatures *outside* the body
+as CESR attachment groups (indexed signatures). This envelope carries `sigs` as
+a field *inside* the packet and signs `canonical_bytes` of the packet with
+`sigs` emptied. Even with 9.3 corrected, the byte string under signature would
+still differ, so signatures would not verify across implementations.
+
+### 9.5 JCS reorders the fields KERI expects at the head
+
+Packets are canonicalized with RFC 8785 JCS, which sorts keys lexicographically.
+On-wire order is therefore `a, d, i, p, s, sigs, t, v`. KERI places `v, t, d`
+first precisely so a stream parser can read the version string — which carries
+the total serialization length — at a fixed offset from the start of the frame.
+A KERI stream parser cannot locate the version string in these packets at all.
+Separately the version string itself is 19 characters (`FLOSSI10JSON` + 6 hex +
+`_`) against KERI's 17, so even a fixed-span read misparses.
+
+### 9.6 What this means for adoption decisions
+
+Adopting a KERI library does **not** follow from the field names in this
+envelope, and it does not follow from Holochain either — Holochain uses its own
+`holo_hash` `AgentPubKey` and Action source chain, with DeepKey for key
+rotation, and contains no KERI, ACDC, or CESR anywhere. Any future proposal to
+adopt KERI tooling must be argued on its own merits (witness receipts and
+pre-rotation are the real candidates) and must budget for the fact that
+migrating this envelope changes every SAID, every identifier, and every
+signature in the existing chain.
+
+The divergences in 9.3 through 9.5 are pinned by
+`packages/activity_log/tests/test_keri_divergence.py`. Those tests assert the
+divergence, not the conformance: if someone makes this envelope CESR-correct,
+they will fail, and that is the intended signal that a substrate-class migration
+has begun.
+
 ## Pilot
 
 Pilot scope is Claude hooks plus the consensus gateway for one week. Daily audit
