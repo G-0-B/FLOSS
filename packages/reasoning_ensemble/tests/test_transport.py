@@ -93,8 +93,9 @@ def _dead_local(_text):
 def _capture_cloud_fn(monkeypatch):
     captured = {}
 
-    def fake_cloud_fn(model):
+    def fake_cloud_fn(model, timeout=transport.DEFAULT_EMBED_TIMEOUT_SECONDS):
         captured["model"] = model
+        captured["timeout"] = timeout
         return lambda t: [0.9]
 
     monkeypatch.setattr(transport, "_cloud_embed_fn", fake_cloud_fn)

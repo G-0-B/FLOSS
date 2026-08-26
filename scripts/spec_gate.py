@@ -86,7 +86,9 @@ REUSE_TRUTH_STATUSES = ("Verified", "Specified", "Unverified")
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def _iso_date_problems(label: str, value: Any) -> list[str]:
+def _iso_date_problems(
+    label: str, value: Any, *, allow_future: bool = False
+) -> list[str]:
     """One rule for every date the gate reads. Fourth time is the charm.
 
     `str(20260825)` is `"20260825"`, and `date.fromisoformat()` accepts that as
@@ -103,9 +105,24 @@ def _iso_date_problems(label: str, value: Any) -> list[str]:
     if not _ISO_DATE_RE.match(value):
         return [f"{label} {value!r} is not YYYY-MM-DD"]
     try:
-        _dt.date.fromisoformat(value)
+        parsed = _dt.date.fromisoformat(value)
     except ValueError:
         return [f"{label} {value!r} is not a real date"]
+    # `search_date` already rejected future dates and `reviewer.date` /
+    # `probe.date` did not, so `2099-01-01` was a real date that let a tier-2
+    # entry claim a review or a passing probe had concluded decades before it
+    # can occur. That is the fourth instance of one structure fixed at one
+    # reader and not its siblings, which is exactly what this helper exists to
+    # stop -- so the rule lives here and every caller inherits it.
+    #
+    # `search_date` opts out only because it carries its own message naming the
+    # freshness window; it still rejects the future at its own call site.
+    if not allow_future and parsed > _dt.date.today():
+        return [
+            f"{label} {value!r} is in the future "
+            f"({(parsed - _dt.date.today()).days}d ahead); evidence cannot "
+            f"predate the event it records"
+        ]
     return []
 
 
@@ -408,12 +425,37 @@ def _record_problems(rel: str, record: str) -> list[str]:
 
 def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
     """Validate an entry's reuse block (ADR-18). Returns (fails, warns)."""
-    tier = entry.get("tier")
-    if tier not in (1, 2):
+    # An ABSENT tier is the grandfather exemption: 100 of the 104 registry
+    # entries predate ADR-18 and carry no tier at all. A PRESENT tier outside
+    # 1/2 is something else entirely -- a hand-edited `"2"` or `3` used to hit
+    # the same early return and exempt the entry from every reuse, reviewer and
+    # probe check. A fail-closed gate cannot be opened by a typo in the field
+    # that decides whether it applies.
+    if "tier" in entry:
+        tier = entry.get("tier")
+        if isinstance(tier, bool) or not isinstance(tier, int):
+            return [
+                f"{rel}: tier must be integer 1 or 2, got "
+                f"{type(tier).__name__} {tier!r}"
+            ], []
+        if tier not in (1, 2):
+            return [f"{rel}: tier {tier!r} is not 1 or 2"], []
+    else:
         return [], []
     reuse = entry.get("reuse")
     if not isinstance(reuse, dict):
-        if entry.get("emergency"):
+        # `entry.get("emergency")` was a truthiness test, so the string "false"
+        # -- schema-invalid, and the most likely way a human writes it wrong --
+        # read as an active emergency and downgraded a wholly missing reuse
+        # block to a warning that `--check` exits 0 on. Only the boolean waives
+        # the gate.
+        emergency = entry.get("emergency")
+        if "emergency" in entry and not isinstance(emergency, bool):
+            return [
+                f"{rel}: emergency must be a boolean, got "
+                f"{type(emergency).__name__} {emergency!r}"
+            ], []
+        if emergency is True:
             return [], [
                 f"{rel}: emergency artifact without reuse record — retrospective "
                 f"audit required before promotion/generalization"
@@ -495,7 +537,9 @@ def _reuse_problems(rel: str, entry: dict) -> tuple[list[str], list[str]]:
     if verdict is not None and verdict not in REUSE_VERDICTS:
         fails.append(f"{rel}: verdict {verdict!r} not in {'/'.join(REUSE_VERDICTS)}")
     raw_date = reuse.get("search_date")
-    date_problems = _iso_date_problems(f"{rel}: reuse search_date", raw_date)
+    date_problems = _iso_date_problems(
+        f"{rel}: reuse search_date", raw_date, allow_future=True
+    )
     if date_problems:
         fails.extend(date_problems)
     else:

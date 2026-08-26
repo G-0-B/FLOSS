@@ -390,8 +390,16 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
     (local mxbai or a cloud fallback) so every voter shares one vector space.
     """
     started = time.perf_counter()
+    # Resolved OUTSIDE the try. When it lived inside, the except branch below
+    # built its VoterResponse without it and the field fell back to its
+    # "litellm" default -- so every failed ollama or flowith call was attributed
+    # to litellm in the staged artifact and in _log_synthesis_action(), which is
+    # precisely the data a provider failure-rate audit reads.
     try:
         voter_transport = str(voter.get("transport") or "litellm")
+    except Exception:  # noqa: BLE001 -- a malformed voter must not raise here
+        voter_transport = "litellm"
+    try:
         text = transport.generate(voter, prompt, VOTER_TIMEOUT_SECONDS, ollama_generate)
         duration = time.perf_counter() - started
         if not text:
@@ -454,6 +462,7 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
             response_embedding=None,
             duration_seconds=round(duration, 3),
             error=f"{type(e).__name__}: {e}",
+            transport_name=voter_transport,
         )
 
 
@@ -878,7 +887,9 @@ def synthesize(
     # EMBED_PROBE_TIMEOUT_SECONDS. Once resolved, the returned embedder uses the
     # full timeout for actual work.
     _embed_name, embed_fn = transport.resolve_embedder(
-        _local_embed_probe, local_embed_fn=ollama_embed
+        _local_embed_probe,
+        local_embed_fn=ollama_embed,
+        embed_timeout=EMBED_TIMEOUT_SECONDS,
     )
 
     # 1-3: dispatch + embed (embed is inside _dispatch_voter)

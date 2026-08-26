@@ -537,3 +537,119 @@ def test_a_valid_window_still_governs_freshness(gate):
     }
     fails, _warns = gate._reuse_problems("x.md", entry)
     assert any("stale" in f for f in fails), fails
+
+
+# ---------------------------------------------------------------------------
+# The gate must not be openable by the field that decides whether it applies.
+# ---------------------------------------------------------------------------
+
+
+def _tier_entry(**overrides) -> dict:
+    entry = {
+        "tier": 2,
+        "reuse": {
+            "capability": "c",
+            "search_date": "2026-08-25",
+            "candidates": [
+                {"name": "thing", "truth_status": "Verified", "probe": "probed: ran it"}
+            ],
+            "verdict": "build",
+            "irreducible_delta": "d",
+            "reviewer": {
+                "surfaces": ["groq", "mistral", "nvidia"],
+                "families": ["gpt", "qwen", "deepseek", "llama"],
+                "record": "docs/specs/reuse-gate.spec.md",
+                "outcome": "APPROVED",
+                "date": "2026-08-25",
+            },
+        },
+    }
+    entry.update(overrides)
+    return entry
+
+
+@pytest.mark.parametrize("tier", ["2", "1", 3, 0, -1, 2.0, True, None])
+def test_a_malformed_tier_fails_instead_of_exempting(gate, tier):
+    """A typo in `tier` must not waive every reuse, reviewer and probe check.
+
+    `if tier not in (1, 2): return [], []` treated a hand-edited `"2"` or `3`
+    exactly like an absent tier, so a schema-invalid value silently exempted a
+    new architecture artifact from a fail-closed gate.
+    """
+    fails, _warns = gate._reuse_problems("x.md", {"tier": tier})
+    assert fails, f"tier {tier!r} was exempted rather than rejected"
+    assert "tier" in fails[0]
+
+
+def test_an_absent_tier_is_still_the_grandfather_exemption(gate):
+    """100 of the 104 registry entries predate ADR-18 and carry no tier."""
+    assert gate._reuse_problems("x.md", {}) == ([], [])
+    assert gate._reuse_problems("x.md", {"spec": "something"}) == ([], [])
+
+
+@pytest.mark.parametrize("emergency", ["false", "true", "no", 1, 0, [], {}])
+def test_a_non_boolean_emergency_does_not_waive_the_reuse_block(gate, emergency):
+    """`entry.get("emergency")` was a truthiness test.
+
+    The string "false" -- schema-invalid, and the most likely way a human writes
+    it wrong -- read as an active emergency and downgraded a wholly missing
+    reuse block to a warning that `--check` exits 0 on.
+    """
+    fails, warns = gate._reuse_problems("x.md", {"tier": 2, "emergency": emergency})
+    assert fails, f"emergency={emergency!r} waived the gate"
+    assert not warns
+
+
+def test_a_real_emergency_still_downgrades_to_a_warning(gate):
+    fails, warns = gate._reuse_problems("x.md", {"tier": 2, "emergency": True})
+    assert fails == []
+    assert warns and "retrospective" in warns[0]
+
+
+def test_emergency_false_is_not_an_emergency(gate):
+    fails, warns = gate._reuse_problems("x.md", {"tier": 2, "emergency": False})
+    assert fails == ["x.md: tier 2 artifact has no reuse block"]
+    assert warns == []
+
+
+# ---------------------------------------------------------------------------
+# Evidence cannot predate the event it records.
+# ---------------------------------------------------------------------------
+
+
+def test_a_future_reviewer_date_is_rejected(gate):
+    entry = _tier_entry()
+    entry["reuse"]["reviewer"]["date"] = "2099-01-01"
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("future" in f for f in fails), fails
+
+
+def test_a_future_probe_date_is_rejected(gate):
+    entry = _tier_entry()
+    entry["reuse"]["candidates"][0]["probe"] = {
+        "status": "passed",
+        "detail": "ran it",
+        "date": "2099-01-01",
+    }
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("future" in f for f in fails), fails
+
+
+def test_search_date_keeps_its_own_future_message(gate):
+    """search_date opts out of the shared rule only to keep a richer message."""
+    entry = _tier_entry()
+    entry["reuse"]["search_date"] = "2099-01-01"
+    fails, _warns = gate._reuse_problems("x.md", entry)
+    assert any("cannot predate its own search" in f for f in fails), fails
+
+
+def test_every_date_field_shares_one_future_rule(gate):
+    """Generic, not per-instance: the helper is the single place it is enforced.
+
+    Three date fields existed and two of them accepted 2099. Asserting the
+    helper directly means a fourth date field added later inherits the rule
+    instead of needing its own test.
+    """
+    assert gate._iso_date_problems("d", "2099-01-01")
+    assert gate._iso_date_problems("d", "2020-01-01") == []
+    assert gate._iso_date_problems("d", "2099-01-01", allow_future=True) == []

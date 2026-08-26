@@ -241,15 +241,25 @@ def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _cloud_embed_fn(model: str):
+# Fallback embedding budget, used only when a caller does not supply one.
+# resolve_embedder()'s docstring promised that the resolved embedder does real
+# work "under the normal timeout", but the cloud wrapper passed no timeout at
+# all, so omniroute_client.embedding() applied its own 60s default. An
+# embedding that finished between 60s and 90s was recorded as failed, its voter
+# was dropped from `embedded`, and a run inside its configured budget could be
+# pushed to DEGRADED by the budget not being forwarded.
+DEFAULT_EMBED_TIMEOUT_SECONDS = 90.0
+
+
+def _cloud_embed_fn(model: str, timeout: float = DEFAULT_EMBED_TIMEOUT_SECONDS):
     def embed(text: str) -> list[float]:
         if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
             from packages.omniroute_client import embedding as _omni_embed
 
-            return _omni_embed(model, text)
+            return _omni_embed(model, text, timeout=timeout)
         from litellm import embedding
 
-        resp = embedding(model=model, input=[text])
+        resp = embedding(model=model, input=[text], timeout=timeout)
         vec = resp.data[0]["embedding"]
         if not vec:
             raise RuntimeError(f"empty embedding from {model}")
@@ -258,7 +268,12 @@ def _cloud_embed_fn(model: str):
     return embed
 
 
-def resolve_embedder(probe_fn, local_embed_fn=None) -> tuple[str, object]:
+def resolve_embedder(
+    probe_fn,
+    local_embed_fn=None,
+    *,
+    embed_timeout: float = DEFAULT_EMBED_TIMEOUT_SECONDS,
+) -> tuple[str, object]:
     """Pick the run's single embedder: local mxbai if it answers, else cloud.
 
     `probe_fn(text) -> list[float]` is the HEALTH PROBE and should carry a short
@@ -281,7 +296,7 @@ def resolve_embedder(probe_fn, local_embed_fn=None) -> tuple[str, object]:
     except Exception:  # noqa: BLE001 — fall through to cloud
         pass
     cloud_model = _available_cloud_embed_model()
-    return cloud_model, _cloud_embed_fn(cloud_model)
+    return cloud_model, _cloud_embed_fn(cloud_model, embed_timeout)
 
 
 # Re-exported for tests that need to know which env vars gate each candidate.

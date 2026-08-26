@@ -111,3 +111,124 @@ def test_one_callable_still_works():
     name, fn = transport.resolve_embedder(lambda t: [0.5])
     assert name == "mxbai-embed-large"
     assert fn("x") == [0.5]
+
+
+def test_failed_generation_keeps_its_own_transport():
+    """A provider failure must be attributed to the provider that failed.
+
+    voter_transport used to be resolved inside the try, and the except branch
+    built its VoterResponse without it, so the field fell back to its "litellm"
+    default. Every failed ollama or flowith call was therefore recorded as a
+    litellm failure in the staged artifact and in _log_synthesis_action() --
+    the exact data a provider failure-rate audit reads.
+    """
+
+    def _explode(voter, prompt, timeout, ollama_generate):
+        raise RuntimeError("provider exploded")
+
+    original = synthesizer.transport.generate
+    synthesizer.transport.generate = _explode
+    try:
+        for wire in ("ollama", "flowith", "litellm"):
+            result = synthesizer._dispatch_voter(
+                {
+                    "voter_id": f"v-{wire}",
+                    "model": f"{wire}/m",
+                    "family": wire,
+                    "transport": wire,
+                },
+                "prompt",
+            )
+            assert result.error.startswith("RuntimeError")
+            assert result.transport_name == wire, (
+                f"{wire} failure attributed to {result.transport_name}"
+            )
+    finally:
+        synthesizer.transport.generate = original
+
+
+def test_cloud_embedder_receives_the_runs_embedding_budget(monkeypatch):
+    """The cloud wrapper must carry the 90s budget, not the client's 60s default.
+
+    resolve_embedder()'s docstring already promised the resolved embedder does
+    real work under the normal timeout. The cloud path passed no timeout at all,
+    so an embedding finishing between 60s and 90s was recorded as failed and its
+    voter dropped -- a run inside its configured budget pushed to DEGRADED by
+    the budget not being forwarded.
+    """
+    # Pinned explicitly: FLOSS_MODEL_BACKEND is read at call time, and with it
+    # left to the ambient environment this test took the omniroute branch and
+    # made a live HTTP request during the suite.
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
+    seen: dict[str, object] = {}
+
+    def _fake_embedding(model, input, timeout=None):  # noqa: A002
+        seen["timeout"] = timeout
+        return type("R", (), {"data": [{"embedding": [0.1, 0.2]}]})()
+
+    import sys
+    import types
+
+    stub = types.ModuleType("litellm")
+    stub.embedding = _fake_embedding
+    original = sys.modules.get("litellm")
+    sys.modules["litellm"] = stub
+    try:
+        embed = transport._cloud_embed_fn("some/model", 90.0)
+        assert embed("text") == [0.1, 0.2]
+        assert seen["timeout"] == 90.0
+    finally:
+        if original is None:
+            sys.modules.pop("litellm", None)
+        else:
+            sys.modules["litellm"] = original
+
+
+def test_resolve_embedder_threads_the_timeout_to_the_cloud_fallback():
+    def _dead_local(_text):
+        raise RuntimeError("no local ollama")
+
+    captured: dict[str, object] = {}
+    original = transport._cloud_embed_fn
+
+    def _spy(model, timeout=transport.DEFAULT_EMBED_TIMEOUT_SECONDS):
+        captured["model"] = model
+        captured["timeout"] = timeout
+        return lambda text: [0.0]
+
+    transport._cloud_embed_fn = _spy
+    try:
+        transport.resolve_embedder(_dead_local, embed_timeout=90.0)
+        assert captured["timeout"] == 90.0
+    finally:
+        transport._cloud_embed_fn = original
+
+
+def test_omniroute_embedder_also_receives_the_budget(monkeypatch):
+    """The other branch of the same wrapper, and the one that had the 60s default."""
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "omniroute")
+    seen: dict[str, object] = {}
+
+    import sys
+    import types
+
+    stub = types.ModuleType("packages.omniroute_client")
+
+    def _fake_embedding(model, text, *, timeout=60.0):
+        seen["timeout"] = timeout
+        return [0.3, 0.4]
+
+    stub.embedding = _fake_embedding
+    original = sys.modules.get("packages.omniroute_client")
+    sys.modules["packages.omniroute_client"] = stub
+    try:
+        assert transport._cloud_embed_fn("some/model", 90.0)("text") == [0.3, 0.4]
+        assert seen["timeout"] == 90.0, (
+            "omniroute_client.embedding() defaults to 60s; an embedding "
+            "finishing between 60s and 90s was dropped inside its own budget"
+        )
+    finally:
+        if original is None:
+            sys.modules.pop("packages.omniroute_client", None)
+        else:
+            sys.modules["packages.omniroute_client"] = original
