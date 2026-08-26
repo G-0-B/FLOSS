@@ -273,3 +273,48 @@ asserting without evidence since it was written.
 - **Letting the operator's own view enter the packet.** It contaminates every
   downstream reviewer at once, which is the one correlation no protocol can
   measure out.
+
+## When this is automated
+
+The manual shuttling — paste packet, wait, copy JSON, paste onward with the
+prior reviews attached, collect — is mechanical, high-friction and requires no
+judgment. It is the right first automation target, and the computer-use lease
+router plus Playwright MCP is the right substrate for it: transport, not
+decision, which is the same router-not-controller line
+`docs/specs/computer-use-gateway.spec.md` already draws.
+
+Two constraints fall straight out of what exists:
+
+- **Web reviewers are automatable now; desktop and TUI reviewers are not.**
+  `sendinput` and `screenshot` are default-deny even under an exclusive lease,
+  and `uia.invoke` is leased but unwired pending a probe. The spec names
+  Playwright MCP as the sanctioned web actuator, so web flows go through
+  Playwright and never through computer-use input injection.
+- **Prefer an API over driving a UI wherever one exists.** More reliable than
+  DOM scraping, and many services restrict automated access to their web
+  interfaces. Check terms before scaling a browser-driven reviewer.
+
+### The falsifier for the automation itself
+
+Automation tends toward homogenization: one pipeline, one packet template, one
+browser profile, one session state. Every one of those pushes reviewers toward
+each other — and reviewer *difference* is the entire source of value here. An
+orchestrator that makes four harnesses uniform would be faster and worse, and
+nothing about the output would look wrong.
+
+So the automation gets the same treatment as any other artifact in this project:
+
+> **Baseline n_eff on manual runs before automating. Re-measure after. If n_eff
+> falls, the automation consumed the independence it was built to scale.**
+
+`scripts/review_independence.py` already computes it. This is cheap, it is a real
+falsifier rather than a gesture at one, and it is the only way to notice this
+particular failure — because a homogenized panel still returns confident,
+well-formatted, unanimous findings. That is the scale-mismatch signature again
+(`project-scale-mismatch-recurring-defect`): the property lives in the diversity
+of retrieval, and nothing in the output surface measures it.
+
+Corollary worth stating plainly: the JSON schema above is what makes this
+automatable at all. Structured output was adopted because it made reviews better;
+it turns out to be the same property that makes the transport mechanical. Keep
+the schema stable — it is now load-bearing twice.
