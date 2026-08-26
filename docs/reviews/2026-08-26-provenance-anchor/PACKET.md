@@ -1,0 +1,259 @@
+# Lane A packet — provenance anchor, ADR-18 tier-2 reuse review
+
+**Protocol:** [`docs/governance/manual-review-protocol-v1.0.md`](../../governance/manual-review-protocol-v1.0.md)
+**Lane:** A (independent first pass — no reviewer sees another)
+**Created:** 2026-08-26
+**Status:** ready to send
+
+Everything from `--- PACKET BEGINS ---` to `--- PACKET ENDS ---` is sent
+**verbatim and identical** to every Lane A reviewer. Any variation between
+reviewers contaminates the correlation measurement and makes `n_eff`
+uninterpretable.
+
+## Reviewer assignment
+
+Record before reading any output. This is the independent variable and the whole
+point of the run.
+
+| ID | Model | Harness | Repo access | Web / deep research | Filename |
+|---|---|---|---|---|---|
+| A1 | frontier | Perplexity | no | **yes** | `a1.json` |
+| A2 | frontier | GitHub MCP surface | **yes** | no | `a2.json` |
+| A3 | frontier | bare chat | no | no | `a3.json` |
+| A4 | **different family from A3** | bare chat | no | no | `a4.json` |
+
+A3 vs A4 isolates model-family diversity with tools held constant.
+A3 vs A1/A2 isolates tool access against the bare-chat baseline.
+
+Then: `python scripts/review_independence.py docs/reviews/2026-08-26-provenance-anchor/a*.json`
+
+## Known contamination in this packet
+
+The packet author wrote the artifact under review. The "author's claim" section
+is therefore a shared prior injected into all four reviewers at once — the one
+correlation the protocol cannot measure out. Mitigations applied: the
+description is factual, the reasoning is quarantined into a block explicitly
+labelled as a target rather than as context, and reviewers are told to attack it.
+This is stated so a later reader can discount the run appropriately, not because
+the mitigation is sufficient.
+
+---
+--- PACKET BEGINS ---
+
+You are one of several independent reviewers auditing an artifact from the
+FLOSSI0ULLK project. You will not see the other reviewers' work, and they will
+not see yours.
+
+Your job is to find what is **wrong, missing, dangerous, or overstated**. Do not
+summarize. Do not open by agreeing. If the artifact is sound, say so in one line
+and spend the rest of your effort on its weakest points anyway.
+
+**Ground every finding in retrieval, not memory.** Use whatever repository, web
+and execution access you have. Quote file paths with line numbers, quote source
+text verbatim, cite URLs. A finding you cannot evidence is marked `speculative` —
+that is a legitimate output, but say so rather than asserting it.
+
+Before striking any claim as unverifiable, **attempt retrieval first**. "Could
+not retrieve" and "does not exist" are different findings and must be labelled
+differently.
+
+Return ONLY the JSON schema at the end. No prose outside it.
+
+## THE ARTIFACT
+
+Repository: `G-0-B/FLOSS`, branch `reconcile/pr38-salvage-20260817` (public).
+Commits: `0a34637` (mechanism), `fbaae97` (first published anchor).
+
+| File | Lines | Role |
+|---|---|---|
+| `packages/activity_log/anchor.py` | 418 | Library: leaf construction, Merkle tree, scan, sign, verify |
+| `scripts/provenance_anchor.py` | 165 | CLI: `publish` / `verify`; prints git commands, runs none |
+| `docs/specs/provenance-anchor.spec.md` | 244 | Specification, including a stated-limits section |
+| `packages/activity_log/tests/test_anchor.py` | 332 | 25 tests, all passing |
+
+Related context, not itself under review: `packages/activity_log/provenance.py`
+(the existing per-agent signed packet chain), `docs/specs/provenance-packet.spec.md`.
+
+## THE PROBLEM IT ADDRESSES
+
+The project maintains a store of signed provenance packets. Each packet carries
+an agent identifier `i`, a decimal sequence `s`, a prior-packet digest `p`, and a
+self-addressing digest `d`. Sequences are gapless per agent, so deleting a packet
+from the middle of a chain leaves an arithmetic hole that the existing validator
+enumerates by exact sequence number.
+
+Two deletions leave no hole:
+
+1. **Head truncation.** Delete everything above sequence *n* and the chain ends
+   at *n*. Nothing inside a self-signed chain distinguishes that from an agent
+   that has not written since *n*.
+2. **Deleting a single-packet identity.** Nothing survives to be gapped against.
+
+Measured on the live store: **96 of 99 identities are single-packet chains**
+(253 packets, 99 identities at the time of writing).
+
+Four prior external review layers rated wholesale head truncation *Critical*.
+Fourteen commits of validator hardening did not move it.
+
+## WHAT WAS BUILT
+
+A Merkle set-commitment over the whole packet store, published to a public git
+repository.
+
+- **Leaf preimage:** RFC 8785 JCS over `{"d": SAID, "i": AID, "s": sequence}`.
+- **Tree:** RFC 6962-shaped binary Merkle over BLAKE3-256, domain-separated
+  (`0x00` leaf, `0x01` interior), odd node promoted rather than duplicated.
+  Leaves sorted by `(identity, int(sequence), said)`. Empty tree has a distinct
+  constant.
+- **Anchor document:** merkle root, packet and identity counts, per-identity
+  `max_seq` / `head_saids[]` / `interior_gaps[]` / `duplicate_seqs[]`,
+  `unreadable[]`, and `prev_root` chaining each anchor to its predecessor.
+  Ed25519-signed with an existing project identity; `sig` and `signer` excluded
+  from the signed bytes.
+- **Publication:** the root is placed in the git **tag name** and **commit
+  message**, not only in file contents. The CLI prints those commands and
+  executes none.
+- **Verify outcomes:** `VERIFIED` (0), `ANCHOR_STALE` (1, store grew and nothing
+  anchored is gone), `TRUNCATION_DETECTED` (2), `ANCHOR_MISMATCH` (2),
+  `ANCHOR_UNAVAILABLE` (3).
+
+Behaviour exercised against a copy of the live store: unchanged → VERIFIED;
+5-packet head truncation → TRUNCATION_DETECTED with a head regression;
+single-packet identity wiped → TRUNCATION_DETECTED with a vanished identity;
+growth only → ANCHOR_STALE; interior deletion → ANCHOR_MISMATCH; head removed
+*and* a packet added so counts are equal → TRUNCATION_DETECTED; packet moved to
+the store root → VERIFIED; anchor field edited → ANCHOR_UNAVAILABLE; wrong pinned
+signer → ANCHOR_UNAVAILABLE.
+
+## GOVERNANCE STATUS
+
+The project's ADR-18 prior-art gate requires: `adopt` before `extend` before
+`compose` before `build`, and tier-2 (architecture-class) artifacts require an
+independent review spanning at least 3 provider surfaces and 4 model families.
+
+This artifact is registered **tier 2 with `emergency: true`**, which emits
+`retrospective audit required before promotion/generalization` rather than
+passing silently. **The tier-2 reuse review has not been performed. This review
+is that review.**
+
+The prior-art survey that informed the design was conducted by a single model
+family and is recorded at `docs/research/2026-08-26-ensemble-aggregation-prior-art.md`
+(that document is about a different subsystem; the anchor's own survey covered
+Sigstore Rekor, SCITT, Trillian/certificate transparency, signed git tags, and
+Holochain).
+
+## WEAKNESSES THE AUTHOR ALREADY ACCEPTS
+
+Stated so you do not spend passes rediscovering them. **Finding a *new* problem
+with any of these, or showing one is worse than stated, is in scope.**
+
+1. It does not stop the operator. It converts undetectable deletion into
+   detectable *equivocation*, and only for a party who retained a prior root.
+   With no retained copy it is a self-consistency check.
+2. The window between anchor runs is undefended — a packet created and deleted
+   inside it never enters a leaf set.
+3. `generated_at` is self-asserted. Backdating is not prevented.
+4. Deleting or privating the repository removes the anchor; only already-ingested
+   third-party event records survive.
+5. The signing key is the operator's key. A rotated identity can sign a fresh
+   consistent series. Pinning the public key beforehand is the actual root of
+   trust.
+6. It says nothing about packet validity — an anchor over 253 invalid packets is
+   a valid anchor.
+7. It does not repair existing damage. Four known holes and six duplicate
+   sequence slots are recorded *in* the anchor to freeze them as pre-existing.
+8. **Third-party mirror retention is asserted, not verified.** The claim that
+   public-repository push events reach mirrors outside the operator's control is
+   marked ⚠️ Specified. No mirror has been confirmed to have indexed this
+   repository.
+
+## THE AUTHOR'S REASONING — THIS IS A TARGET, NOT CONTEXT
+
+Quarantined deliberately. Treat every sentence below as a claim to be attacked,
+not as background. If you find yourself agreeing with it, say why, with evidence,
+or mark the agreement `speculative`.
+
+> Sequence gaps operate at chain scale; truncation attacks set scale; therefore
+> no amount of gap enumeration can ever detect it, and a commitment at set scale
+> is not a better version of the same check but the first check at the right
+> scale.
+>
+> The root must ride in the git tag name and commit message rather than only in
+> file contents, because the operator controls both the store and the remote —
+> so a ref they can rewrite constrains nobody. A public push emits events
+> carrying ref names and message text to third parties with no write path back.
+> That is the one place a fact outside the operator's control is created.
+>
+> Rekor and SCITT are the correct hardening layer but not the correct first
+> anchor. Holochain is the correct terminal destination and is disqualified as a
+> first anchor because a single-operator DHT provides zero anchoring in
+> principle. Building a small Merkle commitment on existing dependencies
+> (BLAKE3, `jcs`, PyNaCl — all already required) was preferred to adopting a
+> transparency-log service because it adds no dependency and no network egress.
+>
+> `ANCHOR_STALE` must be neither a pass nor a failure, because honest growth is
+> the common case and a gate that cries wolf every session gets turned off.
+
+## QUESTIONS
+
+Answer through findings; do not answer them as prose.
+
+1. **Ladder.** ADR-18 requires `adopt` before `build`. A custom Merkle
+   commitment was built. Was that correct, or does an existing system —
+   Sigstore Rekor, SCITT, Trillian, certificate-transparency tooling, a signed
+   git tag alone, OpenTimestamps, or something not listed — deliver enough of
+   this with less code and less risk? Name what specifically would be lost by
+   adopting it.
+2. **Cryptographic construction.** Leaf format, domain separation, odd-node
+   promotion, sort order, empty-tree constant, and the signing scope (`sig` and
+   `signer` excluded). Is any of it exploitable? Second-preimage, ambiguity
+   between two packet sets producing one root, or a signature that fails to
+   cover something it must.
+3. **Threat model honesty.** Section 7 above claims the limits are stated in
+   full. What is missing from that list?
+4. **The publication argument.** Is "the root in a tag name reaches third-party
+   mirrors" correct in mechanism, and correct in practice? What would you need
+   to see to move it from Specified to Verified — and is there a cheaper
+   mechanism that is externally witnessed by construction?
+5. **Operational.** Anything that makes this fail silently, produce a false
+   `VERIFIED`, or wedge under concurrent writes, partial writes, clock skew, or
+   filesystem behaviour on Windows.
+6. **Scope.** Is this the right thing to have built at all, given the stated
+   limits? A defensible finding is "this should not exist in this form."
+
+## OUTPUT SCHEMA
+
+Return ONLY this JSON.
+
+```json
+{
+  "reviewer": {
+    "model": "string",
+    "harness": "string",
+    "tools_used": ["github", "web", "execution", "none"],
+    "saw_prior_reviews": false
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "claim": "One sentence. The defect, not the topic.",
+      "severity": "critical | major | minor | nit",
+      "location": "path:line, or the specific claim being disputed",
+      "evidence": [
+        "Verbatim quote, file:line, URL, or command output. NOT a recollection."
+      ],
+      "falsifier": "What would show this finding is wrong.",
+      "confidence": "verified | likely | speculative",
+      "novel_vs_prior": "novel"
+    }
+  ],
+  "refutations": [],
+  "predicted_majority": "What you expect the OTHER reviewers to conclude overall.",
+  "where_you_expect_to_be_alone": "The finding you think the others will miss."
+}
+```
+
+TRUTH LABELS used by this project: ✅ Verified / ⚠️ Specified / 🔮 Aspirational /
+❌ Blocked.
+
+--- PACKET ENDS ---
