@@ -305,13 +305,23 @@ was found here.
 
 Findings, taken from the individual responses:
 
-**Q1 — blast radius. 4 System, 1 Substrate, 1 no-answer.** The majority principle:
-blast radius follows which invariant a change alters, not whether a nearby label
-reads "non-negotiable." Depth-0 strictness is untouched, so the `provenance_first`
-core — a current packet must carry valid current evidence — survives; only
-historical artifact consistency relaxes. The dissent is not frivolous and is
-recorded rather than outvoted. Note that D-B3, which the same audit prefers, makes
-the question substantially easier: aligning the implementation to the spec's stated
+**Q1 — blast radius.** *(This tally was corrected on 2026-08-26; see "Correction
+to the Q1 tally" below. It originally read "4 System, 1 Substrate, 1 no-answer",
+which is not what the raw responses say.)*
+
+There is no majority here to state. Read from `voter_responses[]`, exactly one
+voter answered **System** and exactly one answered **Substrate**; the other four
+did not produce a classifiable verdict. What every voter who expressed any view
+on D-B2 shared was opposition to it.
+
+The System argument, made by `huggingface/deepseek-v4-flash`, is that blast
+radius follows which invariant a change alters, not whether a nearby label reads
+"non-negotiable": depth-0 strictness is untouched, so the `provenance_first`
+core — a current packet must carry valid current evidence — survives, and only
+historical artifact consistency relaxes. It is recorded here because it is the
+strongest version of the position this ADR originally took, not because it
+carried a majority. Note that D-B3, which the same audit prefers, makes the
+question substantially easier: aligning the implementation to the spec's stated
 `p` contract is not a loosening at all.
 
 **Q2 — laundering. Split, and the split is the useful part.** The majority reads the
@@ -471,10 +481,18 @@ The board's reasoning, which I accept:
 > is precisely the class of change override-forbidden review exists for. That the
 > change is also well-motivated doesn't downgrade its blast radius.
 
-Open Question 1 is closed as **Substrate**. Worth recording that the lone dissenter
-in the 2026-08-23 ensemble audit, `groq/openai/gpt-oss-120b`, reached this
-conclusion first, in a 359-character fragment that the synthesizer clustered as
-agreement. The minority was right.
+Open Question 1 is closed as **Substrate**. Worth recording that
+`groq/openai/gpt-oss-120b` reached this conclusion first, in a 359-character
+fragment — truncated mid-sentence — that the synthesizer clustered as agreement.
+
+It was not, however, the lone dissenter, as this ADR originally claimed.
+`mistral/devstral-small` opened its answer `**1. BLAST RADIUS: Substrate (0.85,
+override forbidden).**` and was filed on the System side, and
+`nvidia/nemotron-super-49b` labelled its answer System while its own stated
+rationale — "Agree with the counterargument; D-B2 poses a non-negotiable risk to
+`provenance_first`" — is the Substrate position. See "Correction to the Q1 tally"
+below. The conclusion this section reaches is unchanged and better supported than
+when it was written.
 
 ### Open Question 2 is closed, against this ADR's reasoning
 
@@ -515,13 +533,55 @@ exists.
 
 The board asked whether decisions resting on the ensemble synthesizer should be
 re-tallied from raw `voter_responses[]`, since that synthesizer mislabels dissent
-as agreement. For this ADR the re-tally was already performed and is recorded in
-the Adversarial Audit section above: 4 System / 1 Substrate / 1 non-answer on
-blast radius, 2-1 against the D-B1 pairing, unanimous on over-validation and
-insufficiency. The synthesizer's "Tier-1, 6/6 unanimous" was false. **The
-corrected tally is what this ADR was decided on, and the Substrate
-reclassification above now follows the minority position.** Other tiered decisions
-in the repository have not been re-tallied and should be.
+as agreement. For this ADR the re-tally was performed and is recorded in the
+Adversarial Audit section above. The synthesizer's "Tier-1, 6/6 unanimous" was
+false. Other tiered decisions in the repository have not been re-tallied and
+should be.
+
+### Correction to the Q1 tally (2026-08-26)
+
+**A hand re-tally that reads a synthesis for verdict tokens reproduces the same
+failure at one remove, and this ADR did exactly that.** The correction is
+recorded here rather than by rewriting the record, because the original figure
+was cited and a silent edit would leave a citation pointing at something that
+never existed.
+
+This ADR recorded Q1 as **"4 System, 1 Substrate, 1 no-answer"** with
+`groq/openai/gpt-oss-120b` as "the lone dissenter." Re-read against
+`.agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json`:
+
+| Voter | What its text actually says |
+|---|---|
+| `huggingface/deepseek-v4-flash` | **System**, explicit and argued. |
+| `mistral/devstral-small` | **Substrate.** Opens `**1. BLAST RADIUS: Substrate (0.85, override forbidden).**` Filed on the System side. |
+| `nvidia/nemotron-super-49b` | Labelled **System**; rationale reads "Agree with the counterargument; D-B2 poses a non-negotiable risk to `provenance_first`" — the Substrate position. Label and reasoning contradict. |
+| `groq/openai/gpt-oss-120b` | Truncated at 359 chars mid-sentence. Substrate-leaning, but emits no verdict token. |
+| `openrouter/gpt-4o-mini` | Never uses the System/Substrate vocabulary at all. Opposes D-B2 on other grounds. |
+| `groq/qwen3-27b` | No answer. A bare unclosed `<think>` restatement of the prompt, 2291 chars. Counted as a converged voter. |
+
+So the honest tally is **1 explicit System, 1 explicit Substrate, and four
+responses that cannot be classified** — one of them not an answer at all. There
+was never a 4-1 majority to overrule. The original figure manufactured one by
+reading a synthesis rather than the responses, then attributing a verdict to
+voters that had not given one.
+
+Three things follow.
+
+1. **The Substrate reclassification is unaffected and better supported.** It was
+   decided on the argument, and the raw responses contain more support for it
+   than the ADR credited, not less.
+2. **`groq/qwen3-27b` and `groq/openai/gpt-oss-120b` were non-functional across
+   the whole 2026-08-24 campaign** — an unclosed reasoning block in 5 of 5 runs
+   and a mid-sentence truncation in 5 of 5, at 212/359/727/1290/1466 characters
+   against 2000-3200 for peers. Two of six voters produced no positions, so the
+   "≥3 provider surfaces / ≥4 model families" independence bar was met on paper
+   by voters that did not vote. `degenerate_voters()` in
+   `packages/reasoning_ensemble/synthesizer.py` now flags both shapes.
+3. **A verdict token is not a vote.** `nvidia/nemotron-super-49b` labelled itself
+   System while arguing Substrate; `openrouter/gpt-4o-mini` argued a position
+   without ever using the vocabulary. Any future re-tally must read the argument,
+   not scan for the word — which is also why the replacement for the ensemble is
+   a structured per-question ballot rather than a better clustering threshold.
 
 ### Accepted but not implemented here
 

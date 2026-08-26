@@ -165,6 +165,97 @@
       "spec": "GRANDFATHERED 2026-06-12 (BudgetEntry Specification)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/computer-use-gateway.schema.json": {
+      "spec": "JSON Schema for surface lease tickets",
+      "spec_ref": "docs/specs/computer-use-gateway.spec.md",
+      "tier": 1,
+      "reuse": {
+        "capability": "Lease ticket JSON shape for acquire_lease",
+        "search_date": "2026-08-25",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "existing spec-registry JSON Schema style",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": {
+              "status": "passed",
+              "detail": "matches computer-use-gateway.schema.json required keys",
+              "date": "2026-08-25"
+            },
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Four fields: lease_id, agent_id, surface, mode. No new schema language."
+      }
+    },
+    "FLOSS/docs/specs/computer-use-gateway.spec.md": {
+      "spec": "Workstation surface lease: router not controller, SendInput default-deny",
+      "spec_ref": "docs/specs/computer-use-gateway.schema.json",
+      "tier": 1,
+      "reuse": {
+        "capability": "Local workstation surface lease so many MCP hosts share one Windows desktop without racing SendInput",
+        "search_date": "2026-08-25",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "Cua cua-driver (trycua/cua)",
+            "version": "0.22.0 docs 2026-08-25",
+            "license": "MIT",
+            "maintenance": "active",
+            "platform_fit": "Windows background input; a11y tree shallow",
+            "probe": "not_probed: binary not on PATH this session",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "Playwright MCP",
+            "version": "@playwright/mcp latest 2026-08-25",
+            "license": "Apache-2.0",
+            "maintenance": "active",
+            "platform_fit": "web a11y snapshots, not OS GUI",
+            "probe": {
+              "status": "passed",
+              "detail": "npx @playwright/mcp@latest --help exit 0",
+              "date": "2026-08-25"
+            },
+            "truth_status": "Verified"
+          },
+          {
+            "name": "microsoft/UFO2 hybrid UIA+API",
+            "version": "v3.0.7 2026-06-12",
+            "license": "MIT",
+            "maintenance": "LTS",
+            "platform_fit": "Windows AgentOS; HostAgent is a controller",
+            "probe": "not_probed: steal action layer later, not HostAgent",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "CursorTouch Windows-MCP",
+            "license": "MIT",
+            "maintenance": "active",
+            "platform_fit": "UIA+SendInput; per-host spawn races",
+            "probe": "not_probed: not wired; SendInput default-deny here",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "Omnigent execution surface",
+            "license": "Apache-2.0",
+            "maintenance": "alpha",
+            "platform_fit": "ADR-16 Proposed; MCP seam unbuilt",
+            "probe": "not_probed: seam still open",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "compose",
+        "irreducible_delta": "Exclusive surface lease, human-priority freeze, default-deny SendInput/screenshot, single-process router in front of actuators. No new AgentOS.",
+        "rejected_because": [
+          "Pixel CUA on live desktop: focus steal + screenshot exfil",
+          "Per-host Windows-MCP spawn: input races"
+        ]
+      }
+    },
     "FLOSS/docs/specs/consensus-gate.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (consensus-gate.schema)",
       "grandfathered": true
@@ -227,6 +318,11 @@
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/provenance-anchor.spec.md": {
+      "spec": "Merkle set-commitment over the packet store; defeats head truncation, which per-chain sequence gaps cannot see",
+      "tier": 2,
+      "emergency": true
     },
     "FLOSS/docs/specs/provenance-packet.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (provenance-packet.schema)",
@@ -433,6 +529,11 @@
     "FLOSS/scripts/process_intake_events.py": {
       "spec": "Intake event consolidator over the claim-by-rename queue",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+    },
+    "FLOSS/scripts/provenance_anchor.py": {
+      "spec": "CLI to publish and verify the provenance Merkle anchor; prints publish commands, runs none",
+      "tier": 2,
+      "emergency": true
     },
     "FLOSS/scripts/refresh_agent_surfaces.py": {
       "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
