@@ -57,6 +57,96 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
+def _process_start_token(pid: int) -> str | None:
+    """Return a stable per-PID process-creation token, or None if unavailable.
+
+    A PID alone does not identify a process. After a crash or a reboot the PID
+    file survives, the OS reassigns that number to something unrelated, and
+    `_pid_alive()` then reports the daemon as running while port 7331/7332 goes
+    unserved -- the launcher exits successfully and the stop script is aimed at
+    an innocent process.
+
+    Process creation time is the standard disambiguator and needs no new
+    dependency: GetProcessTimes on Windows, field 22 of /proc/<pid>/stat on
+    Linux. Anywhere else this returns None, and the caller keeps the old
+    conservative behaviour rather than guessing.
+    """
+
+    if pid <= 0:
+        return None
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return None
+        try:
+            creation = wintypes.FILETIME()
+            exited = wintypes.FILETIME()
+            kernel = wintypes.FILETIME()
+            user = wintypes.FILETIME()
+            ok = kernel32.GetProcessTimes(
+                handle,
+                ctypes.byref(creation),
+                ctypes.byref(exited),
+                ctypes.byref(kernel),
+                ctypes.byref(user),
+            )
+            if not ok:
+                return None
+            return f"{creation.dwHighDateTime}:{creation.dwLowDateTime}"
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    # The comm field is parenthesised and may itself contain spaces and
+    # parens, so split after its LAST ')' rather than tokenising the whole
+    # line. starttime is field 22 overall, i.e. index 19 of what follows.
+    try:
+        fields = stat[stat.rindex(")") + 1:].split()
+        return fields[19]
+    except (ValueError, IndexError):
+        return None
+
+
+def _identity_path(pid_path: Path) -> Path:
+    """Sidecar holding the holder's creation token.
+
+    Deliberately a sidecar rather than a richer PID-file format: the PID file
+    is read by scripts/start_mcp_daemons.ps1 and by existing callers that
+    expect a bare integer, and changing that format to carry identity would
+    break them for a guard they do not use.
+    """
+
+    return pid_path.with_name(pid_path.name + ".identity")
+
+
+def _holder_is_really_ours(pid_path: Path, pid: int) -> bool:
+    """True unless we can PROVE the live PID is a different process.
+
+    Unverifiable cases -- a legacy PID file with no sidecar, an unsupported
+    platform, a process we cannot open -- deliberately return True and keep the
+    old blocking behaviour. A false "stale" verdict starts a second daemon on a
+    bound port, which is worse than a false "live" verdict that a human can
+    clear by deleting the file.
+    """
+
+    try:
+        recorded = _identity_path(pid_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return True
+    if not recorded:
+        return True
+    current = _process_start_token(pid)
+    if current is None:
+        return True
+    return current == recorded
+
+
 def claim_singleton(pid_filename: str) -> bool:
     """Return True if this process now owns the daemon slot, False if one is live.
 
@@ -88,7 +178,7 @@ def claim_singleton(pid_filename: str) -> bool:
             # second claim on one slot means a double-start, and reporting
             # success for it would defeat the very guarantee this function
             # exists to provide (see test_live_pid_blocks_second_claim).
-            if _pid_alive(existing):
+            if _pid_alive(existing) and _holder_is_really_ours(pid_path, existing):
                 return False
             # Stale holder: drop it and race for the exclusive create again
             # rather than overwriting, so a concurrent launcher that wins the
@@ -102,6 +192,17 @@ def claim_singleton(pid_filename: str) -> bool:
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as handle:
                     handle.write(str(me))
+                token = _process_start_token(me)
+                if token:
+                    _identity_path(pid_path).write_text(token, encoding="utf-8")
+                else:
+                    # No token means the next claimant cannot disprove us, so
+                    # leave no stale sidecar from a previous holder behind to
+                    # be compared against the wrong process.
+                    try:
+                        _identity_path(pid_path).unlink(missing_ok=True)
+                    except OSError:
+                        pass
             except OSError:
                 try:
                     pid_path.unlink(missing_ok=True)
@@ -122,6 +223,7 @@ def claim_singleton(pid_filename: str) -> bool:
         try:
             if pid_path.read_text(encoding="utf-8").strip() == str(me):
                 pid_path.unlink(missing_ok=True)
+                _identity_path(pid_path).unlink(missing_ok=True)
         except (OSError, ValueError):
             pass
 

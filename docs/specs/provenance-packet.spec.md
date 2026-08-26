@@ -244,7 +244,7 @@ This is the substantive divergence, and it is silent.
 CESR requires that pad bytes be prepended to the value *before* base64
 conversion, so that the padding lands after the framing code but before the
 value — "mid-padding". For a 32-byte raw value, `ps = (3 - (32 % 3)) % 3 = 1`,
-so a conforming encoder base64-encodes `b" " + raw` (33 bytes, 44 characters,
+so a conforming encoder base64-encodes `b"\x00" + raw` (33 bytes, 44 characters,
 no `=` padding) and then overwrites the first `ps` characters with the code.
 
 This envelope instead base64-encodes `raw` directly, strips the trailing `=`,

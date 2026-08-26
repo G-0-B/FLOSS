@@ -1690,9 +1690,10 @@ def test_decoy_claiming_an_ancestor_digest_does_not_poison_the_walk(
     head = paths[-1]
     assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
 
-    # Genesis, not the immediate prior: the first hop resolves by FILENAME via
-    # _find_packet_by_digest, so only a deeper ancestor is reached through
-    # chain_index and can be shadowed by it.
+    # Genesis rather than the immediate prior. This used to be forced: the
+    # first hop resolved by FILENAME and never consulted chain_index at all.
+    # Both hops now share `_cursor_for`, and
+    # test_root_level_decoy_does_not_win_the_first_hop covers the other end.
     middle = json.loads(paths[0].read_text(encoding="utf-8"))
 
     # Same claimed digest, garbage content, name sorts last.
@@ -1716,6 +1717,58 @@ def test_decoy_claiming_an_ancestor_digest_does_not_poison_the_walk(
     assert result.ok is True, (
         f"a decoy copying an ancestor digest must not poison the walk: "
         f"{result.errors}"
+    )
+
+
+def test_root_level_decoy_does_not_win_the_first_hop(tmp_path, monkeypatch):
+    """The immediate prior was resolved by a different path than every other hop.
+
+    The loop's later hops picked a candidate that VALIDATES out of chain_index,
+    but the initial cursor called `_find_packet_by_digest`, which checks
+    `provenance_root / f"{digest}.json"` first and returns it deterministically.
+    So a decoy dropped at the root under the parent's digest won the first hop
+    every time, and an otherwise valid child inherited the decoy's errors --
+    the same structure fixed at one reader and not its sibling, a third time.
+
+    Aimed at the IMMEDIATE prior on purpose: that is the hop the earlier decoy
+    test had to avoid.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 3)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    parent = json.loads(paths[-2].read_text(encoding="utf-8"))
+    head_packet = json.loads(head.read_text(encoding="utf-8"))
+    assert head_packet["p"] == parent["d"], "test aims at the immediate prior"
+
+    # Exactly the path _find_packet_by_digest probes before any glob.
+    decoy = output_root / f"{parent['d']}.json"
+    assert not decoy.exists(), "real packets are filed into dated subdirectories"
+    decoy.write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": parent["i"],
+                "s": parent["s"],
+                "p": parent["p"],
+                "d": parent["d"],
+                "v": parent["v"],
+                "a": [],
+                "sigs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert result.ok is True, (
+        f"a root-level decoy must not win the first hop: {result.errors}"
     )
 
 

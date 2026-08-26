@@ -5,10 +5,14 @@ Run: C:\\Python313\\python.exe -m pytest FLOSS/packages/tests/test_mcp_daemon.py
 """
 import os
 import sys
+
+import pytest
 from pathlib import Path
 
 # Ensure workspace root is on sys.path so `from packages import mcp_daemon` works
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from packages import mcp_daemon  # noqa: E402
 
 
 def test_stale_pid_is_overwritten(tmp_path, monkeypatch):
@@ -233,3 +237,89 @@ def test_release_does_not_delete_another_process_claim(tmp_path, monkeypatch):
 
     assert (tmp_path / "slot.pid").exists(), "released a claim we no longer owned"
     assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == "424242"
+
+
+def test_a_reused_pid_does_not_block_the_slot(tmp_path, monkeypatch):
+    """A live PID is not proof the daemon is running.
+
+    After a crash or a reboot the PID file survives and the OS reassigns that
+    number to something unrelated. `_pid_alive()` then reported the daemon as
+    running while its port went unserved: the launcher exited successfully and
+    the stop script was aimed at an innocent process.
+
+    Here the PID file names a genuinely live process (our own) but the recorded
+    creation token belongs to a different one, so the holder is provably not
+    the daemon and the slot must be reclaimable.
+    """
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    pid_path = tmp_path / "reused.pid"
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    mcp_daemon._identity_path(pid_path).write_text(
+        "not-the-token-of-this-process", encoding="utf-8"
+    )
+
+    assert mcp_daemon.claim_singleton("reused.pid") is True
+    assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_a_matching_identity_still_blocks(tmp_path, monkeypatch):
+    """The guard must not be a blanket permission to double-start."""
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    pid_path = tmp_path / "live.pid"
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    token = mcp_daemon._process_start_token(os.getpid())
+    if token is None:
+        pytest.skip("no process-creation token on this platform")
+    mcp_daemon._identity_path(pid_path).write_text(token, encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("live.pid") is False
+
+
+def test_a_legacy_pid_file_without_a_sidecar_keeps_blocking(tmp_path, monkeypatch):
+    """Unverifiable must stay conservative.
+
+    A false 'stale' verdict starts a second daemon on a bound port. A false
+    'live' verdict is a file a human can delete. When identity cannot be
+    established -- legacy PID file, unsupported platform, unopenable process --
+    the old blocking behaviour is the safe one.
+    """
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    pid_path = tmp_path / "legacy.pid"
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    assert not mcp_daemon._identity_path(pid_path).exists()
+
+    assert mcp_daemon.claim_singleton("legacy.pid") is False
+
+
+def test_an_empty_sidecar_is_treated_as_unverifiable(tmp_path, monkeypatch):
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    pid_path = tmp_path / "empty.pid"
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    mcp_daemon._identity_path(pid_path).write_text("   ", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("empty.pid") is False
+
+
+def test_a_claim_records_its_own_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    assert mcp_daemon.claim_singleton("fresh.pid") is True
+
+    pid_path = tmp_path / "fresh.pid"
+    token = mcp_daemon._process_start_token(os.getpid())
+    if token is None:
+        pytest.skip("no process-creation token on this platform")
+    assert mcp_daemon._identity_path(pid_path).read_text(encoding="utf-8") == token
+
+
+def test_a_dead_pid_token_is_unavailable():
+    assert mcp_daemon._process_start_token(999999999) is None
+    assert mcp_daemon._process_start_token(0) is None
+    assert mcp_daemon._process_start_token(-1) is None
+
+
+def test_the_token_is_stable_across_calls():
+    """A token that changed between calls would make every holder look reused."""
+    first = mcp_daemon._process_start_token(os.getpid())
+    if first is None:
+        pytest.skip("no process-creation token on this platform")
+    assert first == mcp_daemon._process_start_token(os.getpid())

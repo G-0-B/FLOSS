@@ -1023,9 +1023,48 @@ def validate_packet(
         #
         # Each ancestor is validated with `_follow_prior=False` so it checks
         # its own signature/SAID/evidence but leaves its prior to this loop.
+        def _cursor_for(digest: str) -> Path | None:
+            """Pick the packet for `digest`, preferring one that validates.
+
+            A digest is a SAID over the packet's own content, so a file merely
+            claiming one cannot also satisfy it -- which is what makes
+            validation the right tiebreaker when several files claim the same
+            digest. Fall back to the first claimant so a genuinely broken
+            ancestor still reports its own errors instead of vanishing, and to
+            the filename lookup for a packet the index never saw.
+
+            This exists as a function because it was written once, for the
+            loop's later hops, while the INITIAL cursor kept using the bare
+            filename lookup -- and that lookup prefers a root-level
+            `<digest>.json` deterministically, so a decoy placed there won the
+            first hop every time and an otherwise valid child inherited the
+            decoy's errors. One reader of a structure fixed and not its
+            sibling, for the third time in this module; the shared helper is
+            the fix, not another copy of the selection logic.
+            """
+
+            candidates = chain_index.get(digest) or []
+            return next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if _packet_validates(
+                        candidate,
+                        workspace_root=root,
+                        provenance_root=prov_root,
+                        seen=seen,
+                        depth=_depth,
+                        max_depth=max_depth,
+                        ignored_chain_position=_ignored_chain_position,
+                        position_index=_position_index,
+                    )
+                ),
+                candidates[0] if candidates else None,
+            ) or _find_packet_by_digest(prov_root, digest)
+
         child_packet: dict[str, Any] = packet
         child_sequence: Any = sequence
-        cursor: Path | None = _find_packet_by_digest(prov_root, str(prior_digest))
+        cursor: Path | None = _cursor_for(str(prior_digest))
         walked: set[str] = {str(prior_digest)}
         # True for the one link immediately after a gap, where the adjacency
         # assertion must not fire: non-adjacency IS the gap, already recorded.
@@ -1199,28 +1238,7 @@ def validate_packet(
             walked.add(key)
             child_packet = prior_packet
             child_sequence = prior_packet.get("s")
-            # A digest is a SAID over the packet's own content, so a file
-            # merely claiming one cannot also satisfy it. Prefer a candidate
-            # that validates; fall back to the first so a genuinely broken
-            # ancestor still reports its errors instead of vanishing.
-            candidates_for_digest = chain_index.get(key) or []
-            cursor = next(
-                (
-                    candidate
-                    for candidate in candidates_for_digest
-                    if _packet_validates(
-                        candidate,
-                        workspace_root=root,
-                        provenance_root=prov_root,
-                        seen=seen,
-                        depth=_depth,
-                        max_depth=max_depth,
-                        ignored_chain_position=_ignored_chain_position,
-                        position_index=_position_index,
-                    )
-                ),
-                candidates_for_digest[0] if candidates_for_digest else None,
-            ) or _find_packet_by_digest(prov_root, key)
+            cursor = _cursor_for(key)
 
         if gap_sequences:
             # Enumerated, not summarised. An auditor reading this result can
