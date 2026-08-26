@@ -541,6 +541,33 @@
     "FLOSS/scripts/research_log.py": {
       "spec": "Appends dated research-log entries to the shared research register"
     },
+    "FLOSS/scripts/review_independence.py": {
+      "spec": "Kish n_eff over reviewer findings-overlap; measures panel redundancy without gold labels",
+      "tier": 1,
+      "reuse": {
+        "capability": "measure effective independence of a review panel without gold labels",
+        "search_date": "2026-08-26",
+        "candidates": [
+          {
+            "name": "Kish effective sample size (arXiv:2605.29800 section 3.3)",
+            "truth_status": "Verified",
+            "probe": "probed: read the method section in full; formula is n_eff = k / (1 + (k-1) * mean_phi) over binary vectors, plus an eigenvalue variant k / lambda_max. Adopted both verbatim."
+          },
+          {
+            "name": "numpy / scipy for the eigenvalue computation",
+            "truth_status": "Verified",
+            "probe": "probed: neither is declared in requirements-ci.txt or ARF/requirements.txt. Rejected -- adding a numeric stack to compute the largest eigenvalue of a matrix with k under ten would itself be a reuse-gate violation. 12-line power iteration instead."
+          },
+          {
+            "name": "krippendorff / statsmodels inter-rater agreement (alpha, Fleiss kappa)",
+            "truth_status": "Verified",
+            "probe": "probed: these measure inter-rater RELIABILITY, which is a different quantity. arXiv:2605.29800 section 3.3 rejects kappa explicitly -- it 'conflates prevalence with dependence; phi isolates the linear dependence that directly degrades majority-vote performance'. Using a kappa library would compute the wrong number."
+          }
+        ],
+        "verdict": "adopt",
+        "irreducible_delta": "The published method builds binary vectors from errors against gold labels. This project has no gold labels, so the item set is the union of findings raised and the vectors are 'did you raise this'. That measures redundancy, not accuracy, and the deviation is stated in the module docstring and the protocol doc so the number is never cited as the paper's own result."
+      }
+    },
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
     },
