@@ -121,7 +121,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -211,6 +211,31 @@ EMBED_PROBE_TIMEOUT_SECONDS = 5
 # answers. 0.75 = "saying basically the same thing"; 0.85 = "near-paraphrase."
 CLUSTER_SIMILARITY_THRESHOLD = 0.75
 
+# Measured 2026-08-25 across all six syntheses in .agent-surface/reasoning/ensemble:
+# the LOWEST off-diagonal cosine similarity in the entire corpus is 0.791, and the
+# median run sits between 0.86 and 0.94. Every pair, in every run -- including four
+# prompts explicitly written to elicit disagreement, one of which said "Attack it.
+# Do not summarize or agree" -- is above 0.75. All six runs therefore reported
+# largest_cluster_fraction = 1.0 with an empty minority set.
+#
+# That is not six unanimous panels. It is one metric with no discriminative power.
+# Whole-response cosine similarity over long-form model prose is dominated by
+# topic, vocabulary and register, not by position: six models asked the same
+# question about the same repository name the same files in the same voice, and
+# land at ~0.9 regardless of whether they agree. Raising the threshold does not
+# fix this -- at 0.79 it still separates nothing, and by 0.90 it is splitting on
+# writing style rather than on claims.
+#
+# The threshold is left where it is on purpose. It is not the defect, and moving
+# it would hide the defect behind a number that looks tuned. Instead
+# separation_diagnostics() below detects when the clustering could not have
+# separated anything and refuses to report the result as consensus.
+SIMILARITY_FLOOR_OBSERVED = 0.791
+
+# Marker emitted when every pair sits above the clustering threshold, so a
+# single cluster was the only reachable outcome.
+CONSENSUS_NOT_MEASURED = "E_CONSENSUS_NOT_MEASURED"
+
 # Coherence threshold for the anti-sycophancy override (v0.2 §12.5).
 # A single-voter dissent is only surfaced verbatim if its response_length and
 # internal_coherence_proxy meet a minimum bar. Otherwise logged but not surfaced.
@@ -260,6 +285,15 @@ class TierClassification:
     largest_cluster_fraction: float
     minority_coherent_voters: list[str]  # voter_ids of small but coherent dissenters
     similarity_matrix: list[list[float]]  # N×N for log/debug
+    # Whether the clustering could have produced more than one cluster at all.
+    # False means the tier is an artifact of the metric, not a finding about the
+    # voters. Defaulted so existing constructors keep working; every real path
+    # sets it explicitly.
+    separation: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def consensus_was_measurable(self) -> bool:
+        return bool(self.separation.get("discriminative", True))
 
 
 @dataclass
@@ -544,6 +578,75 @@ def greedy_cluster(
     return assignments
 
 
+def separation_diagnostics(
+    similarity: list[list[float]], threshold: float
+) -> dict[str, object]:
+    """Report whether the clustering could have separated anything at all.
+
+    A cluster assignment only carries information if the similarity values
+    actually straddle the threshold. If every off-diagonal pair is above it, a
+    single cluster was the only reachable outcome and ``tier1`` says nothing
+    about whether the voters agreed -- it says the metric never looked.
+
+    That is not hypothetical. Every synthesis this repository has produced to
+    date reports ``largest_cluster_fraction = 1.0`` with an empty minority set,
+    including four prompts written specifically to provoke dissent. The measured
+    floor across the whole corpus is 0.791 against a 0.75 threshold.
+
+    Returns a dict rather than a bool so the numbers travel with the verdict and
+    a future calibration argument can be made from data instead of from memory.
+    """
+
+    off_diagonal = [
+        similarity[i][j]
+        for i in range(len(similarity))
+        for j in range(len(similarity))
+        if i != j
+    ]
+    scored = [value for value in off_diagonal if value > 0.0]
+    if not scored:
+        return {
+            "discriminative": False,
+            "reason": "no scored pairs (missing embeddings)",
+            "pair_count": 0,
+            "threshold": threshold,
+        }
+
+    low = min(scored)
+    high = max(scored)
+    below = sum(1 for value in scored if value < threshold)
+    # Discriminative means the threshold actually falls inside the observed
+    # spread. If it sits below the floor, no pair could ever have been split;
+    # if it sits above the ceiling, every voter would be its own cluster and
+    # "dissent" would be equally meaningless.
+    discriminative = low < threshold <= high
+
+    diagnostics: dict[str, object] = {
+        "discriminative": discriminative,
+        "pair_count": len(scored),
+        "threshold": threshold,
+        "min": round(low, 4),
+        "max": round(high, 4),
+        "mean": round(sum(scored) / len(scored), 4),
+        "pairs_below_threshold": below,
+    }
+    if not discriminative:
+        if low >= threshold:
+            diagnostics["reason"] = (
+                f"{CONSENSUS_NOT_MEASURED}: every one of {len(scored)} pairs "
+                f"scored >= {threshold} (floor {low:.3f}); a single cluster was "
+                f"the only reachable outcome, so the tier reflects the metric "
+                f"and not the voters"
+            )
+        else:
+            diagnostics["reason"] = (
+                f"{CONSENSUS_NOT_MEASURED}: every one of {len(scored)} pairs "
+                f"scored < {threshold} (ceiling {high:.3f}); every voter is its "
+                f"own cluster, so dissent is equally unmeasured"
+            )
+    return diagnostics
+
+
 def classify_tier(
     responses: list[VoterResponse],
     similarity: list[list[float]],
@@ -595,6 +698,7 @@ def classify_tier(
         largest_cluster_fraction=round(largest_fraction, 3),
         minority_coherent_voters=minority_coherent_voters,
         similarity_matrix=[[round(v, 3) for v in row] for row in similarity],
+        separation=separation_diagnostics(similarity, CLUSTER_SIMILARITY_THRESHOLD),
     )
 
 
@@ -629,22 +733,61 @@ def write_synthesis(
         f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
         f"({100 * tier_class.largest_cluster_fraction:.0f}%)"
     )
+    if not tier_class.consensus_was_measurable:
+        # Say this above the fold, before any number that looks like agreement.
+        # A reader who takes "6/6, 100%" at face value and cites it as
+        # multi-model corroboration is making a claim the measurement does not
+        # support, and the measurement is the only thing that knows that.
+        separation = tier_class.separation
+        lines.append("")
+        lines.append("> **This run did not measure consensus.**")
+        lines.append(">")
+        lines.append(f"> {separation.get('reason', CONSENSUS_NOT_MEASURED)}")
+        lines.append(">")
+        lines.append(
+            f"> Observed pairwise similarity: min {separation.get('min')}, "
+            f"mean {separation.get('mean')}, max {separation.get('max')} "
+            f"across {separation.get('pair_count')} pairs, threshold "
+            f"{separation.get('threshold')}. "
+            f"{separation.get('pairs_below_threshold')} pairs fell below it."
+        )
+        lines.append(">")
+        lines.append(
+            "> Treat the cluster numbers above as diagnostics of the metric, not "
+            "as agreement between voters. Do not cite this run as corroboration."
+        )
     lines.append("")
 
     if tier_class.tier == "tier1":
-        lines.append("## Unanimous consensus")
+        if tier_class.consensus_was_measurable:
+            lines.append("## Unanimous consensus")
+        else:
+            lines.append("## Single cluster — consensus not established")
         lines.append("")
-        # Pick the most coherent / longest response from the cluster as the synthesis
+        # The "synthesis" of a single cluster is one voter's verbatim text,
+        # selected by character count. That is worth stating plainly rather than
+        # letting the word "synthesis" imply that anything was combined.
         rep = max(
             (voter_by_id[v] for v in largest_cluster_voters),
             key=lambda r: len(r.response),
         )
         lines.append(f"> {rep.response}")
         lines.append("")
-        lines.append(
-            f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
-            f"All {len(responses)} voters converged.)_"
-        )
+        if tier_class.consensus_was_measurable:
+            lines.append(
+                f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
+                f"All {len(responses)} voters converged.)_"
+            )
+        else:
+            lines.append(
+                f"_(Text above is the verbatim response of {rep.voter_id} / "
+                f"{rep.family} family, selected as the longest of "
+                f"{len(responses)}. Nothing was combined, and the clustering "
+                f"could not have placed any voter elsewhere. The other "
+                f"{len(responses) - 1} responses are preserved in "
+                f"`voter_responses[]` and are the only place a disagreement, if "
+                f"there was one, still exists.)_"
+            )
 
     elif tier_class.tier == "tier2":
         lines.append("## Majority consensus (with named dissent)")
@@ -760,6 +903,15 @@ def synthesize(
                 largest_cluster_fraction=1.0,
                 minority_coherent_voters=[],
                 similarity_matrix=[],
+                separation={
+                    "discriminative": False,
+                    "reason": (
+                        f"{CONSENSUS_NOT_MEASURED}: degraded run, "
+                        f"{len(embedded)}/{len(responses)} voters embedded"
+                    ),
+                    "pair_count": 0,
+                    "threshold": CLUSTER_SIMILARITY_THRESHOLD,
+                },
             ),
             final_synthesis=(
                 f"# Ensemble synthesis — DEGRADED\n\n"
@@ -814,6 +966,7 @@ def synthesize(
                         "largest_cluster_fraction": tier_class.largest_cluster_fraction,
                         "minority_coherent_voters": tier_class.minority_coherent_voters,
                         "similarity_matrix": tier_class.similarity_matrix,
+                        "separation": tier_class.separation,
                         "voter_responses": [asdict(r) for r in responses],
                         "final_synthesis": final,
                     },
