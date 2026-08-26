@@ -340,6 +340,44 @@ like a solved problem, search first and record what was found - including "nothi
 fits", which is a finding and not a formality. A gate that only inspects artifacts
 will always catch the file and miss the choice.
 
+### CF-8 - Evidence that only works for the author
+
+Two instances, one hour apart, both found by verification rather than by review.
+
+**The path.** ADR-20 cited its reuse reviewer as a file under
+`.agent-surface/reasoning/ensemble/`. That path was unresolvable from the repository
+twice over: `.agent-surface` sits at the workspace root, one level above FLOSS, and
+the directory is gitignored. It survived because `_reviewer_problems` -- and the
+record-resolution guard inside it -- runs only for `tier == 2`, and the entry is
+tier 1. Running the guard against the old value directly returns "does not exist";
+the gate would have caught it the moment it applied, and it never applied.
+
+**The hash.** Fixing that by copying the file into the repository produced the same
+failure one layer down. `.gitattributes` carried `*.json text eol=lf`, so the commit
+rewrote 200,104 CRLF bytes to 193,821 LF bytes while the record README published the
+CRLF sha256 as the file's integrity claim. The evidence would have failed its own
+hash in any clone. Caught only because the commit was verified rather than trusted.
+
+Both are the same defect: **evidence that works for the person who does not need
+it.** A record resolves on the author's machine; a hash verifies on the author's
+machine; neither does anything for the auditor, who is the only reader that matters.
+
+**Rules.**
+
+- After publishing a hash for a tracked file, verify the hash of the COMMITTED
+  BLOB, not the worktree file. `git cat-file -p HEAD:<path>` is the artifact a
+  reader receives.
+- Mark anything whose bytes ARE the claim as `-text`. Line-ending normalization is
+  a content transform applied by default to everything the repository calls text --
+  correct for source, silently wrong for signed material, hashed evidence, and
+  fixtures pinned by digest. It is invisible in a diff and sits underneath every
+  integrity claim in the repository.
+- **A tier-1 reuse block is recorded but not validated.** Any evidence claim living
+  in one is unchecked prose until the entry is promoted. Widening tier-1
+  enforcement was deliberately NOT done as part of this fix: tightening a validator
+  against existing history without first enumerating what breaks is the b0de2fe
+  mistake, and this register already carries it as CF-1.
+
 ---
 
 ## 4. Insights worth keeping
