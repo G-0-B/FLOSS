@@ -269,7 +269,7 @@ Questions 3 and 5 were settled by the audit below and are marked accordingly.
 Run through the reasoning-ensemble MCP in forced `ensemble` mode against the five
 open questions above, with the prompt instructing voters to attack the ADR rather
 than summarize it. Draft:
-`.agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json`.
+`docs/reviews/2026-08-24-adr20-adversarial-audit/synthesis.json`.
 
 Six voters across five provider surfaces and six model families, satisfying the
 ≥3-surface / ≥4-family diversity policy: `groq/openai/gpt-oss-120b`,
@@ -548,7 +548,7 @@ never existed.
 
 This ADR recorded Q1 as **"4 System, 1 Substrate, 1 no-answer"** with
 `groq/openai/gpt-oss-120b` as "the lone dissenter." Re-read against
-`.agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json`:
+`docs/reviews/2026-08-24-adr20-adversarial-audit/synthesis.json`:
 
 | Voter | What its text actually says |
 |---|---|

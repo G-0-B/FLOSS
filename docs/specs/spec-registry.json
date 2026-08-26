@@ -117,7 +117,23 @@
         "rejected_because": [
           "in-toto/sigstore: dependency weight disproportionate to a constant-drift plus scope-mismatch defect (Specified)"
         ],
-        "reviewer": "adversarial ensemble audit 2026-08-23, 6 voters / 5 provider surfaces / 6 model families; synthesis .agent-surface/reasoning/ensemble/20260824T023542Z_97e6b32c78072e8b_synthesis.json. Not a consensus-gate decision.",
+        "reviewer": {
+          "surfaces": [
+            "huggingface",
+            "mistral",
+            "nvidia",
+            "openrouter"
+          ],
+          "families": [
+            "deepseek",
+            "mistral",
+            "llama",
+            "gpt"
+          ],
+          "record": "docs/reviews/2026-08-24-adr20-adversarial-audit/synthesis.json",
+          "outcome": "ADVERSARIAL AUDIT, NOT A CONSENSUS-GATE DECISION. Overturned the proposed D-B2 in favour of D-B3 and forced the blast-radius reclassification System -> Substrate. The synthesis file's own tier1 / 100% / 'unanimous' labels are FALSE and must not be cited; see the review README and ADR-20 'Correction to the Q1 tally (2026-08-26)'. 2 of the 6 dispatched voters produced no position and are excluded from the surfaces and families above.",
+          "date": "2026-08-24"
+        },
         "expiry_or_retest_date": "2026-12-21"
       }
     },
