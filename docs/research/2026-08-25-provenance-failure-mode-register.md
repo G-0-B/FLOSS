@@ -315,6 +315,31 @@ audits the decision against.
 especially when the premise is a resemblance between two things that solve the same
 problem. Record the reason that actually holds, not the one that motivated the ask.
 
+### CF-7 - A reuse gate that fires at registration, not at design
+
+This repository has an ADR-18 prior-art gate: adopt before extend before compose
+before build, with tier-2 work requiring an independent review. During this session
+that gate was hardened four times - malformed tiers stopped exempting entries,
+non-boolean `emergency` stopped waiving the reuse block, future dates stopped
+passing as evidence.
+
+In the same session, with the ensemble's clustering defect measured, the response
+was to start designing a replacement from scratch: per-question ballots, an
+admission gate, a dissent-preserving tally. No prior-art search was run. The gate
+did not fire, and it could not have: `spec_gate --check` inspects the registry when
+a file is registered, which is long after the design decision is made.
+
+The search, run afterwards, found an active literature that changes the design and
+contains two results that contradict beliefs this repository operates on - that
+model-family diversity buys independence, and that a panel is better than its best
+member. See `2026-08-26-ensemble-aggregation-prior-art.md`.
+
+**Rule:** the reuse question belongs at the moment a design starts, not at the
+moment an artifact is registered. Before writing a design for anything that sounds
+like a solved problem, search first and record what was found - including "nothing
+fits", which is a finding and not a formality. A gate that only inspects artifacts
+will always catch the file and miss the choice.
+
 ---
 
 ## 4. Insights worth keeping
@@ -343,6 +368,10 @@ problem. Record the reason that actually holds, not the one that motivated the a
 9. **Verify the premise, not just the plan.** The most expensive kind of correct work
    is work that is correct against a false premise, and the premise is the one part
    nobody re-reads once implementation starts.
+10. **A diagnostic nobody publishes is a diagnostic you invented.** Before shipping
+    a bespoke metric, check what the field reports for the same property. The
+    hand-rolled similarity-floor check found a real defect; `n_eff` and the
+    co-failure rate are what a reader can compare against somebody else's number.
 
 ---
 
