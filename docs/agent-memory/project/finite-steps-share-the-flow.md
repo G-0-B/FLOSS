@@ -1,0 +1,19 @@
+# Finite steps, shared flow
+
+**Date:** 2026-08-26
+**Status:** ⚠️ Specified (operator insight this session; not a new ADR)
+**Canon already:** Kernel §9 UpgradableArtifact + `friction_tier` (low docs / medium CI / high identity-consent). Personal-meta-harness: same six harnesses at operator scale.
+
+## Insight
+
+Work that stays in one chat is a raindrop. Work written as intent / method / expect / actual is a step another being can stand on. Enough shared steps, the individual increment can approach zero and still move the whole.
+
+Do not restart the cosmos each session. Upgrade the artifact. Resistance matches blast radius.
+
+## This session's application
+
+Computer-use lease router is a finite step. Daemon lifecycle belongs in existing `start_mcp_daemons.ps1` / materializer iteration, not a Grok-owned process. Local-model organizer is the next intended step. Consensus/provenance repair is in-flight elsewhere — do not pile on.
+
+## Do not
+
+New philosophy doc. New orchestrator. New start-script fork. Encode into the surfaces that already exist.
