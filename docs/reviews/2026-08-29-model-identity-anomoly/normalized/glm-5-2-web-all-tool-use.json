@@ -1,0 +1,131 @@
+{
+ "reviewer": {
+  "model_selected": "glm-5-2-web-all-tool-use",
+  "harness": "glm",
+  "model_vendor_states": null,
+  "model_self_reported": "glm-5-2",
+  "self_reported_harness": "vibe-work (run_typescript + github_app + web_search)",
+  "tools_used": [
+   "github",
+   "web",
+   "execution",
+   "none"
+  ],
+  "saw_prior_reviews": false
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "claim": "The spec's core publication argument is broken: GitHub removed the payload.commits field (carrying commit messages) from PushEvent payloads on October 7, 2025, ten months before the anchor was published, so the full root no longer reaches third-party mirrors via the events firehose.",
+   "severity": "critical",
+   "location": "scripts/provenance_anchor.py docstring (lines 13-14); docs/specs/provenance-anchor.spec.md lines 126-132 (Publish section)",
+   "evidence": [
+    "scripts/provenance_anchor.py docstring: 'a public repository emits PushEvent and CreateEvent into GitHub's public events firehose, and those events carry ref names and commit message text to mirrors with no write path back.'",
+    "docs/specs/provenance-anchor.spec.md Publish section: 'Putting the root in the ref name and message rather than only in file contents is what gets it into that retained record.'",
+    "GitHub Changelog 2025-08-08 (https://github.blog/changelog/2025-08-08-upcoming-changes-to-github-events-api-payloads/): 'Push events: Removing commit summaries and counts that require slow external calls.' Implemented October 7, 2025.",
+    "GitHub Community Discussion #177111 (https://github.com/orgs/community/discussions/177111): 'Today I noticed that as a result of the 2025-10-07 changes to Event API, the payload.commits field was removed on PushEvents.'",
+    "Genesis anchor commit fbaae97 dated 2026-08-26T08:28:56Z — after the Oct 2025 API change. Commit message: 'chore(anchor): provenance merkle root E3Ehni4XGXL3Zku90BaAfB_HyCOGR4x_cZVCDGTUlYi0 [packets=257 identities=99 prev=genesis]'",
+    "CreateEvent payload (GitHub docs, https://docs.github.com/en/rest/activity/events) includes only ref and ref_type for tag creation — no commit message field exists in CreateEvent."
+   ],
+   "falsifier": "Demonstrate that a PushEvent or CreateEvent emitted after October 7, 2025 for a public repository still includes the commit message text in its payload. If the commits array or a message field is present in a post-2025-10-07 event payload, this finding is wrong.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F2",
+   "claim": "ANCHOR_STALE masks interior packet deletion when accompanied by net growth: the verify logic uses len(leaves) > packet_count as a proxy for 'nothing anchored has gone' but does not check whether the current leaf set is a superset of the anchored leaf set.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py, verify_anchor function, the ANCHOR_STALE branch",
+   "evidence": [
+    "anchor.py verify_anchor: 'elif len(leaves) > (anchor.get(\"packet_count\") or 0): # Growth only, nothing anchored has gone. The common case between runs. result[\"status\"] = ANCHOR_STALE'",
+    "docs/specs/provenance-anchor.spec.md Outcomes table: '| ANCHOR_STALE | 1 | Store is a strict superset; nothing anchored has gone. |'",
+    "The code checks vanished identities, head regressions, and missing head SAIDs — but never checks whether interior (non-head) anchored leaves are still present. An operator who deletes an interior packet from identity A and adds 2 new packets for identity B produces net growth (len(leaves) > packet_count), yielding ANCHOR_STALE despite an anchored packet being gone.",
+    "The spec defines ANCHOR_MISMATCH for 'Root differs with no head loss — an interior packet changed or went.' But this status is only reached when len(leaves) <= packet_count. Interior deletion + net growth bypasses it.",
+    "No test covers interior deletion with concurrent growth. test_interior_deletion_is_reported_without_claiming_truncation (test_anchor.py) only tests interior deletion without growth.",
+    "The existing provenance.py sequence-gap validator would catch the interior deletion independently, but verify_anchor in isolation reports a misleading status."
+   ],
+   "falsifier": "Show a test where interior deletion + net growth produces a status other than ANCHOR_STALE, or show that the code performs a superset check that I missed.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F3",
+   "claim": "OpenTimestamps was not surveyed in the prior-art review despite being the cheapest mechanism that is externally witnessed by construction: it stamps a hash to the Bitcoin blockchain via calendar servers, requiring one HTTP POST and one pip dependency, with verification requiring only block headers.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md Composition section (lists Rekor, SCITT, Holochain as future witnesses; OpenTimestamps absent); Author's reasoning block ('Building a small Merkle commitment on existing dependencies was preferred to adopting a transparency-log service because it adds no dependency and no network egress')",
+   "evidence": [
+    "The prior-art survey covered 'Sigstore Rekor, SCITT, Trillian/certificate transparency, signed git tags, and Holochain' (from the artifact description). OpenTimestamps is not listed.",
+    "docs/specs/provenance-anchor.spec.md Composition section mentions Rekor, SCITT, and Holochain as future witness kinds. OpenTimestamps is absent.",
+    "ADR-18 (docs/adr/ADR-18-prior-art-reuse-gate.md): 'adopt is default; burden of proof increases rightward' and 'compose/build verdicts require >=1 direct probe; unprobed incompatibility claims cannot justify build.'",
+    "OpenTimestamps (https://en.wikipedia.org/wiki/OpenTimestamps): 'ots stamp hello.txt' submits a SHA-256 hash to calendar servers which aggregate into Bitcoin transactions. 'ots verify hello.txt.ots' verifies against the Bitcoin blockchain. No trusted third party. The operator cannot rewrite Bitcoin history.",
+    "The artifact's argument against transparency-log services was 'adds no dependency and no network egress.' OpenTimestamps adds one pip dependency (opentimestamps-client) and one network request. The Merkle tree construction can remain custom-built; OpenTimestamps would only replace the publication/witnessing mechanism, moving third-party retention from Specified to Verified by construction.",
+    "What would be lost by adopting OpenTimestamps for witnessing: nothing functionally. The custom Merkle root would still be computed the same way. OpenTimestamps would stamp the root (or the anchor file hash) to Bitcoin, providing a stronger external witness than a git tag name in an events firehose."
+   ],
+   "falsifier": "Show that OpenTimestamps was considered and rejected with a documented reason, or show that OpenTimestamps cannot stamp a BLAKE3 hash (it uses SHA-256, but the root can be re-hashed to SHA-256 before stamping).",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F4",
+   "claim": "The spec describes a 4-step verification process but the implementation only performs steps 1 and 3. Step 2 (walk prev_root backwards and confirm the series is unbroken) is not implemented in verify_anchor or the CLI verify command, and this gap is not acknowledged in the Limits section.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md Verify section (steps 1-4); packages/activity_log/anchor.py verify_anchor function; scripts/provenance_anchor.py _verify function",
+   "evidence": [
+    "docs/specs/provenance-anchor.spec.md Verify section: '1. Verify sig against the pinned key. 2. Walk prev_root backwards and confirm the series is unbroken. 3. Independently recompute the root from whatever packet set they hold. 4. Cross-check the root against the tag name, the commit message, and — the load-bearing step — a third-party mirror of the event stream.'",
+    "anchor.py verify_anchor: checks signature (step 1), recomputes root (step 3). Does NOT walk prev_root. Does NOT check any third-party mirror.",
+    "scripts/provenance_anchor.py _verify: 'stored = anchor_lib.load_anchor(args.anchor); result = anchor_lib.verify_anchor(args.provenance_root, stored, expected_signer=args.expect_signer); print(json.dumps(result, indent=2, ensure_ascii=False)[: args.max_output])' — loads one anchor, verifies, prints. No chain walking.",
+    "The anchor stores prev_root and prev_generated_at, and build_anchor chains them, but verify_anchor never reads prev_root. An operator can drop intermediate anchors from git history and the verify command will not detect the broken chain.",
+    "Step 4 (third-party mirror) is acknowledged as Specified not Verified in weakness #8. Step 2 (chain walking) is NOT acknowledged anywhere — not in the 8 accepted weaknesses, not in the Limits section."
+   ],
+   "falsifier": "Show that verify_anchor or the CLI _verify function walks the prev_root chain, or show documentation acknowledging that chain-walking is not implemented.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F5",
+   "claim": "GitHub reduced Events API retention from 90 days to 30 days on January 30, 2025, narrowing the window for third-party mirrors to ingest events. This specific operational constraint is not stated in the spec's Limits section.",
+   "severity": "minor",
+   "location": "docs/specs/provenance-anchor.spec.md Limits section (weakness 4: 'Repository deletion defeats the ref')",
+   "evidence": [
+    "GitHub Changelog (https://github.blog/changelog/2024-11-08-upcoming-changes-to-data-retention-for-events-api-atom-feed-timeline-and-dashboard-feed-features/): 'On January 30, 2025, we will be modifying the window of data retention for these features from 90 days to 30 days.'",
+    "GitHub Community Discussion #141827 (https://github.com/orgs/community/discussions/141827): 'Events older than 90 days will not be included.'",
+    "docs/specs/provenance-anchor.spec.md Limits: 'Repository deletion defeats the ref. Deleting or privating the repository removes the anchor; only already-ingested firehose records survive.' This acknowledges that ingestion must happen but does not specify the 30-day window.",
+    "GH Archive (https://www.gharchive.org/) ingests hourly into BigQuery, which mitigates this for verifiers using BigQuery, but the spec does not name GH Archive and weakness #8 states 'no mirror has been confirmed to have indexed this repository.'"
+   ],
+   "falsifier": "Show that the spec or its Limits section explicitly states the 30-day (or any specific) retention window for GitHub's Events API.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F6",
+   "claim": "The anchor version field ('v': 'flossi-anchor-1') is not checked at verify time, so an anchor with a different or future version is verified identically as long as the signature is valid.",
+   "severity": "minor",
+   "location": "packages/activity_log/anchor.py, verify_anchor and anchor_signature_problem functions",
+   "evidence": [
+    "anchor.py: ANCHOR_VERSION = 'flossi-anchor-1' is set but verify_anchor never reads anchor.get('v').",
+    "anchor_signature_problem checks signer prefix, signature prefix, and expected_signer pinning, but not the version field.",
+    "If a future version changes the leaf preimage format or tree construction, an old verifier would compute a different root and report ANCHOR_MISMATCH — so this is not a silent vulnerability, but it means the version field is decorative rather than functional."
+   ],
+   "falsifier": "Show that verify_anchor or anchor_signature_problem checks the 'v' field against ANCHOR_VERSION.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F7",
+   "claim": "Test name test_the_root_is_independent_of_enumeration_order is misleading: the test asserts forward != backward, proving the root IS order-dependent, and verifies that sorting makes it deterministic — the opposite of what the name says.",
+   "severity": "nit",
+   "location": "packages/activity_log/tests/test_anchor.py, test_the_root_is_independent_of_enumeration_order",
+   "evidence": [
+    "test_anchor.py: 'assert forward != backward, (\"sanity: _root_of is order-sensitive, which is why scan_packets sorts\")' — this asserts the root IS order-dependent (forward != backward).",
+    "The test then asserts 'assert anchor_lib._root_of(again) == forward' which verifies that scan_packets' sort produces determinism.",
+    "The test name 'test_the_root_is_independent_of_enumeration_order' implies the root is order-independent, which the assertion contradicts. The root is made deterministic by sorting, not independent of order."
+   ],
+   "falsifier": "Show that the test name is consistent with its assertions under a reasonable reading.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  }
+ ],
+ "refutations": [],
+ "predicted_majority": "Other reviewers will likely accept the author's reasoning, find the ANCHOR_STALE false negative (F2) from reading the code, note the OpenTimestamps/Rekor ladder gap (F3) from the prior-art question, and conclude the artifact is sound-in-principle with stated limits. Most will accept the publication mechanism at face value without discovering the October 2025 API change that breaks it. The overall conclusion will be 'build verdict justified as emergency, promote to adopt OpenTimestamps or Rekor for witnessing.'",
+ "where_you_expect_to_be_alone": "F1 — the discovery that GitHub removed payload.commits from PushEvent on October 7, 2025, which invalidates the spec's claim that commit message text reaches third-party mirrors via the events firehose. This requires specific external retrieval about a GitHub API change that post-dates most training data and that the author did not catch despite writing the spec after the change took effect."
+}

@@ -1,0 +1,67 @@
+[
+ {
+  "file": "antigravity-gemini-3-1-pro-no-tools.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 4
+ },
+ {
+  "file": "deepseek-web-no-tools.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 6
+ },
+ {
+  "file": "gemini-3-1-pro-web-search-no-github-mcp.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 6
+ },
+ {
+  "file": "glm-5-2-web-all-tool-use.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 7
+ },
+ {
+  "file": "grok-4-6-thinking-all-tools-github-mcp.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 11
+ },
+ {
+  "file": "meta-muse-spark-1-1-web-search-no-github-mcp.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 8
+ },
+ {
+  "file": "perplexity-gemini-3-7-thinking-all-tools.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 9
+ },
+ {
+  "file": "perplexity-gpt-5-6-terra-thinking-web-search-no-github-mcp.json",
+  "status": "repaired",
+  "repair": "removed 3 harness-injected `[github](url)` citations appended after closing string quotes; array separators preserved; no character inside any string value altered",
+  "findings": 3
+ },
+ {
+  "file": "perplexity-grok-4-6-thinking-all-tools-github-mcp.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 8
+ },
+ {
+  "file": "pioneer-gpt-5-6-sol-api-no-tools.json",
+  "status": "PARSE_FAILED_NOT_REPAIRED",
+  "reason": "unescaped quotes INSIDE string values; repairing would rewrite evidence content, not remove contamination"
+ },
+ {
+  "file": "unsure-sonnet-3-5-no-tools.json",
+  "status": "clean",
+  "repair": null,
+  "findings": 6
+ }
+]

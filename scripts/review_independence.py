@@ -52,8 +52,20 @@ from typing import Any
 CAUTION_RATIO = 0.5  # arXiv:2605.29800's recommended threshold
 
 
+class NotAReview(ValueError):
+    """The file is valid JSON but is not a reviewer output."""
+
+
 def load_review(path: Path) -> dict[str, Any]:
     document = json.loads(path.read_text(encoding="utf-8"))
+    # A directory of reviews also holds manifests, merge maps and adjudications.
+    # Crashing on the first one that is not a review makes a glob unusable and
+    # tells the caller nothing about which file was wrong.
+    if not isinstance(document, dict) or "reviewer" not in document:
+        raise NotAReview(
+            f"no `reviewer` object (top level is "
+            f"{type(document).__name__}); not a reviewer output"
+        )
     reviewer = document.get("reviewer") or {}
     # Labelled by SELECTED model and harness. Never by the self-reported name:
     # a model has no introspective access to its own deployment identity, so
@@ -137,11 +149,23 @@ def kish_neff(vectors: list[list[int]]) -> tuple[float, float, int]:
     if not values:
         return float("nan"), float("nan"), 0
     mean_phi = sum(values) / len(values)
+    if mean_phi <= 0:
+        # Kish assumes non-negative mean correlation. Below zero the formula
+        # still returns a finite number and that number is garbage: on the
+        # first real corpus, phi_bar = -0.096 with k = 10 produced
+        # n_eff = 71.33 and an "independence ratio" of 713%, printed as if it
+        # were a result.
+        #
+        # A negative mean here almost never means the reviewers are genuinely
+        # anti-correlated. It means the finding sets are near-disjoint, which
+        # makes the binary vectors anti-correlated by construction -- and
+        # near-disjoint sets are what a naive text matcher produces when
+        # reviewers word the same defect differently. The matcher is the
+        # suspect, not the panel.
+        return float("nan"), mean_phi, len(values)
     denominator = 1 + (k - 1) * mean_phi
     if denominator <= 0:
-        # Strong negative mean correlation. n_eff is not defined here; the panel
-        # is anti-correlated, which is a finding in itself, not a bigger panel.
-        return float("inf"), mean_phi, len(values)
+        return float("nan"), mean_phi, len(values)
     return k / denominator, mean_phi, len(values)
 
 
@@ -214,6 +238,12 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
         return 2
 
     n_eff, mean_phi, pairs = kish_neff(vectors)
+    # How much of the finding set was raised by more than one reviewer. If this
+    # is near zero the overlap matrix carries no signal and nothing downstream
+    # of it means anything, whatever the arithmetic produces.
+    overlap_counts = [sum(v[i] for v in vectors) for i in range(len(keys))]
+    shared_findings = sum(1 for c in overlap_counts if c > 1)
+    overlap_rate = shared_findings / len(keys) if keys else 0.0
     correlation = [
         [1.0 if i == j else (0.0 if math.isnan(phi(vectors[i], vectors[j]))
                              else phi(vectors[i], vectors[j]))
@@ -227,16 +257,45 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
     print(f"Distinct findings:    {len(keys)}")
     print(f"Comparable pairs:     {pairs} of {k * (k - 1) // 2}")
     print(f"Mean pairwise phi:    {mean_phi:.3f}")
-    print(f"n_eff (Kish):         {n_eff:.2f}")
-    print(f"n_eff (eigenvalue):   {eigen_neff:.2f}")
-    ratio = n_eff / k if k else float("nan")
-    print(f"Independence ratio:   {ratio:.1%}")
-    if ratio < CAUTION_RATIO:
+    print(
+        f"Findings raised by >1: {shared_findings} of {len(keys)} "
+        f"({overlap_rate:.0%})"
+    )
+
+    if math.isnan(n_eff):
+        print()
+        print("n_eff:                REFUSED — not computable on this input")
         print(
-            f"  ^ below the {CAUTION_RATIO:.0%} caution threshold "
-            f"(arXiv:2605.29800): you paid for {k} perspectives and received "
-            f"about {n_eff:.1f}."
+            f"  Mean pairwise phi is {mean_phi:+.3f}. Kish assumes a "
+            f"non-negative mean; below zero the formula returns a finite "
+            f"number that is meaningless."
         )
+        print(
+            f"  Almost certainly the MATCHER, not the panel: only "
+            f"{overlap_rate:.0%} of findings were raised by more than one "
+            f"reviewer, and near-disjoint sets are anti-correlated by "
+            f"construction. Reviewers word the same defect differently."
+        )
+        print("  Do a human merge pass and re-run with --merge.")
+        REFUSED = True
+    else:
+        REFUSED = False
+        print(f"n_eff (Kish):         {n_eff:.2f}")
+        print(f"n_eff (eigenvalue):   {eigen_neff:.2f}")
+        ratio = n_eff / k if k else float("nan")
+        print(f"Independence ratio:   {ratio:.1%}")
+        if overlap_rate < 0.25:
+            print(
+                f"  ^ TREAT AS UNRELIABLE: only {overlap_rate:.0%} of findings "
+                f"were raised by more than one reviewer, so the overlap matrix "
+                f"is mostly zeros and n_eff is dominated by matching failures."
+            )
+        elif ratio < CAUTION_RATIO:
+            print(
+                f"  ^ below the {CAUTION_RATIO:.0%} caution threshold "
+                f"(arXiv:2605.29800): you paid for {k} perspectives and "
+                f"received about {n_eff:.1f}."
+            )
     print()
 
     print("Per reviewer:")
@@ -362,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
     for path in args.reviews:
         try:
             reviews.append(load_review(path))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError, NotAReview) as exc:
             print(f"skipping {path}: {exc}", file=sys.stderr)
     if not reviews:
         print("no readable reviews", file=sys.stderr)
