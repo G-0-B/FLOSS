@@ -6,8 +6,24 @@ import asyncio
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
-from a2a.helpers import get_stream_response_text, new_text_message
+from a2a.helpers import get_artifact_text, get_message_text, new_text_message
 from a2a.types import Role, SendMessageRequest
+
+
+def _reply_text_from_chunk(chunk) -> str | None:
+    """Extract agent reply text; ignore status-update chatter."""
+    kind = chunk.WhichOneof("payload")
+    if kind == "task":
+        parts = [get_artifact_text(a) for a in chunk.task.artifacts]
+        joined = "\n".join(p for p in parts if p)
+        return joined or None
+    if kind == "artifact_update":
+        text = get_artifact_text(chunk.artifact_update.artifact)
+        return text or None
+    if kind == "message":
+        text = get_message_text(chunk.message)
+        return text or None
+    return None
 
 
 async def _send_hello_async(base_url: str, text: str) -> str:
@@ -21,18 +37,17 @@ async def _send_hello_async(base_url: str, text: str) -> str:
     try:
         message = new_text_message(text, role=Role.ROLE_USER)
         request = SendMessageRequest(message=message)
-        collected: list[str] = []
+        reply: str | None = None
         async for chunk in client.send_message(request):
-            piece = get_stream_response_text(chunk)
+            piece = _reply_text_from_chunk(chunk)
             if piece:
-                collected.append(piece)
+                reply = piece
     finally:
         await client.close()
 
-    if not collected:
-        return ""
-    # Prefer the longest non-empty piece (artifact reply over status chatter).
-    return max(collected, key=len)
+    if not reply:
+        raise RuntimeError(f"No agent reply text from {base_url}")
+    return reply
 
 
 def send_hello(base_url: str, text: str) -> str:

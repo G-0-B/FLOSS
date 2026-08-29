@@ -106,16 +106,22 @@ def serve_helloworld(host: str, port: int) -> None:
     with _serve_lock:
         if _serving.get(key):
             return
+        app = _build_app(host, port)
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="warning",
+            access_log=False,
+        )
+        config.timeout_graceful_shutdown = 0
+        server = uvicorn.Server(config)
+        # Bind before marking served so a failed build/bind never sticks the flag.
+        sock = config.bind_socket()
         _serving[key] = True
-    app = _build_app(host, port)
-    config = uvicorn.Config(
-        app,
-        host=host,
-        port=port,
-        log_level="warning",
-        access_log=False,
-    )
-    # Help sequential pytest rebinds / TIME_WAIT on the same port.
-    config.timeout_graceful_shutdown = 0
-    server = uvicorn.Server(config)
-    server.run()
+
+    try:
+        server.run(sockets=[sock])
+    finally:
+        with _serve_lock:
+            _serving.pop(key, None)
