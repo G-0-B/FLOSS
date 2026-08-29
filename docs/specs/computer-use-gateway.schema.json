@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floss://specs/computer-use-gateway.schema.json",
+  "title": "Workstation Surface Lease",
+  "description": "Lease ticket returned by the computer-use gateway acquire_lease tool.",
+  "type": "object",
+  "required": ["lease_id", "agent_id", "surface", "mode"],
+  "properties": {
+    "lease_id": { "type": "string" },
+    "agent_id": { "type": "string" },
+    "surface": { "type": "string" },
+    "mode": { "enum": ["observe-only", "exclusive"] },
+    "frozen": { "type": "boolean" }
+  }
+}

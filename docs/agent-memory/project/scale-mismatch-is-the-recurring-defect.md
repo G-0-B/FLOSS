@@ -1,3 +1,14 @@
+---
+id: project-scale-mismatch-recurring-defect
+type: project
+created: '2026-08-26'
+status: active
+applies_to:
+- any-agent
+source: grok_session
+title: Scale mismatch is the recurring defect
+---
+
 # Scale mismatch is the recurring defect
 
 **Date:** 2026-08-26

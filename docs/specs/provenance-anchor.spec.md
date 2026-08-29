@@ -4,6 +4,16 @@
 - Status: ⚠️ Specified — implementation ✅ Verified against the live store.
   **External witnessing ❌ Blocked** (2026-08-29): the commit-message carrier does
   not work and the tag carrier has never been exercised. See Publish.
+- **ADR-18 tier-2 review: PERFORMED 2026-08-29, outcome REVISION REQUIRED.**
+  9 reviewers, 68 findings. Record:
+  `docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md`.
+  Open against this spec: `G1` signer excluded from the signed bytes,
+  `G4` `ANCHOR_STALE` is a count not a subset check (reproduced),
+  `G5` the `prev_root` walk is unimplemented, `G9` key auto-mint with pinning off
+  by default, `G2` the ladder was not satisfied for witnessing, `G12` the
+  headline claim is false after a republish over a truncated store.
+  **`spec_gate --check` passes on this entry. That is the gate reporting that a
+  review happened, not that it approved.**
 - Implementation: `packages/activity_log/anchor.py`, `scripts/provenance_anchor.py`
 - Tests: `packages/activity_log/tests/test_anchor.py`
 - Supersedes nothing. Complements `docs/specs/provenance-packet.spec.md`.

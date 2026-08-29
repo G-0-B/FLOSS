@@ -378,6 +378,38 @@ machine; neither does anything for the auditor, who is the only reader that matt
   against existing history without first enumerating what breaks is the b0de2fe
   mistake, and this register already carries it as CF-1.
 
+### CF-9 - A gate that checks a review happened, not what it concluded
+
+The provenance anchor's ADR-18 tier-2 reuse review was performed on 2026-08-29 by
+9 distinct reviewers across 7 surfaces. Its outcome was REVISION REQUIRED: four
+confirmed defects, two of them reproduced, plus a six-reviewer finding that the
+ladder was not satisfied and a two-reviewer finding that the artifact's headline
+claim is false.
+
+Filling in the reuse block with that review makes `spec_gate --check` go green.
+
+`_reviewer_problems` requires `surfaces`, `families`, `record`, `outcome` and
+`date`; it checks that `outcome` is a non-empty string and never reads it. A
+review that approved and a review that demanded revision are indistinguishable to
+the gate. The `verdict` field is the ladder rung, not the outcome, so nothing in
+the registry carries whether the review passed.
+
+That is not a bug in the sense that the gate does what it says -- ADR-18 requires
+an independent review to have occurred, and one did. It is a bug in what a green
+gate *communicates*, which is the only thing a gate is for.
+
+**Not fixed here, deliberately.** Teaching the gate an outcome vocabulary means
+inventing one and enforcing it against every existing entry, which is the CF-1
+mistake -- tightening a validator against existing history without enumerating
+what breaks. Recorded as a proposal: a recognised negative outcome should emit a
+warning, additive and fail-open, so a green run still says "reviewed, revision
+outstanding" out loud.
+
+**Rule:** when a gate passes on something you know is unresolved, say so in the
+artifact itself. The anchor spec's status line now carries "spec_gate --check
+passes on this entry. That is the gate reporting that a review happened, not that
+it approved."
+
 ---
 
 ## 4. Insights worth keeping

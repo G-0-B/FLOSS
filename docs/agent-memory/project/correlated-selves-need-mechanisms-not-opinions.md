@@ -1,3 +1,14 @@
+---
+id: project-correlated-selves-need-mechanisms
+type: project
+created: '2026-08-26'
+status: active
+applies_to:
+- any-agent
+source: grok_session
+title: Correlated selves need mechanisms, not more opinions
+---
+
 # Correlated selves need mechanisms, not more opinions
 
 **Date:** 2026-08-26

@@ -1,3 +1,14 @@
+---
+id: project-finite-steps-share-flow
+type: project
+created: '2026-08-26'
+status: active
+applies_to:
+- any-agent
+source: grok_session
+title: Finite steps, shared flow
+---
+
 # Finite steps, shared flow
 
 **Date:** 2026-08-26
