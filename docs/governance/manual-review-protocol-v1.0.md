@@ -221,6 +221,36 @@ Three fields carry disproportionate weight:
   a correct minority. Not hypothetical here: ADR-20's blast radius was decided
   against a minority that was right, and the tally had to be corrected twice.
 
+### Run one unstructured reviewer as a control
+
+**This corrects the protocol against its own evidence.** Measured 2026-08-29 over
+five model-family audits of the provenance packet plus two aggregates:
+sustainability was raised by 4 of 5 sources and carried by 0 aggregates, and the
+single most useful finding in the whole set came from the run labelled
+`UNOPTIMIZED-PROMPT` — the variant assumed to be worse:
+
+> The audit packet was authored by Claude Opus 5 … an AI agent auditing its own
+> system's provenance chain. **The labor of careful disagreement was erased by
+> the aggregation method.** This is not a technical problem; it is a governance
+> problem about whose conclusions count when they differ.
+
+The five optimized runs, which asked for named structured lenses, produced no
+equivalent. Neither aggregate carried it.
+
+The schema in this protocol has no field for relational accountability, so **this
+protocol would have dropped that finding too.** Structure buys comparability by
+narrowing what can be said, and that trade was made here without being named.
+
+So: at least one Lane A reviewer receives the artifact and the question with **no
+output schema and no named lenses** — only "find what is wrong, missing,
+dangerous or overstated, and ground it in retrieval." Its findings are merged by
+hand. It is not a worse version of the structured reviewers; it is the only
+instrument that can report something the schema did not anticipate.
+
+Corollary for the tally: **aggregate by union with attribution, never by prose
+synthesis**, and keep the source artifacts. An aggregate cannot tell you what it
+dropped.
+
 ## Lane A prompt
 
 > You are one of several independent reviewers auditing an artifact from the

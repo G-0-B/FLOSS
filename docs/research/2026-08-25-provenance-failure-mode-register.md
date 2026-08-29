@@ -410,6 +410,66 @@ artifact itself. The anchor spec's status line now carries "spec_gate --check
 passes on this entry. That is the gate reporting that a review happened, not that
 it approved."
 
+### CF-10 - Aggregation dropped the majority concern and the only finding that mattered
+
+Five model-family audits of the provenance packet were run on 2026-08-25, then
+two aggregates were produced from them. Only the aggregates were read; the
+sources sat unopened in `.toilet/` for four days. Measured on 2026-08-29 by
+term-diffing sources against aggregates:
+
+| Concern | Sources raising it | Aggregates carrying it |
+|---|---|---|
+| Sustainability / who maintains this | **4 of 5** | **0** |
+| IETF Verifiable Data Structures | 1 | 0 |
+| W3C Verifiable Credentials | 1 | 0 |
+
+A majority concern reached zero aggregates. The standard worry about synthesis is
+that it loses the minority; here it also lost the majority, which is worse and
+was invisible from inside the aggregate.
+
+**The finding that was erased, in full, from the one source that raised it:**
+
+> The audit packet was authored by Claude Opus 5 in a Claude Code session -- an AI
+> agent auditing its own system's provenance chain. This surfaces a relational
+> accountability question... **The labor of careful disagreement was erased by the
+> aggregation method.** This is not a technical problem; it is a governance
+> problem about whose conclusions count when they differ.
+
+Three things stack here and each is checkable:
+
+1. The finding is that aggregation erases careful disagreement.
+2. It was erased by aggregation. Neither aggregate mentions the self-audit
+   conflict of interest, and `grep -il "auditing its own"` across both returns
+   nothing.
+3. It came from the run labelled **UNOPTIMIZED-PROMPT** -- the variant assumed to
+   be worse. The five optimized runs, which asked for named structured lenses,
+   produced no equivalent. The open-ended prompt was the only one that could
+   return a governance finding, because the structured ones had no slot for one.
+
+It also independently identifies the conflict of interest later self-declared in
+`docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md`, from a
+direction no structured lens reached.
+
+**This cuts against `manual-review-protocol-v1.0.md`, which is mine.** That
+protocol mandates a fixed JSON finding schema, and structured output is the
+property that made the reviews comparable and the transport automatable. It has
+no field for relational accountability, so it would have dropped this finding
+too. Structure buys comparability by narrowing what can be said, and that trade
+was made without being named.
+
+**Rules.**
+
+- **Aggregate by union with attribution, never by prose synthesis.** A finding
+  raised by anyone survives to the tally with the reviewer's name on it. Prose
+  synthesis is lossy in ways that cannot be detected by reading the prose.
+- **Keep and read the sources.** An aggregate cannot tell you what it dropped.
+  Four days of acting on aggregates while the sources sat unopened is the whole
+  failure.
+- **Run at least one unstructured reviewer as a control.** A schema collects only
+  findings it has a slot for. The open-ended prompt is not a worse version of the
+  structured one; it is the only instrument that can report something the schema
+  did not anticipate.
+
 ---
 
 ## 4. Insights worth keeping
@@ -442,6 +502,20 @@ it approved."
     a bespoke metric, check what the field reports for the same property. The
     hand-rolled similarity-floor check found a real defect; `n_eff` and the
     co-failure rate are what a reader can compare against somebody else's number.
+11. **This project builds the commitment and improvises the witness.** Four
+    independent instances -- the anchor's Merkle tree with a broken git-tag
+    witness, packets that are KERI-shaped but not KERI-compatible, a BLAKE3
+    hashline with no signed attestation, and real reviews with unresolvable then
+    unpinned records. The hard cryptographic part is done carefully every time;
+    the part that makes it legible to an outsider is invented on the spot. **The
+    witness is the part to adopt** -- a commitment is built to fit your data, a
+    witness must be recognisable to someone who does not trust you, which is what
+    a standard is for.
+12. **A mechanism whose value depends on it firing needs a test that it fires**,
+    separate from a test that it is configured. Three instances: the anchor's tag
+    carrier was never created, ADR-20's reviewer record never resolved, and an
+    external audit flags the same shape in the materializer's assumption that
+    Tier-A clients honour blocking hooks.
 
 ---
 
