@@ -162,3 +162,65 @@ reviewer**, which is why k=9 is the honest denominator.
 4. Verify the two checkable external claims: `G6b` (PushEvent payload) and `G21`
    (Events API retention). Both are single-reviewer, both would change the
    design, neither has been checked.
+
+---
+
+## Verification of the two external claims (2026-08-29)
+
+Both were single-reviewer, both would change the design, neither had been
+checked. **Both are correct.**
+
+### G6b — `PushEvent` no longer carries commit messages: CONFIRMED
+
+Checked against the live API on this repository's own pushes, not against a
+changelog:
+
+```
+$ gh api repos/G-0-B/FLOSS/events --jq '[.[]|select(.type=="PushEvent")][0].payload|keys'
+["before","head","push_id","ref","repository_id"]
+```
+
+No `commits` key. GitHub announced the removal on 2025-08-08, brownout-tested it
+2025-09-08, shipped it 2025-10-07 — ten months before the anchor was written.
+`GLM/F1` named the ship date correctly.
+
+**But the finding is half right in a way that matters.** The spec put the root in
+*two* carriers, and only one is dead:
+
+| Carrier | Event | Status |
+|---|---|---|
+| Commit message | `PushEvent` | **DEAD** — no `commits` key at all |
+| Tag name | `CreateEvent.payload.ref` | **ALIVE** — ref carried verbatim |
+
+`CreateEvent` payload keys today:
+`["description","full_ref","master_branch","pusher_type","ref","ref_type"]`.
+`DeleteEvent` carries `ref` too, so deleting an anchor tag is itself externally
+visible — a partial answer to `G6`'s tag-mutability attack.
+
+Combined with `GROK/F3` (no tags exist; the CLI never creates them): **the
+surviving carrier has never been used, and the carrier actually used at genesis
+`fbaae97` witnesses nothing.** The spec's external-witness claim is now ❌ Blocked
+rather than ⚠️ Specified.
+
+### G21 — Events API retention cut to 30 days: CONFIRMED
+
+90 → 30 days, effective **2025-01-30**, announced 2024-11-08. `GLM/F5` named the
+date correctly. Added to the spec's Limits: a mirror that does not ingest within
+30 days has nothing to ingest, so both anchor cadence and mirror-confirmation
+cadence are bounded by that number.
+
+### What this does to the merge groups
+
+`G6` (7 findings, 6 reviewers) is **upgraded, not merely sustained**. The panel
+argued the tag/firehose story was overstated; the actual position is worse than
+any single reviewer stated — one carrier is dead, the other unexercised. `GLM`
+supplied the decisive fact and was the only reviewer to name it. It is a
+single-reviewer finding that outweighs the six-reviewer group it belongs to,
+which is exactly the case for preserving minority findings rather than tallying
+them.
+
+Note also which reviewer this was: `glm-5-2-web-all-tool-use`, running with
+`github`, `web` and `execution`. The two decisive external facts in the whole
+corpus came from a tooled reviewer citing dated changelog entries, not from any
+of the bare-chat reviewers. Suggestive for the tool-access hypothesis; still one
+data point.

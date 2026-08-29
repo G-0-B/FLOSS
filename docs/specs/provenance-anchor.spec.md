@@ -1,7 +1,9 @@
 # Provenance Anchor Specification
 
 - Version: 1.0.0
-- Status: ⚠️ Specified — implementation ✅ Verified against the live store, publication ⚠️ not yet performed
+- Status: ⚠️ Specified — implementation ✅ Verified against the live store.
+  **External witnessing ❌ Blocked** (2026-08-29): the commit-message carrier does
+  not work and the tag carrier has never been exercised. See Publish.
 - Implementation: `packages/activity_log/anchor.py`, `scripts/provenance_anchor.py`
 - Tests: `packages/activity_log/tests/test_anchor.py`
 - Supersedes nothing. Complements `docs/specs/provenance-packet.spec.md`.
@@ -117,18 +119,52 @@ anchor breaks linkage and is visible rather than silent.
 2. Sign with an existing Ed25519 identity from `.agent-surface/identity/` — the
    same PyNaCl path `create_packet` uses. No GPG, no SSH key, no new key type.
 3. Write to `.anchors/anchor.json` in the repository.
-4. Commit with the root **in the commit message**; tag with the root **in the
-   tag name**.
+4. Tag with the root **in the tag name** — this is the only carrier that
+   reaches the public event record; see the correction below. The root is also
+   written into the commit message, which is useful to a human reading `git log`
+   and reaches no third party.
 5. Push to the public remote.
 
-**Why the tag name and the message, not only the file.** This is the whole
-trick. The operator controls the store *and* the git remote, so a ref they can
-rewrite constrains nobody. What the operator does not control is the record
-third parties keep of a public push: a public repository emits `PushEvent` and
-`CreateEvent` into GitHub's public events firehose, and those events carry ref
-names and commit message text to mirrors with no write path back. Putting the
-root in the ref name and message rather than only in file contents is what gets
-it into that retained record.
+**CORRECTION 2026-08-29 — half of this mechanism does not work.**
+
+External review (`docs/reviews/2026-08-29-model-identity-anomoly`, finding
+`GLM/F1`) claimed GitHub had removed commit content from `PushEvent`. Verified
+against the live API, on this repository's own pushes:
+
+```
+$ gh api repos/G-0-B/FLOSS/events --jq '[.[]|select(.type=="PushEvent")][0].payload|keys'
+["before","head","push_id","ref","repository_id"]
+```
+
+There is no `commits` key. GitHub announced the removal of push commit summaries
+and counts on 2025-08-08, brownout-tested it on 2025-09-08, and shipped it on
+2025-10-07 — ten months before this anchor was written. **The commit message
+never reaches the firehose.** The genesis anchor `fbaae97` placed the root in a
+commit message; that placement witnesses nothing.
+
+The tag-name half survives. `CreateEvent` still carries the ref verbatim:
+
+```
+CreateEvent payload keys: ["description","full_ref","master_branch","pusher_type","ref","ref_type"]
+```
+
+so a tag named `prov-anchor-<timestamp>-<root>` does place the root in the public
+event record. `DeleteEvent` carries `ref` too, so deleting an anchor tag is
+itself externally visible — a partial answer to tag mutability, worth only as
+much as the retention window below.
+
+**Combined with `GROK/F3` — the repository has no tags and the CLI never creates
+them — the surviving half has never been exercised, and the half that was used
+does not work. The external-witness claim is ❌ Blocked, not ⚠️ Specified, until
+a tag is pushed and its root retrieved from a third party.**
+
+**Why the tag name.** The operator controls the store *and* the git remote, so a
+ref they can rewrite constrains nobody. What the operator does not control is the
+record third parties keep of a public push: a public repository emits
+`CreateEvent` into GitHub's public events firehose, and that event carries the
+ref name to mirrors with no write path back. Putting the
+root in the ref name rather than only in file contents is what gets it into that
+retained record.
 
 `scripts/provenance_anchor.py` prints those git commands and runs none of them.
 Publishing to a public repository is an operator decision.
@@ -142,9 +178,9 @@ key.
    **no anchor**.
 2. Walk `prev_root` backwards and confirm the series is unbroken.
 3. Independently recompute the root from whatever packet set they hold.
-4. Cross-check the root against the tag name, the commit message, and — the
-   load-bearing step — a **third-party mirror** of the event stream, with that
-   mirror's ingest timestamp.
+4. Cross-check the root against the **tag name** and — the load-bearing step —
+   a **third-party mirror** of the event stream, with that mirror's ingest
+   timestamp. Not the commit message: it is not in the event payload.
 
 Steps 1–3 detect accident and third-party tampering. **Step 4 is the only step
 that survives an operator who rewrites their own repository.**
@@ -199,6 +235,10 @@ Stated in full, because an unstated limit reads as a guarantee.
 - **Repository deletion defeats the ref.** Deleting or privating the repository
   removes the anchor; only already-ingested firehose records survive — which is
   exactly why the root must ride in the tag name.
+- **The ingestion window is 30 days, not 90.** GitHub cut Events API retention
+  from 90 days to 30 on 2025-01-30 (review finding `GLM/F5`, confirmed). A mirror
+  that does not ingest within 30 days has nothing to ingest, so anchor cadence
+  and mirror-confirmation cadence are both bounded by that number.
 - **The signing key is the operator's key.** A rotated identity can sign a fresh
   consistent series. **Pinning the public key beforehand is the actual root of
   trust**, not the signature.
