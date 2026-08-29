@@ -280,7 +280,9 @@ def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
 
 
 def build_anchor(
-    provenance_root: Path, previous: dict[str, Any] | None = None
+    provenance_root: Path,
+    previous: dict[str, Any] | None = None,
+    witnesses: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build (but do not sign or publish) an anchor over the current store."""
 
@@ -298,6 +300,12 @@ def build_anchor(
         # breaks linkage and is visible rather than silent.
         "prev_root": (previous or {}).get("merkle_root"),
         "prev_generated_at": (previous or {}).get("generated_at"),
+        # External witnessing. Each entry records WHAT WAS REQUESTED -- kind,
+        # digest, calendars -- and is covered by the signature. The proof itself
+        # is a sidecar (see witness.proof_path): a pending stamp is upgraded to a
+        # Bitcoin attestation hours later, and a signed anchor must not be edited
+        # after signing.
+        "witnesses": list(witnesses or []),
     }
 
 

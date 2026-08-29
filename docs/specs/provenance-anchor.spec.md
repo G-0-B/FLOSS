@@ -1,9 +1,12 @@
 # Provenance Anchor Specification
 
 - Version: 1.0.0
+- Version: 2.0.0 — `flossi-anchor-2`. v1 anchors are refused, not upgraded:
+  `signer` moved inside the signed bytes, so the pre-image differs.
 - Status: ⚠️ Specified — implementation ✅ Verified against the live store.
-  **External witnessing ❌ Blocked** (2026-08-29): the commit-message carrier does
-  not work and the tag carrier has never been exercised. See Publish.
+  **External witnessing: git-tag carrier ❌ Blocked; OpenTimestamps ⚠️ Specified**
+  — stamping is implemented and exercised end-to-end, but no proof has yet
+  reached a Bitcoin attestation, and PENDING is not a witness. See Witnessing.
 - **ADR-18 tier-2 review: PERFORMED 2026-08-29, outcome REVISION REQUIRED.**
   9 reviewers, 68 findings. Record:
   `docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md`.
@@ -178,6 +181,63 @@ retained record.
 
 `scripts/provenance_anchor.py` prints those git commands and runs none of them.
 Publishing to a public repository is an operator decision.
+
+## Witnessing
+
+The git-tag mechanism is retained only as a human-readable convenience. The
+witness of record is an OpenTimestamps stamp over the **merkle root string** —
+not over the anchor file, since the root is the commitment and the file is one
+serialization of it.
+
+| | Git tag / firehose | OpenTimestamps |
+|---|---|---|
+| Operator-controlled ref in the trust path | yes | **no** |
+| Expiry | **30 days** (Events API retention) | none — a Bitcoin block header does not expire |
+| Exercised | never | end-to-end, pending confirmation |
+
+**`opentimestamps` is an optional dependency and is in no requirements file.**
+The direct probe (`docs/reviews/2026-08-29-model-identity-anomoly/PROBE-opentimestamps.md`)
+found every `ots` CLI subcommand broken on Windows/CPython 3.13 — `python-bitcoinlib`
+ctypes-loads an OpenSSL DLL that is not present — and two of three default
+calendars serving expired TLS certificates. So this uses the library API directly
+and never shells out, the calendar list is configurable, calendar failure is a
+reported outcome rather than an exception, and absence of the package degrades to
+publishing without a witness rather than to an import error.
+
+Where things live:
+
+- The **claim** — kind, digest, the calendars that accepted it — is a
+  `witnesses[]` entry inside the anchor, covered by the signature, so witness
+  claims cannot be added or removed after signing.
+- The **proof** is a sidecar at `.anchors/witness/<root>.ots`. A pending stamp is
+  upgraded to a Bitcoin attestation hours later, and a signed anchor must not be
+  edited after signing.
+
+Witness states: `ABSENT`, `UNAVAILABLE`, `PENDING`, `CONFIRMED`.
+
+> **`PENDING` is not a witness.** Between stamping and Bitcoin confirmation you
+> hold a volunteer-run calendar's promise. Reporting that as external witnessing
+> would restate the git-tag mistake in a new place.
+
+Witness state is reported **alongside** the store verdict and never folded into
+it. A confirmed witness does not make a truncated store `VERIFIED`, and a missing
+witness does not make an intact store a failure — they answer different
+questions.
+
+## What this still does not do
+
+OpenTimestamps timestamps a **digest**. It cannot commit to a packet set, so it
+does not replace the anchor — it replaces the anchor's publication mechanism. It
+proves "no later than", never "no earlier than", so backdating remains
+unprevented. It attests that a digest existed, not that the digest is the store's
+true contents. An operator can simply stop stamping, and absence of a proof is
+evidence of nothing.
+
+Against the standing finding that republishing a consistent anchor over a
+truncated store returns `VERIFIED`: this **improves it without solving it**. The
+operator can still stamp a fresh anchor. What changes is that they cannot delete
+the earlier proof, so equivocation becomes permanent and self-verifying for
+anyone holding one — where the git-tag path let the record simply expire.
 
 ## Verify
 

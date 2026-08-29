@@ -40,6 +40,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from packages.activity_log import anchor as anchor_lib  # noqa: E402
+from packages.activity_log import witness as witness_lib  # noqa: E402
 from packages.activity_log.provenance import (  # noqa: E402
     load_or_create_identity,
 )
@@ -129,6 +130,31 @@ def _publish(args: argparse.Namespace) -> int:
             )
             return 3
 
+    # Witness BEFORE signing. The root is computed over leaves only, so
+    # attaching a witness record does not change it -- but the record must be
+    # inside the signed bytes, or an operator could add or remove witness claims
+    # after the fact.
+    if args.witness:
+        stamped = witness_lib.stamp_root(
+            built["merkle_root"], timeout=args.witness_timeout
+        )
+        for failure in stamped.get("failed", []):
+            print(f"  calendar unavailable: {failure['calendar']}: {failure['error']}")
+        if stamped["proof"] is None:
+            print(
+                f"WITNESS {stamped['status']}: {stamped.get('reason')}. "
+                f"Publishing WITHOUT an external witness."
+            )
+        else:
+            built["witnesses"] = [
+                {
+                    "kind": witness_lib.WITNESS_KIND,
+                    "digest_alg": "sha256",
+                    "digest": stamped["digest"],
+                    "calendars": stamped["attested"],
+                }
+            ]
+
     signed = anchor_lib.sign_anchor(built, identity)
 
     problem = anchor_lib.anchor_signature_problem(signed)
@@ -156,6 +182,17 @@ def _publish(args: argparse.Namespace) -> int:
     staging = args.anchor.with_suffix(".json.tmp")
     staging.write_bytes(payload)
     staging.replace(args.anchor)
+
+    if args.witness and signed.get("witnesses"):
+        proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])
+        proof_file.parent.mkdir(parents=True, exist_ok=True)
+        proof_file.write_bytes(stamped["proof"])
+        state = witness_lib.inspect_proof(
+            stamped["proof"], expected_digest=witness_lib.root_digest(signed["merkle_root"])
+        )
+        print(f"  witness: {state['status']} -> {proof_file.name}")
+        if state.get("note"):
+            print(f"  {state['note']}")
     print(
         json.dumps(
             {
@@ -197,13 +234,64 @@ def _verify(args: argparse.Namespace) -> int:
         expected_signer=pin,
         series_dir=args.anchor.parent / anchor_lib.SERIES_DIRNAME,
     )
+    # Witness state is reported alongside, never folded into, the store verdict.
+    # A confirmed witness does not make a truncated store VERIFIED, and a missing
+    # witness does not make an intact store a failure -- they answer different
+    # questions.
+    result["witness"] = _witness_state(args.anchor, stored)
     print(json.dumps(result, indent=2, ensure_ascii=False)[: args.max_output])
     return anchor_lib.EXIT_CODES.get(result["status"], 2)
 
 
+def _witness_state(anchor_path: Path, stored: dict | None) -> dict:
+    if not isinstance(stored, dict):
+        return {"status": witness_lib.WITNESS_ABSENT, "reason": "no anchor"}
+    root = stored.get("merkle_root")
+    claims = stored.get("witnesses") or []
+    proof_file = witness_lib.proof_path(anchor_path.parent, str(root))
+    if not proof_file.exists():
+        return {
+            "status": witness_lib.WITNESS_ABSENT,
+            "reason": (
+                "the anchor claims a witness but no proof file is present"
+                if claims
+                else "this anchor was published without an external witness"
+            ),
+            "claims_in_anchor": len(claims),
+        }
+    state = witness_lib.inspect_proof(
+        proof_file.read_bytes(), expected_digest=witness_lib.root_digest(str(root))
+    )
+    state["proof"] = proof_file.name
+    state["claims_in_anchor"] = len(claims)
+    return state
+
+
+def _witness_upgrade(args: argparse.Namespace) -> int:
+    stored = anchor_lib.load_anchor(args.anchor)
+    if not isinstance(stored, dict):
+        print("no anchor to upgrade")
+        return 3
+    root = str(stored.get("merkle_root"))
+    proof_file = witness_lib.proof_path(args.anchor.parent, root)
+    if not proof_file.exists():
+        print(f"no proof at {proof_file}")
+        return 3
+    result = witness_lib.upgrade_proof(
+        proof_file.read_bytes(), timeout=args.witness_timeout
+    )
+    proof = result.pop("proof", None)
+    if proof:
+        proof_file.write_bytes(proof)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0 if result.get("status") == witness_lib.WITNESS_CONFIRMED else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["publish", "verify"])
+    parser.add_argument(
+        "command", choices=["publish", "verify", "witness-upgrade"]
+    )
     parser.add_argument("--provenance-root", type=Path, default=DEFAULT_PROVENANCE_ROOT)
     parser.add_argument("--identity-dir", type=Path, default=DEFAULT_IDENTITY_DIR)
     parser.add_argument("--anchor", type=Path, default=DEFAULT_ANCHOR_PATH)
@@ -215,6 +303,16 @@ def main(argv: list[str] | None = None) -> int:
             "without it, a fresh key can sign a fresh consistent series."
         ),
     )
+    parser.add_argument(
+        "--witness",
+        action="store_true",
+        help=(
+            "Request an OpenTimestamps stamp over the root. Requires the "
+            "optional `opentimestamps` package; degrades to publishing without "
+            "a witness if unavailable."
+        ),
+    )
+    parser.add_argument("--witness-timeout", type=int, default=30)
     parser.add_argument(
         "--allow-new-identity",
         action="store_true",
@@ -243,6 +341,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "publish":
         return _publish(args)
+    if args.command == "witness-upgrade":
+        return _witness_upgrade(args)
     return _verify(args)
 
 
