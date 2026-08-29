@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import hashlib
 import json
 import re
 from pathlib import Path, PurePosixPath
@@ -305,6 +306,7 @@ def _reviewer_problems(rel: str, reviewer: Any) -> list[str]:
             problems.append(f"{rel}: reuse.reviewer.record must be a path or ref")
         else:
             problems.extend(_record_problems(rel, record))
+            problems.extend(_record_digest_problems(rel, reviewer, record))
     return problems
 
 
@@ -384,6 +386,59 @@ def _is_direct_probe(candidate: Any) -> bool:
     if not text.lower().startswith(PROBE_POSITIVE_PREFIX):
         return False
     return bool(text[len(PROBE_POSITIVE_PREFIX) :].strip())
+
+
+def record_digest(path: Path) -> str | None:
+    """SHA-256 of a review record, with line endings normalised to LF.
+
+    Normalised on purpose. `.gitattributes` declares `*.md text eol=lf`, so a
+    worktree file on Windows differs byte-for-byte from the blob git stores, and
+    a raw hash would be stable on one machine and wrong everywhere else. That is
+    CF-8 in the failure-mode register: a published hash that verifies only for
+    the author is not evidence.
+    """
+
+    try:
+        raw = path.read_bytes()
+        return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+    except OSError:
+        return None
+
+
+def _record_digest_problems(rel: str, reviewer: Any, record: str) -> list[str]:
+    """If the reviewer block pins a digest, the record must still match it.
+
+    Existence was the only check. A record could therefore be replaced wholesale
+    after the gate passed, and the gate would keep passing -- the same shape an
+    external audit named on this project's own multi-model attribution: an
+    unsigned attestation by an unknown key.
+
+    OPTIONAL and fail-open by design. Entries without `record_sha256` are
+    unaffected, because tightening a validator against existing history without
+    enumerating what breaks is CF-1 in the failure-mode register. New entries
+    should pin; old ones are not retroactively broken.
+    """
+
+    if not isinstance(reviewer, dict):
+        return []
+    pinned = reviewer.get("record_sha256")
+    if pinned is None:
+        return []
+    if not isinstance(pinned, str) or not re.fullmatch(r"[0-9a-f]{64}", pinned):
+        return [
+            f"{rel}: reuse.reviewer.record_sha256 must be 64 lowercase hex chars"
+        ]
+    resolved = _physical_path(record.strip()) or (REPO_ROOT / record.strip())
+    actual = record_digest(resolved)
+    if actual is None:
+        return [f"{rel}: reuse.reviewer.record {record!r} could not be read to verify its digest"]
+    if actual != pinned:
+        return [
+            f"{rel}: reuse.reviewer.record {record!r} no longer matches its "
+            f"pinned digest (pinned {pinned[:16]}..., actual {actual[:16]}...) "
+            f"— the evidence changed after the review was recorded"
+        ]
+    return []
 
 
 def _record_problems(rel: str, record: str) -> list[str]:

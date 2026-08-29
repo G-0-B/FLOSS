@@ -653,3 +653,94 @@ def test_every_date_field_shares_one_future_rule(gate):
     assert gate._iso_date_problems("d", "2099-01-01")
     assert gate._iso_date_problems("d", "2020-01-01") == []
     assert gate._iso_date_problems("d", "2099-01-01", allow_future=True) == []
+
+
+# ---------------------------------------------------------------------------
+# The reviewer record must not be swappable after the review.
+# ---------------------------------------------------------------------------
+
+
+def test_a_record_can_be_pinned_to_its_content(gate, tmp_path, monkeypatch):
+    """Existence was the only check, so a record could be replaced wholesale.
+
+    An external audit named this exact shape on this project's own multi-model
+    attribution: "an unsigned attestation by an unknown key". A pointer that
+    resolves is not evidence that the thing it points at is what was reviewed.
+    """
+    record = REPO_ROOT / "docs" / "specs" / "reuse-gate.spec.md"
+    digest = gate.record_digest(record)
+    assert digest is not None and len(digest) == 64
+
+    reviewer = {
+        "surfaces": ["a", "b", "c"],
+        "families": ["w", "x", "y", "z"],
+        "record": "docs/specs/reuse-gate.spec.md",
+        "record_sha256": digest,
+        "outcome": "APPROVED",
+        "date": "2026-08-26",
+    }
+    assert gate._reviewer_problems("x.md", reviewer) == []
+
+    wrong = dict(reviewer)
+    wrong["record_sha256"] = "0" * 64
+    problems = gate._reviewer_problems("x.md", wrong)
+    assert problems and "no longer matches" in problems[0]
+
+
+def test_an_unpinned_record_is_unaffected(gate):
+    """Fail-open by design.
+
+    Tightening a validator against existing history without enumerating what
+    breaks is the b0de2fe mistake, recorded as CF-1. Entries with no
+    `record_sha256` keep working; new entries should pin.
+    """
+    reviewer = {
+        "surfaces": ["a", "b", "c"],
+        "families": ["w", "x", "y", "z"],
+        "record": "docs/specs/reuse-gate.spec.md",
+        "outcome": "APPROVED",
+        "date": "2026-08-26",
+    }
+    assert gate._reviewer_problems("x.md", reviewer) == []
+
+
+@pytest.mark.parametrize("bad", ["ABC", "z" * 64, 123, True, "0" * 63, ""])
+def test_a_malformed_pin_is_rejected(gate, bad):
+    reviewer = {
+        "surfaces": ["a", "b", "c"],
+        "families": ["w", "x", "y", "z"],
+        "record": "docs/specs/reuse-gate.spec.md",
+        "record_sha256": bad,
+        "outcome": "APPROVED",
+        "date": "2026-08-26",
+    }
+    problems = gate._reviewer_problems("x.md", reviewer)
+    assert problems, f"{bad!r} was accepted as a digest"
+
+
+def test_the_digest_is_line_ending_normalised(gate, tmp_path):
+    """Or the pin would verify only on the machine that wrote it.
+
+    `.gitattributes` declares `*.md text eol=lf`, so a Windows worktree file
+    differs byte-for-byte from the blob git stores. CF-8 is exactly this failure
+    one layer down: a published hash that verifies only for the author.
+    """
+    crlf = tmp_path / "crlf.md"
+    lf = tmp_path / "lf.md"
+    crlf.write_bytes(b"line one\r\nline two\r\n")
+    lf.write_bytes(b"line one\nline two\n")
+
+    assert gate.record_digest(crlf) == gate.record_digest(lf)
+
+
+def test_an_unreadable_record_cannot_satisfy_a_pin(gate):
+    reviewer = {
+        "surfaces": ["a", "b", "c"],
+        "families": ["w", "x", "y", "z"],
+        "record": "docs/specs/does-not-exist.md",
+        "record_sha256": "a" * 64,
+        "outcome": "APPROVED",
+        "date": "2026-08-26",
+    }
+    problems = gate._reviewer_problems("x.md", reviewer)
+    assert any("could not be read" in p or "does not exist" in p for p in problems)

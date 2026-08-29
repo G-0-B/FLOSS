@@ -388,7 +388,8 @@
           ],
           "record": "docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md",
           "outcome": "REVISION REQUIRED -- NOT approved. 9 distinct reviewers, 68 findings, 31 after merge. Confirmed by reproduction: ANCHOR_STALE is a count comparison not a subset check (G4, 4 reviewers); the prev_root walk is specified and unimplemented (G5, 4 reviewers). Confirmed against live APIs: the commit-message witness carrier does not work (G6b) and Events retention is 30 days (G21). Unfixed: signer excluded from signed bytes (G1, 4 reviewers), key auto-mint with pinning off by default (G9). Against the design: the ladder was not satisfied for witnessing (G2, 6 reviewers) and the headline claim 'silent wholesale truncation impossible' is false once the operator republishes over a truncated store (G12). One reviewer (GROK/F11) concluded it should not ship in this form; that position is not yet refuted.",
-          "date": "2026-08-29"
+          "date": "2026-08-29",
+          "record_sha256": "0c9c8a08f492f62e32deaaa210afe3848d74cbff6e3b0ff0a8af97dcc9ef89de"
         }
       }
     },
@@ -651,7 +652,8 @@
           ],
           "record": "docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md",
           "outcome": "REVISION REQUIRED -- NOT approved. 9 distinct reviewers, 68 findings, 31 after merge. Confirmed by reproduction: ANCHOR_STALE is a count comparison not a subset check (G4, 4 reviewers); the prev_root walk is specified and unimplemented (G5, 4 reviewers). Confirmed against live APIs: the commit-message witness carrier does not work (G6b) and Events retention is 30 days (G21). Unfixed: signer excluded from signed bytes (G1, 4 reviewers), key auto-mint with pinning off by default (G9). Against the design: the ladder was not satisfied for witnessing (G2, 6 reviewers) and the headline claim 'silent wholesale truncation impossible' is false once the operator republishes over a truncated store (G12). One reviewer (GROK/F11) concluded it should not ship in this form; that position is not yet refuted.",
-          "date": "2026-08-29"
+          "date": "2026-08-29",
+          "record_sha256": "0c9c8a08f492f62e32deaaa210afe3848d74cbff6e3b0ff0a8af97dcc9ef89de"
         }
       }
     },
