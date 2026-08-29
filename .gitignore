@@ -126,3 +126,7 @@ docs/research/consolidation_processed.txt
 .ruff_cache/
 .mypy_cache/
 target/
+
+# Isolated git worktrees and Superpowers SDD scratch (briefs, ledger, review packages)
+.worktrees/
+.superpowers/
