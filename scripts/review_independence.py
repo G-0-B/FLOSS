@@ -55,15 +55,20 @@ CAUTION_RATIO = 0.5  # arXiv:2605.29800's recommended threshold
 def load_review(path: Path) -> dict[str, Any]:
     document = json.loads(path.read_text(encoding="utf-8"))
     reviewer = document.get("reviewer") or {}
-    label = (
-        reviewer.get("harness")
-        and f"{reviewer.get('model', '?')}@{reviewer['harness']}"
-        or reviewer.get("model")
-        or path.stem
+    # Labelled by SELECTED model and harness. Never by the self-reported name:
+    # a model has no introspective access to its own deployment identity, so
+    # `model_self_reported` is a claim to be recorded and disagreed with, not an
+    # identifier. `model` is accepted as a legacy alias.
+    selected = (
+        reviewer.get("model_selected") or reviewer.get("model") or "?"
     )
+    harness = reviewer.get("harness")
+    label = f"{selected}@{harness}" if harness else (selected if selected != "?" else path.stem)
     return {
         "label": str(label),
         "path": path,
+        "harness": harness,
+        "self_reported": reviewer.get("model_self_reported"),
         "saw_prior": bool(reviewer.get("saw_prior_reviews")),
         "tools": [t for t in (reviewer.get("tools_used") or []) if t != "none"],
         "findings": document.get("findings") or [],
@@ -255,6 +260,44 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
     # family diversity does, the tooled reviewers should hold the lowest
     # pairwise correlations. Printed rather than concluded -- one run is an
     # anecdote.
+    # Reviewers that share a harness are suspected of sharing an orchestrator,
+    # whatever the dropdown said. Observed 2026-08-29: several nominally
+    # different models on one harness all self-reported the same identity, and
+    # one vendor's stated version disagreed with what its models claimed. A
+    # model has no introspective access to its own deployment identity, so a
+    # self-report is a claim; the phi below is the measurement.
+    by_harness: dict[Any, list[str]] = {}
+    for review in reviews:
+        if review.get("harness"):
+            by_harness.setdefault(review["harness"], []).append(review["label"])
+    shared = {h: labels for h, labels in by_harness.items() if len(labels) > 1}
+    if shared:
+        print("Reviewers sharing a harness (independence is a property of the")
+        print("harness, not of the model name on the dropdown):")
+        for harness, labels in shared.items():
+            print(f"  {harness}: {', '.join(labels)}")
+        print("  ^ if their pairwise phi below is near 1.0 they are one reviewer.")
+        print()
+
+    reported = {
+        review["label"]: review["self_reported"]
+        for review in reviews
+        if review.get("self_reported")
+    }
+    collisions = {}
+    for label, claimed in reported.items():
+        collisions.setdefault(claimed, []).append(label)
+    disputed = {c: ls for c, ls in collisions.items() if len(ls) > 1}
+    if disputed:
+        print("Identity collisions (self-reported, NOT verified):")
+        for claimed, labels in disputed.items():
+            print(f"  {claimed!r} claimed by: {', '.join(labels)}")
+        print(
+            "  ^ weak evidence about training corpora, no evidence about "
+            "routing. Fingerprint behaviour rather than asking."
+        )
+        print()
+
     print("Pairwise phi (lower = more independent):")
     ordered = sorted(
         (

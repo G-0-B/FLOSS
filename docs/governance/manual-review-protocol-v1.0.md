@@ -58,6 +58,68 @@ replaced.
 
 Three lanes. Lane A can be run in any order; Lane B requires Lane A output.
 
+### A model's self-reported identity is not data
+
+Observed 2026-08-29: several models, across different families and harnesses,
+self-reported as "Sonnet 4.6" when asked what they were — including every model
+selected through one harness whose vendor states it uses a different version.
+
+**A model has no introspective access to its own weights or deployment name.**
+Asking "what model are you" produces generation, not measurement. The answer
+comes from the system prompt if one states it, from the training corpus if one
+does not, and from confabulation if neither resolves. A cross-family agreement on
+one identity string is therefore weak evidence about training corpora and *no*
+evidence about routing.
+
+Candidate explanations, none yet discriminated:
+
+1. **Confabulation to the training-cutoff attractor.** Corpora are saturated with
+   Claude-generated and Claude-transcript text, so an identity question with no
+   system-prompt answer falls into the densest region of the identity
+   distribution. This predicts the *stale* version number specifically: a
+   component reports the newest release it saw in training, not the one it is.
+2. **Synthetic-data distillation.** Real, industry-standard, and consistent with
+   (1) — but (1) explains the observation without it, so the observation is not
+   evidence for it.
+3. **A shared orchestrating component.** If *every* model on one harness reports
+   the same identity, the harness is a common cause and the models are not the
+   variable the user thinks they are selecting.
+4. **A stale system prompt** stating a version the vendor has since moved past.
+   Weakened here: the reported version disagrees with the vendor's stated
+   version, and a system prompt would agree with it.
+
+Discriminating tests, cheapest first. **Fingerprint behaviour; do not ask.**
+Identity claims are free to emit and impossible to verify; capability signatures
+are expensive to fake:
+
+- Same model, same prompt, harness versus direct API. Divergence implicates the
+  harness; agreement implicates the corpus.
+- A task where the nominal models measurably differ — tokenizer boundaries,
+  a language one handles and another does not, a known family-specific
+  refusal or formatting habit. If four "different models" behave identically
+  there, they are one model.
+- Explicit system-prompt override of the identity claim. If it moves, the claim
+  was prompt-derived.
+
+### Why this threatens the measurement
+
+**Independence is a property of the harness, not of the model name on the
+dropdown.** If several reviewers route through one orchestrator, they are one
+reviewer wearing several labels, and the panel's `n_eff` is near 1 while its
+roster looks diverse — the same failure as the local ensemble, arrived at from
+the opposite direction.
+
+This is measurable rather than arguable. Run those reviewers through
+`scripts/review_independence.py`: pairwise φ near 1.0 across nominally different
+models on one harness is the signature. Note that it would also *support* the
+tool-access hypothesis rather than undermining it — if one orchestrator with real
+retrieval still outperforms four bare frontier models, retrieval is doing the
+work and the model roster never was.
+
+Consequently, record model identity as **three separate claims, never as one
+fact**: what you selected, what the vendor states, and what the model said about
+itself. Where they disagree, that disagreement is the finding.
+
 ### Lane A — Independent first pass (no reviewer sees another)
 
 Two to four reviewers, each on a **different harness**, not merely a different
@@ -109,8 +171,10 @@ matrix — and therefore n_eff — computable at all.
 ```json
 {
   "reviewer": {
-    "model": "string",
-    "harness": "string",
+    "model_selected": "what the operator chose in the UI",
+    "model_vendor_states": "what the harness documents itself as running, or null",
+    "model_self_reported": "what the model said when asked, or null — A CLAIM, NOT A FACT",
+    "harness": "string — this, not the model name, is the unit of independence",
     "tools_used": ["github", "web", "execution", "none"],
     "saw_prior_reviews": false
   },

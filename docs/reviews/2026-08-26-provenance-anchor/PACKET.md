@@ -228,8 +228,10 @@ Return ONLY this JSON.
 ```json
 {
   "reviewer": {
-    "model": "string",
-    "harness": "string",
+    "model_selected": "what the operator chose in the UI",
+    "model_vendor_states": "what the harness documents itself as running, or null",
+    "model_self_reported": "what the model said when asked, or null — A CLAIM, NOT A FACT",
+    "harness": "string — this, not the model name, is the unit of independence",
     "tools_used": ["github", "web", "execution", "none"],
     "saw_prior_reviews": false
   },
