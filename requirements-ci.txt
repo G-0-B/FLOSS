@@ -58,3 +58,6 @@ tomlkit>=0.13
 # needed it. Re-checked, not assumed.
 httpx>=0.27
 ruamel.yaml>=0.18
+
+# packages/a2a_mesh helloworld pair (Task 1): Agent Card + JSON-RPC via official SDK.
+a2a-sdk[http-server]==1.1.2
