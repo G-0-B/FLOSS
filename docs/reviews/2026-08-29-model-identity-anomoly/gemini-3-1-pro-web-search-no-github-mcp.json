@@ -1,0 +1,97 @@
+{
+  "reviewer": {
+    "model": "Gemini",
+    "harness": "system",
+    "tools_used": [
+      "web"
+    ],
+    "saw_prior_reviews": false
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "claim": "The custom Merkle tree duplicates Git's native tree architecture, violating the `adopt before build` mandate while adding unnecessary risk.",
+      "severity": "critical",
+      "location": "packages/activity_log/anchor.py (and docs/specs/provenance-anchor.spec.md)",
+      "evidence": [
+        "Git inherently constructs a Merkle tree over the repository's files. A signed Git tag provides a cryptographically secure Merkle set-commitment over the store.",
+        "Adopting a signed Git tag alone eliminates 418 lines of custom cryptography. The only property lost is layout-independence, but the test suite ('packet moved to the store root -> VERIFIED') shows layout is not strictly enforced anyway."
+      ],
+      "falsifier": "Git's Merkle tree fails to satisfy a specific cryptographic constraint strictly required by the threat model that the custom tree successfully provides.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F2",
+      "claim": "Dynamically sorting leaves by `(identity, int(sequence), said)` destroys the append-only nature of the tree, making efficient consistency proofs mathematically impossible.",
+      "severity": "critical",
+      "location": "docs/specs/provenance-anchor.spec.md ('Leaves sorted by (identity, int(sequence), said)')",
+      "evidence": [
+        "Sorting leaves dynamically rather than appending chronologically means adding a new identity inserts a leaf into the middle of the Merkle tree.",
+        "This completely alters all internal nodes above it, breaking the structural requirements for log consistency proofs (RFC 6962).",
+        "Consequently, verifying `ANCHOR_STALE` requires downloading the entire store to rebuild the tree from scratch, rendering the Merkle architecture no better than a flat signed hash of the sorted store."
+      ],
+      "falsifier": "The implementation includes a novel zero-knowledge or structural proof that can efficiently demonstrate one dynamically sorted Merkle tree is a strict superset of another without transmitting the full leaf set.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F3",
+      "claim": "If the BLAKE3-256 root is used exactly as the Git tag name, major Git platforms will reject the push due to commit hash ambiguity rules.",
+      "severity": "major",
+      "location": "scripts/provenance_anchor.py (Publication argument: 'root is placed in the git tag name')",
+      "evidence": [
+        "GitLab documentation explicitly states: 'Tag names starting with 40 or 64 hexadecimal characters are prohibited, because they are similar to Git commit hashes' [5.2.1].",
+        "GitHub similarly prohibits pushes of tags that are exactly 40 hex characters long.",
+        "A bare BLAKE3-256 root (64 hex characters) pushed without a prefix will fail on these hosts."
+      ],
+      "falsifier": "The `provenance_anchor.py` script automatically prefixes the tag name (e.g., `anchor-<root>`) to avoid git ref format collisions.",
+      "confidence": "speculative",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F4",
+      "claim": "The fallback mechanism that records locked files as `unreadable[]` allows an attacker to mask head truncation by locking files instead of deleting them.",
+      "severity": "major",
+      "location": "Anchor document definition (`unreadable[]` array)",
+      "evidence": [
+        "On Windows, concurrent processes can place exclusive locks on files, raising `PermissionError` on read.",
+        "If the anchor script handles this by appending the file to `unreadable[]` and excluding it from the Merkle tree, an attacker can hold a lock on truncated packets during the anchor run.",
+        "The Merkle root will silently omit those packets, bypassing truncation detection without explicitly altering the store."
+      ],
+      "falsifier": "The verification logic treats the presence of any entry in `unreadable[]` as an immediate fatal error rather than a logged warning when evaluating `ANCHOR_STALE` or `VERIFIED`.",
+      "confidence": "likely",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F5",
+      "claim": "The assumption that pushing a git tag creates an immutable fact on third-party mirrors ignores the race condition of immediate deletion.",
+      "severity": "major",
+      "location": "docs/specs/provenance-anchor.spec.md (Publication argument)",
+      "evidence": [
+        "An operator acting maliciously can execute `git push origin tagname && git push --delete origin tagname`.",
+        "Since third-party mirrors (like GHArchive) operate on a polling interval or queue, the tag can be destroyed before it is ingested, leaving no external fact.",
+        "A transparency log (e.g., Sigstore Rekor) is strictly required to synchronously witness the event."
+      ],
+      "falsifier": "The project relies on a verified webhook integration that synchronously commits pushed tags to an immutable ledger before returning HTTP 200 to the git client.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F6",
+      "claim": "The tree construction strictly violates RFC 6962 by promoting odd nodes layer-by-layer instead of using power-of-2 balancing.",
+      "severity": "minor",
+      "location": "docs/specs/provenance-anchor.spec.md ('RFC 6962-shaped binary Merkle... odd node promoted')",
+      "evidence": [
+        "RFC 6962 Section 2.1 dictates partitioning leaves at the largest power of 2 (k < n) and recursively hashing. It does not promote odd nodes layer-by-layer.",
+        "Layer-by-layer odd node promotion fundamentally modifies the tree shape, guaranteeing that standard RFC 6962 verifiers and proof libraries will compute a mismatched root."
+      ],
+      "falsifier": "The specification intends to refer only to the domain separators (0x00, 0x01) of RFC 6962, not the structural shape, and expects clients to use the custom verifier logic exclusively.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    }
+  ],
+  "refutations": [],
+  "predicted_majority": "Other reviewers will likely focus on the operational weaknesses of the Python script (e.g., Windows filesystem locks, clock skew) and the lack of true non-repudiation in Git tag publication.",
+  "where_you_expect_to_be_alone": "Identifying that dynamically sorting the leaves by identity and sequence completely destroys the ability to generate Merkle consistency proofs, making the custom Merkle tree architecture functionally identical to a flat hash."
+}
