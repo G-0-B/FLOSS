@@ -6,12 +6,16 @@ import asyncio
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
-from a2a.helpers import get_artifact_text, get_message_text, new_text_message
+from a2a.helpers import get_artifact_text, new_text_message
 from a2a.types import Role, SendMessageRequest
 
 
 def _reply_text_from_chunk(chunk) -> str | None:
-    """Extract agent reply text; ignore status-update chatter."""
+    """Extract agent reply from task/artifact payloads only.
+
+    Status chatter ("Processing request...", "Request is completed!") may
+    surface as message payloads; never treat those as the reply.
+    """
     kind = chunk.WhichOneof("payload")
     if kind == "task":
         parts = [get_artifact_text(a) for a in chunk.task.artifacts]
@@ -19,9 +23,6 @@ def _reply_text_from_chunk(chunk) -> str | None:
         return joined or None
     if kind == "artifact_update":
         text = get_artifact_text(chunk.artifact_update.artifact)
-        return text or None
-    if kind == "message":
-        text = get_message_text(chunk.message)
         return text or None
     return None
 
