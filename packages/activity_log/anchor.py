@@ -59,7 +59,11 @@ from packages.activity_log.provenance import (
     _b64url_encode,
 )
 
-ANCHOR_VERSION = "flossi-anchor-1"
+# Bumped from flossi-anchor-1 on 2026-08-29. `signer` moved INSIDE the signed
+# bytes (review finding G1), which changes the pre-image, so v1 anchors cannot be
+# verified under v2 rules and must be rejected rather than silently mis-verified.
+ANCHOR_VERSION = "flossi-anchor-2"
+SUPPORTED_VERSIONS = frozenset({ANCHOR_VERSION})
 
 # Domain separation, RFC 6962 style: a leaf hash and an interior hash must never
 # be confusable, or a second-preimage attack can present an interior node as a
@@ -248,6 +252,33 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
     return summaries
 
 
+def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
+    """Every (identity, sequence) the anchor committed to.
+
+    Reconstructed from `max_seq` and `interior_gaps`, which together already
+    describe the exact set of occupied slots per identity: {0..max_seq} minus
+    the gaps. No new field, no growth in anchor size.
+
+    This exists because `ANCHOR_STALE` was a COUNT comparison. The branch read
+    `len(leaves) > packet_count` under a comment claiming "nothing anchored has
+    gone", and nothing checked that -- so deleting an interior packet while
+    adding two others reported honest growth. Four reviewers found it
+    independently (G4) and it reproduced on the first try.
+    """
+
+    positions: set[tuple[str, int]] = set()
+    for entry in anchor.get("identities", []) or []:
+        aid = entry.get("aid")
+        top = entry.get("max_seq")
+        if not isinstance(aid, str) or not isinstance(top, int) or top < 0:
+            continue
+        gaps = {
+            g for g in (entry.get("interior_gaps") or []) if isinstance(g, int)
+        }
+        positions.update((aid, n) for n in range(top + 1) if n not in gaps)
+    return positions
+
+
 def build_anchor(
     provenance_root: Path, previous: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -271,22 +302,32 @@ def build_anchor(
 
 
 def anchor_signing_bytes(anchor: dict[str, Any]) -> bytes:
-    """Canonical bytes under signature.
+    """Canonical bytes under signature. Excludes `sig` ONLY.
 
-    `sig` and `signer` are excluded so the signature covers the anchor's claims
-    and not itself -- the same shape `provenance._signing_bytes` uses, and for
-    the same reason. Stated here explicitly because a verifier that guesses
-    wrong gets a signature failure with no way to tell it apart from tampering.
+    `signer` used to be excluded too, which four reviewers independently flagged
+    (G1) and one named as duplicate-signature key selection: with the identity
+    outside the signed pre-image, any valid signature could be re-attributed to
+    any `signer` value by editing one field. The signature attested the claims
+    and not who made them.
+
+    `sig` must still be excluded -- a signature cannot cover itself.
     """
 
-    clone = {k: v for k, v in anchor.items() if k not in ("sig", "signer")}
+    clone = {k: v for k, v in anchor.items() if k != "sig"}
     return jcs.canonicalize(clone)
 
 
 def sign_anchor(anchor: dict[str, Any], identity: Identity) -> dict[str, Any]:
+    """Sign the anchor INCLUDING its `signer` field.
+
+    The signature must be computed over the dict that already carries `signer`,
+    not over the one it was derived from -- otherwise the identity is still
+    outside the pre-image and G1 is unfixed while looking fixed.
+    """
+
     signed = dict(anchor)
     signed["signer"] = identity.aid
-    signature = identity.signing_key.sign(anchor_signing_bytes(anchor)).signature
+    signature = identity.signing_key.sign(anchor_signing_bytes(signed)).signature
     signed["sig"] = "0B" + _b64url_encode(signature)
     return signed
 
@@ -324,11 +365,102 @@ def anchor_signature_problem(
     return None
 
 
+SERIES_DIRNAME = "series"
+
+
+def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
+    """Every retained anchor, keyed by its merkle_root.
+
+    `publish` used to write a single `anchor.json` and overwrite it, so the
+    `prev_root` field pointed backwards into nothing and the spec's Verify step 2
+    described a walk over a series that was never retained. Four reviewers
+    flagged the missing walk (G5); one noticed the deeper problem that there was
+    nothing to walk.
+    """
+
+    series: dict[str, dict[str, Any]] = {}
+    if series_dir is None or not series_dir.exists():
+        return series
+    for path in sorted(series_dir.glob("*.json")):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        root = document.get("merkle_root")
+        if isinstance(root, str):
+            series[root] = document
+    return series
+
+
+def walk_series(
+    anchor: dict[str, Any],
+    series: dict[str, dict[str, Any]],
+    *,
+    expected_signer: str | None = None,
+) -> dict[str, Any]:
+    """Follow `prev_root` back to genesis. Reports, never raises.
+
+    Every link is signature-checked. An unsigned or wrongly-signed ancestor is
+    the same problem as an unsigned head: an anchor series whose history can be
+    rewritten by anyone is not a series.
+    """
+
+    chain: list[str] = []
+    seen: set[str] = set()
+    cursor: dict[str, Any] | None = anchor
+    problems: list[str] = []
+    while cursor is not None:
+        root = cursor.get("merkle_root")
+        if not isinstance(root, str):
+            problems.append("an anchor in the series has no merkle_root")
+            break
+        if root in seen:
+            problems.append(f"cycle in the anchor series at {root[:16]}...")
+            break
+        seen.add(root)
+        chain.append(root)
+        prev = cursor.get("prev_root")
+        if prev is None:
+            return {
+                "reached_genesis": True,
+                "length": len(chain),
+                "chain": chain,
+                "problems": problems,
+            }
+        if not isinstance(prev, str):
+            problems.append(f"{root[:16]}... has a non-string prev_root")
+            break
+        ancestor = series.get(prev)
+        if ancestor is None:
+            # A retained series that does not reach genesis is a hole, and the
+            # hole is the finding. Do not silently treat the oldest file on disk
+            # as the beginning of history.
+            problems.append(
+                f"anchor series breaks at {prev[:16]}...: no retained anchor "
+                f"carries that root"
+            )
+            break
+        ancestor_problem = anchor_signature_problem(
+            ancestor, expected_signer=expected_signer
+        )
+        if ancestor_problem is not None:
+            problems.append(f"ancestor {prev[:16]}...: {ancestor_problem}")
+            break
+        cursor = ancestor
+    return {
+        "reached_genesis": False,
+        "length": len(chain),
+        "chain": chain,
+        "problems": problems,
+    }
+
+
 def verify_anchor(
     provenance_root: Path,
     anchor: dict[str, Any] | None,
     *,
     expected_signer: str | None = None,
+    series_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Compare the current store against an anchor. Never raises."""
 
@@ -336,6 +468,19 @@ def verify_anchor(
         return {
             "status": ANCHOR_UNAVAILABLE,
             "reason": "no anchor found",
+            "note": UNAVAILABLE_NOTE,
+        }
+    version = anchor.get("v")
+    if version not in SUPPORTED_VERSIONS:
+        # G20: the version field was written and never read, so a v1 anchor --
+        # signed over a DIFFERENT pre-image, without `signer` -- would have been
+        # handed to v2 verification rules. Refuse rather than guess.
+        return {
+            "status": ANCHOR_UNAVAILABLE,
+            "reason": (
+                f"anchor version {version!r} is not supported "
+                f"(this build verifies {sorted(SUPPORTED_VERSIONS)})"
+            ),
             "note": UNAVAILABLE_NOTE,
         }
     signature_problem = anchor_signature_problem(
@@ -352,7 +497,13 @@ def verify_anchor(
     current_root = _root_of(leaves)
     anchored_root = anchor.get("merkle_root")
 
+    # Verify step 2, which the spec has always specified and the code never did.
+    series = walk_series(
+        anchor, load_series(series_dir), expected_signer=expected_signer
+    )
+
     result: dict[str, Any] = {
+        "series": series,
         "anchored_root": anchored_root,
         "current_root": current_root,
         "anchored_at": anchor.get("generated_at"),
@@ -361,6 +512,14 @@ def verify_anchor(
         "unreadable_now": unreadable,
     }
     if current_root == anchored_root:
+        if series["problems"]:
+            # The store matches the anchor, but the anchor's own history does
+            # not hold together. Reporting VERIFIED here would attest exactly
+            # the property the walk was added to check.
+            result["status"] = ANCHOR_UNAVAILABLE
+            result["reason"] = "; ".join(series["problems"])
+            result["note"] = UNAVAILABLE_NOTE
+            return result
         result["status"] = VERIFIED
         return result
 
@@ -390,22 +549,34 @@ def verify_anchor(
             if said not in current_saids:
                 missing_heads.append({"aid": aid, "said": said})
 
+    # THE SUBSET CHECK. `ANCHOR_STALE` may only be reported when every position
+    # the anchor committed to is still present. Growth is not evidence that
+    # nothing was lost, and treating it as such is exactly the G4 defect.
+    current_positions = {(leaf.identity, leaf.sequence) for leaf in leaves}
+    missing_positions = sorted(anchored_positions(anchor) - current_positions)
+
     if vanished or regressions or missing_heads:
         result["status"] = TRUNCATION_DETECTED
+    elif missing_positions:
+        # Anchored content is gone, but no head and no identity: an interior
+        # loss. Reported as a mismatch rather than a truncation so the status
+        # does not claim more than the evidence shows -- but never as STALE.
+        result["status"] = ANCHOR_MISMATCH
     elif len(leaves) > (anchor.get("packet_count") or 0):
-        # Growth only, nothing anchored has gone. The common case between runs.
-        # Distinct from VERIFIED on purpose -- a stale anchor is not a passing
-        # anchor -- and distinct from TRUNCATION so it does not cry wolf.
+        # Growth only, and now actually checked: the anchored set is a subset of
+        # what is present. The common case between runs. Distinct from VERIFIED
+        # on purpose -- a stale anchor is not a passing anchor -- and distinct
+        # from a loss so it does not cry wolf.
         result["status"] = ANCHOR_STALE
     else:
-        # Root differs, no head is missing and no identity vanished: an interior
-        # packet changed or went. Named separately so the report does not claim
-        # a truncation it cannot demonstrate.
         result["status"] = ANCHOR_MISMATCH
     result["findings"] = {
         "vanished_identities": vanished,
         "head_regressions": regressions,
         "missing_anchored_heads": missing_heads,
+        "missing_anchored_positions": [
+            {"aid": aid, "sequence": seq} for aid, seq in missing_positions
+        ],
         "packet_delta": len(leaves) - (anchor.get("packet_count") or 0),
     }
     return result

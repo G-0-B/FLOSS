@@ -330,3 +330,183 @@ def test_each_anchor_chains_to_its_predecessor(store, identity):
     assert second["prev_root"] == first["merkle_root"]
     assert second["prev_generated_at"] == first["generated_at"]
     assert second["merkle_root"] != first["merkle_root"]
+
+
+# ---------------------------------------------------------------------------
+# Review findings from docs/reviews/2026-08-29-model-identity-anomoly.
+# Each test names the group and the number of reviewers that raised it.
+# ---------------------------------------------------------------------------
+
+
+def test_g1_the_signature_binds_the_claimed_signer(store, identity):
+    """G1, 4 reviewers. `signer` was outside the signed bytes.
+
+    With the identity excluded from the pre-image, any valid signature could be
+    re-attributed to any signer value by editing one field -- duplicate-signature
+    key selection. The signature attested the claims and not who made them.
+    """
+    signed = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    assert anchor_lib.anchor_signature_problem(signed) is None
+
+    forged = dict(signed)
+    forged["signer"] = "D" + "z" * 43
+    assert anchor_lib.anchor_signature_problem(forged) is not None
+    assert _status(store, forged)["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+
+
+def test_g20_an_unsupported_anchor_version_is_refused(store, anchored):
+    """G20. The version field was written and never read.
+
+    A v1 anchor was signed over a different pre-image -- without `signer` -- so
+    handing it to v2 rules is not a downgrade, it is a category error.
+    """
+    old = dict(anchored)
+    old["v"] = "flossi-anchor-1"
+    result = _status(store, old)
+    assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "not supported" in result["reason"]
+
+
+def test_g4_interior_deletion_with_net_growth_is_not_stale(store, anchored):
+    """G4, 4 reviewers, reproduced before the fix.
+
+    ANCHOR_STALE was `len(leaves) > packet_count` under a comment claiming
+    "nothing anchored has gone". Deleting an interior packet while adding two
+    others therefore reported honest growth.
+    """
+    (store / "2026-08-01" / "long1.json").unlink()
+    _write(store, "2026-08-03", "n1", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
+    _write(store, "2026-08-03", "n2", _packet("D" + "d" * 43, 0, "E" + "m" * 43))
+
+    result = _status(store, anchored)
+    assert result["findings"]["packet_delta"] == 1, "net growth, as in the report"
+    assert result["status"] != anchor_lib.ANCHOR_STALE
+    assert result["status"] == anchor_lib.ANCHOR_MISMATCH
+    assert result["findings"]["missing_anchored_positions"] == [
+        {"aid": "D" + "a" * 43, "sequence": 1}
+    ]
+
+
+def test_g4_genuine_growth_is_still_stale(store, anchored):
+    """The subset check must not turn every honest session into an alarm."""
+    _write(store, "2026-08-03", "n1", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
+
+    result = _status(store, anchored)
+    assert result["status"] == anchor_lib.ANCHOR_STALE
+    assert result["findings"]["missing_anchored_positions"] == []
+
+
+def test_anchored_positions_reconstructs_the_committed_set(tmp_path):
+    """max_seq plus interior_gaps already describe the occupied slots."""
+    root = tmp_path / "provenance"
+    aid = "D" + "a" * 43
+    for n in (0, 1, 3):
+        _write(root, "d", f"p{n}", _packet(aid, n, f"E{'p' * 42}{n}"))
+
+    positions = anchor_lib.anchored_positions(anchor_lib.build_anchor(root))
+    assert positions == {(aid, 0), (aid, 1), (aid, 3)}
+
+
+# ---------------------------------------------------------------------------
+# G5 — the prev_root walk, and the series it needs to walk over.
+# ---------------------------------------------------------------------------
+
+
+def _series(tmp_path, anchors):
+    d = tmp_path / "series"
+    d.mkdir(parents=True, exist_ok=True)
+    for a in anchors:
+        (d / f"{a['merkle_root']}.json").write_text(
+            json.dumps(a), encoding="utf-8"
+        )
+    return d
+
+
+def test_g5_the_walk_reaches_genesis(store, identity, tmp_path):
+    """G5, 4 reviewers. prev_root was written and never read."""
+    first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    _write(store, "2026-08-03", "n1", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
+    second = anchor_lib.sign_anchor(
+        anchor_lib.build_anchor(store, first), identity
+    )
+
+    result = anchor_lib.verify_anchor(
+        store, second, series_dir=_series(tmp_path, [first, second])
+    )
+    assert result["status"] == anchor_lib.VERIFIED
+    assert result["series"]["reached_genesis"] is True
+    assert result["series"]["length"] == 2
+    assert result["series"]["problems"] == []
+
+
+def _two_anchors(store, identity):
+    """Two anchors with DIFFERENT roots.
+
+    The store has to change between them. Anchoring an unchanged store twice
+    yields root == prev_root, which the walk correctly calls a cycle -- a real
+    property worth knowing, and not what these tests are about.
+    """
+    first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    _write(store, "2026-08-03", "grow", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
+    second = anchor_lib.sign_anchor(
+        anchor_lib.build_anchor(store, first), identity
+    )
+    assert second["merkle_root"] != first["merkle_root"]
+    assert second["prev_root"] == first["merkle_root"]
+    return first, second
+
+
+def test_g5_a_missing_ancestor_is_not_verified(store, identity, tmp_path):
+    """A store that matches its anchor, over a history with a hole in it."""
+    first, second = _two_anchors(store, identity)
+
+    result = anchor_lib.verify_anchor(
+        store, second, series_dir=_series(tmp_path, [second])
+    )
+    assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "series breaks" in result["reason"]
+
+
+def test_g5_a_tampered_ancestor_is_not_verified(store, identity, tmp_path):
+    """Every link is signature-checked, not just the head."""
+    first, second = _two_anchors(store, identity)
+    tampered = json.loads(json.dumps(first))
+    tampered["packet_count"] = 1
+
+    result = anchor_lib.verify_anchor(
+        store, second, series_dir=_series(tmp_path, [tampered, second])
+    )
+    assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "does not verify" in result["reason"]
+
+
+def test_g5_a_signed_cycle_is_reported_as_a_cycle(store, identity):
+    """Signed, so the walk gets past the signature check and reaches the loop."""
+    built = anchor_lib.build_anchor(store)
+    built["prev_root"] = built["merkle_root"]
+    looped = anchor_lib.sign_anchor(built, identity)
+    assert anchor_lib.anchor_signature_problem(looped) is None
+
+    walk = anchor_lib.walk_series(looped, {looped["merkle_root"]: looped})
+    assert walk["reached_genesis"] is False
+    assert any("cycle" in p for p in walk["problems"]), walk["problems"]
+
+
+def test_g5_anchoring_an_unchanged_store_twice_self_references(store, identity):
+    """Worth pinning: it is why the helper above mutates the store.
+
+    prev_root then equals merkle_root, and the walk reports a cycle rather than
+    a one-link history. Publishing an identical anchor is a no-op that should
+    not look like progress.
+    """
+    first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    second = anchor_lib.build_anchor(store, first)
+    assert second["prev_root"] == second["merkle_root"]
+
+
+def test_g5_genesis_alone_is_a_complete_series(store, anchored, tmp_path):
+    result = anchor_lib.verify_anchor(
+        store, anchored, series_dir=_series(tmp_path, [anchored])
+    )
+    assert result["status"] == anchor_lib.VERIFIED
+    assert result["series"]["reached_genesis"] is True

@@ -83,10 +83,52 @@ def commit_message(anchor: dict) -> str:
     )
 
 
+def _resolve_identity(identity_dir: Path, allow_new: bool):
+    """Refuse to mint a signing identity as a side effect of publishing.
+
+    `load_or_create_identity` creates a key when the directory is empty, so a
+    missing or mistyped `--identity-dir` silently minted a fresh AID and signed a
+    fresh, internally consistent anchor series -- the exact failure the spec says
+    key pinning exists to prevent. Two reviewers flagged it (G9).
+
+    Creating the first identity is legitimate; doing it by accident is not. It
+    now requires saying so.
+    """
+
+    if not (Path(identity_dir) / "private.key").exists() and not allow_new:
+        raise SystemExit(
+            f"refusing to mint a new signing identity at {identity_dir}. "
+            f"No private.key there, and an anchor signed by a brand-new key is "
+            f"a fresh consistent series that attests nothing about the old one. "
+            f"Pass --allow-new-identity if this really is the first anchor."
+        )
+    return load_or_create_identity(identity_dir)
+
+
 def _publish(args: argparse.Namespace) -> int:
     previous = anchor_lib.load_anchor(args.anchor)
     built = anchor_lib.build_anchor(args.provenance_root, previous)
-    identity = load_or_create_identity(args.identity_dir)
+    identity = _resolve_identity(args.identity_dir, args.allow_new_identity)
+
+    # Signer continuity. If a previous anchor exists, its signer is the implicit
+    # pin: changing it mid-series is precisely the rotation attack the spec
+    # names, and it should require an explicit statement rather than happening
+    # because a key directory moved.
+    if previous is not None:
+        prior_signer = previous.get("signer")
+        if (
+            isinstance(prior_signer, str)
+            and prior_signer != identity.aid
+            and not args.allow_signer_change
+        ):
+            print(
+                f"refusing to change the anchor signer. "
+                f"previous={prior_signer} now={identity.aid}. "
+                f"A new key can sign a fresh consistent series over any store. "
+                f"Pass --allow-signer-change if the rotation is intended."
+            )
+            return 3
+
     signed = anchor_lib.sign_anchor(built, identity)
 
     problem = anchor_lib.anchor_signature_problem(signed)
@@ -97,10 +139,23 @@ def _publish(args: argparse.Namespace) -> int:
         return 3
 
     args.anchor.parent.mkdir(parents=True, exist_ok=True)
-    args.anchor.write_bytes(
-        json.dumps(signed, indent=2, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        + b"\n"
-    )
+    payload = json.dumps(
+        signed, indent=2, ensure_ascii=False, sort_keys=True
+    ).encode("utf-8") + b"\n"
+
+    # RETAIN THE SERIES. Overwriting a single anchor.json left `prev_root`
+    # pointing backwards into nothing, so the "anchor series is a hash chain"
+    # claim was a field on one file rather than a retained history (G5).
+    series_dir = args.anchor.parent / anchor_lib.SERIES_DIRNAME
+    series_dir.mkdir(parents=True, exist_ok=True)
+    (series_dir / f"{signed['merkle_root']}.json").write_bytes(payload)
+
+    # Pointer written last, through a temp file. A crash mid-write used to leave
+    # a corrupt anchor.json that load_anchor read as None, which would then
+    # publish a fresh genesis over a real series (part of G10).
+    staging = args.anchor.with_suffix(".json.tmp")
+    staging.write_bytes(payload)
+    staging.replace(args.anchor)
     print(
         json.dumps(
             {
@@ -127,8 +182,20 @@ def _publish(args: argparse.Namespace) -> int:
 
 def _verify(args: argparse.Namespace) -> int:
     stored = anchor_lib.load_anchor(args.anchor)
+    # Default the pin to the stored anchor's own signer rather than to None.
+    # `--expect-signer` defaulting to None meant the documented "actual root of
+    # trust" was off unless the operator remembered to switch it on (G9). This
+    # is a weaker pin than an out-of-band one -- it detects a signer change
+    # within a retained series, not a series forged wholesale -- but it is the
+    # strongest default available without asking the operator for a key.
+    pin = args.expect_signer
+    if pin is None and not args.no_pin and isinstance(stored, dict):
+        pin = stored.get("signer")
     result = anchor_lib.verify_anchor(
-        args.provenance_root, stored, expected_signer=args.expect_signer
+        args.provenance_root,
+        stored,
+        expected_signer=pin,
+        series_dir=args.anchor.parent / anchor_lib.SERIES_DIRNAME,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False)[: args.max_output])
     return anchor_lib.EXIT_CODES.get(result["status"], 2)
@@ -146,6 +213,24 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Pin the anchor's signer AID. Pinning is the actual root of trust: "
             "without it, a fresh key can sign a fresh consistent series."
+        ),
+    )
+    parser.add_argument(
+        "--allow-new-identity",
+        action="store_true",
+        help="Permit minting a signing identity. Required for the first anchor.",
+    )
+    parser.add_argument(
+        "--allow-signer-change",
+        action="store_true",
+        help="Permit signing with a different key than the previous anchor used.",
+    )
+    parser.add_argument(
+        "--no-pin",
+        action="store_true",
+        help=(
+            "Do not pin the signer to the stored anchor's own. Weakens verify "
+            "to 'some key signed this'."
         ),
     )
     parser.add_argument(
