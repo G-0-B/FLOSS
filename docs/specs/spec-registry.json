@@ -288,6 +288,83 @@
       "spec": "GRANDFATHERED 2026-06-12 (Consent Payload Spec)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/coordination-room.schema.json": {
+      "spec": "JSON Schema for coordination-room JSONL events",
+      "spec_ref": "docs/specs/coordination-room.spec.md",
+      "tier": 1,
+      "reuse": {
+        "capability": "JSONL event line for coordination-room claim/release/broadcast",
+        "search_date": "2026-08-30",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "existing spec-registry JSON Schema style",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": {
+              "status": "passed",
+              "detail": "matches coordination-room.schema.json required keys seq, ts, type, agent_id",
+              "date": "2026-08-30"
+            },
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Event types claim|release|broadcast with optional path/text. No new schema language."
+      }
+    },
+    "FLOSS/docs/specs/coordination-room.spec.md": {
+      "spec": "File-claim MCP room: router not controller, table conflict not chat parse",
+      "spec_ref": "docs/specs/coordination-room.schema.json",
+      "tier": 1,
+      "reuse": {
+        "capability": "File-claim coordination room: exclusive path holder plus append-only broadcast log as MCP tools",
+        "search_date": "2026-08-30",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "AgentRoom (Cho & Lee arXiv:2608.23740) MCP room_claim/release/state/broadcast/read",
+            "version": "v1 2026-08-24",
+            "license": "CC BY 4.0",
+            "maintenance": "preprint",
+            "platform_fit": "file-claim MCP tools on CRDT FS; we take the tools, not pycrdt in v0",
+            "probe": {
+              "status": "passed",
+              "detail": "local PDF matches arXiv v1; paper: MCP tools not CRDT bear the load",
+              "date": "2026-08-30"
+            },
+            "truth_status": "Specified"
+          },
+          {
+            "name": "FLOSS packages/computer_use_gateway SurfaceLeaseManager",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "exclusive holder table for desktop surfaces, not file paths",
+            "probe": {
+              "status": "passed",
+              "detail": "lease tests 16/16 prior landing; compose shape, do not share table",
+              "date": "2026-08-30"
+            },
+            "truth_status": "Verified"
+          },
+          {
+            "name": "agent-room.com / agent-room-alkl hosted MCP chat",
+            "license": "product",
+            "maintenance": "active",
+            "platform_fit": "chat room; AgentRoom paper showed free-text claims fail",
+            "probe": "not_probed: rejected as chat bus",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "compose",
+        "irreducible_delta": "File-path exclusive claim plus JSONL log on loopback 7334. No pycrdt, no task claims, not the desktop lease table.",
+        "rejected_because": [
+          "Hosted Agent Room chat as the bus",
+          "Character-level CRDT on the whole repo in v0"
+        ]
+      }
+    },
     "FLOSS/docs/specs/harvest-protocol.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (HARVEST Protocol Specification)",
       "grandfathered": true

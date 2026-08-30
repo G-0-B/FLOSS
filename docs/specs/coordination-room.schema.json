@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "floss://specs/coordination-room.schema.json",
+  "title": "Coordination room event",
+  "description": "One append-only JSONL line in the coordination-room event log.",
+  "type": "object",
+  "required": ["seq", "ts", "type", "agent_id"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 1 },
+    "ts": { "type": "string" },
+    "type": { "enum": ["claim", "release", "broadcast"] },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "path": { "type": "string" },
+    "text": { "type": "string", "maxLength": 4096 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "broadcast" } } },
+      "then": { "required": ["text"] }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["claim", "release"] } } },
+      "then": { "required": ["path"] }
+    }
+  ]
+}
