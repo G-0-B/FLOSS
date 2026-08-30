@@ -781,9 +781,20 @@ def classify_tier(
         CLUSTER_SIMILARITY_THRESHOLD,
         embedded=[r.response_embedding is not None for r in responses],
     )
-    if tier == "tier1" and not separation.get("discriminative", True):
-        # `tier1` is a claim about the voters. This run made no such claim, and
-        # saying so only in prose let every machine consumer read it as one.
+    if not separation.get("discriminative", True):
+        # ANY tier, not just tier1. The guard was written for the documented
+        # all-pairs-above-threshold case and therefore only caught single-cluster
+        # runs -- while the equally non-discriminative all-pairs-BELOW case
+        # produces many clusters, lands on tier4, and was exported and rendered
+        # as measured divergence.
+        #
+        # separation_diagnostics already reports discriminative=False for both
+        # sides. Guarding one of them was reading the diagnostic and then
+        # re-deciding the question from the tier.
+        #
+        # `tier1` is a claim that the voters agreed; `tier4` is a claim that they
+        # diverged. A run whose threshold sat outside the observed spread
+        # supports neither.
         tier = TIER_UNMEASURED
 
     return TierClassification(

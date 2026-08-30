@@ -35,6 +35,7 @@ from packages.reasoning_ensemble.synthesizer import (  # noqa: E402
     degenerate_voters,
     TIER_UNMEASURED,
     classify_tier,
+    greedy_cluster,
     separation_diagnostics,
     write_synthesis,
 )
@@ -460,3 +461,50 @@ def test_an_unmeasured_run_is_not_rendered_as_tier4_divergence():
     for voter in ("alpha", "beta", "gamma"):
         assert voter in text
     assert "Representative voter" not in text
+
+
+def test_all_pairs_below_threshold_is_also_unmeasured():
+    """The guard was asymmetric: it caught one side of a two-sided property.
+
+    `separation_diagnostics` reports discriminative=False for all-above AND
+    all-below. The reclassification only tested tier1, so the all-below case —
+    which produces one cluster per voter and lands on tier4 — was exported and
+    rendered as measured divergence. `tier1` claims the voters agreed; `tier4`
+    claims they diverged; a run whose threshold sat outside the observed spread
+    supports neither.
+    """
+    responses = [
+        _resp("a", "Alpha position, stated at some length."),
+        _resp("b", "Beta position, quite different, also long."),
+        _resp("c", "Gamma position, different again, at length."),
+    ]
+    similarity = [
+        [1.0, 0.20, 0.11],
+        [0.20, 1.0, 0.19],
+        [0.11, 0.19, 1.0],
+    ]
+    assignments = greedy_cluster(responses, similarity, CLUSTER_SIMILARITY_THRESHOLD)
+    assert len(set(assignments.values())) == 3, "every voter is its own cluster"
+
+    tier = classify_tier(responses, similarity, assignments)
+    assert tier.separation["discriminative"] is False
+    assert tier.tier == TIER_UNMEASURED, "not tier4"
+    assert "Tier-4 divergence" not in write_synthesis("q?", responses, tier)
+
+
+def test_a_genuinely_split_panel_is_still_classified_normally():
+    """The guard must not swallow every multi-cluster run."""
+    responses = [
+        _resp("a", "Alpha and Beta agree with each other at length."),
+        _resp("b", "Beta and Alpha agree with each other at length."),
+        _resp("c", "Gamma disagrees with both, at length."),
+    ]
+    similarity = [
+        [1.0, 0.91, 0.30],
+        [0.91, 1.0, 0.31],
+        [0.30, 0.31, 1.0],
+    ]
+    assignments = greedy_cluster(responses, similarity, CLUSTER_SIMILARITY_THRESHOLD)
+    tier = classify_tier(responses, similarity, assignments)
+    assert tier.separation["discriminative"] is True
+    assert tier.tier != TIER_UNMEASURED

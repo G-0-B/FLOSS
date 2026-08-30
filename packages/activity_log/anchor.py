@@ -615,27 +615,43 @@ def verify_anchor(
     result["unreadable_appeared"] = sorted(current_unreadable - anchored_unreadable)
     result["unreadable_vanished"] = sorted(anchored_unreadable - current_unreadable)
 
+    # THESE TWO CHECKS ARE ABOUT THE ANCHOR, NOT THE STORE DELTA, SO THEY RUN
+    # FIRST.
+    #
+    # Both were previously nested inside `if current_root == anchored_root`,
+    # which made each of them conditional on the one thing they have nothing to
+    # do with. Add one valid packet alongside a malformed one and the root
+    # changes, so the unreadable comparison never ran and the verdict was
+    # ANCHOR_STALE -- which publish permits, signing the new damage into the
+    # baseline. Likewise a legitimately growing store over a BROKEN series
+    # returned ANCHOR_STALE, publish accepted it, another link went onto the
+    # broken history, and verification of the anchor just written reported
+    # ANCHOR_UNAVAILABLE.
+    #
+    # A history that does not hold together is unusable whatever the store did
+    # since, and damage appearing or vanishing is a finding whether or not the
+    # root also moved.
+    if series["problems"]:
+        result["status"] = ANCHOR_UNAVAILABLE
+        result["reason"] = "; ".join(series["problems"])
+        result["note"] = UNAVAILABLE_NOTE
+        return result
+
+    if result["unreadable_appeared"] or result["unreadable_vanished"]:
+        result["status"] = ANCHOR_MISMATCH
+        result["findings"] = {
+            "vanished_identities": [],
+            "head_regressions": [],
+            "missing_anchored_heads": [],
+            "missing_anchored_positions": [],
+            "missing_anchored_leaves": [],
+            "packet_delta": len(leaves) - (anchor.get("packet_count") or 0),
+            "unreadable_appeared": result["unreadable_appeared"],
+            "unreadable_vanished": result["unreadable_vanished"],
+        }
+        return result
+
     if current_root == anchored_root:
-        if result["unreadable_appeared"] or result["unreadable_vanished"]:
-            result["status"] = ANCHOR_MISMATCH
-            result["findings"] = {
-                "vanished_identities": [],
-                "head_regressions": [],
-                "missing_anchored_heads": [],
-                "missing_anchored_positions": [],
-                "packet_delta": len(leaves) - (anchor.get("packet_count") or 0),
-                "unreadable_appeared": result["unreadable_appeared"],
-                "unreadable_vanished": result["unreadable_vanished"],
-            }
-            return result
-        if series["problems"]:
-            # The store matches the anchor, but the anchor's own history does
-            # not hold together. Reporting VERIFIED here would attest exactly
-            # the property the walk was added to check.
-            result["status"] = ANCHOR_UNAVAILABLE
-            result["reason"] = "; ".join(series["problems"])
-            result["note"] = UNAVAILABLE_NOTE
-            return result
         result["status"] = VERIFIED
         return result
 

@@ -792,3 +792,48 @@ def test_invalid_utf8_is_unreadable_rather_than_a_crash(tmp_path):
     assert anchor_lib.verify_anchor(root, None)["status"] == (
         anchor_lib.ANCHOR_UNAVAILABLE
     )
+
+
+def test_new_damage_is_caught_even_when_the_store_also_grew(store, identity):
+    """The unreadable comparison must not be conditional on the root matching.
+
+    It was nested inside `if current_root == anchored_root`, so adding one valid
+    packet alongside a malformed one moved the root, skipped the check entirely,
+    and returned ANCHOR_STALE — which publish permits, signing the new damage
+    into the baseline.
+    """
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    _write(store, "2026-08-03", "legit", _packet("D" + "c" * 43, 0, "legit"))
+    (store / "2026-08-03" / "broken.json").write_text(
+        '{"t":"prov","i":"D","s":"0","d":"E' + "z" * 43 + '"}', encoding="utf-8"
+    )
+
+    result = _status(store, anchored)
+    assert result["findings"]["packet_delta"] >= 1, "the store genuinely grew"
+    assert result["status"] != anchor_lib.ANCHOR_STALE
+    assert result["unreadable_appeared"], "the new damage must be named"
+
+
+def test_a_broken_series_is_unavailable_even_when_the_store_grew(store, identity):
+    """History that does not hold together is unusable whatever the store did.
+
+    This check was also nested under the root comparison, so clean growth over a
+    broken series returned ANCHOR_STALE, publish accepted it, another link went
+    onto the broken history, and verifying the anchor just written reported
+    ANCHOR_UNAVAILABLE.
+    """
+    first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    _write(store, "2026-08-03", "g1", _packet("D" + "c" * 43, 0, "g1"))
+    second = anchor_lib.sign_anchor(anchor_lib.build_anchor(store, first), identity)
+    _write(store, "2026-08-03", "g2", _packet("D" + "d" * 43, 0, "g2"))
+
+    series = store.parent / "series"
+    series.mkdir(parents=True, exist_ok=True)
+    # the predecessor is NOT retained
+    (series / f"{second['merkle_root']}.json").write_text(
+        json.dumps(second), encoding="utf-8"
+    )
+
+    result = anchor_lib.verify_anchor(store, second, series_dir=series)
+    assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "series breaks" in result["reason"]
