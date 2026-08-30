@@ -80,6 +80,7 @@ python C:\~shit\FLOSS\scripts\audit_provenance_packets.py
 | Dynamic poll slate | `FLOSS/scripts/heartbeat_slate.py` | Local | `.agent-surface/heartbeat/next_slate.json` | `docs/architecture/METAHARNESS_OPERATING_MODEL.md` |
 | High-ROI poll | `FLOSS/scripts/poll_high_roi_actions.py` | Voter calls | `.agent-surface/polls/`, source-chain claims | `docs/specs/heartbeat-runtime-budget.spec.md`, ADR-10 |
 | Consensus gateway | `FLOSS/packages/metacoordinator_mcp/` | Voter calls | `~/.floss_agent/cells/.../source_chain/` | ADR-10 / `ADR-MCP-ORCHESTRATOR` |
+| Coordination room | `FLOSS/packages/coordination_room/` + `flossiullk-coordination-room` MCP (`127.0.0.1:7334`) | Local | `.agent-surface/rooms/default/events.jsonl` | `docs/specs/coordination-room.spec.md` — file-claim router; not in `start_mcp_daemons.ps1` yet |
 | Reasoning ensemble | `FLOSS/packages/reasoning_ensemble/` + `flossiullk-reasoning-ensemble` MCP | Local/LLM calls | `.agent-surface/reasoning/` | `docs/specs/reasoning-ensemble-{router,synthesizer,mcp}.spec.md` |
 | Activity log | `FLOSS/packages/activity_log/schema.py` | Local | `.agent-surface/activity.jsonl` | `docs/research/2026-05-18-metaharness-unification.md` |
 | Provenance packets | `FLOSS/packages/activity_log/provenance.py`, `FLOSS/scripts/audit_provenance_packets.py` | Local | `.agent-surface/provenance/` | `docs/specs/provenance-packet.spec.md` |

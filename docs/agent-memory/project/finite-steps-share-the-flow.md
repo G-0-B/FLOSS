@@ -23,7 +23,7 @@ Do not restart the cosmos each session. Upgrade the artifact. Resistance matches
 
 ## This session's application
 
-Computer-use lease router is a finite step. Daemon lifecycle belongs in existing `start_mcp_daemons.ps1` / materializer iteration, not a Grok-owned process. Local-model organizer is the next intended step. Consensus/provenance repair is in-flight elsewhere — do not pile on.
+Computer-use lease router is a finite step. Coordination room v0 (`packages/coordination_room/`, `:7334`) is the next finite step: file-claim MCP so the human is not the write bus. How-to: `coordination-room-v0.md`. Daemon lifecycle still belongs in existing `start_mcp_daemons.ps1` / materializer iteration, not a Grok-owned process. MELD knowledge-merge and local-model organizer remain later. Consensus/provenance repair is in-flight elsewhere — do not pile on.
 
 ## Do not
 
