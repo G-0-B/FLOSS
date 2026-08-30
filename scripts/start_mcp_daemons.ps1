@@ -71,7 +71,18 @@ if ($py -and (Test-Path $omniPid)) {
     if ($tok) { $tok = $tok.ToString().Trim() }
     if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
-if ($omniVerdict -eq 'OURS') {
+# UNKNOWN IS OCCUPIED, not free.
+#
+# The stop path and claim_singleton both treat an unverifiable holder as
+# still holding; this branch treated it as absent and started a duplicate.
+# The duplicate then loses the port bind, but --record-identity has ALREADY
+# overwritten the record with its PID -- so when it exits, the original
+# OmniRoute is live, untracked, and can no longer be stopped by the
+# companion script. Same verdict, three callers, and this was the one that
+# read it optimistically.
+if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
+    Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."
+} elseif ($omniVerdict -eq 'OURS') {
     Write-Host "[FLOSS MCP] OmniRoute already running (recorded PID $(Get-Content $omniPid -Raw))"
 } else {
     $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'

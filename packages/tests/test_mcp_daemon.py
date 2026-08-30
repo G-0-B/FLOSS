@@ -587,3 +587,48 @@ def test_the_start_script_parses_under_windows_powershell_5():
         if stripped.startswith("#"):
             continue
         assert "?." not in stripped, f"PowerShell 7-only operator in: {stripped}"
+
+
+def _script(name: str) -> str:
+    return (
+        Path(__file__).resolve().parents[2] / "scripts" / name
+    ).read_text(encoding="utf-8")
+
+
+def test_no_stop_process_deletes_a_record_without_confirming(tmp_path):
+    """Both kill sites must confirm before removing the record.
+
+    The Python-daemon branch did this and explained why; the OmniRoute branch
+    added later used `-ErrorAction SilentlyContinue` and deleted the PID and
+    identity regardless, so an access-denied failure left a live process
+    unfindable while the script reported it stopped. One file, two branches, one
+    of them written without reading the other.
+    """
+    script = _script("stop_mcp_daemons.ps1")
+    kills = [
+        line for line in script.splitlines()
+        if "Stop-Process" in line and not line.strip().startswith("#")
+    ]
+    assert len(kills) >= 2, "kill sites moved; update this guard"
+    for line in kills:
+        assert "-ErrorAction Stop" in line, (
+            f"a suppressed failure is indistinguishable from success: {line.strip()}"
+        )
+
+
+def test_unknown_identity_is_conservative_in_every_caller():
+    """UNKNOWN means occupied, everywhere.
+
+    claim_singleton and the stop path both treat an unverifiable holder as still
+    holding. The start path read the same verdict optimistically and launched a
+    duplicate, which loses the port bind AFTER --record-identity has overwritten
+    the record with its own PID -- leaving the original live, untracked, and
+    unstoppable by the companion script.
+    """
+    start = _script("start_mcp_daemons.ps1")
+    stop = _script("stop_mcp_daemons.ps1")
+
+    assert "$omniVerdict -eq 'UNKNOWN'" in start, "start must handle UNKNOWN explicitly"
+    assert "not starting a duplicate" in start
+    assert "$verdict -ne 'OURS'" in stop, "stop kills only on a proven match"
+    assert "refusing to force-kill" in stop

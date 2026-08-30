@@ -154,11 +154,31 @@ if ($py -and (Test-Path $omniPid)) {
     if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
 if ($omniVerdict -eq 'OURS') {
+    # CONFIRM IT IS GONE BEFORE DELETING THE RECORD.
+    #
+    # -ErrorAction SilentlyContinue swallowed access-denied and every other
+    # transient failure, and the next two lines deleted the record anyway:
+    # the live process became unfindable while the script reported it
+    # stopped. The Python-daemon branch fifteen lines above does this
+    # correctly and says why; this branch was written without looking at it.
     $omniId = [int]((Get-Content $omniPid -Raw).Trim())
-    Stop-Process -Id $omniId -Force -ErrorAction SilentlyContinue
-    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
-    Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-    Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
+    $omniStopped = $false
+    try {
+        Stop-Process -Id $omniId -Force -ErrorAction Stop
+        $omniStopped = $true
+    } catch {
+        if (-not (Get-Process -Id $omniId -ErrorAction SilentlyContinue)) {
+            $omniStopped = $true
+        } else {
+            Write-Host "[FLOSS MCP] OmniRoute PID $omniId is ALIVE but could not be stopped: $($_.Exception.Message)"
+            Write-Host "[FLOSS MCP] Keeping $omniPid so it stays findable."
+        }
+    }
+    if ($omniStopped) {
+        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+        Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
+    }
 } elseif ($omniVerdict -eq 'FOREIGN') {
     Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue

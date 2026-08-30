@@ -837,3 +837,56 @@ def test_a_broken_series_is_unavailable_even_when_the_store_grew(store, identity
     result = anchor_lib.verify_anchor(store, second, series_dir=series)
     assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
     assert "series breaks" in result["reason"]
+
+
+def test_every_json_reader_survives_invalid_utf8(tmp_path):
+    """Generic, not per-instance.
+
+    `scan_packets` was fixed for UnicodeDecodeError and its two siblings —
+    `load_series` and `load_anchor` — were not. Review named one of the two. A
+    guard written per reported instance leaves the next one, so this asserts the
+    property across every reader instead of the three that exist today.
+    """
+    bad = tmp_path / "bad.json"
+    bad.write_bytes(b'{"merkle_root":"E\xff\xfe"}')
+
+    # load_anchor: a corrupt anchor.json must not crash publish OR verify
+    assert anchor_lib.load_anchor(bad) is None
+
+    # load_series: one bad file must not take the whole series down
+    series = tmp_path / "series"
+    series.mkdir()
+    (series / "bad.json").write_bytes(b'{"merkle_root":"E\xff\xfe"}')
+    good = {"merkle_root": "E" + "a" * 43, "prev_root": None}
+    (series / "good.json").write_text(json.dumps(good), encoding="utf-8")
+    loaded = anchor_lib.load_series(series)
+    assert list(loaded) == ["E" + "a" * 43], "the readable one still loads"
+
+    # scan_packets: already covered, asserted here so the three stay together
+    store = tmp_path / "prov"
+    (store / "d").mkdir(parents=True)
+    (store / "d" / "p.json").write_bytes(b'{"t":"prov","i":"D","s":"0","d":"E\xff"}')
+    leaves, unreadable = anchor_lib.scan_packets(store)
+    assert leaves == [] and len(unreadable) == 1
+
+
+def test_no_json_reader_omits_unicodeerror():
+    """The guard that catches the next one, not just today's three."""
+    import re
+
+    source = (
+        Path(anchor_lib.__file__).read_text(encoding="utf-8")
+    )
+    readers = [
+        m for m in re.finditer(r"json\.loads\(path\.read_text", source)
+    ]
+    assert len(readers) >= 3, "readers moved; update this guard"
+    for index, match in enumerate(readers):
+        # up to the NEXT reader, so a long explanatory comment between the try
+        # and its except does not hide the clause
+        stop = readers[index + 1].start() if index + 1 < len(readers) else len(source)
+        clause = re.search(r"except \(([^)]*)\)", source[match.end():stop])
+        assert clause, f"no except clause after reader at {match.start()}"
+        assert "UnicodeError" in clause.group(1), (
+            f"reader at offset {match.start()} does not catch UnicodeError"
+        )

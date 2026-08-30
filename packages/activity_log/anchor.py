@@ -466,7 +466,11 @@ def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
     for path in sorted(series_dir.glob("*.json")):
         try:
             document = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        # UnicodeError too. `scan_packets` was fixed for exactly this and its two
+        # sibling readers were not, so one invalid byte in an unrelated retained
+        # anchor crashed the whole verdict instead of producing the structured
+        # ANCHOR_UNAVAILABLE the caller is promised.
+        except (OSError, UnicodeError, json.JSONDecodeError):
             continue
         root = document.get("merkle_root")
         if isinstance(root, str):
@@ -724,5 +728,8 @@ def verify_anchor(
 def load_anchor(path: Path) -> dict[str, Any] | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    # The third reader, unnamed by review. A corrupt anchor.json crashed BOTH
+    # publish and verify -- and publish reads it to decide whether a predecessor
+    # exists, so a single bad byte took down the command that would replace it.
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
