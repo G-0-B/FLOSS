@@ -719,3 +719,76 @@ def test_the_spec_states_the_signature_scope_the_code_implements():
     signed_bytes = anchor_lib.anchor_signing_bytes(probe)
     assert b"signer" in signed_bytes, "signer must be inside the pre-image"
     assert b'"sig"' not in signed_bytes, "a signature cannot cover itself"
+
+
+def test_a_same_slot_substitution_with_growth_is_not_stale(store, identity):
+    """Positions are a weaker proxy for what digests state exactly.
+
+    Replacing a NON-HEAD packet with a different one at the same (identity,
+    sequence) while the store also grows leaves every anchored position
+    occupied, the count higher, and — before this fix — the verdict
+    ANCHOR_STALE. The pre-publish guard permits STALE, so the loss would have
+    been absorbed into the replacement anchor. That is the count-comparison
+    defect one level up.
+    """
+    aid = "D" + "a" * 43
+    target = store / "2026-08-01" / "long1.json"
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    original = json.loads(target.read_text(encoding="utf-8"))
+
+    target.write_text(json.dumps(_packet(aid, 1, "SWAPPED")), encoding="utf-8")
+    _write(store, "2026-08-03", "extra", _packet("D" + "c" * 43, 0, "extra"))
+
+    result = _status(store, anchored)
+    assert result["findings"]["packet_delta"] == 1, "the store still grew"
+    assert result["findings"]["missing_anchored_positions"] == [], (
+        "every anchored position is still occupied — which is why positions "
+        "alone could not see this"
+    )
+    assert result["status"] != anchor_lib.ANCHOR_STALE
+    missing = result["findings"]["missing_anchored_leaves"]
+    assert [m["said"] for m in missing] == [original["d"]]
+    assert missing[0]["sequence"] == 1
+
+
+def test_the_anchor_records_every_leaf_not_only_heads(store):
+    built = anchor_lib.build_anchor(store)
+    long_chain = next(
+        e for e in built["identities"] if e["count"] == 4
+    )
+    assert len(long_chain["leaf_saids"]) == 4
+    assert [pair[0] for pair in long_chain["leaf_saids"]] == [0, 1, 2, 3]
+    # head_saids stays, and must agree with the tail of leaf_saids
+    assert long_chain["head_saids"] == [long_chain["leaf_saids"][-1][1]]
+
+
+def test_a_v2_anchor_is_refused_because_it_cannot_be_checked_exactly(store, identity):
+    """v2 has no leaf_saids, so its subset check would silently be the weak one."""
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    old = dict(anchored)
+    old["v"] = "flossi-anchor-2"
+    result = _status(store, old)
+    assert result["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "not supported" in result["reason"]
+
+
+def test_invalid_utf8_is_unreadable_rather_than_a_crash(tmp_path):
+    """`Path.read_text` raises UnicodeDecodeError, which is neither OSError nor
+    JSONDecodeError — so one corrupt byte crashed both publish and verify with a
+    traceback, breaking verify_anchor's documented never-raises contract for
+    exactly the malformed input the unreadable set exists to report.
+    """
+    root = tmp_path / "prov"
+    (root / "d").mkdir(parents=True)
+    (root / "d" / "bad.json").write_bytes(
+        b'{"t":"prov","i":"D","s":"0","d":"E\xff\xfe"}'
+    )
+
+    leaves, unreadable = anchor_lib.scan_packets(root)
+    assert leaves == []
+    assert len(unreadable) == 1
+    assert "codec can't decode" in unreadable[0]["error"]
+    # and the whole verdict path stays non-raising
+    assert anchor_lib.verify_anchor(root, None)["status"] == (
+        anchor_lib.ANCHOR_UNAVAILABLE
+    )

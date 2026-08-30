@@ -60,10 +60,19 @@ from packages.activity_log.provenance import (
     _said_digest,
 )
 
-# Bumped from flossi-anchor-1 on 2026-08-29. `signer` moved INSIDE the signed
-# bytes (review finding G1), which changes the pre-image, so v1 anchors cannot be
-# verified under v2 rules and must be rejected rather than silently mis-verified.
-ANCHOR_VERSION = "flossi-anchor-2"
+# v1 -> v2 (2026-08-29): `signer` moved INSIDE the signed bytes, changing the
+# pre-image, so v1 anchors cannot be verified under v2 rules.
+#
+# v2 -> v3 (2026-08-29): identities carry `leaf_saids`, the full [sequence, said]
+# list. The subset check compared only OCCUPIED POSITIONS, so replacing a
+# non-head packet with a different SAID at the same (identity, sequence) while
+# the store also grew left every position occupied, the count higher, and the
+# verdict ANCHOR_STALE -- which the pre-publish guard permits, so the loss was
+# absorbed into the replacement anchor. That is the count-comparison defect one
+# level up: positions are a weaker proxy for the same thing digests state
+# exactly. Old anchors lack the field and are refused rather than checked
+# loosely.
+ANCHOR_VERSION = "flossi-anchor-3"
 SUPPORTED_VERSIONS = frozenset({ANCHOR_VERSION})
 
 # Domain separation, RFC 6962 style: a leaf hash and an interior hash must never
@@ -175,7 +184,13 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
     for path in sorted(provenance_root.rglob("*.json")):
         try:
             document = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        # UnicodeError too: Path.read_text raises UnicodeDecodeError on invalid
+        # UTF-8, which is neither an OSError nor a JSONDecodeError, so a single
+        # corrupt byte in any packet crashed BOTH publish and verify with a
+        # traceback -- breaking verify_anchor's documented "never raises"
+        # contract for exactly the malformed input the unreadable set exists to
+        # report. provenance.py's indexers already catch it.
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             unreadable.append(
                 {"path": _relative(path, provenance_root), "error": str(exc)[:160]}
             )
@@ -271,6 +286,12 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
                 "head_saids": sorted(
                     leaf.said for leaf in group if leaf.sequence == top
                 ),
+                # Every leaf, not just the heads. Positions alone cannot detect a
+                # same-slot substitution, and the diagnosis has to be able to
+                # name which digest went rather than only which slot emptied.
+                "leaf_saids": sorted(
+                    [leaf.sequence, leaf.said] for leaf in group
+                ),
                 # Recorded IN the anchor on purpose. Freezing the store's known
                 # damage means later damage cannot be laundered as
                 # pre-existing.
@@ -279,6 +300,30 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
             }
         )
     return summaries
+
+
+def anchored_leaves(anchor: dict[str, Any]) -> set[tuple[str, int, str]]:
+    """Every (identity, sequence, SAID) the anchor committed to.
+
+    Read from `leaf_saids`, which v3 records. The position-only view below
+    cannot see a packet being swapped for a different one in the same slot, and
+    that is exactly what a subset check has to catch.
+    """
+
+    leaves: set[tuple[str, int, str]] = set()
+    for entry in anchor.get("identities", []) or []:
+        aid = entry.get("aid")
+        if not isinstance(aid, str):
+            continue
+        for pair in entry.get("leaf_saids") or []:
+            if (
+                isinstance(pair, (list, tuple))
+                and len(pair) == 2
+                and isinstance(pair[0], int)
+                and isinstance(pair[1], str)
+            ):
+                leaves.add((aid, pair[0], pair[1]))
+    return leaves
 
 
 def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
@@ -625,10 +670,13 @@ def verify_anchor(
     # nothing was lost, and treating it as such is exactly the G4 defect.
     current_positions = {(leaf.identity, leaf.sequence) for leaf in leaves}
     missing_positions = sorted(anchored_positions(anchor) - current_positions)
+    # And the digests, which positions cannot speak for.
+    current_leaves = {(leaf.identity, leaf.sequence, leaf.said) for leaf in leaves}
+    missing_leaves = sorted(anchored_leaves(anchor) - current_leaves)
 
     if vanished or regressions or missing_heads:
         result["status"] = TRUNCATION_DETECTED
-    elif missing_positions:
+    elif missing_positions or missing_leaves:
         # Anchored content is gone, but no head and no identity: an interior
         # loss. Reported as a mismatch rather than a truncation so the status
         # does not claim more than the evidence shows -- but never as STALE.
@@ -647,6 +695,10 @@ def verify_anchor(
         "missing_anchored_heads": missing_heads,
         "missing_anchored_positions": [
             {"aid": aid, "sequence": seq} for aid, seq in missing_positions
+        ],
+        "missing_anchored_leaves": [
+            {"aid": aid, "sequence": seq, "said": said}
+            for aid, seq, said in missing_leaves
         ],
         "packet_delta": len(leaves) - (anchor.get("packet_count") or 0),
     }

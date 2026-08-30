@@ -1,8 +1,10 @@
 # Provenance Anchor Specification
 
 - Version: 1.0.0
-- Version: 2.0.0 — `flossi-anchor-2`. v1 anchors are refused, not upgraded:
-  `signer` moved inside the signed bytes, so the pre-image differs.
+- Version: 3.0.0 — `flossi-anchor-3`. Earlier anchors are refused, not upgraded.
+  v1 → v2 moved `signer` inside the signed bytes, changing the pre-image;
+  v2 → v3 added `leaf_saids`, without which the subset check silently degrades
+  to the weaker position-only form.
 - Status: ⚠️ Specified — implementation ✅ Verified against the live store.
   **External witnessing: git-tag carrier ❌ Blocked; OpenTimestamps ⚠️ Specified**
   — stamping is implemented and exercised end-to-end, but no proof has yet
@@ -101,7 +103,7 @@ hash               "blake3-256/jcs"
 packet_count       integer
 identity_count     integer
 merkle_root        root over all leaves
-identities[]       aid, count, max_seq, head_saids[], interior_gaps[], duplicate_seqs[]
+identities[]       aid, count, max_seq, head_saids[], leaf_saids[], interior_gaps[], duplicate_seqs[]
 unreadable[]       malformed files, NAMED rather than skipped
 prev_root          previous anchor's merkle_root, or null at genesis
 prev_generated_at  previous anchor's generated_at, or null
@@ -111,6 +113,14 @@ sig                "0B" + base64url signature
 
 `head_saids` is a **list**. Slots in the live store already hold two occupants;
 flattening that would anchor a fork as if it were a single head.
+
+`leaf_saids` records **every** leaf as `[sequence, said]`, not only the heads.
+Added in v3: the subset check compared occupied *positions*, so replacing a
+non-head packet with a different one at the same `(identity, sequence)` while
+the store also grew left every position occupied and the count higher, and the
+verdict was `ANCHOR_STALE` — which the pre-publish guard permits, so the loss
+was absorbed into the replacement anchor. Positions are a weaker proxy for what
+digests state exactly, which is the count-comparison defect one level up.
 
 `interior_gaps` and `duplicate_seqs` are recorded **in** the anchor on purpose.
 Freezing the store's known damage — the four holes on `DkuY…` at 3/36/37/39, the

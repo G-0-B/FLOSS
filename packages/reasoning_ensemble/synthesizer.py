@@ -954,6 +954,37 @@ def write_synthesis(
                 "logged to activity log but not surfaced.)_"
             )
 
+    elif tier_class.tier == TIER_UNMEASURED:
+        # Its own branch. Reclassifying a single-cluster run to `unmeasured`
+        # dropped it into the tier4 `else`, so the artifact said consensus was
+        # unmeasured and then, three lines later, claimed "Tier-4 divergence
+        # preserved" and "No single cluster carried the majority" -- about a run
+        # that had exactly ONE cluster. A reader could believe either half.
+        lines.append("## Consensus not measured")
+        lines.append("")
+        lines.append(
+            "Every voter landed in one cluster, and the clustering could not "
+            "have produced more than one. That is a property of the metric, not "
+            "a finding about the voters: this run neither established agreement "
+            "nor observed divergence."
+        )
+        lines.append("")
+        lines.append("**The responses are the output. All of them, unranked:**")
+        lines.append("")
+        for voter_id in tier_class.cluster_assignments:
+            voter = voter_by_id.get(voter_id)
+            if voter is None:
+                continue
+            lines.append(f"### {voter.voter_id} ({voter.family})")
+            lines.append("")
+            lines.append(f"> {voter.response}")
+            lines.append("")
+        lines.append(
+            "_(Nothing was combined and nothing was selected as representative. "
+            "Any disagreement between these responses is present above and was "
+            "not measured by the clustering.)_"
+        )
+
     else:  # tier4
         lines.append("## Tier-4 divergence preserved")
         lines.append("")

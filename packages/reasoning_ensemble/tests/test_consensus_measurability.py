@@ -429,3 +429,34 @@ def test_a_measurable_unanimous_run_is_still_tier1():
     tier = classify_tier(responses, similarity, {"alpha": 0, "beta": 0, "gamma": 0})
     assert tier.tier == "tier1"
     assert tier.consensus_was_measurable is True
+
+
+def test_an_unmeasured_run_is_not_rendered_as_tier4_divergence():
+    """The reclassification dropped into the tier4 `else` branch.
+
+    The artifact then said consensus was unmeasured and, three lines later,
+    claimed "Tier-4 divergence preserved" and "No single cluster carried the
+    majority" — about a run that had exactly ONE cluster. A reader could believe
+    either half.
+    """
+    responses = [
+        _resp("alpha", "Alpha says the bridge is fine. It is fine."),
+        _resp("beta", "Beta says the bridge is broken. It is broken."),
+        _resp("gamma", "Gamma says something else entirely, at length."),
+    ]
+    similarity = [
+        [1.0, 0.91, 0.88],
+        [0.91, 1.0, 0.90],
+        [0.88, 0.90, 1.0],
+    ]
+    tier = classify_tier(responses, similarity, {"alpha": 0, "beta": 0, "gamma": 0})
+    assert tier.tier == TIER_UNMEASURED
+
+    text = write_synthesis("does the bridge work?", responses, tier)
+    assert "Tier-4 divergence" not in text
+    assert "carried the majority" not in text
+    assert "Consensus not measured" in text
+    # every response is present, none promoted as representative
+    for voter in ("alpha", "beta", "gamma"):
+        assert voter in text
+    assert "Representative voter" not in text
