@@ -181,7 +181,7 @@ ruff check .
 
 ## MCP & Hooks
 
-`.mcp.json` and `.claude/settings.json` live at both the workspace root (`C:\~shit\`) and at this `FLOSS/` level so sessions launched from either location pick them up automatically. The MCP configuration exposes the passive-router consensus gateway (`packages/metacoordinator_mcp/server.py`) as a tool surface for multi-model Claim/Vote collaboration.
+`.mcp.json` and `.claude/settings.json` live at both the workspace root (`C:\~shit\`) and at this `FLOSS/` level so sessions launched from either location pick them up automatically. The MCP configuration exposes the passive-router consensus gateway (`packages/metacoordinator_mcp/server.py`) as a tool surface for multi-model Claim/Vote collaboration, and the coordination room (`packages/coordination_room/`, `flossiullk-coordination-room` on `127.0.0.1:7334`) for file-path claims so agents do not use the human as the write bus. How-to: `docs/agent-memory/project/coordination-room-v0.md`.
 
 ## Historical Reference
 
