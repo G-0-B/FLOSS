@@ -510,3 +510,70 @@ def test_g5_genesis_alone_is_a_complete_series(store, anchored, tmp_path):
     )
     assert result["status"] == anchor_lib.VERIFIED
     assert result["series"]["reached_genesis"] is True
+
+
+def test_publish_must_not_launder_a_loss_into_the_new_baseline(tmp_path, identity):
+    """Review finding: publish never checked the store against the anchor.
+
+    An accidental truncation was written straight into the new baseline -- the
+    next verify reported VERIFIED over a store that had lost packets, and the
+    only record that anything went missing was the anchor being overwritten.
+    This is the actionable half of the standing "republish over a truncated
+    store returns VERIFIED" finding.
+    """
+    import subprocess
+
+    store = tmp_path / "prov"
+    (store / "d").mkdir(parents=True)
+    aid = "D" + "a" * 43
+    for n in range(4):
+        _write(store, "d", f"p{n}", _packet(aid, n, f"E{'x' * 42}{n}"))
+    anchor_path = tmp_path / "anchors" / "anchor.json"
+    script = REPO_ROOT / "scripts" / "provenance_anchor.py"
+    base = [
+        sys.executable, str(script),
+        "--provenance-root", str(store),
+        "--identity-dir", str(tmp_path / "id"),
+        "--anchor", str(anchor_path),
+    ]
+
+    first = subprocess.run(base + ["publish", "--allow-new-identity"],
+                           capture_output=True, text=True)
+    assert first.returncode == 0, first.stderr[-400:]
+
+    (store / "d" / "p3.json").unlink()  # truncate the head
+
+    refused = subprocess.run(base + ["publish"], capture_output=True, text=True)
+    assert refused.returncode == 2, refused.stdout + refused.stderr[-300:]
+    assert "refusing to publish" in refused.stdout
+    assert "TRUNCATION_DETECTED" in refused.stdout
+    # The refusal must name what is missing, not just decline.
+    assert "head_regressions" in refused.stdout
+
+    forced = subprocess.run(base + ["publish", "--force"], capture_output=True, text=True)
+    assert forced.returncode == 0, "an operator who understands the loss can still proceed"
+    assert "merkle_root" in forced.stdout
+
+
+def test_the_cli_survives_an_anchor_path_outside_the_repository(tmp_path, identity):
+    """`relative_to` RAISES outside the repo, and publish called it after writing.
+
+    Every earlier run used the in-repo default and never reached this line, so
+    the crash was invisible until a test used tmp_path.
+    """
+    import subprocess
+
+    store = tmp_path / "prov"
+    _write(store, "d", "p0", _packet("D" + "a" * 43, 0, "E" + "x" * 43))
+    result = subprocess.run(
+        [
+            sys.executable, str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+            "--provenance-root", str(store),
+            "--identity-dir", str(tmp_path / "id"),
+            "--anchor", str(tmp_path / "elsewhere" / "anchor.json"),
+            "publish", "--allow-new-identity",
+        ],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr[-500:]
+    assert "Traceback" not in result.stderr

@@ -183,7 +183,17 @@ def claim_singleton(pid_filename: str) -> bool:
             # Stale holder: drop it and race for the exclusive create again
             # rather than overwriting, so a concurrent launcher that wins the
             # retry still blocks us instead of both proceeding.
+            #
+            # THE SIDECAR GOES FIRST. Unlinking only the PID file leaves the old
+            # identity token on disk, and the window between the two unlinks is
+            # exploitable: launcher A wins the exclusive create and writes its
+            # new PID, launcher B still sees the STALE token beside it, judges
+            # A's valid claim stale, unlinks it, and claims the slot too. Both
+            # then return success and race for the same port. Removing the
+            # identity first means the worst case is an unverifiable holder,
+            # which blocks, rather than a mismatched one, which does not.
             try:
+                _identity_path(pid_path).unlink(missing_ok=True)
                 pid_path.unlink(missing_ok=True)
             except OSError:
                 return False
@@ -346,3 +356,47 @@ def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
     mcp.settings.port = port
     mcp.settings.host = "127.0.0.1"
     mcp.run(transport="streamable-http")
+
+
+def _identity_cli() -> int:
+    """`python -m packages.mcp_daemon --check-identity <pid_file>`.
+
+    Exists so the stop script does not reimplement the creation-token format in
+    PowerShell. ONE implementation, two callers. An identity check written twice
+    in two languages is the drift this repository keeps recording as FM-4 -- and
+    a stop path computing the token slightly differently would either refuse to
+    stop real daemons or agree to kill innocent processes. A first attempt at the
+    PowerShell version already produced a different token for the same PID,
+    because `-band 0xFFFFFFFF` does not mask an int64 there.
+
+    Exit codes: 0 the live PID is provably ours, 1 provably NOT ours (dead, or a
+    different process), 2 cannot tell. The caller must treat 2 as "do not kill",
+    for the same reason claim_singleton treats it as "still blocked".
+    """
+
+    if len(sys.argv) < 3:
+        print("usage: --check-identity <pid_file>", file=sys.stderr)
+        return 2
+    pid_path = Path(sys.argv[2])
+    try:
+        pid = int(pid_path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return 2
+    if not _pid_alive(pid):
+        return 1
+    try:
+        recorded = _identity_path(pid_path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return 2
+    if not recorded:
+        return 2
+    current = _process_start_token(pid)
+    if current is None:
+        return 2
+    return 0 if current == recorded else 1
+
+
+if __name__ == "__main__":
+    if "--check-identity" in sys.argv:
+        raise SystemExit(_identity_cli())
+    raise SystemExit(0)

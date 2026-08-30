@@ -178,7 +178,21 @@ def _litellm_generate(model: str, prompt: str, timeout: int) -> str:
     if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
         from packages.omniroute_client import completion as _omni
 
-        return _omni(model, [{"role": "user", "content": prompt}], max_tokens=600, temperature=0.4)
+        # timeout forwarded. Without it omniroute_client.completion() applies
+        # its own 60s default against a 180s voter budget, so a generation
+        # finishing between 60s and 180s is recorded as a failed voter and can
+        # push the round to DEGRADED while staying inside its configured budget.
+        #
+        # This is the SIBLING of the embedding-path defect fixed earlier in this
+        # branch. Fixing one omniroute call site and not the other is the same
+        # mistake the failure-mode register records as FM-4.
+        return _omni(
+            model,
+            [{"role": "user", "content": prompt}],
+            max_tokens=600,
+            temperature=0.4,
+            timeout=timeout,
+        )
     from litellm import completion
 
     resp = completion(

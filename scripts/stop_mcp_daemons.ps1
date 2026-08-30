@@ -39,6 +39,39 @@ foreach ($pidFile in $pidFiles) {
         # unfindable -- the same end state the $PID bug above produced, reached
         # a different way. Confirm the process is actually gone before removing
         # the file.
+        # IDENTITY BEFORE FORCE. claim_singleton records a process-creation
+        # token beside the PID file; this path never read it, so after a crash
+        # or reboot a reassigned PID was killed and its file deleted -- the
+        # user-impacting half of the PID-reuse defect, still live after the
+        # claim-side fix.
+        #
+        # The check is DELEGATED to mcp_daemon rather than reimplemented here.
+        # One implementation, two callers: a first attempt at computing the
+        # token in PowerShell produced a DIFFERENT value for the same PID,
+        # because `-band 0xFFFFFFFF` does not mask an int64. A stop path with a
+        # slightly different token would refuse to stop real daemons or agree
+        # to kill innocent ones.
+        #
+        # Exit 0 = provably ours, 1 = provably not, 2 = cannot tell. Only 0 may
+        # kill; 2 keeps the conservative behaviour claim_singleton uses.
+        $identity = 2
+        try {
+            & python -m packages.mcp_daemon --check-identity $pidPath 2>$null | Out-Null
+            $identity = $LASTEXITCODE
+        } catch {
+            $identity = 2
+        }
+        if ($identity -eq 1) {
+            Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon (identity mismatch or process gone) - removing the stale file, killing nothing"
+            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+            Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
+            continue
+        }
+        if ($identity -ne 0) {
+            Write-Host "[FLOSS MCP] $pidFile PID $daemonPid identity UNVERIFIABLE - refusing to force-kill. Stop it manually if it really is ours."
+            continue
+        }
+
         $stopped = $false
         try {
             Stop-Process -Id $daemonPid -Force -ErrorAction Stop

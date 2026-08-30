@@ -323,3 +323,76 @@ def test_the_token_is_stable_across_calls():
     if first is None:
         pytest.skip("no process-creation token on this platform")
     assert first == mcp_daemon._process_start_token(os.getpid())
+
+
+def test_the_stale_sidecar_is_removed_before_the_pid_file(tmp_path, monkeypatch):
+    """Reopening the PID slot must not leave the old token behind.
+
+    Unlinking only the PID file leaves a window: launcher A wins the exclusive
+    create and writes its new PID, launcher B still sees the STALE token beside
+    it, judges A's valid claim stale, unlinks it, and claims the slot too. Both
+    return success and race for the same port.
+    """
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    pid_path = tmp_path / "race.pid"
+    pid_path.write_text("999999999", encoding="utf-8")  # dead pid
+    mcp_daemon._identity_path(pid_path).write_text("stale-token", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("race.pid") is True
+    # The sidecar now describes US, not the dead holder.
+    token = mcp_daemon._process_start_token(os.getpid())
+    if token is None:
+        pytest.skip("no process-creation token on this platform")
+    assert mcp_daemon._identity_path(pid_path).read_text(encoding="utf-8") == token
+
+
+def test_identity_cli_exit_codes(tmp_path, monkeypatch):
+    """0 = provably ours, 1 = provably not, 2 = cannot tell.
+
+    The stop script depends on these exactly, and it must treat 2 as "do not
+    kill" for the same reason claim_singleton treats it as "still blocked".
+    """
+    pid_path = tmp_path / "cli.pid"
+
+    def run() -> int:
+        monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--check-identity", str(pid_path)])
+        return mcp_daemon._identity_cli()
+
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    token = mcp_daemon._process_start_token(os.getpid())
+    if token is None:
+        pytest.skip("no process-creation token on this platform")
+
+    mcp_daemon._identity_path(pid_path).write_text(token, encoding="utf-8")
+    assert run() == 0, "matching token must be provably ours"
+
+    mcp_daemon._identity_path(pid_path).write_text("not-the-token", encoding="utf-8")
+    assert run() == 1, "mismatched token must be provably NOT ours"
+
+    mcp_daemon._identity_path(pid_path).unlink()
+    assert run() == 2, "no sidecar means cannot tell, never a kill"
+
+    pid_path.write_text("999999999", encoding="utf-8")
+    mcp_daemon._identity_path(pid_path).write_text("anything", encoding="utf-8")
+    assert run() == 1, "a dead pid is provably not our running daemon"
+
+    pid_path.write_text("not-a-number", encoding="utf-8")
+    assert run() == 2
+
+
+def test_the_stop_script_delegates_the_identity_check():
+    """One implementation, two callers.
+
+    A first attempt computed the token in PowerShell and produced a DIFFERENT
+    value for the same PID -- `-band 0xFFFFFFFF` does not mask an int64 there.
+    An identity check written twice in two languages is the drift the register
+    records as FM-4, so the script must call this module rather than reimplement.
+    """
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "stop_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "--check-identity" in script, "stop path must consult the identity check"
+    assert "GetProcessTimes" not in script, "the token must not be recomputed here"
+    assert "ToFileTime" not in script, "the token must not be recomputed here"
+    assert "$identity -ne 0" in script, "anything but a proven match must not kill"

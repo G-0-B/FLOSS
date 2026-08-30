@@ -84,6 +84,23 @@ def commit_message(anchor: dict) -> str:
     )
 
 
+def _display_path(path: Path) -> str:
+    """Repo-relative when possible, absolute otherwise.
+
+    `relative_to` RAISES for a path outside the repository, so any `--anchor`
+    pointing elsewhere -- a temp directory in a test, a second store, an
+    operator keeping anchors outside the checkout -- crashed publish with a
+    traceback after the anchor had already been written. Found by a test that
+    used a tmp_path; the earlier runs all used the in-repo default and never
+    reached it.
+    """
+
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def _resolve_identity(identity_dir: Path, allow_new: bool):
     """Refuse to mint a signing identity as a side effect of publishing.
 
@@ -108,6 +125,51 @@ def _resolve_identity(identity_dir: Path, allow_new: bool):
 
 def _publish(args: argparse.Namespace) -> int:
     previous = anchor_lib.load_anchor(args.anchor)
+
+    # VERIFY BEFORE OVERWRITING. Publishing used to build a replacement anchor
+    # without ever checking the store against the one it was replacing, so an
+    # accidental truncation or interior deletion was laundered into the new
+    # baseline: the next verify reported VERIFIED over a store that had lost
+    # packets, and the evidence that anything went missing was the anchor being
+    # overwritten.
+    #
+    # This is the actionable half of the standing finding that republishing over
+    # a truncated store returns VERIFIED. It does not stop a deliberate
+    # operator -- --force exists and they own the key -- but it stops the
+    # accident, which is the case that was silently destroying evidence.
+    if previous is not None and not args.force:
+        prior = anchor_lib.verify_anchor(
+            args.provenance_root,
+            previous,
+            series_dir=args.anchor.parent / anchor_lib.SERIES_DIRNAME,
+        )
+        if prior["status"] in (
+            anchor_lib.TRUNCATION_DETECTED,
+            anchor_lib.ANCHOR_MISMATCH,
+            anchor_lib.ANCHOR_UNAVAILABLE,
+        ):
+            print(
+                f"refusing to publish: the current anchor reports "
+                f"{prior['status']} against this store."
+            )
+            if prior.get("reason"):
+                print(f"  {prior['reason']}")
+            findings = prior.get("findings") or {}
+            for label in (
+                "vanished_identities",
+                "head_regressions",
+                "missing_anchored_heads",
+                "missing_anchored_positions",
+            ):
+                if findings.get(label):
+                    print(f"  {label}: {json.dumps(findings[label])[:400]}")
+            print(
+                "Publishing now would overwrite the only record that anything "
+                "is missing. Investigate, then re-run with --force if the loss "
+                "is understood and intended."
+            )
+            return 2
+
     built = anchor_lib.build_anchor(args.provenance_root, previous)
     identity = _resolve_identity(args.identity_dir, args.allow_new_identity)
 
@@ -196,7 +258,7 @@ def _publish(args: argparse.Namespace) -> int:
     print(
         json.dumps(
             {
-                "wrote": str(args.anchor.relative_to(REPO_ROOT).as_posix()),
+                "wrote": _display_path(args.anchor),
                 "merkle_root": signed["merkle_root"],
                 "packet_count": signed["packet_count"],
                 "identity_count": signed["identity_count"],
@@ -210,7 +272,7 @@ def _publish(args: argparse.Namespace) -> int:
     if args.print_tag:
         print()
         print("# Not run for you -- publishing is an operator decision.")
-        print(f'git add "{args.anchor.relative_to(REPO_ROOT).as_posix()}"')
+        print(f'git add "{_display_path(args.anchor)}"')
         print(f"git commit -m {json.dumps(commit_message(signed))}")
         print(f'git tag "{tag_name(signed)}"')
         print("git push origin HEAD --tags")
@@ -301,6 +363,14 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "Pin the anchor's signer AID. Pinning is the actual root of trust: "
             "without it, a fresh key can sign a fresh consistent series."
+        ),
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "Publish even when the current anchor reports a loss against this "
+            "store. Overwrites the only record that something is missing."
         ),
     )
     parser.add_argument(
