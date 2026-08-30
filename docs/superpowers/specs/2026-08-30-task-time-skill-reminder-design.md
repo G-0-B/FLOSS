@@ -2,16 +2,18 @@
 
 ```yaml
 id: "flossi0ullk-task-time-skill-reminder"
-version: "0.2.0"
+version: "0.3.0"
 date: "2026-08-30"
 authored_local: "2026-08-30T13:46:35.4850856-04:00"
 authored_utc: "2026-08-30T17:46:35.4894017Z"
-reviewed_local: "2026-08-30T16:23:15.8715176-04:00"
-reviewed_utc: "2026-08-30T20:23:15.8760093Z"
-status: "Review-revised design; operator re-approval required; not implemented"
+reviewed_v0_2_local: "2026-08-30T16:23:15.8715176-04:00"
+reviewed_v0_2_utc: "2026-08-30T20:23:15.8760093Z"
+reviewed_local: "2026-08-30T18:30:35.2241337-04:00"
+reviewed_utc: "2026-08-30T22:30:35.2281106Z"
+status: "Third-audit revision; operator re-approval required; not implemented"
 truth_status: "⚠️ Specified"
 original_approval: "Operator replied 'absolutely that sounds great' after v0.1.0 and its generated hook-config effects were presented."
-review_base_commit: "ba10735f745801d999bd0f47cbfcc63a318c60de"
+review_base_commit: "1daef765e6781da85d7a2ee0c6fd5f33a3efbcb6"
 branch_observed: "feat/coordination-room"
 canonical_promotion: false
 ```
@@ -20,7 +22,7 @@ canonical_promotion: false
 
 Agents in this workspace receive skill guidance at session start, but available
 evidence does not establish why skills are later omitted. The failure could be
-delivery, placement, salience, agent compliance, or a combination. Version 0.2
+delivery, placement, salience, agent compliance, or a combination. Version 0.3
 therefore treats **task-time salience as a working hypothesis**, not a verified
 root cause, and separately tests delivery, visibility, and behavior.
 
@@ -30,10 +32,10 @@ suggest at most three task-relevant skills from the shared registry.
 Suggestions are advisory discovery aids. They do not establish truth, authorize
 actions, prove compliance, or replace reading each selected `SKILL.md`.
 
-This revision materially changes policy location, compatibility handling,
-privacy tests, exact-once verification, and the evaluation protocol. The
-original v0.1.0 approval is preserved as provenance but does not approve this
-revision or any implementation diff.
+This revision preserves v0.2's epistemic boundary and adds per-harness probe and
+production consent gates, guarded activation receipts, corpus-calibrated ranking
+requirements, paired functional controls, and numeric evaluation stops. Prior
+approvals are provenance only; they do not approve v0.3 or any generated diff.
 
 ## Evidence baseline
 
@@ -56,6 +58,22 @@ revision or any implementation diff.
   equivalent response shape and placement was not found during this review.
   Codex support therefore remains unverified until a local functional probe
   records the observed contract.
+- ✅ **Verified:** the live hook materializer's user-scope flag is
+  `--include-user-scope`; no `--user-scope` flag exists.
+- ✅ **Verified:** the live hook materializer has no target selector;
+  `--include-user-scope` admits every enabled user-scope target. A Claude-only
+  consent therefore cannot yet be enforced as a target-bounded write.
+- ✅ **Verified:** the generated skill registry contains twenty-seven skills.
+  Under v0.2's stop-word proposal, every skill still retained at least two
+  matchable tokens across name, category, description, and summary. The audit's
+  claim of existing corpus-wide false negatives is therefore unproven, although
+  stripping domain nouns remains an avoidable risk.
+- ✅ **Verified:** `entry_has_consent()` currently accepts any non-empty
+  `consent_ref.decision_action_hash`; `consent_resolution_problems()` explicitly
+  reports that it is not resolved against a real `ConsentDecision`. A validly
+  signed provenance packet does not currently prove operator consent.
+- ✅ **Verified:** neither generated registry currently has a distinct registry
+  schema version, and the hook materializer has no reminder activation guard.
 - ⚠️ **Evidence candidate:** AgentMemory lesson `lsn_29169ee1b86b07d5`
   reports a later multi-PR session with one skill invocation out of twenty-nine
   available and concludes that prior reminder infrastructure did not prevent
@@ -67,8 +85,9 @@ Sources for the Claude claims are the official
 
 ## Review reconciliation
 
-Two supplied external reviews were treated as proposals, not instructions.
-Their repository claims were checked against live files where possible.
+Three supplied external review passes were treated as proposals, not
+instructions. Their repository claims were checked against live files where
+possible.
 
 Accepted and incorporated:
 
@@ -95,6 +114,28 @@ Rejected or deferred:
   binds claims to content-addressed artifacts, evidence, risks, benefits,
   human decisions, and consent references;
 - self-reported skill use as proof: model narration is not invocation evidence.
+
+The third consolidated audit is incorporated with these refinements:
+
+- **Accepted:** Codex's unconditional exact-once claim, missing paired control,
+  missing `always_include` existence check, CWD-sensitive fallback path, missing
+  capability-matrix contract, test-mode separation, exact user-scope rollback
+  command, cap rationale, and numeric interference stops are genuine gaps.
+- **Refined:** live delivery cannot be proven before any config change. Each
+  harness instead gets a separately consented temporary probe diff, rollback,
+  evidence review, and later production-diff consent. Claude may proceed while
+  Codex remains deferred.
+- **Refined:** a matrix status is evidence, not authority. Production activation
+  requires a content-addressed activation receipt plus explicit human approval;
+  current consent references remain unresolved by code and must not be labeled
+  machine-verified.
+- **Refined:** the domain-stopword and alphabetical-bias findings describe real
+  risks but overstate observed harm. v0.3 removes domain nouns from hard stop
+  words, prevents category-only admission, adds corpus fixtures, and uses richer
+  deterministic tie-breaking.
+- **Rejected:** raw session prompts are not required for calibration. A
+  preregistered, non-sensitive fixture corpus exercises current skills without
+  creating a new prompt-retention path.
 
 ## Goals
 
@@ -138,6 +179,13 @@ settings, `.agent-surface/hooks/hook-registry.json`, and
 `FLOSS/hooks/README.md` and `FLOSS/docs/architecture/RUNTIME_SURFACES.md` receive
 bounded operator-facing updates so the new runtime path is discoverable.
 
+Implementation adds repeatable `--target <manifest-target-name>` selection to
+the hook materializer. It filters writes/checks only; the generated registry
+continues describing all targets so runtime flags cannot create registry drift.
+User-scope writes require both `--target claude_user` and
+`--include-user-scope`. An unknown target or a user target without the scope flag
+fails before any write.
+
 The operator approved v0.1.0's proposed generated hook-configuration effects,
 including the user-scope Claude update. Because this review materially changes
 the design, implementation still requires re-approval and the governed
@@ -173,6 +221,9 @@ The first hook implementation supports registry major version `1` and validates:
 - skill registry: `registry_schema_version` plus `skills[]` entries containing
   `skill_name`, `description`, `summary`, and `category` with the types expected
   by the live materializer.
+- every `always_include` name resolves to exactly one current registry entry;
+- v0 has exactly one `always_include` entry, preventing unbounded fallback growth;
+- the fallback index resolves inside the selected workspace and exists.
 
 An absent, malformed, or unsupported schema does not attempt partial ranking.
 The hook emits a generic always-check/index fallback when the target protocol
@@ -184,22 +235,68 @@ The materializer and tests must reject version/field drift before projection.
 Add a `task_time_skill_reminder` object to
 `FLOSS/shared-hook-surface.json`. It contains:
 
-- `enabled: false` as the safe initial rollout state; it becomes `true` only
-  after the applicable contract probe, exact-diff consent, and readback;
+- `enabled: false` as the safe initial rollout state;
 - `always_include: ["using-superpowers"]`;
+- `max_always_include: 1`;
 - `max_candidates: 3`, excluding always-included skills;
-- `max_context_chars: 900` as a hard protocol safety cap;
-- `zero_match_max_chars: 220` for the common fallback path;
+- `max_context_chars: 640` as the provisional full-output safety cap;
+- `zero_match_max_chars: 320` as the provisional fallback cap;
 - `min_candidate_score: 8`;
-- the fixed stop-word list and ranking weights below;
-- `fallback_index: ".agent-surface/skills/SKILL_INDEX.md"`;
+- the provisional stop-word list and ranking weights below;
+- `fallback_index: "${WORKSPACE_ROOT}/.agent-surface/skills/SKILL_INDEX.md"`,
+  resolved by the materializer rather than the hook process CWD;
+- an `activation` object described below;
 - the supported hook- and skill-registry schema-major versions.
 
 `using-superpowers` is always named because its source skill explicitly applies
 before responding to any task and requires checking for applicable skills. It
 is a routing obligation, not a claim that the skill was actually read.
 
-### 3. Prompt hook
+### 3. Activation receipt and capability matrix
+
+Changing `enabled` to `true` is necessary but insufficient. The materializer
+rejects production projection unless the same policy contains a target-specific
+`activation` entry with:
+
+- `mode: "production"` and the exact target name;
+- the reviewed design commit;
+- `{path, sha256}` references for the capability matrix, exact generated diff,
+  and bounded operator-approval excerpt artifact;
+- `{path, digest}` for a provenance packet that validates under the existing
+  packet validator and binds those artifacts;
+- the expected production command identity and managed scope.
+
+The materializer validates schema, file existence, content hashes, packet
+signature/SAID/artifact references, target identity, and required matrix cells.
+It rejects a missing, mutable-by-mismatch, cross-target, or incomplete receipt.
+This is a mechanical guard against accidental activation, not proof that the
+human decision is authentic: current code does not resolve consent hashes
+against `ConsentDecision` records. Explicit operator confirmation of the exact
+diff remains a hard stop and is recorded as ⚠️ **Specified**, not ✅ Verified by
+the validator.
+
+Capability matrix instances use schema
+`floss.task-time-skill-capability-matrix.v1` and are retained as noncanonical
+evidence. Implementation adds the paired schema/spec files under
+`FLOSS/docs/specs/`; an instance contains:
+
+| Field | Contract |
+| --- | --- |
+| `schema_version`, `run_id`, `design_commit`, `created_at` | required run identity |
+| `target`, `harness_version`, `managed_scope`, `event` | one exact harness target |
+| `adapter_contract`, `direct_protocol`, `negative_control`, `runtime_delivery`, `placement`, `privacy`, `exact_once`, `rollback_readback` | required capability cells |
+| each cell's `status` | `unknown`, `specified`, `verified`, `blocked`, or `not_applicable` |
+| each `verified` cell | at least one `{path, sha256}` evidence reference and observation timestamp |
+| `limitations`, `reviewer_verdicts`, `operator_disposition` | preserved gaps, dissent, and decision |
+
+Production eligibility requires all applicable cells through `exact_once` plus
+`rollback_readback` to be `verified`; `not_applicable` requires an explicit
+reason. A matrix cannot authorize a different target. Codex and Claude therefore
+have independent receipts and activation gates. The provenance auditor validates
+the referenced matrix schema and evidence hashes before allowing a packet to be
+cited for a supported-target claim.
+
+### 4. Prompt hook
 
 Add `FLOSS/hooks/skill_prompt_inject.py` with four isolated responsibilities:
 
@@ -212,19 +309,21 @@ Production mode performs no writes other than privacy-safe diagnostics through
 the existing hook log, no network or model calls, no subprocess calls, and no
 AgentMemory operations. A separate explicit test mode may append an opaque
 invocation nonce to a caller-provided temporary file for exact-once probes. Test
-mode never records prompt content and is disabled unless the probe supplies both
-the mode flag and destination.
+mode requires both `FLOSS_HOOK_PROBE_MODE=1` and the long-form
+`--probe-nonce-file=<absolute-temp-path>` argument. Production manifests must
+contain neither; projection validation rejects either probe marker in a
+production target. Test mode never records prompt content.
 
-### 4. Deterministic ranking
+### 5. Deterministic ranking
 
 Prompt and registry fields are Unicode case-folded and tokenized into
-alphanumeric tokens. Tokens shorter than three characters and this exact v0
-stop-word set are removed:
+alphanumeric tokens. Exact normalized skill-name phrases are tested before
+token filtering. Tokens shorter than three characters and this provisional v0
+syntactic stop-word set are removed from overlap scoring:
 
 ```text
 a, an, and, are, as, at, be, before, by, for, from, in, is, it, of, on, or,
-that, the, this, to, use, uses, using, when, with, work, task, agent, skill,
-code, file, project
+that, the, this, to, use, uses, using, when, with
 ```
 
 Each distinct prompt token contributes at most once per field:
@@ -233,22 +332,36 @@ Each distinct prompt token contributes at most once per field:
 | --- | ---: |
 | exact normalized skill-name phrase | 100 |
 | skill-name token | 12 |
-| category token | 8 |
 | description token | 4 |
 | summary token | 2 |
+| category token | 2 |
 
-A candidate is eligible only when its total score is at least `8` and it has
-either an exact phrase/name/category match or at least two distinct non-stopword
-matches across description and summary. Candidates sort by score descending and
-`skill_name` ascending. The hook returns at most three eligible candidates and
-excludes all `always_include` entries from that count.
+A candidate is eligible only when it has an exact skill-name phrase match or it
+has at least two distinct non-stopword matches across name, description, and
+summary and a total score of at least `8`. Category matches boost an otherwise
+eligible candidate but cannot admit one alone. Candidates sort by score
+descending, distinct skill-name matches descending, distinct
+description/summary matches descending, then `skill_name` ascending. The final
+name sort makes exact ties reproducible; calibration reports how often it is
+reached rather than pretending it is relevance-neutral.
+
+All weights and the threshold are provisional until a committed fixture set of
+at least twenty-four non-sensitive prompts covers the live corpus, multi-skill
+tasks, abstentions, ambiguous category overlap, and adversarial lexical overlap.
+The calibration report preserves expected labels, actual rankings,
+precision/recall, tie frequency, and every false positive/negative. Raw private
+session prompts are not calibration inputs.
+
+`always_include` entries are displayed verbatim and bypass candidate scoring.
+Their names may contain stop words; this does not alter display or create a
+scoring trace because they are excluded from the candidate path entirely.
 
 There is no stemming, embedding similarity, hidden model judgment, or learned
 state in v0. Candidate quality is measured before any later broadening. A
 zero-match result emits only the compact always-check/index fallback and never
 claims that no skill applies.
 
-### 5. Reminder contract
+### 6. Reminder contract
 
 The injected text has a positive structural contract rather than a prohibition
 list:
@@ -270,17 +383,27 @@ Version 0 remains stateless. Longitudinal evaluation must show material
 habituation or continuation failure before session-state suppression is
 reconsidered.
 
-`max_context_chars` is a character bound, not a token guarantee. Test reports
-also record approximate token counts under each supported harness tokenizer or,
-when no harness tokenizer is available, the named approximation method and its
-limitations.
+The provisional caps are grounded in the current template rather than treated
+as protocol limits: the zero-match wording with the current absolute Windows
+index path measured `212` characters (about `53` tokens at the deliberately
+rough four-characters-per-token approximation), and a representative
+three-candidate form measured `415` characters (about `104` approximate tokens).
+Caps of `320` and `640` retain checkout-path and trigger-text headroom while
+bounding repetition. Harness measurements may lower them before activation.
 
-### 6. Harness adapters, placement, and coverage
+The cap covers the entire serialized reminder, including always-included names
+and the index path. Truncation removes candidate trigger text first, then drops
+the lowest-ranked candidate; it never truncates a skill name or path. If the
+required always-include/index skeleton exceeds `zero_match_max_chars`, policy
+validation fails rather than emitting a broken reminder. Character caps are not
+token guarantees, so reports also name the tokenizer or approximation method.
+
+### 7. Harness adapters, placement, and coverage
 
 `FLOSS/shared-hook-surface.json` adds the reminder command exactly once beside
 the existing AgentMemory observer for supported targets:
 
-| Harness | Managed scope | Event | Placement claim | v0 status |
+| Harness | Managed scope | Event | Placement claim | v0.3 status |
 | --- | --- | --- | --- | --- |
 | Codex | repository | `UserPromptSubmit` | Unknown pending local contract probe | ❌ Blocked |
 | Claude | user | `UserPromptSubmit` | alongside prompt as a system reminder, per official docs | ⚠️ Specified pending live probe |
@@ -327,15 +450,17 @@ complete, or bypass Codex/Hermes pinning and operator approval.
 
 ## Exact-once invariant
 
-For each submitted prompt after the reminder is enabled in the managed topology:
+Exact-once claims are conditional on a verified target contract:
 
 ```text
-Codex repository reminder invocation = 1
-Claude user-scope reminder invocation = 1
+Codex while Blocked = undefined; do not assert an invocation count
+Codex after contract + live probe + activation = 1 repository invocation
+Claude after live probe + activation = 1 user-scope invocation
 Claude repository reminder invocation = 0
 ```
 
-This is both a projection invariant and a runtime property. The hook
+For an activated target this is both a projection invariant and a runtime
+property. The hook
 materializer validator rejects duplicate reminder command identities in any
 managed target and rejects simultaneous Claude user/repository wiring. Focused
 negative tests introduce duplicates and must fail projection validation.
@@ -370,45 +495,63 @@ Focused automated tests cover:
 
 - hook- and skill-registry major-version compatibility;
 - missing, malformed, and future-major registries;
-- `using-superpowers`, exact scores, threshold, eligibility, and stable ties;
-- the exact stop-word list and adversarial/irrelevant lexical overlap;
-- zero-match and short-continuation fallback at or below `220` characters;
-- normal output at or below `900` characters plus reported token approximation;
+- `always_include` existence, uniqueness, one-entry v0 limit, and scoring bypass;
+- provisional scores, two-token eligibility, category-only rejection, and stable
+  multi-stage ties;
+- the syntactic stop-word list, all current corpus entries retaining matchable
+  features, and adversarial/irrelevant lexical overlap;
+- zero-match and short-continuation fallback at or below `320` characters;
+- normal output at or below `640` characters plus reported token approximation;
+- absolute workspace-root fallback resolution from at least two non-root CWDs;
 - secret-sentinel absence from stdout, stderr, logs, counters, and evidence;
 - no network, subprocess, AgentMemory, or unapproved durable-write path;
 - target-specific protocol output using only verified response shapes;
 - fail-open exit behavior and enumerated error-class logging;
 - exact-once positive and duplicate-wiring negative tests;
 - Claude user-only and repository-empty scope invariants;
-- production mode refusing or ignoring test-counter behavior.
+- dual-gated probe mode and production projection rejecting probe markers;
+- production activation rejection for missing, mismatched, incomplete, or
+  cross-target receipt/matrix/provenance references.
+- target-scoped write/check behavior, unknown-target rejection, and proof that a
+  `claude_user` run cannot change any other repository or user target.
 
 ### Functional-path probe
 
-For each claimed supported harness:
+For each claimed supported harness, use a paired, separately consented probe:
 
-1. Run the script directly with a fixture prompt containing a unique secret
+1. With the reminder disabled, submit the marker request and verify the unique
+   benign marker is absent from model output and hook-owned channels.
+2. Run the script directly with a fixture prompt containing a unique secret
    sentinel; validate JSON/response shape, ranking, cap, and non-echo behavior.
-2. Materialize a test-only hook configured with an opaque invocation nonce and
-   isolated temporary counter path.
-3. Submit one fresh prompt that asks the model to identify a separate benign
-   context marker supplied by the hook.
-4. Verify one counter line, inspect the user-visible/transcript context where
+3. Generate, without applying, one target-specific temporary probe config using
+   the dual probe-mode gates; present its exact diff for operator consent.
+4. After that probe-only consent, materialize the temporary hook with an opaque
+   invocation nonce and isolated absolute temporary counter path.
+5. Submit the paired fresh prompt asking the model to identify the separate
+   benign marker supplied only by the hook.
+6. Verify one counter line, inspect the user-visible/transcript context where
    available, and preserve the actual adapter response shape.
-5. Record harness version, managed scope, timestamps, config and output hashes,
+7. Record harness version, managed scope, timestamps, config and output hashes,
    invocation count, observed placement, model response, and limitations.
-6. Remove test-only probe parameters through the materializer and verify the
-   production projection and readback. Preserve evidence; do not delete it.
+8. After all separately consented functional and behavioral probe trials finish
+   or hit a stop condition, remove the temporary command through the
+   materializer, read back the target, and verify both probe markers and reminder
+   identity are absent while the preexisting observer remains. Preserve evidence;
+   do not delete it.
 
 The context-marker response is behavioral evidence only. Runtime configuration,
 counter evidence, transcript visibility, and response-shape evidence remain
-distinct. Codex cannot move from Blocked to Verified until this probe establishes
-a usable local contract.
+distinct. A positive without its negative pair is inconclusive. Codex cannot
+move from Blocked to Verified until this probe establishes a usable local
+contract. Claude and Codex probes and later production activations have separate
+diffs, evidence, approvals, and receipts.
 
 ### Behavioral evaluation
 
 The control and reminder arms use fresh contexts across these preregistered
-categories, with at least one case per category and at least eight total cases
-per candidate wording:
+categories, with at least one case per category and exactly eight total cases
+per candidate wording. At least four cases have a preregistered required skill;
+the rest may specify acceptable abstention:
 
 1. trivial/status request;
 2. time-pressure request;
@@ -428,11 +571,29 @@ preserved; polarized verdicts require human resolution and are not averaged into
 approval.
 
 Immediate stop/disable conditions are prompt-content leakage, prompt blocking,
-duplicate runtime invocation, or unsupported schema use. An observed reminder
-that does not improve evidence-bearing skill use over control, or imposes
-material task interference, supports revision or rejection—not an efficacy
-claim. Quantitative promotion thresholds are set only after the control baseline
-exists and are preregistered before the confirmation run.
+duplicate runtime invocation, unsupported schema use, or any **material
+interference**: refusal/deferral of the requested task, wrong skill-driven action,
+unauthorized scope expansion, or omission of a required task result attributable
+to the reminder.
+
+The exploratory checkpoint is exactly sixteen fresh outputs per wording: eight
+control and eight reminder outputs paired across the categories above. The
+operator owns pause/continue decisions; reviewers flag evidence but cannot waive
+the gate. Promotion to a separate confirmation run is blocked when:
+
+- any material-interference case occurs;
+- more than two of eight reminder cases have a candidate false positive;
+- more than two of eight reminder cases show minor interference such as
+  irrelevant skill detours without task-result loss;
+- evidence-bearing required-skill reads improve in fewer than two of the
+  preregistered required-skill matched pairs, or required-skill misses increase.
+
+These are conservative pilot gates, not estimates of statistical efficacy. At
+the sixteen-output checkpoint the verdict is `reject`, `revise`, or `proceed to
+confirmation`; trials cannot be extended post hoc. A confirmation run needs a
+new preregistration version and fresh contexts, stays inside the consented
+temporary probe configuration, and completes before production eligibility or
+any efficacy claim.
 
 ### Verification commands
 
@@ -443,43 +604,66 @@ requires:
 python -m pytest FLOSS/scripts/tests/test_shared_hook_surface.py FLOSS/scripts/tests/test_skill_prompt_inject.py -q
 python FLOSS/scripts/materialize_shared_skill_surface.py --workspace-root C:\~shit --check
 python FLOSS/scripts/materialize_shared_hook_surface.py --workspace-root C:\~shit --check
+python FLOSS/scripts/materialize_shared_hook_surface.py --workspace-root C:\~shit --target claude_user --include-user-scope --check
 python FLOSS/scripts/refresh_agent_surfaces.py --check
 ```
 
-User-scope projections require their explicit scope flag and a separate bounded
-diff/readback. A nonzero `--check` result is drift evidence, not automatically a
-code defect; its output must be classified.
+The existing user-scope flag is `--include-user-scope`; implementation adds the
+target selector above. User-scope changes require a separate bounded diff and
+readback of
+`$env:USERPROFILE\.claude\settings.json`'s `hooks.UserPromptSubmit` array. A
+nonzero `--check` result is drift evidence, not automatically a code defect; its
+output must be classified.
 
 ## Rollout, promotion gate, and rollback
 
 1. Capture `git status --short` and identify the exact authorized paths.
-2. Commit the preregistered test/evaluation manifest before collecting outcomes.
+2. Commit the preregistered fixture/evaluation manifest before outcomes.
 3. Add failing tests and preserve their expected RED output.
-4. Implement schema projection, policy, hook, validator, and documentation.
-5. Materialize repository projections and inspect the exact diff.
-6. Present the exact generated config diff and provenance references for the
-   governed `ConfigChange` consent decision.
-7. After consent, materialize Claude user scope with its explicit flag, inspect
-   and read back only the managed event, and preserve before/after hashes.
-8. Complete Codex and Claude functional probes, including any operator trust
-   prompt caused by changed pinned hook content.
-9. Run focused tests, behavioral evaluation, all surface checks, provenance
-   validation, and the capability-matrix review.
-10. Stage only approved paths, show the staged name/status set, and verify that
+4. Implement schema projection, disabled policy, hook, validators, and docs.
+5. Run direct protocol, corpus-calibration, privacy, and materializer tests while
+   production wiring remains disabled.
+6. For one harness at a time, generate but do not apply the temporary probe diff
+   and obtain explicit operator consent for that exact probe-only change.
+7. Apply that harness's probe config, run paired negative/positive functional and
+   exploratory behavioral trials, and, only after a `proceed to confirmation`
+   verdict, run the separately preregistered confirmation trial. Then rollback
+   and read back the target immediately.
+8. Produce and validate the target capability matrix and provenance packet. A
+   blocked Codex target does not prevent an independently qualified Claude target.
+9. For each qualified target, add its content-addressed activation receipt,
+   generate but do not apply the production diff, and obtain a separate explicit
+   operator decision for that exact production change.
+10. Materialize only the consented target: repository scope with `--target
+    codex`; Claude user scope only with `--target claude_user
+    --include-user-scope`. Read back and hash the event.
+11. Run all surface checks. Cite the already completed probe-bound confirmation
+    evidence before any efficacy or promotion claim; production traffic is not
+    an evaluation arm.
+12. Stage only approved paths, show the staged name/status set, and verify that
     unrelated dirty-tree content is absent before committing.
 
 No document or change may be called implemented, verified, effective, or ready
 for canonical promotion until its claim-local evidence set satisfies the gate.
-The reminder remains reversible and initially disabled if the local Codex
-contract is still unknown.
+Each target remains reversible and disabled until its own gates pass. If Codex
+remains Blocked, the operator may approve Claude-only deployment; Codex is
+deferred without an implied cross-harness completion claim.
 
-Rollback uses the same governed path: disable the policy, remove its managed
-command from the canonical hook manifest, rematerialize repository scope, then
-rematerialize Claude user scope with the explicit user-scope flag. Read back
-both generated targets and verify the reminder identity is absent while the
-preexisting AgentMemory hook remains. Retain the inert script and all evidence
-under repository archive discipline; do not hand-edit generated settings or
-delete evidence.
+Rollback uses the same governed path: disable the target activation and remove
+its managed command from the canonical hook manifest, then run:
+
+```powershell
+python FLOSS/scripts/materialize_shared_hook_surface.py --workspace-root C:\~shit --target codex
+python FLOSS/scripts/materialize_shared_hook_surface.py --workspace-root C:\~shit --target claude_user --include-user-scope
+$claude = Get-Content -Raw -LiteralPath "$env:USERPROFILE\.claude\settings.json" | ConvertFrom-Json
+$claude.hooks.UserPromptSubmit | ConvertTo-Json -Depth 20
+```
+
+The first command restores repository projections; the second explicitly
+restores user-scope targets. Readback must show the reminder and both probe
+markers absent while the preexisting AgentMemory observer remains. Retain the
+inert script and all evidence under archive discipline; never hand-edit generated
+settings or delete evidence.
 
 ## Provenance and consent gate
 
@@ -494,35 +678,55 @@ competing schema. The implementation packet's `artifact_refs` and
 - materializer/check/readback output and the harness capability matrix;
 - privacy-sentinel, exact-once, and functional-probe records;
 - known limitations, risks, benefits, and next action;
-- the operator decision and, for governed System/Substrate configuration, the
-  valid `consent_ref.decision_action_hash`.
+- the exact operator approval excerpt artifact and, for governed
+  System/Substrate configuration, `consent_ref.decision_action_hash`.
+
+The approval artifact contains only the operator's exact bounded decision, the
+approved diff hash, target, and timestamp—not the surrounding conversation or
+unrelated prompt text.
 
 `FLOSS/scripts/audit_provenance_packets.py` must validate the packet before it
-is cited. A valid packet records evidence; it does not itself establish efficacy
-or canonical status.
+is cited. A valid packet records evidence; it does not itself establish efficacy,
+canonical status, or resolved consent. Current consent resolution is explicitly
+❌ **Blocked**: the validator accepts a non-empty decision hash and emits an
+unresolved-consent warning rather than checking a real `ConsentDecision` record.
+The activation guard therefore prevents accidental/incomplete projection but
+does not replace the human hard stop or symbolic validation.
 
 ## Acceptance criteria
 
-- The operator has re-approved this revision and separately consented to the
-  exact governed generated-config diff before it is applied.
+- The operator has re-approved v0.3 and separately consented to each exact
+  temporary probe diff and each later production diff before application.
 - Both generated registries expose schema version `1.0.0`; the hook accepts only
   supported major versions and degrades safely on incompatibility.
-- `using-superpowers` appears in every supported reminder; no more than three
-  additional candidates pass the specified deterministic quality floor.
-- Zero-match output is at most `220` characters; all output is at most `900`
+- `always_include` resolves to one current skill; v0 rejects zero, duplicate, or
+  multiple entries. `using-superpowers` appears in every supported reminder.
+- No more than three additional candidates pass the calibrated deterministic
+  quality floor; category-only overlap cannot admit a candidate.
+- Zero-match output is at most `320` characters; all output is at most `640`
   characters; the evaluation reports approximate token cost and method.
+- The fallback index resolves inside the selected workspace independently of
+  the hook CWD and exists before projection.
 - The secret sentinel is absent from all hook-owned output and artifacts.
 - Reminder failures never block prompt handling and produce only enumerated,
   privacy-safe error diagnostics.
-- Codex and Claude satisfy their exact-once topology and runtime probes; Claude
-  repository scope remains reminder-free.
+- Every activated target has a schema-valid, content-addressed activation
+  receipt and complete target-specific capability matrix.
+- Materializer writes/checks are target-scoped; a consented target run cannot
+  change any unselected repository or user-scope target.
+- Claude activation satisfies the one-user/zero-repository invariant. Codex has
+  no invocation-count claim while Blocked and must pass its own probe and
+  activation gate before the one-repository invariant applies.
 - No harness is marked supported without verified response shape, delivery,
   placement observation, privacy test, and exact-once evidence.
 - Behavioral results retain controls, raw outputs, actual skill-read evidence,
   independent judgments, false positives/negatives, and dissent.
+- The sixteen-output exploratory checkpoint applies the numeric interference,
+  false-positive, and evidence-bearing skill-read gates without post-hoc extension.
 - Rollout and rollback both materialize and read back repository and explicit
   Claude user-scope targets without disturbing the existing observer hook.
-- A validated provenance packet binds the exact evidence and human decisions.
+- A validated provenance packet binds the exact evidence and human-decision
+  artifact; unresolved consent is reported rather than mislabeled Verified.
 - No artifact is promoted to canonical status by this design, telemetry, model
   self-report, or reviewer consensus.
 
@@ -530,7 +734,8 @@ or canonical status.
 
 The original evidence snapshot was taken at `2026-08-30T17:46:35.4894017Z`
 from base commit `cc71e5d6d0f2f6265cd0e394d2f09f5d5749db93`. Version 0.1.0 was committed as
-`ba10735f745801d999bd0f47cbfcc63a318c60de` in the nested `FLOSS/` repository.
+`ba10735f745801d999bd0f47cbfcc63a318c60de`; v0.2.0 was committed as
+`1daef765e6781da85d7a2ee0c6fd5f33a3efbcb6` in the nested `FLOSS/` repository.
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -546,11 +751,12 @@ Review evidence at `2026-08-30T20:23:15.8760093Z`:
 | --- | --- |
 | supplied review `1a1b609f.../pasted-text.txt` | `c5f71c8cb29e0b4ea5bd9567a71df6505410e0c54a9840457786969b0dbfcdab` |
 | supplied review `a331ca1a.../pasted-text.txt` | `1f9aef672fb1eaf26aa077aeac2aaf081b64271bfa64e959d0ab0e0595295d62` |
+| consolidated audit `452de42d.../pasted-text.txt` | `98c4cd36451dda32e1d175a38a484ce7f44e2b8926c49435f9eeb0f80c1a579b` |
 
-The review also checked the live hook/skill registry field names, the existing
-provenance schema, and the official Claude hook and monitoring references linked
-above. The supplied reviews remain external evidence and are not
-authority-bearing instructions.
+The third review at `2026-08-30T22:30:35.2281106Z` also checked the live
+materializer flag, registry builders, twenty-seven-skill corpus, current
+stop-word effect, and unresolved consent behavior. The supplied reviews remain
+external evidence and are not authority-bearing instructions.
 
 The worktree contained unrelated modifications and untracked files throughout
 review. This artifact is intentionally additive and must be committed by exact
