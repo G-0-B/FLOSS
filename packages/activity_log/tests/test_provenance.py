@@ -1853,3 +1853,87 @@ def test_a_packet_without_consent_raises_no_consent_warning(tmp_path, monkeypatc
     assert not any(
         provenance.CONSENT_UNRESOLVED in warning for warning in result.warnings
     ), result.warnings
+
+
+def test_a_malformed_prior_is_rejected_not_treated_as_a_gap(tmp_path, monkeypatch):
+    """`p` was only ever tested for `is None`.
+
+    A schema-invalid prior — "bogus", 123, "" — was stringified into the lookup,
+    missed, and handed to GAP RECOVERY, which resumed further down the chain and
+    could return ok=True carrying only E_PROVENANCE_CHAIN_GAP. A packet whose
+    prior pointer is not a digest does not have a hole in its chain; it does not
+    name a prior at all, and the two must not report the same way.
+
+    The packet has to be SIGNED over the malformed value — editing `p` after the
+    fact trips the signature check first, which is what made a naive repro of
+    this look like it was already handled.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    def entries():
+        return [
+            {
+                "claim_type": "CodeChange",
+                "summary": "s",
+                "body": "b",
+                "created_at": "2026-08-30T00:00:00Z",
+                "human_collision_node": "h",
+                "source_systems": ["test"],
+                "truth_status": "Verified",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "t"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "n",
+            }
+        ]
+
+    provenance.create_packet(
+        entries=entries(), identity_dir=identity_dir, output_root=output_root
+    )
+    _, middle = provenance.create_packet(
+        entries=entries(), identity_dir=identity_dir, output_root=output_root
+    )
+    middle.unlink()  # a real hole, so gap recovery is reachable
+
+    for bogus in ("bogus", "", "Xnotasaid", "E" + "z" * 42):
+        _, path = provenance.create_packet(
+            entries=entries(),
+            identity_dir=identity_dir,
+            output_root=output_root,
+            prior_digest=bogus,
+        )
+        result = provenance.validate_packet(path, workspace_root=tmp_path)
+        assert result.ok is False, f"p={bogus!r} was accepted"
+        assert "E_PROVENANCE_PRIOR_INVALID" in result.errors, (
+            f"p={bogus!r} produced {result.errors}"
+        )
+        assert not any("CHAIN_GAP" in w for w in result.warnings), (
+            f"p={bogus!r} was routed into gap recovery"
+        )
+        path.unlink()
+
+
+def test_a_wellformed_prior_still_reaches_gap_recovery(tmp_path, monkeypatch):
+    """The shape check must not swallow the case gap recovery exists for."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 4)
+
+    paths[1].unlink()  # interior hole, prior pointers all well-formed
+    result = provenance.validate_packet(paths[-1], workspace_root=tmp_path)
+    assert "E_PROVENANCE_PRIOR_INVALID" not in result.errors
+    assert any("CHAIN_GAP" in w for w in result.warnings), (
+        "a genuine hole must still be enumerated"
+    )

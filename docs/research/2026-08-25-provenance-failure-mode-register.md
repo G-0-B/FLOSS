@@ -470,6 +470,54 @@ was made without being named.
   structured one; it is the only instrument that can report something the schema
   did not anticipate.
 
+### FM-8 - Three ways to fix the instance and leave the property
+
+Seven consecutive review rounds on PR #41 found defects ONLY in the fixes from
+the round before. The original code had stopped producing findings; the fixes had
+not. Three distinct shapes, all mine, all committed after the previous one was
+written down:
+
+**1. Two readers of one structure, one fixed.** This is FM-4 and it recurred six
+times in one session: the omniroute timeout fixed for embeddings and not
+generation, the identity check added to claim and not to stop, the over-broad
+kill scoped for OmniRoute and not for agentmemory twenty lines below, the
+sidecar/PID unlink ordering fixed in reclaim and not in release, `UnicodeError`
+added to one JSON reader of three, and a test that asserted the doubled value it
+should have caught.
+
+**2. A general property guarded by a local condition.** The unreadable-set
+comparison and the series-integrity check were both nested inside
+`if current_root == anchored_root`, so each ran only when the store had not
+changed -- the one condition neither has anything to do with. The `unmeasured`
+reclassification tested `tier == "tier1"`, catching the all-above case and
+missing the equally non-discriminative all-below one. In each case the diagnostic
+already reported the general fact and the guard re-decided it from a local
+signal.
+
+**3. Identity by locator rather than by content.** Three times, each a weaker
+proxy reached for again right after fixing the last: `ANCHOR_STALE` compared
+COUNTS, then compared POSITIONS, then the unreadable set compared PATHS. The
+same correction -- compare the digest -- was needed and written three times.
+
+**What did not work.** Naming the pattern. Every one of these was committed after
+the shape had been described, in some cases in the immediately preceding message.
+Insight 11 in this register is an argument against insight-writing as a control,
+and it is now supported by seven rounds of evidence.
+
+**What did work.** Two things, both mechanical. Sweeping for siblings before
+committing -- and every time it was done deliberately, each finding had one that
+review had not named, including the worst instance of the UnicodeError bug
+(`load_anchor`, which publish reads to decide whether a predecessor exists). And
+writing the regression test against the PROPERTY rather than the instance: every
+JSON reader catches UnicodeError, every kill site confirms before deleting, every
+caller treats UNKNOWN as occupied, the anchor version shipped verifies under the
+build shipped with it.
+
+**Rule.** When a fix lands, do not ask whether the reported case is fixed. Ask
+what the general property is, grep for every place it should hold, and write the
+test against the grep rather than the case. Then look one step sideways: at the
+sibling branch, the symmetric input, the other caller of the same verdict.
+
 ---
 
 ## 4. Insights worth keeping
@@ -516,6 +564,10 @@ was made without being named.
     carrier was never created, ADR-20's reviewer record never resolved, and an
     external audit flags the same shape in the materializer's assumption that
     Tier-A clients honour blocking hooks.
+13. **A fix is a new commit and deserves the scrutiny of one.** Seven review
+    rounds in a row found bugs only in the previous round's fixes. Corrections
+    are written under more time pressure, with more confidence, and against a
+    single named case -- which is exactly the combination that produces FM-8.
 
 ---
 

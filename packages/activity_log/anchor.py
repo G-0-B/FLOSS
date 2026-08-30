@@ -44,6 +44,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,8 +57,10 @@ from nacl.signing import VerifyKey
 
 from packages.activity_log.provenance import (
     Identity,
+    _acquire_lock,
     _b64url_decode,
     _b64url_encode,
+    _release_lock,
     _said_digest,
 )
 
@@ -183,6 +186,47 @@ def _relative(path: Path, provenance_root: Path) -> str:
         return path.resolve().relative_to(provenance_root.resolve()).as_posix()
     except ValueError:
         return path.name
+
+
+@contextmanager
+def _store_lock(provenance_root: Path):
+    """Hold the packet store still for the length of a scan.
+
+    A provenance hook writing concurrently with `publish` can be caught
+    mid-`write_bytes`, so the scan reads a half-written packet and records it as
+    unreadable -- or enumerates the directory just before a new packet lands, so
+    the anchor is stale the moment it is signed. Either way the anchor
+    misdescribes a store that was fine.
+
+    REUSES provenance's lock rather than adding a third implementation. That one
+    already handles the two things a naive lock here would get wrong: on Windows
+    a concurrent unlink puts the lock file in DELETE_PENDING so O_EXCL raises
+    PermissionError rather than FileExistsError, and a crashed writer otherwise
+    wedges the store permanently, so it reclaims after 60 seconds. Both were
+    written in response to an observed failure; neither would have been
+    rediscovered here.
+
+    Advisory, and deliberately non-fatal: the packet writers do not take this
+    lock today, so it serialises anchor runs against each other and narrows --
+    does not close -- the window against a concurrent hook. Said plainly because
+    a lock that is documented as more than it is, is worse than none.
+    """
+
+    lock_path = provenance_root / ".anchor-scan.lock"
+    token = None
+    try:
+        provenance_root.mkdir(parents=True, exist_ok=True)
+        token = _acquire_lock(lock_path)
+    except Exception:  # noqa: BLE001 -- an unavailable lock must not block a read
+        token = None
+    try:
+        yield
+    finally:
+        if token is not None:
+            try:
+                _release_lock(lock_path, token)
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
@@ -392,7 +436,8 @@ def build_anchor(
 ) -> dict[str, Any]:
     """Build (but do not sign or publish) an anchor over the current store."""
 
-    leaves, unreadable = scan_packets(provenance_root)
+    with _store_lock(provenance_root):
+        leaves, unreadable = scan_packets(provenance_root)
     return {
         "v": ANCHOR_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

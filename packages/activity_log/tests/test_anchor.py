@@ -980,3 +980,34 @@ def test_the_shipped_anchor_verifies_under_this_build():
         f"{sorted(anchor_lib.SUPPORTED_VERSIONS)}"
     )
     assert anchor_lib.anchor_signature_problem(anchor) is None
+
+
+def test_build_anchor_takes_the_store_lock_and_releases_it(tmp_path):
+    """Reuses provenance's lock rather than adding a third implementation.
+
+    That one already handles the DELETE_PENDING PermissionError on Windows and
+    reclaims after a crashed writer — both written in response to an observed
+    failure, neither of which would have been rediscovered here.
+    """
+    store = tmp_path / "prov"
+    _write(store, "d", "p0", _packet("D" + "a" * 43, 0))
+
+    anchor_lib.build_anchor(store)
+    assert not (store / ".anchor-scan.lock").exists(), "the lock must be released"
+
+
+def test_an_unavailable_lock_does_not_block_the_scan(tmp_path, monkeypatch):
+    """Advisory, and non-fatal on purpose.
+
+    A lock that can wedge anchoring is worse than the race it narrows, so an
+    acquire failure degrades to an unlocked read rather than an exception.
+    """
+    store = tmp_path / "prov"
+    _write(store, "d", "p0", _packet("D" + "a" * 43, 0))
+
+    def refuse(_path):
+        raise OSError("lock unavailable")
+
+    monkeypatch.setattr(anchor_lib, "_acquire_lock", refuse)
+    built = anchor_lib.build_anchor(store)
+    assert built["packet_count"] == 1

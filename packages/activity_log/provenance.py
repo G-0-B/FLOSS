@@ -714,6 +714,14 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
 _SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
+# The envelope's SAID shape: 'E' plus 43 base64url characters. `d` is checked
+# against its own recomputation, but `p` was only ever tested for `is None` --
+# so a schema-invalid prior like "bogus" or 123 was stringified into the lookup,
+# missed, and handed to GAP RECOVERY, which resumed further down the chain and
+# could return ok=True carrying only E_PROVENANCE_CHAIN_GAP. A pointer that is
+# not a digest is not a hole in the chain; it is a packet that does not name a
+# prior at all.
+_SAID_RE = re.compile(r"^E[A-Za-z0-9_-]{43}\Z")
 # D-A1 (ADR-20). This used to restate the evidence vocabulary as a literal, which
 # made it a fourth allow-list nobody knew existed: the v1.5 D3 widening was applied
 # to the spec, the schema and claim_schema.EVIDENCE_TYPES, but not here — and this
@@ -950,14 +958,25 @@ def validate_packet(
     elif prior_digest is None and sequence != "0":
         errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
 
-    if prior_digest is not None and _follow_prior and _position_index is None:
+    # Shape-check `p` BEFORE anything downstream can interpret its absence as a
+    # gap. Ordering matters: gap recovery treats a lookup miss as evidence that
+    # the named prior is missing, which is only meaningful if the name was a
+    # well-formed digest in the first place.
+    prior_shape_invalid = prior_digest is not None and (
+        not isinstance(prior_digest, str)
+        or _SAID_RE.fullmatch(prior_digest) is None
+    )
+    if prior_shape_invalid:
+        errors.append("E_PROVENANCE_PRIOR_INVALID")
+
+    if prior_digest is not None and _follow_prior and not prior_shape_invalid and _position_index is None:
         # Build once per validation, here rather than at function entry so a
         # single-packet validation with no chain never pays for the scan.
         # Reused by every ancestor below AND by the fork check; building it per
         # call was what kept the walk quadratic after the recursion fix.
         _position_index = _build_position_index(prov_root)
 
-    if prior_digest is not None and _follow_prior:
+    if prior_digest is not None and _follow_prior and not prior_shape_invalid:
         # D-B3 addendum (ADR-20, operator-approved 2026-08-24). A hole in the
         # prior chain is DETECTED AND ENUMERATED - not silently truncated, and
         # not blanket-fatal.
