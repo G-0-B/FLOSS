@@ -9,6 +9,26 @@
 # daemon running.
 $flossAgent = if ($env:FLOSS_AGENT_DIR) { $env:FLOSS_AGENT_DIR } else { "$env:USERPROFILE\.floss_agent" }
 
+# Same interpreter resolution the START script uses: explicit FLOSS_PYTHON,
+# then a venv inside the checkout, then PATH. The identity check delegates to
+# `packages.mcp_daemon`, so running it under a different interpreter -- or
+# from outside the repository -- makes the import fail. PowerShell does NOT
+# enter catch for a failed external command; it records exit 1, which this
+# script previously read as a proven identity mismatch and acted on by
+# deleting the PID files while the daemons kept running, unfindable.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$workspace = Split-Path -Parent $repoRoot
+if ($env:FLOSS_PYTHON) {
+    $py = $env:FLOSS_PYTHON
+} elseif (Test-Path (Join-Path $workspace 'venv\Scripts\python.exe')) {
+    $py = Join-Path $workspace 'venv\Scripts\python.exe'
+} elseif (Test-Path (Join-Path $repoRoot 'venv\Scripts\python.exe')) {
+    $py = Join-Path $repoRoot 'venv\Scripts\python.exe'
+} else {
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    $py = if ($cmd) { $cmd.Source } else { $null }
+}
+
 # Kill FLOSS MCP daemons via PID files
 $pidFiles = @("consensus.pid", "reasoning_ensemble.pid")
 foreach ($pidFile in $pidFiles) {
@@ -54,21 +74,33 @@ foreach ($pidFile in $pidFiles) {
         #
         # Exit 0 = provably ours, 1 = provably not, 2 = cannot tell. Only 0 may
         # kill; 2 keeps the conservative behaviour claim_singleton uses.
-        $identity = 2
-        try {
-            & python -m packages.mcp_daemon --check-identity $pidPath 2>$null | Out-Null
-            $identity = $LASTEXITCODE
-        } catch {
-            $identity = 2
+        # The VERDICT IS THE TOKEN ON STDOUT, not the exit status. A checker
+        # that failed to start also exits 1, and treating that as FOREIGN is
+        # exactly how live daemons got orphaned. A process that never ran
+        # cannot print a token it never produced.
+        $verdict = 'UNKNOWN'
+        if ($py) {
+            try {
+                Push-Location $repoRoot
+                $out = & $py -m packages.mcp_daemon --check-identity $pidPath 2>$null
+                Pop-Location
+                $token = ($out | Select-Object -Last 1)
+                if ($token) { $token = $token.ToString().Trim() }
+                if ($token -eq 'OURS' -or $token -eq 'FOREIGN') { $verdict = $token }
+            } catch {
+                $verdict = 'UNKNOWN'
+            }
+        } else {
+            Write-Host "[FLOSS MCP] no usable Python found - identity unverifiable. Set FLOSS_PYTHON."
         }
-        if ($identity -eq 1) {
+        if ($verdict -eq 'FOREIGN') {
             Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon (identity mismatch or process gone) - removing the stale file, killing nothing"
             Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
             Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
             continue
         }
-        if ($identity -ne 0) {
-            Write-Host "[FLOSS MCP] $pidFile PID $daemonPid identity UNVERIFIABLE - refusing to force-kill. Stop it manually if it really is ours."
+        if ($verdict -ne 'OURS') {
+            Write-Host "[FLOSS MCP] $pidFile PID $daemonPid identity UNVERIFIABLE (verdict=$verdict) - refusing to force-kill, and KEEPING the pid file so the daemon stays findable."
             continue
         }
 
@@ -122,13 +154,30 @@ if ($omni) {
     Write-Host "[FLOSS MCP] OmniRoute not running"
 }
 
-# Kill any orphaned npx @agentmemory processes
-$orphans = Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match 'agentmemory|januscope' }
-if ($orphans) {
-    $orphans | ForEach-Object {
-        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-        Write-Host "[FLOSS MCP] Killed orphan PID $($_.ProcessId)"
+# agentmemory / JanuScope: REPORTED, NOT KILLED.
+#
+# This block matched every node.exe on the host whose command line mentioned
+# agentmemory or januscope and force-killed all of them -- including the live
+# wrapper of an active Claude, Codex or Hermes session that this script has
+# nothing to do with. It checked neither parent liveness nor whether the
+# process belonged to this stack, so "stop my two HTTP daemons" could take
+# down someone else's running agent.
+#
+# It is also the SAME over-broad match fixed for OmniRoute twenty lines above,
+# in the same commit -- one site scoped, its sibling left alone.
+#
+# sweep_mcp_orphans.ps1 already does this properly: parent-liveness, an age
+# and CPU heuristic for leaked subagent wrappers, and a protected-PID list.
+# Reimplementing a weaker copy of it here is how the two drift apart, so this
+# reports and defers rather than guessing.
+$candidates = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Where-Object { $_.CommandLine -match 'agentmemory|januscope' }
+if ($candidates) {
+    Write-Host "[FLOSS MCP] $($candidates.Count) agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session."
+    foreach ($c in $candidates) {
+        Write-Host "[FLOSS MCP]   PID $($c.ProcessId) (parent $($c.ParentProcessId))"
     }
+    Write-Host "[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons."
 }
 
 Write-Host "[FLOSS MCP] All daemons stopped. PID files cleaned."

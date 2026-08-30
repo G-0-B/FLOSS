@@ -369,31 +369,47 @@ def _identity_cli() -> int:
     PowerShell version already produced a different token for the same PID,
     because `-band 0xFFFFFFFF` does not mask an int64 there.
 
-    Exit codes: 0 the live PID is provably ours, 1 provably NOT ours (dead, or a
-    different process), 2 cannot tell. The caller must treat 2 as "do not kill",
-    for the same reason claim_singleton treats it as "still blocked".
+    THE VERDICT IS ON STDOUT, not in the exit code. A caller that read only the
+    exit status could not distinguish "provably not ours" (1) from "the
+    interpreter could not import this module" (also 1) -- and PowerShell does not
+    enter `catch` for a failed external command, it just records the status. The
+    stop script therefore treated a wrong-interpreter launch as a proven
+    mismatch, deleted the PID files, and left live daemons running and
+    unfindable: precisely the outcome the identity check was added to prevent.
+
+    So the contract is a single token on stdout -- OURS / FOREIGN / UNKNOWN --
+    and anything else, including no output at all, means UNKNOWN. Exit codes are
+    kept (0/1/2) for shell use but are advisory; a startup failure cannot forge a
+    token it never printed.
+
+    UNKNOWN must never authorise a kill, for the same reason claim_singleton
+    treats an unverifiable holder as still blocking.
     """
+
+    def verdict(token: str, code: int) -> int:
+        print(token)
+        return code
 
     if len(sys.argv) < 3:
         print("usage: --check-identity <pid_file>", file=sys.stderr)
-        return 2
+        return verdict("UNKNOWN", 2)
     pid_path = Path(sys.argv[2])
     try:
         pid = int(pid_path.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        return 2
+        return verdict("UNKNOWN", 2)
     if not _pid_alive(pid):
-        return 1
+        return verdict("FOREIGN", 1)
     try:
         recorded = _identity_path(pid_path).read_text(encoding="utf-8").strip()
     except OSError:
-        return 2
+        return verdict("UNKNOWN", 2)
     if not recorded:
-        return 2
+        return verdict("UNKNOWN", 2)
     current = _process_start_token(pid)
     if current is None:
-        return 2
-    return 0 if current == recorded else 1
+        return verdict("UNKNOWN", 2)
+    return verdict("OURS", 0) if current == recorded else verdict("FOREIGN", 1)
 
 
 if __name__ == "__main__":

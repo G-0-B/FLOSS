@@ -5,6 +5,8 @@ Run: C:\\Python313\\python.exe -m pytest FLOSS/packages/tests/test_mcp_daemon.py
 """
 import os
 import sys
+import tempfile
+import time
 
 import pytest
 from pathlib import Path
@@ -380,6 +382,93 @@ def test_identity_cli_exit_codes(tmp_path, monkeypatch):
     assert run() == 2
 
 
+def test_identity_cli_prints_the_verdict_on_stdout():
+    """The exit code alone cannot distinguish a verdict from a failed launch.
+
+    A checker that could not import this module also exits 1, and PowerShell does
+    not enter `catch` for a failed external command -- it just records the
+    status. Reading the status therefore turned "wrong interpreter" into "proven
+    mismatch", which deleted the PID files and left live daemons unfindable: the
+    exact outcome the identity check was added to prevent.
+
+    A process that never ran cannot print a token it never produced.
+    """
+    import subprocess
+
+    tmp = Path(tempfile.mkdtemp())
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
+    try:
+        time.sleep(1.2)
+        pid_path = tmp / "tok.pid"
+        pid_path.write_text(str(proc.pid), encoding="utf-8")
+        token = mcp_daemon._process_start_token(proc.pid)
+        if token is None:
+            pytest.skip("no process-creation token on this platform")
+
+        def run():
+            result = subprocess.run(
+                [sys.executable, "-m", "packages.mcp_daemon",
+                 "--check-identity", str(pid_path)],
+                capture_output=True, text=True,
+                cwd=str(Path(__file__).resolve().parents[2]),
+            )
+            return result.stdout.strip(), result.returncode
+
+        mcp_daemon._identity_path(pid_path).write_text(token, encoding="utf-8")
+        assert run() == ("OURS", 0)
+
+        mcp_daemon._identity_path(pid_path).write_text("bogus", encoding="utf-8")
+        assert run() == ("FOREIGN", 1)
+
+        mcp_daemon._identity_path(pid_path).unlink()
+        assert run() == ("UNKNOWN", 2)
+    finally:
+        proc.kill()
+
+
+def test_a_failed_checker_launch_produces_no_token():
+    """Exit 1 with no token must not be readable as FOREIGN."""
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import sys; sys.exit(1)"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 1, "a failed launch shares the FOREIGN exit code"
+    assert result.stdout.strip() == "", "but it cannot produce the token"
+
+
+def test_the_stop_script_resolves_the_repository_interpreter():
+    """Bare `python` may not be the interpreter the daemons were launched with."""
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "stop_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "FLOSS_PYTHON" in script, "honour the documented interpreter override"
+    assert "venv" in script, "then a venv inside the checkout, as the start script does"
+    assert "& $py -m packages.mcp_daemon" in script, "not a bare `python`"
+    assert "Push-Location $repoRoot" in script, "and run it from the repository"
+    assert "$LASTEXITCODE" not in script, "the verdict is the token, not the status"
+
+
+def test_the_stop_script_does_not_force_kill_shared_node_processes():
+    """"Stop my two daemons" must not take down another agent's live session.
+
+    The agentmemory/JanuScope block matched every node.exe on the host mentioning
+    those names and force-killed all of them, checking neither parent liveness
+    nor ownership -- the same over-broad match fixed for OmniRoute twenty lines
+    above, in the same commit. sweep_mcp_orphans.ps1 already does this properly.
+    """
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "stop_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "sweep_mcp_orphans.ps1" in script, "defer to the tool with the predicates"
+    for line in script.splitlines():
+        if "Stop-Process" in line and not line.strip().startswith("#"):
+            assert "agentmemory" not in line and "januscope" not in line
+
+
 def test_the_stop_script_delegates_the_identity_check():
     """One implementation, two callers.
 
@@ -395,4 +484,4 @@ def test_the_stop_script_delegates_the_identity_check():
     assert "--check-identity" in script, "stop path must consult the identity check"
     assert "GetProcessTimes" not in script, "the token must not be recomputed here"
     assert "ToFileTime" not in script, "the token must not be recomputed here"
-    assert "$identity -ne 0" in script, "anything but a proven match must not kill"
+    assert "$verdict -ne 'OURS'" in script, "anything but a proven match must not kill"
