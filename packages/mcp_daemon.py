@@ -16,6 +16,7 @@ import json
 import os
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -188,9 +189,35 @@ def claim_singleton(pid_filename: str) -> bool:
         try:
             fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
+            raw = ""
             try:
-                existing = int(pid_path.read_text(encoding="utf-8").strip())
-            except (OSError, ValueError):
+                raw = pid_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                raw = ""
+            if not raw:
+                # AN EMPTY CLAIM IS AN IN-PROGRESS CLAIM, NOT A STALE ONE.
+                #
+                # O_EXCL creates the file before its PID is written, so a second
+                # launcher can read it in that window. Converting the empty read
+                # to -1 made it "stale", so the second launcher unlinked the
+                # FIRST launcher's valid claim and both returned success --
+                # defeating the guarantee O_EXCL was introduced to provide. The
+                # one that later loses the port bind then removes the survivor's
+                # record on exit, leaving a live daemon untracked.
+                #
+                # Wait for the writer instead of reclaiming from it. Still
+                # blank after that is a crashed writer, and the stale-reclaim
+                # path below handles it on a later pass.
+                time.sleep(0.05)
+                try:
+                    raw = pid_path.read_text(encoding="utf-8").strip()
+                except OSError:
+                    raw = ""
+                if not raw:
+                    return False
+            try:
+                existing = int(raw)
+            except ValueError:
                 existing = -1
             # A live holder blocks us even when that holder is THIS process: a
             # second claim on one slot means a double-start, and reporting

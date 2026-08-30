@@ -137,6 +137,35 @@ def _publish(args: argparse.Namespace) -> int:
     # a truncated store returns VERIFIED. It does not stop a deliberate
     # operator -- --force exists and they own the key -- but it stops the
     # accident, which is the case that was silently destroying evidence.
+    # A SUPERSEDED FORMAT IS A MIGRATION, NOT A LOSS.
+    #
+    # Bumping ANCHOR_VERSION without a migration path bricked the shipped
+    # anchor: the committed one was v2, the verifier accepted only v3, so
+    # `verify` returned ANCHOR_UNAVAILABLE before looking at the store and
+    # `publish` refused its own preflight because the predecessor was
+    # unavailable. The only way forward was --force, which is the flag that
+    # exists to overwrite a DETECTED LOSS -- so the documented escape route for
+    # a format bump was the one reserved for destroying evidence.
+    #
+    # An unreadable-by-version predecessor cannot be compared, so no loss can be
+    # claimed and none can be ruled out. Publishing proceeds, loudly, and starts
+    # a NEW series rather than chaining to a root this build cannot verify:
+    # linking to an unverifiable ancestor is the broken-series condition.
+    migrating = False
+    if previous is not None and previous.get("v") not in anchor_lib.SUPPORTED_VERSIONS:
+        migrating = True
+        print(
+            f"anchor format migration: the current anchor is "
+            f"{previous.get('v')!r} and this build verifies "
+            f"{sorted(anchor_lib.SUPPORTED_VERSIONS)}."
+        )
+        print(
+            "  It cannot be compared against the store, so no loss is claimed "
+            "and none is ruled out. Publishing a new series; the old anchor and "
+            "its series files are left in place as history."
+        )
+        previous = None
+
     if previous is not None and not args.force:
         prior = anchor_lib.verify_anchor(
             args.provenance_root,

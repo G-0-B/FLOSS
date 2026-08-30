@@ -942,3 +942,41 @@ def test_every_unreadable_entry_carries_a_content_digest(tmp_path):
     for entry in unreadable:
         assert entry.get("sha256"), f"no content digest for {entry['path']}"
         assert len(entry["sha256"]) == 64
+
+
+@pytest.mark.parametrize("payload", ["[]", '"a string"', "42", "null", "true"])
+def test_load_anchor_rejects_valid_json_of_the_wrong_shape(tmp_path, payload):
+    """Fixing the exception type without checking the result type.
+
+    `[]`, a bare string or a number parse fine and then reach `.get()` in
+    verify_anchor and publish's preflight. An operator-writable file cannot be
+    trusted to be an object just because it parsed.
+    """
+    path = tmp_path / "anchor.json"
+    path.write_text(payload, encoding="utf-8")
+    assert anchor_lib.load_anchor(path) is None
+    # and the whole verdict path stays structured rather than crashing
+    assert anchor_lib.verify_anchor(tmp_path, anchor_lib.load_anchor(path))["status"] == (
+        anchor_lib.ANCHOR_UNAVAILABLE
+    )
+
+
+def test_the_shipped_anchor_verifies_under_this_build():
+    """The version bump left the committed anchor unverifiable by its own code.
+
+    v2 was shipped while the verifier accepted only v3, so `verify` returned
+    ANCHOR_UNAVAILABLE before looking at the store and `publish` refused its own
+    preflight — leaving `--force`, the flag reserved for overwriting a detected
+    loss, as the documented route through a format bump.
+    """
+    shipped = REPO_ROOT / ".anchors" / "anchor.json"
+    if not shipped.exists():
+        pytest.skip("no anchor published in this checkout")
+
+    anchor = anchor_lib.load_anchor(shipped)
+    assert anchor is not None
+    assert anchor["v"] in anchor_lib.SUPPORTED_VERSIONS, (
+        f"shipped anchor is {anchor['v']}, this build verifies "
+        f"{sorted(anchor_lib.SUPPORTED_VERSIONS)}"
+    )
+    assert anchor_lib.anchor_signature_problem(anchor) is None

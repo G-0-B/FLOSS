@@ -769,9 +769,17 @@ def verify_anchor(
 
 def load_anchor(path: Path) -> dict[str, Any] | None:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        document = json.loads(path.read_text(encoding="utf-8"))
     # The third reader, unnamed by review. A corrupt anchor.json crashed BOTH
     # publish and verify -- and publish reads it to decide whether a predecessor
     # exists, so a single bad byte took down the command that would replace it.
     except (OSError, UnicodeError, json.JSONDecodeError):
         return None
+    # And valid JSON of the wrong SHAPE. Fixing the exception type without
+    # checking the result type left `[]`, a bare string or a number sailing
+    # through to `.get()` in verify_anchor and publish's preflight. An
+    # operator-writable file cannot be trusted to be an object just because it
+    # parsed.
+    if not isinstance(document, dict):
+        return None
+    return document

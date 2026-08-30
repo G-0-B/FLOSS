@@ -632,3 +632,28 @@ def test_unknown_identity_is_conservative_in_every_caller():
     assert "not starting a duplicate" in start
     assert "$verdict -ne 'OURS'" in stop, "stop kills only on a proven match"
     assert "refusing to force-kill" in stop
+
+
+def test_an_empty_in_progress_claim_is_occupied_not_stale(tmp_path, monkeypatch):
+    """O_EXCL creates the file before the PID is written.
+
+    A second launcher reading it in that window saw an empty file, converted it
+    to -1, called it stale, and unlinked the FIRST launcher's valid claim — so
+    both returned success, defeating the guarantee O_EXCL was introduced to
+    provide. The one that later loses the port bind then removes the survivor's
+    record on exit, leaving a live daemon untracked.
+    """
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    claim = tmp_path / "race.pid"
+    claim.write_text("", encoding="utf-8")  # created, PID not yet written
+
+    assert mcp_daemon.claim_singleton("race.pid") is False
+    assert claim.exists(), "the in-progress claim must not be reclaimed"
+
+
+def test_a_genuinely_stale_numeric_claim_is_still_reclaimable(tmp_path, monkeypatch):
+    """The conservative read must not wedge the slot forever."""
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    (tmp_path / "stale.pid").write_text("999999999", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("stale.pid") is True
