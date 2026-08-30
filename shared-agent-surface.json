@@ -52,6 +52,10 @@
     ".agent-surface/harness/ai-roster.json"
   ],
   "targets": {
+    "antigravity": {
+      "scope": "user",
+      "config_path": "~/.gemini/config/mcp_config.json"
+    },
     "gemini": {
       "settings_path": ".gemini/settings.json"
     },
@@ -99,7 +103,9 @@
       "mcp_servers": [
         "flossiullk-consensus",
         "flossiullk-reasoning-ensemble",
-        "agentmemory"
+        "agentmemory",
+        "flossiullk-computer-use",
+        "flossiullk-coordination-room"
       ],
       "server_overrides": {
         "flossiullk-consensus": {
