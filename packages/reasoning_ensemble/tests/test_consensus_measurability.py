@@ -508,3 +508,34 @@ def test_a_genuinely_split_panel_is_still_classified_normally():
     tier = classify_tier(responses, similarity, assignments)
     assert tier.separation["discriminative"] is True
     assert tier.tier != TIER_UNMEASURED
+
+
+def test_the_unmeasured_rendering_describes_the_actual_cluster_shape():
+    """Generalising the classifier without generalising the prose.
+
+    classify_tier was widened to both non-discriminative sides while this branch
+    still said "every voter landed in one cluster" — false for the all-below
+    case, where each voter has its own. The header note carried the same claim.
+    """
+    responses = [
+        _resp("a", "Alpha position at some length."),
+        _resp("b", "Beta position at some length."),
+        _resp("c", "Gamma position at some length."),
+    ]
+    above = [[1.0, 0.91, 0.88], [0.91, 1.0, 0.90], [0.88, 0.90, 1.0]]
+    below = [[1.0, 0.20, 0.11], [0.20, 1.0, 0.19], [0.11, 0.19, 1.0]]
+
+    for similarity, expected_clusters in ((above, 1), (below, 3)):
+        assignments = greedy_cluster(responses, similarity, CLUSTER_SIMILARITY_THRESHOLD)
+        assert len(set(assignments.values())) == expected_clusters
+        tier = classify_tier(responses, similarity, assignments)
+        assert tier.tier == TIER_UNMEASURED
+        text = write_synthesis("q?", responses, tier)
+
+        says_one_cluster = "landed in one cluster" in text
+        assert says_one_cluster == (expected_clusters == 1), (
+            f"{expected_clusters} clusters but text claims one: {says_one_cluster}"
+        )
+        # neither variant may claim the threshold made more clusters impossible
+        # when in fact it made fewer impossible
+        assert "could not have produced more than one cluster" not in text

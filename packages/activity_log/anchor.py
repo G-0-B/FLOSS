@@ -42,6 +42,7 @@ loud truncation attributable, for anyone holding one prior root.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -156,6 +157,27 @@ def merkle_root(leaves: list[bytes]) -> str:
     return _encode_root(nodes[0])
 
 
+def _file_digest(path: Path) -> str | None:
+    """SHA-256 of a file's raw bytes, or None if it cannot be read.
+
+    Unreadable packets are excluded from `leaves`, so they do not move the
+    Merkle root -- which means the ONLY thing committing to them is this record.
+    Comparing paths alone did not freeze the known damage it claimed to: swap a
+    malformed file for different malformed bytes at the same path and both path
+    sets match, the root is unchanged, and verification returned VERIFIED while
+    the store's contents had changed.
+
+    That is the same defect as comparing leaf POSITIONS instead of leaf digests,
+    one level down: identity by locator rather than by content. Fixed there two
+    commits ago and reintroduced here in the same breath.
+    """
+
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
 def _relative(path: Path, provenance_root: Path) -> str:
     try:
         return path.resolve().relative_to(provenance_root.resolve()).as_posix()
@@ -192,7 +214,11 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
         # report. provenance.py's indexers already catch it.
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             unreadable.append(
-                {"path": _relative(path, provenance_root), "error": str(exc)[:160]}
+                {
+                    "path": _relative(path, provenance_root),
+                    "error": str(exc)[:160],
+                    "sha256": _file_digest(path),
+                }
             )
             continue
         if not isinstance(document, dict) or document.get("t") != "prov":
@@ -206,7 +232,11 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
             and isinstance(said, str)
         ):
             unreadable.append(
-                {"path": _relative(path, provenance_root), "error": "malformed header"}
+                {
+                    "path": _relative(path, provenance_root),
+                    "error": "malformed header",
+                    "sha256": _file_digest(path),
+                }
             )
             continue
         try:
@@ -216,6 +246,7 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
                 {
                     "path": _relative(path, provenance_root),
                     "error": f"non-integer sequence {sequence!r}",
+                    "sha256": _file_digest(path),
                 }
             )
             continue
@@ -244,6 +275,7 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
                         f"SAID not satisfied: claims {said[:16]}..., content "
                         f"digests to {str(recomputed)[:16]}..."
                     ),
+                    "sha256": _file_digest(path),
                 }
             )
             continue
@@ -611,13 +643,23 @@ def verify_anchor(
     # verification forever -- the b0de2fe mistake this register records as CF-1.
     # Known damage is frozen; new or vanished damage is a finding.
     anchored_unreadable = {
-        str(entry.get("path"))
+        (str(entry.get("path")), entry.get("sha256"))
         for entry in (anchor.get("unreadable") or [])
         if isinstance(entry, dict)
     }
-    current_unreadable = {entry["path"] for entry in unreadable}
-    result["unreadable_appeared"] = sorted(current_unreadable - anchored_unreadable)
-    result["unreadable_vanished"] = sorted(anchored_unreadable - current_unreadable)
+    current_unreadable = {(entry["path"], entry.get("sha256")) for entry in unreadable}
+    result["unreadable_appeared"] = [
+        {"path": path, "sha256": digest}
+        for path, digest in sorted(
+            current_unreadable - anchored_unreadable, key=lambda x: (x[0], x[1] or "")
+        )
+    ]
+    result["unreadable_vanished"] = [
+        {"path": path, "sha256": digest}
+        for path, digest in sorted(
+            anchored_unreadable - current_unreadable, key=lambda x: (x[0], x[1] or "")
+        )
+    ]
 
     # THESE TWO CHECKS ARE ABOUT THE ANCHOR, NOT THE STORE DELTA, SO THEY RUN
     # FIRST.

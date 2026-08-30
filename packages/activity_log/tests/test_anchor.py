@@ -890,3 +890,55 @@ def test_no_json_reader_omits_unicodeerror():
         assert "UnicodeError" in clause.group(1), (
             f"reader at offset {match.start()} does not catch UnicodeError"
         )
+
+
+def test_swapping_malformed_bytes_at_the_same_path_is_detected(tmp_path, identity):
+    """Comparing paths did not freeze the damage it claimed to.
+
+    Unreadable files are excluded from `leaves`, so they never move the root —
+    which makes the unreadable record the ONLY thing committing to them.
+    Replacing a malformed file with DIFFERENT malformed bytes at the same path
+    left both path sets identical and the root unchanged, and verification
+    returned VERIFIED while the store's contents had changed.
+
+    Identity by locator rather than by content: the same defect as comparing
+    leaf positions instead of leaf digests, one level down.
+    """
+    store = tmp_path / "prov"
+    _write(store, "d", "ok", _packet("D" + "a" * 43, 0))
+    damaged = store / "d" / "damaged.json"
+    damaged.write_text('{"t":"prov","i":"D","s":"0","d":"E' + "z" * 43 + '"}', encoding="utf-8")
+
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    assert anchored["unreadable"][0]["sha256"], "the anchor commits to the content"
+    assert anchor_lib.verify_anchor(store, anchored)["status"] == anchor_lib.VERIFIED
+
+    damaged.write_text(
+        '{"t":"prov","i":"D","s":"0","d":"E' + "q" * 43 + '","extra":"swapped"}',
+        encoding="utf-8",
+    )
+    result = anchor_lib.verify_anchor(store, anchored)
+    assert result["status"] != anchor_lib.VERIFIED
+    assert result["unreadable_appeared"][0]["path"].endswith("damaged.json")
+    assert result["unreadable_vanished"], "the old bytes are named as gone too"
+
+
+def test_every_unreadable_entry_carries_a_content_digest(tmp_path):
+    """All four unreadable paths, not just the one review named."""
+    store = tmp_path / "prov"
+    (store / "d").mkdir(parents=True)
+    (store / "d" / "badjson.json").write_text("{not json", encoding="utf-8")
+    (store / "d" / "badutf8.json").write_bytes(b'{"t":"prov","d":"E\xff"}')
+    (store / "d" / "noheader.json").write_text('{"t":"prov","i":1,"s":2,"d":3}', encoding="utf-8")
+    (store / "d" / "badseq.json").write_text(
+        '{"t":"prov","i":"D","s":"x","d":"E' + "z" * 43 + '"}', encoding="utf-8"
+    )
+    (store / "d" / "liar.json").write_text(
+        '{"t":"prov","i":"D","s":"0","d":"E' + "y" * 43 + '"}', encoding="utf-8"
+    )
+
+    _leaves, unreadable = anchor_lib.scan_packets(store)
+    assert len(unreadable) == 5
+    for entry in unreadable:
+        assert entry.get("sha256"), f"no content digest for {entry['path']}"
+        assert len(entry["sha256"]) == 64

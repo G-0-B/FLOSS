@@ -845,10 +845,15 @@ def write_synthesis(
     lines.append(f"# Ensemble synthesis — {tier_class.tier.upper()}")
     if tier_class.tier == TIER_UNMEASURED:
         lines.append("")
+        # Same false claim as the body branch had: this asserted the all-above
+        # shape for both non-discriminative sides. The header is a sibling of
+        # that defect and was written in the same commit.
         lines.append(
-            "_(`tier: unmeasured`, not `tier1`. The clustering could not have "
-            "produced more than one cluster, so this run makes no claim about "
-            "agreement. Machine consumers must not read it as consensus.)_"
+            "_(`tier: unmeasured`, not `tier1` or `tier4`. The clustering "
+            "threshold sat outside the observed similarity range, so it could "
+            "not have separated the voters differently however they answered. "
+            "This run makes no claim about agreement OR divergence, and machine "
+            "consumers must not read it as either.)_"
         )
     lines.append("")
     lines.append(
@@ -973,12 +978,32 @@ def write_synthesis(
         # that had exactly ONE cluster. A reader could believe either half.
         lines.append("## Consensus not measured")
         lines.append("")
+        # Read the REASON from the diagnostic instead of assuming the case the
+        # branch was written for. Generalising classify_tier to both
+        # non-discriminative sides while leaving this prose describing only the
+        # all-above one produced an artifact that told an all-below run every
+        # voter had landed in one cluster -- when in fact each had its own.
+        separation = tier_class.separation or {}
+        cluster_count = len(set(tier_class.cluster_assignments.values()))
+        if cluster_count <= 1:
+            shape = (
+                "Every voter landed in one cluster, and the clustering could "
+                "not have produced more than one."
+            )
+        else:
+            shape = (
+                f"The clustering produced {cluster_count} clusters -- one per "
+                f"voter -- because no pair reached the threshold, so it could "
+                f"not have produced fewer."
+            )
         lines.append(
-            "Every voter landed in one cluster, and the clustering could not "
-            "have produced more than one. That is a property of the metric, not "
-            "a finding about the voters: this run neither established agreement "
-            "nor observed divergence."
+            f"{shape} That is a property of the metric, not a finding about the "
+            f"voters: this run neither established agreement nor observed "
+            f"divergence."
         )
+        if separation.get("reason"):
+            lines.append("")
+            lines.append(f"> {separation['reason']}")
         lines.append("")
         lines.append("**The responses are the output. All of them, unranked:**")
         lines.append("")

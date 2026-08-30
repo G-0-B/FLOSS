@@ -235,6 +235,7 @@ def toml_inline_table(mapping: dict[str, Any]) -> str:
 # rather than silently materializing nothing for it and reporting clean.
 KNOWN_TARGET_KEYS = frozenset(
     {
+        "antigravity",
         "gemini",
         "opencode",
         "vibe",
@@ -393,6 +394,33 @@ def classify_transport(name: str, server: dict[str, Any]) -> tuple[str, dict[str
     raise SharedSurfaceError(
         f"Shared MCP server {name!r} must define either `command` or `url`"
     )
+
+
+def build_antigravity_payload(
+    existing: dict[str, Any], shared_mcp: dict[str, Any]
+) -> dict[str, Any]:
+    """Project shared MCP servers into Antigravity's mcp_config.json shape.
+
+    Antigravity uses `{"serverUrl": ...}` for HTTP remote servers and
+    `{"command": ..., "args": [...]}` for stdio local servers. Preserves
+    existing unmanaged servers in `mcpServers`.
+    """
+    payload = dict(existing)
+    servers: dict[str, Any] = dict(payload.get("mcpServers") or {})
+    for name, raw_server in shared_mcp.items():
+        transport, spec = classify_transport(name, raw_server)
+        if transport == "http":
+            servers[name] = {"serverUrl": spec["url"]}
+        elif transport == "stdio":
+            entry: dict[str, Any] = {
+                "command": spec["command"],
+                "args": spec["args"],
+            }
+            if spec.get("env"):
+                entry["env"] = spec["env"]
+            servers[name] = entry
+    payload["mcpServers"] = servers
+    return payload
 
 
 def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[str, Any]:
@@ -1601,6 +1629,26 @@ def materialize(
 
     targets: dict[str, Any] = manifest["targets"]
 
+    antigravity_cfg = targets.get("antigravity")
+    if isinstance(antigravity_cfg, dict) and antigravity_cfg.get("config_path"):
+        if target_in_scope(antigravity_cfg, include_user_scope):
+            antigravity_path = resolve_manifest_path(
+                workspace_root, str(antigravity_cfg["config_path"])
+            )
+            existing = (
+                load_json(antigravity_path) if antigravity_path.exists() else {}
+            )
+            payload = build_antigravity_payload(existing, shared_mcp)
+            message, changed = check_or_write(
+                antigravity_path, payload, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+        else:
+            results.append(
+                "SKIP  antigravity (user scope; pass --include-user-scope)"
+            )
+
     gemini_cfg = targets.get("gemini")
     if isinstance(gemini_cfg, dict) and gemini_cfg.get("settings_path"):
         gemini_path = workspace_root / gemini_cfg["settings_path"]
@@ -1882,6 +1930,12 @@ def materialize(
             output_dir=workspace_root / ".agent-surface" / "skills",
             check=check,
             dry_run=dry_run,
+            # Forwarded, as it already is to the hook materializer six lines
+            # above. Without it --include-user-scope updated the user-scoped MCP
+            # and hook targets, silently skipped the manifest's user-scoped Codex
+            # and Hermes SKILL directories, and exited successfully -- so the
+            # command reported doing something it had only partly done.
+            include_user_scope=include_user_scope,
         )
         results.extend(skill_results)
         drift_found = drift_found or skill_drift
