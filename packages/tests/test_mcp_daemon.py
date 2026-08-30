@@ -485,3 +485,105 @@ def test_the_stop_script_delegates_the_identity_check():
     assert "GetProcessTimes" not in script, "the token must not be recomputed here"
     assert "ToFileTime" not in script, "the token must not be recomputed here"
     assert "$verdict -ne 'OURS'" in script, "anything but a proven match must not kill"
+
+
+def test_pid_alive_is_false_for_a_terminated_process():
+    """OpenProcess SUCCEEDING is not liveness.
+
+    Found while testing the identity CLI, not reported by review. A terminated
+    process stays openable while any handle to it persists, so this returned
+    True for daemons that had already exited: claim_singleton reported "already
+    running" when nothing was, permanently, and --check-identity said OURS about
+    a corpse. GetExitCodeProcess distinguishes them.
+    """
+    import subprocess
+
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    time.sleep(1.0)
+    assert mcp_daemon._pid_alive(proc.pid) is True
+
+    proc.kill()
+    proc.wait()
+    time.sleep(1.0)
+    assert mcp_daemon._pid_alive(proc.pid) is False, (
+        "a killed and reaped process must not read as alive"
+    )
+    assert mcp_daemon._pid_alive(999999999) is False
+    assert mcp_daemon._pid_alive(os.getpid()) is True
+
+
+def test_record_identity_writes_a_verifiable_pair(tmp_path):
+    """OmniRoute is launched by PowerShell, so nothing recorded its identity."""
+    import subprocess
+
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
+    try:
+        time.sleep(1.0)
+        pid_path = tmp_path / "omniroute.pid"
+
+        def run(*args):
+            result = subprocess.run(
+                [sys.executable, "-m", "packages.mcp_daemon", *args],
+                capture_output=True, text=True,
+                cwd=str(Path(__file__).resolve().parents[2]),
+            )
+            return result.stdout.strip(), result.returncode
+
+        assert run("--record-identity", str(pid_path), str(proc.pid)) == ("RECORDED", 0)
+        assert pid_path.read_text(encoding="utf-8").strip() == str(proc.pid)
+        assert run("--check-identity", str(pid_path)) == ("OURS", 0)
+    finally:
+        proc.kill()
+        proc.wait()
+
+    time.sleep(1.0)
+    after = subprocess.run(
+        [sys.executable, "-m", "packages.mcp_daemon", "--check-identity", str(pid_path)],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+    assert after.stdout.strip() == "FOREIGN", "a dead recorded PID is not ours"
+
+
+def test_recording_a_dead_pid_is_refused(tmp_path):
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-m", "packages.mcp_daemon",
+         "--record-identity", str(tmp_path / "x.pid"), "999999999"],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+    assert result.stdout.strip() == "NOT_RUNNING"
+    assert not (tmp_path / "x.pid").exists()
+
+
+def test_neither_daemon_script_matches_omniroute_by_command_line():
+    """Two wrong filters in two commits was the signal to stop filtering.
+
+    First a host-wide `omniroute` match that killed other projects' processes.
+    Then a checkout-scoped match that matched NOTHING, because
+    `omniroute --no-open` produces a command line naming the global package and
+    never the working directory — so our own process was classified foreign and
+    left running. Identity is recorded at launch instead.
+    """
+    scripts = Path(__file__).resolve().parents[2] / "scripts"
+    for name in ("start_mcp_daemons.ps1", "stop_mcp_daemons.ps1"):
+        text = (scripts / name).read_text(encoding="utf-8")
+        assert "CommandLine -match 'omniroute'" not in text, name
+        assert "--record-identity" in text or "--check-identity" in text, name
+
+
+def test_the_start_script_parses_under_windows_powershell_5():
+    """`?.` is 7.1+, and 5.1 fails to PARSE the file, so nothing starts at all.
+
+    The documented Scheduled Task registers this with `powershell`, which is 5.1.
+    """
+    text = (
+        Path(__file__).resolve().parents[2] / "scripts" / "start_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        assert "?." not in stripped, f"PowerShell 7-only operator in: {stripped}"

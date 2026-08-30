@@ -11,6 +11,11 @@
 # outright. $PSScriptRoot is scripts/, so the repository root is its parent.
 $workspace = Split-Path -Parent $PSScriptRoot
 $env:PYTHONPATH = $workspace
+# `$workspace` is the REPOSITORY root here (parent of scripts/), despite the
+# name. Aliased so the identity calls below read correctly, and the agent
+# directory is resolved the same way mcp_daemon.py and the stop script do.
+$repoRoot = $workspace
+$flossAgent = if ($env:FLOSS_AGENT_DIR) { $env:FLOSS_AGENT_DIR } else { "$env:USERPROFILE\.floss_agent" }
 
 # Honour an explicit interpreter, then a venv inside the checkout, then PATH.
 if ($env:FLOSS_PYTHON) {
@@ -18,7 +23,11 @@ if ($env:FLOSS_PYTHON) {
 } elseif (Test-Path (Join-Path $workspace "venv\Scripts\python.exe")) {
     $py = Join-Path $workspace "venv\Scripts\python.exe"
 } else {
-    $py = (Get-Command python -ErrorAction SilentlyContinue)?.Source
+    # `?.` is PowerShell 7.1+. The documented Scheduled Task registers this
+    # with `powershell`, which is Windows PowerShell 5.1 -- and 5.1 fails to
+    # PARSE the whole file on that operator, so no daemon starts at all.
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    $py = if ($cmd) { $cmd.Source } else { $null }
 }
 if (-not $py -or -not (Test-Path $py)) {
     Write-Error "[FLOSS MCP] No usable Python found. Set FLOSS_PYTHON to an interpreter, or create $workspace\venv."
@@ -38,13 +47,40 @@ Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.
 # script started ANOTHER OmniRoute on every rerun despite the duplicate
 # guard it advertises below. Same root cause as the stop script, opposite
 # and equally wrong outcome.
-$omni = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'omniroute' }
-if (-not $omni) {
-    Start-Process -WindowStyle Hidden "omniroute" "--no-open"
-    Write-Host "[FLOSS MCP] OmniRoute started (:20128)"
+# IDENTITY, NOT COMMAND-LINE MATCHING.
+#
+# Matching `omniroute` across every node.exe on the host let ANOTHER
+# project's OmniRoute satisfy this duplicate guard, so the launcher skipped
+# its own startup and then reported all daemons started -- on a different
+# port, config and credentials.
+#
+# Scoping the match to this checkout does not work: `omniroute --no-open`
+# produces a command line referencing the globally installed package and
+# never the working directory, so a checkout filter matches nothing and
+# classifies our own process as foreign. That was tried and it was wrong.
+#
+# So the PID and creation token are recorded at launch, exactly as
+# claim_singleton does for the Python daemons. One mechanism, third caller.
+$omniPid = Join-Path $flossAgent 'omniroute.pid'
+$omniVerdict = 'UNKNOWN'
+if ($py -and (Test-Path $omniPid)) {
+    Push-Location $repoRoot
+    $out = & $py -m packages.mcp_daemon --check-identity $omniPid 2>$null
+    Pop-Location
+    $tok = ($out | Select-Object -Last 1)
+    if ($tok) { $tok = $tok.ToString().Trim() }
+    if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
+}
+if ($omniVerdict -eq 'OURS') {
+    Write-Host "[FLOSS MCP] OmniRoute already running (recorded PID $(Get-Content $omniPid -Raw))"
 } else {
-    Write-Host "[FLOSS MCP] OmniRoute already running (PID $($omni.Id))"
+    $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'
+    if ($proc -and $py) {
+        Push-Location $repoRoot
+        & $py -m packages.mcp_daemon --record-identity $omniPid $($proc.Id) | Out-Null
+        Pop-Location
+    }
+    Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $($proc.Id))"
 }
 
 Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."

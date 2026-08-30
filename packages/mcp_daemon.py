@@ -38,8 +38,26 @@ def _pid_alive(pid: int) -> bool:
         kernel32 = ctypes.windll.kernel32
         handle = kernel32.OpenProcess(0x1000, False, pid)
         if handle:
+            # OpenProcess SUCCEEDING IS NOT LIVENESS. A terminated process
+            # remains openable while any handle to it persists, so this returned
+            # True for daemons that had already exited -- measured: kill a
+            # process, reap it, and OpenProcess still hands back a handle whose
+            # GetExitCodeProcess reports the real exit code rather than
+            # STILL_ACTIVE. claim_singleton then reported "already running" when
+            # nothing was, permanently, and --check-identity said OURS about a
+            # corpse.
+            #
+            # A live process can legitimately exit with 259 later, which would
+            # read as alive here. That is the documented ambiguity of this API
+            # and it errs toward "alive", which is the conservative direction
+            # for a singleton guard.
+            STILL_ACTIVE = 259
+            code = ctypes.c_ulong()
+            got = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
             kernel32.CloseHandle(handle)
-            return True
+            if not got:
+                return True  # cannot tell; stay conservative
+            return code.value == STILL_ACTIVE
         # ERROR_INVALID_PARAMETER (87) = PID not in use
         # ERROR_ACCESS_DENIED (5) = exists but owned by another user
         err = kernel32.GetLastError()
@@ -232,8 +250,14 @@ def claim_singleton(pid_filename: str) -> bool:
         """
         try:
             if pid_path.read_text(encoding="utf-8").strip() == str(me):
-                pid_path.unlink(missing_ok=True)
+                # SIDECAR FIRST, exactly as the stale-reclaim path does.
+                # Unlinking the PID file first opens a window in which a
+                # replacement launcher claims the freed slot and writes ITS
+                # identity -- which this callback then deletes. The replacement
+                # stays alive but unverifiable, so the stop script refuses to
+                # terminate it and every later launch stays blocked.
                 _identity_path(pid_path).unlink(missing_ok=True)
+                pid_path.unlink(missing_ok=True)
         except (OSError, ValueError):
             pass
 
@@ -358,6 +382,53 @@ def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
     mcp.run(transport="streamable-http")
 
 
+def _record_identity_cli() -> int:
+    """`--record-identity <pid_file> <pid>` -> write the pair for another process.
+
+    OmniRoute is launched by the PowerShell start script, not by this module, so
+    nothing was recording its identity. Both scripts therefore identified it by
+    matching `omniroute` in every node.exe command line on the host -- which
+    killed other projects' processes on stop, and let another project's process
+    satisfy the duplicate guard on start.
+
+    Scoping that match to the checkout does not work either: the start script
+    runs `omniroute --no-open`, so the child's command line references the
+    globally installed package and never the working directory. A filter written
+    on that assumption classifies our own process as foreign and leaves it
+    running -- which is what happened.
+
+    The answer is to stop matching command lines and record identity at launch,
+    the same way claim_singleton does. One mechanism, a third caller.
+    """
+
+    if len(sys.argv) < 4:
+        print("usage: --record-identity <pid_file> <pid>", file=sys.stderr)
+        return 2
+    pid_path = Path(sys.argv[2])
+    try:
+        pid = int(sys.argv[3])
+    except ValueError:
+        return 2
+    if not _pid_alive(pid):
+        print("NOT_RUNNING")
+        return 1
+    token = _process_start_token(pid)
+    try:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(pid), encoding="utf-8")
+        if token:
+            _identity_path(pid_path).write_text(token, encoding="utf-8")
+        else:
+            # No token means the next reader cannot disprove this PID, so leave
+            # no stale sidecar from a previous holder to be compared against it.
+            _identity_path(pid_path).unlink(missing_ok=True)
+    except OSError:
+        print("UNKNOWN")
+        return 2
+    print("RECORDED")
+    return 0
+
+
 def _identity_cli() -> int:
     """`python -m packages.mcp_daemon --check-identity <pid_file>`.
 
@@ -415,4 +486,6 @@ def _identity_cli() -> int:
 if __name__ == "__main__":
     if "--check-identity" in sys.argv:
         raise SystemExit(_identity_cli())
+    if "--record-identity" in sys.argv:
+        raise SystemExit(_record_identity_cli())
     raise SystemExit(0)

@@ -130,28 +130,41 @@ foreach ($pidFile in $pidFiles) {
 # "omniroute" -- the old filter found nothing and the script cheerfully reported
 # OmniRoute stopped while it kept running. The identical mistake in
 # start_mcp_daemons.ps1 launched a second copy on every rerun.
-# SCOPED TO THIS CHECKOUT. A bare command-line match on 'omniroute' selects
-# every node.exe on the host whose command line mentions it -- including a
-# copy another project is running -- and Stop-Process -Force then terminates
-# all of them. Killing an unrelated developer's process is a worse outcome
-# than leaving ours up, so the match is narrowed to processes whose command
-# line also references this repository, and anything outside that is
-# reported rather than killed.
-$repoRoot = Split-Path -Parent $PSScriptRoot
-$omniAll = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'omniroute' }
-$omni = $omniAll | Where-Object {
-    $_.CommandLine -like "*$repoRoot*" -or $_.CommandLine -like "*$([System.IO.Path]::GetFileName($repoRoot))*"
+# IDENTITY, NOT COMMAND-LINE MATCHING.
+#
+# First this matched `omniroute` across every node.exe on the host and
+# force-killed all of them, including another project's. Then it was scoped
+# to processes whose command line referenced this checkout -- which was ALSO
+# wrong, and worse: the start script runs `omniroute --no-open`, so the child
+# command line names the globally installed package and never the working
+# directory. That filter matched nothing, classified our own OmniRoute as
+# foreign, and left it running on every stop.
+#
+# Two wrong filters in two commits is the signal to stop filtering. The start
+# script now records the PID and creation token at launch, the same mechanism
+# claim_singleton uses, and this reads it.
+$omniPid = Join-Path $flossAgent 'omniroute.pid'
+$omniVerdict = 'UNKNOWN'
+if ($py -and (Test-Path $omniPid)) {
+    Push-Location $repoRoot
+    $out = & $py -m packages.mcp_daemon --check-identity $omniPid 2>$null
+    Pop-Location
+    $tok = ($out | Select-Object -Last 1)
+    if ($tok) { $tok = $tok.ToString().Trim() }
+    if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
-$foreign = $omniAll | Where-Object { $omni -notcontains $_ }
-foreach ($p in $foreign) {
-    Write-Host "[FLOSS MCP] leaving OmniRoute PID $($p.ProcessId) alone - its command line does not reference $repoRoot"
-}
-if ($omni) {
-    $omni | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    Write-Host "[FLOSS MCP] OmniRoute stopped"
+if ($omniVerdict -eq 'OURS') {
+    $omniId = [int]((Get-Content $omniPid -Raw).Trim())
+    Stop-Process -Id $omniId -Force -ErrorAction SilentlyContinue
+    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+    Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+    Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
+} elseif ($omniVerdict -eq 'FOREIGN') {
+    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+    Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+    Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared, killed nothing"
 } else {
-    Write-Host "[FLOSS MCP] OmniRoute not running"
+    Write-Host "[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing"
 }
 
 # agentmemory / JanuScope: REPORTED, NOT KILLED.
