@@ -147,3 +147,43 @@ def test_no_calendar_reachable_is_unavailable_not_pending():
     assert result["proof"] is None
     assert result["attested"] == []
     assert len(result["failed"]) == 1
+
+
+def test_a_bitcoin_attestation_is_never_reported_as_confirmed():
+    """Deserialising an attestation proves the bytes parse, nothing more.
+
+    The proof sidecar is operator-writable, so a fabricated attestation over the
+    expected digest would read as an external witness. Verifying it needs block
+    headers this layer does not have, so it reports what it actually knows.
+    """
+    if not HAVE_OTS:
+        pytest.skip("needs opentimestamps to construct a proof")
+
+    from opentimestamps.core.notary import BitcoinBlockHeaderAttestation
+    from opentimestamps.core.op import OpSHA256
+    from opentimestamps.core.serialize import BytesSerializationContext
+    from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
+
+    timestamp = Timestamp(witness_lib.root_digest(ROOT))
+    timestamp.attestations.add(BitcoinBlockHeaderAttestation(800000))
+    buffer = BytesSerializationContext()
+    DetachedTimestampFile(OpSHA256(), timestamp).serialize(buffer)
+
+    result = witness_lib.inspect_proof(
+        buffer.getbytes(), expected_digest=witness_lib.root_digest(ROOT)
+    )
+    assert result["status"] == witness_lib.WITNESS_ATTESTED
+    assert result["status"] != witness_lib.WITNESS_CONFIRMED
+    assert result["bitcoin_attestations"] == 1
+    assert "800000" in result["bitcoin_block_heights"]
+    assert "HAS NOT VERIFIED" in result["note"]
+
+
+def test_confirmed_is_reserved_and_unreachable_from_inspection():
+    """CONFIRMED exists as a target state, not as something this code emits."""
+    assert witness_lib.WITNESS_CONFIRMED == "CONFIRMED"
+    assert witness_lib.WITNESS_ATTESTED == "ATTESTED_UNVERIFIED"
+    source = (Path(__file__).resolve().parents[1] / "witness.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"status": WITNESS_CONFIRMED' not in source

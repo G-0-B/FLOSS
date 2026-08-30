@@ -171,6 +171,36 @@ def _publish(args: argparse.Namespace) -> int:
             return 2
 
     built = anchor_lib.build_anchor(args.provenance_root, previous)
+
+    # UNCHANGED ROOT IS A NO-OP, NOT A PUBLICATION.
+    #
+    # The series file is keyed by root, so republishing an unchanged store
+    # overwrote the previous entry with an anchor whose prev_root EQUALS its own
+    # merkle_root. walk_series then correctly reported a cycle, and every
+    # subsequent verify returned ANCHOR_UNAVAILABLE -- permanently, from one
+    # redundant publish. Reproduced: publish, publish, verify -> exit 3.
+    #
+    # A test in test_anchor.py already documented that anchoring an unchanged
+    # store twice produces prev_root == merkle_root. Noticing the property and
+    # not guarding the caller is how this shipped.
+    if previous is not None and built["merkle_root"] == previous.get("merkle_root"):
+        print(
+            json.dumps(
+                {
+                    "status": "unchanged",
+                    "merkle_root": built["merkle_root"],
+                    "packet_count": built["packet_count"],
+                    "note": (
+                        "the store has not changed since the current anchor; "
+                        "nothing published. Re-anchoring identical content would "
+                        "make the anchor its own predecessor and break the series."
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
     identity = _resolve_identity(args.identity_dir, args.allow_new_identity)
 
     # Signer continuity. If a previous anchor exists, its signer is the implicit
@@ -346,6 +376,10 @@ def _witness_upgrade(args: argparse.Namespace) -> int:
     if proof:
         proof_file.write_bytes(proof)
     print(json.dumps(result, indent=2, ensure_ascii=False))
+    # Exit 0 requires CONFIRMED, which this code never returns -- verifying a
+    # Bitcoin attestation needs block headers the witness layer does not have.
+    # An attested-but-unverified proof therefore exits 1, not 0: it is progress,
+    # not a witness.
     return 0 if result.get("status") == witness_lib.WITNESS_CONFIRMED else 1
 
 

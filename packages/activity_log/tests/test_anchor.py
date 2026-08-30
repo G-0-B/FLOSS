@@ -24,11 +24,35 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from packages.activity_log import anchor as anchor_lib  # noqa: E402
+from packages.activity_log import provenance  # noqa: E402
 from packages.activity_log.provenance import load_or_create_identity  # noqa: E402
 
 
-def _packet(identity: str, sequence: int, said: str) -> dict:
-    return {"t": "prov", "i": identity, "s": str(sequence), "d": said}
+def _packet(identity: str, sequence: int, said: str = "") -> dict:
+    """A packet whose SAID is actually SATISFIED, not merely claimed.
+
+    These fixtures used to assert an arbitrary `d`. That worked only because
+    scan_packets trusted the header, which is the defect a reviewer found: a
+    129-byte header-only stub reproduced the leaf of a 585-byte signed packet.
+    Now that the SAID is recomputed, a fixture with a made-up digest is
+    correctly treated as unreadable — so the fixtures have to be real.
+
+    The `said` argument is retained and ignored so call sites keep reading as
+    "this packet, at this position"; the digest is derived from the content.
+    """
+
+    packet = {
+        "v": provenance.VERSION_PLACEHOLDER,
+        "t": "prov",
+        "d": provenance.SAID_PLACEHOLDER,
+        "i": identity,
+        "s": str(sequence),
+        "p": None,
+        "a": [{"note": said or f"{identity}:{sequence}"}],
+        "sigs": [],
+    }
+    packet["d"] = provenance._said_digest(packet)
+    return packet
 
 
 def _write(root: Path, subdir: str, name: str, packet: dict) -> Path:
@@ -577,3 +601,121 @@ def test_the_cli_survives_an_anchor_path_outside_the_repository(tmp_path, identi
     )
     assert result.returncode == 0, result.stderr[-500:]
     assert "Traceback" not in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Review round 2. The leaf must commit to content, not to self-declared headers.
+# ---------------------------------------------------------------------------
+
+
+def test_a_header_only_stub_cannot_reproduce_a_packets_leaf(store, identity):
+    """The worst finding of the review, reproduced before the fix.
+
+    The leaf was built from `t`/`i`/`s`/`d` read off the file, so a 129-byte
+    stub asserting those four fields reproduced the leaf of a 585-byte signed
+    packet exactly — signatures, payload, artifact refs and evidence all
+    deleted, anchor still VERIFIED. That defeated the entire truncation
+    guarantee: the commitment was to what a file said about itself.
+    """
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
+    assert _status(store, anchored)["status"] == anchor_lib.VERIFIED
+
+    target = store / "2026-08-02" / "solo.json"
+    real = json.loads(target.read_text(encoding="utf-8"))
+    stub = {"t": "prov", "i": real["i"], "s": real["s"], "d": real["d"]}
+    target.write_text(json.dumps(stub), encoding="utf-8")
+
+    assert len(json.dumps(stub)) < len(json.dumps(real)), "the stub is smaller"
+    result = _status(store, anchored)
+    assert result["status"] != anchor_lib.VERIFIED
+    assert result["unreadable_appeared"], "the gutted packet must be named"
+
+
+def test_a_packet_that_only_claims_its_said_is_unreadable(tmp_path):
+    """`d` is a digest over the packet's own content; claiming is not satisfying."""
+    root = tmp_path / "prov"
+    (root / "d").mkdir(parents=True)
+    (root / "d" / "liar.json").write_text(
+        json.dumps({"t": "prov", "i": "D" + "a" * 43, "s": "0", "d": "E" + "z" * 43}),
+        encoding="utf-8",
+    )
+
+    leaves, unreadable = anchor_lib.scan_packets(root)
+    assert leaves == []
+    assert len(unreadable) == 1
+    assert "SAID not satisfied" in unreadable[0]["error"]
+
+
+def test_known_damage_is_frozen_rather_than_bricking_verification(tmp_path, identity):
+    """The live store has three permanently damaged packets.
+
+    Requiring an empty unreadable set would make it unverifiable forever, which
+    is the b0de2fe mistake. The anchored set is the baseline; only a CHANGE is a
+    finding.
+    """
+    root = tmp_path / "prov"
+    (root / "d").mkdir(parents=True)
+    _write(root, "d", "good", _packet("D" + "a" * 43, 0))
+    (root / "d" / "damaged.json").write_text(
+        json.dumps({"t": "prov", "i": "D" + "b" * 43, "s": "0", "d": "E" + "z" * 43}),
+        encoding="utf-8",
+    )
+
+    anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(root), identity)
+    assert anchored["unreadable"], "the damage is recorded in the anchor"
+    assert (
+        anchor_lib.verify_anchor(root, anchored)["status"] == anchor_lib.VERIFIED
+    ), "known damage must not block verification"
+
+    (root / "d" / "damaged.json").unlink()
+    after = anchor_lib.verify_anchor(root, anchored)
+    assert after["status"] != anchor_lib.VERIFIED
+    assert after["unreadable_vanished"], "a deleted malformed packet must not pass silently"
+
+
+def test_republishing_an_unchanged_store_is_a_no_op(tmp_path, identity):
+    """Two identical publishes used to brick verification permanently.
+
+    The series file is keyed by root, so republishing overwrote the predecessor
+    with an anchor whose prev_root equals its own merkle_root; walk_series then
+    reported a cycle and every later verify returned ANCHOR_UNAVAILABLE.
+    """
+    import subprocess
+
+    store = tmp_path / "prov"
+    _write(store, "d", "p0", _packet("D" + "a" * 43, 0))
+    anchor_path = tmp_path / "anchors" / "anchor.json"
+    base = [
+        sys.executable, str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+        "--provenance-root", str(store),
+        "--identity-dir", str(tmp_path / "id"),
+        "--anchor", str(anchor_path),
+    ]
+
+    assert subprocess.run(base + ["publish", "--allow-new-identity"]).returncode == 0
+    second = subprocess.run(base + ["publish"], capture_output=True, text=True)
+    assert second.returncode == 0
+    assert json.loads(second.stdout)["status"] == "unchanged"
+
+    verified = subprocess.run(base + ["verify"], capture_output=True, text=True)
+    assert verified.returncode == 0, "a redundant publish must not brick verification"
+    assert json.loads(verified.stdout)["status"] == anchor_lib.VERIFIED
+
+
+def test_the_spec_states_the_signature_scope_the_code_implements():
+    """Spec/code divergence on a signature rule is a verifier-breaking defect.
+
+    The spec said `sig` and `signer` were both excluded while the code excluded
+    only `sig`. A verifier written from the spec rejects every real anchor; one
+    that implements the spec faithfully reintroduces the signer-substitution
+    flaw. Pinned so the two cannot drift apart again silently.
+    """
+    spec = (REPO_ROOT / "docs" / "specs" / "provenance-anchor.spec.md").read_text(
+        encoding="utf-8"
+    )
+    assert "**`sig` alone is excluded**" in spec
+
+    probe = {"v": "x", "merkle_root": "r", "signer": "S", "sig": "0Bxx"}
+    signed_bytes = anchor_lib.anchor_signing_bytes(probe)
+    assert b"signer" in signed_bytes, "signer must be inside the pre-image"
+    assert b'"sig"' not in signed_bytes, "a signature cannot cover itself"

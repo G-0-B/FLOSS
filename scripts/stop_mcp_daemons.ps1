@@ -98,8 +98,23 @@ foreach ($pidFile in $pidFiles) {
 # "omniroute" -- the old filter found nothing and the script cheerfully reported
 # OmniRoute stopped while it kept running. The identical mistake in
 # start_mcp_daemons.ps1 launched a second copy on every rerun.
-$omni = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+# SCOPED TO THIS CHECKOUT. A bare command-line match on 'omniroute' selects
+# every node.exe on the host whose command line mentions it -- including a
+# copy another project is running -- and Stop-Process -Force then terminates
+# all of them. Killing an unrelated developer's process is a worse outcome
+# than leaving ours up, so the match is narrowed to processes whose command
+# line also references this repository, and anything outside that is
+# reported rather than killed.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$omniAll = Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
     Where-Object { $_.CommandLine -match 'omniroute' }
+$omni = $omniAll | Where-Object {
+    $_.CommandLine -like "*$repoRoot*" -or $_.CommandLine -like "*$([System.IO.Path]::GetFileName($repoRoot))*"
+}
+$foreign = $omniAll | Where-Object { $omni -notcontains $_ }
+foreach ($p in $foreign) {
+    Write-Host "[FLOSS MCP] leaving OmniRoute PID $($p.ProcessId) alone - its command line does not reference $repoRoot"
+}
 if ($omni) {
     $omni | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Write-Host "[FLOSS MCP] OmniRoute stopped"

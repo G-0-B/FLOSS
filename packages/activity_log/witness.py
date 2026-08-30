@@ -24,9 +24,17 @@ the Merkle anchor -- it replaces the anchor's publication mechanism. The ladder
 verdict is compose, not adopt.
 
 It proves "no later than", never "no earlier than". Backdating remains
-unprevented. It attests that a digest existed, not that the digest is the store's
-true contents. An operator can simply stop stamping, and absence of a proof is
-evidence of nothing.
+unprevented. It attests that a digest existed, not that the digest is the
+store's true contents. An operator can simply stop stamping, and absence of a
+proof is evidence of nothing.
+
+And this module NEVER returns CONFIRMED. It can see that a proof carries a
+Bitcoin block-header attestation, but verifying that attestation needs block
+headers this layer does not have -- and the proof sidecar is a file the operator
+can write, so a fabricated attestation over the right digest would otherwise
+read as an external witness. An attested proof is reported as
+ATTESTED_UNVERIFIED, with the block heights, and the caller is told to check
+them independently.
 
 OPTIONAL BY DESIGN
 
@@ -67,6 +75,12 @@ WITNESS_KIND = "opentimestamps"
 WITNESS_ABSENT = "ABSENT"
 WITNESS_UNAVAILABLE = "UNAVAILABLE"
 WITNESS_PENDING = "PENDING"
+# ATTESTED, not CONFIRMED. The proof carries a Bitcoin block-header attestation
+# and we have NOT checked it against Bitcoin. Reporting that as confirmation is
+# the git-tag mistake again: an unverified claim presented as an external fact.
+# The sidecar is operator-writable, so a fabricated attestation over the right
+# digest would otherwise read as a witness.
+WITNESS_ATTESTED = "ATTESTED_UNVERIFIED"
 WITNESS_CONFIRMED = "CONFIRMED"
 
 
@@ -217,20 +231,34 @@ def inspect_proof(proof: bytes, *, expected_digest: bytes | None = None) -> dict
             ),
         }
 
-    pending, confirmed, heights = _attestation_counts(detached.timestamp, ots)
+    pending, attested, heights = _attestation_counts(detached.timestamp, ots)
+    # CONFIRMED is never returned from here. Deserialising a
+    # BitcoinBlockHeaderAttestation proves only that the bytes parse; nothing in
+    # this process has checked the claimed block header against Bitcoin, and the
+    # proof sidecar is a file the operator can write. Confirming would require a
+    # node or a trusted header source, which this layer deliberately does not
+    # have -- so it reports what it actually knows.
+    if attested:
+        status = WITNESS_ATTESTED
+        note = (
+            f"The proof carries {attested} Bitcoin attestation(s) at block(s) "
+            f"{', '.join(heights) or '?'}, and THIS CODE HAS NOT VERIFIED THEM "
+            f"against Bitcoin. Verify the block header independently before "
+            f"treating this as an external witness."
+        )
+    else:
+        status = WITNESS_PENDING
+        note = (
+            "PENDING is a calendar promise, not a Bitcoin attestation. "
+            "It is not yet an external witness."
+        )
     return {
-        "status": WITNESS_CONFIRMED if confirmed else WITNESS_PENDING,
+        "status": status,
         "digest": detached.file_digest.hex(),
         "pending_attestations": pending,
-        "bitcoin_attestations": confirmed,
+        "bitcoin_attestations": attested,
         "bitcoin_block_heights": heights,
-        # Said plainly, because "PENDING" reads like partial success and is not.
-        "note": (
-            None
-            if confirmed
-            else "PENDING is a calendar promise, not a Bitcoin attestation. "
-            "It is not yet an external witness."
-        ),
+        "note": note,
     }
 
 

@@ -298,6 +298,14 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
             )
     print()
 
+    # Solo-find is defined by the protocol as findings only this reviewer raised
+    # THAT SURVIVED ADJUDICATION. Computed from the raw vectors alone, a unique
+    # finding the operator REJECTED still counted toward that reviewer's value --
+    # overstating exactly the reviewers whose distinctiveness was being wrong.
+    accepted_keys: set[str] | None = None
+    if adjudication and isinstance(adjudication.get("accepted"), list):
+        accepted_keys = {str(k) for k in adjudication["accepted"]}
+
     print("Per reviewer:")
     for index, review in enumerate(reviews):
         raised = sum(vectors[index])
@@ -306,12 +314,20 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
             for position in range(len(keys))
             if vectors[index][position] == 1
             and sum(v[position] for v in vectors) == 1
+            and (accepted_keys is None or keys[position] in accepted_keys)
         )
         tools = ",".join(review["tools"]) or "none"
         cascade = " (cascade)" if review["saw_prior"] else ""
+        label = "solo*" if accepted_keys is not None else "solo"
         print(
-            f"  {review['label']:<38} raised {raised:>3}  solo {solo:>3}  "
+            f"  {review['label']:<38} raised {raised:>3}  {label} {solo:>3}  "
             f"tools[{tools}]{cascade}"
+        )
+    if accepted_keys is None:
+        print(
+            "  (solo counts are UNADJUDICATED: a unique finding later "
+            "rejected still counts here. Supply --adjudication for the "
+            "protocol's definition; adjudicated counts are marked solo*.)"
         )
     print()
 

@@ -331,9 +331,20 @@ def _probe_shape_problems(rel: str, position: int, probe: Any) -> list[str]:
     status = probe.get("status")
     if status not in PROBE_STATUSES:
         problems.append(f"{where}.status {status!r} not in {'/'.join(PROBE_STATUSES)}")
-    if "detail" in probe and not isinstance(probe["detail"], str):
-        problems.append(f"{where}.detail must be a string")
-    if "date" in probe:
+    # `detail` and `date` are REQUIRED by reuse-gate.schema.json for every
+    # structured probe, and were checked only when present -- so {"status":
+    # "failed"} passed, recording neither what was exercised nor when. A failed
+    # probe is evidence too: "we tried X on date Y and it did not work" is the
+    # finding that stops the next agent trying X again.
+    detail = probe.get("detail")
+    if not isinstance(detail, str) or not detail.strip():
+        problems.append(
+            f"{where}.detail must be a non-empty string — a probe that records "
+            f"neither what was exercised nor what happened is not evidence"
+        )
+    if "date" not in probe:
+        problems.append(f"{where}.date is required — an undated probe cannot go stale")
+    else:
         problems.extend(_iso_date_problems(f"{where}.date", probe["date"]))
     return problems
 

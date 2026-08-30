@@ -33,6 +33,8 @@ from packages.reasoning_ensemble.synthesizer import (  # noqa: E402
     SIMILARITY_FLOOR_OBSERVED,
     TierClassification,
     degenerate_voters,
+    TIER_UNMEASURED,
+    classify_tier,
     separation_diagnostics,
     write_synthesis,
 )
@@ -96,7 +98,11 @@ def test_a_genuinely_split_panel_is_discriminative():
 
     assert diagnostics["discriminative"] is True
     assert "reason" not in diagnostics
-    assert diagnostics["pairs_below_threshold"] == 4
+    # 3 voters = 3 distinct pairs, 2 of them below threshold. This asserted 4
+    # while the loop walked both (i,j) and (j,i) -- the test encoded the double
+    # count rather than catching it.
+    assert diagnostics["pair_count"] == 3
+    assert diagnostics["pairs_below_threshold"] == 2
 
 
 def test_everything_below_threshold_is_equally_unmeasured():
@@ -325,3 +331,101 @@ def test_the_writeup_says_when_counted_voters_took_no_position():
     assert "no position" in text
     assert "`thinker`" in text
     assert "agrees with nothing" in text
+
+
+def test_each_symmetric_pair_is_counted_once():
+    """The matrix is symmetric; walking all of it doubles every count.
+
+    pair_count and pairs_below_threshold are persisted and read as experimental
+    diagnostics, so a factor of two was wrong everywhere they were consumed.
+    """
+    for k in (2, 3, 4, 6):
+        matrix = [[1.0 if i == j else 0.5 for j in range(k)] for i in range(k)]
+        diagnostics = separation_diagnostics(matrix, CLUSTER_SIMILARITY_THRESHOLD)
+        assert diagnostics["pair_count"] == k * (k - 1) // 2, k
+
+
+def test_a_negative_cosine_is_a_measurement_not_a_missing_embedding():
+    """Dropping non-positive values hid the only pairs that separated anyone.
+
+    `pairwise_similarity_matrix` writes 0.0 for a voter with no embedding, and
+    the filter was `value > 0.0` -- so a genuine negative cosine was discarded as
+    "missing". A panel whose only separating pairs were negative reported that
+    every scored pair converged and separation was impossible, while the
+    clustering used those same negatives and split the voters.
+    """
+    matrix = [
+        [1.0, 0.92, -0.30],
+        [0.92, 1.0, -0.25],
+        [-0.30, -0.25, 1.0],
+    ]
+    embedded = [True, True, True]
+
+    diagnostics = separation_diagnostics(
+        matrix, CLUSTER_SIMILARITY_THRESHOLD, embedded=embedded
+    )
+    assert diagnostics["pair_count"] == 3, "the negative pairs are measurements"
+    assert diagnostics["min"] < 0
+    assert diagnostics["discriminative"] is True, (
+        "the threshold sits inside the observed spread; this panel DID separate"
+    )
+
+
+def test_a_voter_with_no_embedding_is_reported_separately():
+    matrix = [
+        [1.0, 0.9, 0.0],
+        [0.9, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+    diagnostics = separation_diagnostics(
+        matrix, CLUSTER_SIMILARITY_THRESHOLD, embedded=[True, True, False]
+    )
+    assert diagnostics["pair_count"] == 1, "only the embedded pair is scored"
+    assert diagnostics["pairs_missing_embeddings"] == 2
+
+
+def test_an_unmeasured_run_does_not_export_tier1():
+    """The tier is what machines read; the prose warning is what they ignore.
+
+    `tier1` means unanimous consensus in the spec, and the staged JSON, the
+    activity action and the deliberate() MCP response all export it verbatim. A
+    run whose clustering could not have separated anything was still labelled
+    tier1, so every automated consumer treated an explicitly unmeasured result
+    as corroboration while the caveat sat in human-readable prose.
+    """
+    responses = [
+        _resp("alpha", "Alpha says the bridge is fine. It is fine."),
+        _resp("beta", "Beta says the bridge is broken. It is broken."),
+        _resp("gamma", "Gamma says something else entirely, at length."),
+    ]
+    # every pair above threshold: separation is impossible
+    similarity = [
+        [1.0, 0.91, 0.88],
+        [0.91, 1.0, 0.90],
+        [0.88, 0.90, 1.0],
+    ]
+    assignments = {"alpha": 0, "beta": 0, "gamma": 0}
+    tier = classify_tier(responses, similarity, assignments)
+
+    assert tier.tier == TIER_UNMEASURED
+    assert tier.tier != "tier1"
+    assert tier.consensus_was_measurable is False
+    # and it still reaches the writeup, so a human sees it too
+    assert "unmeasured" in write_synthesis("q?", responses, tier).lower()
+
+
+def test_a_measurable_unanimous_run_is_still_tier1():
+    """The guard must not relabel every unanimous panel."""
+    responses = [
+        _resp("alpha", "The bridge is fine. It is fine."),
+        _resp("beta", "The bridge is fine too. Agreed."),
+        _resp("gamma", "Also fine, for the same reason."),
+    ]
+    similarity = [
+        [1.0, 0.91, 0.30],
+        [0.91, 1.0, 0.31],
+        [0.30, 0.31, 1.0],
+    ]
+    tier = classify_tier(responses, similarity, {"alpha": 0, "beta": 0, "gamma": 0})
+    assert tier.tier == "tier1"
+    assert tier.consensus_was_measurable is True

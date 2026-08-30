@@ -236,6 +236,14 @@ SIMILARITY_FLOOR_OBSERVED = 0.791
 # single cluster was the only reachable outcome.
 CONSENSUS_NOT_MEASURED = "E_CONSENSUS_NOT_MEASURED"
 
+# The machine-readable tier for a run whose clustering could not have separated
+# anything. `tier1` means unanimous consensus in the spec, and every automated
+# consumer -- the staged JSON, the activity action, the deliberate() MCP
+# response -- exported it verbatim while the warning went only into human prose.
+# A reader parsing `tier` therefore treated an explicitly unmeasured run as
+# corroboration. The tier itself has to carry the finding.
+TIER_UNMEASURED = "unmeasured"
+
 # Coherence threshold for the anti-sycophancy override (v0.2 §12.5).
 # A single-voter dissent is only surfaced verbatim if its response_length and
 # internal_coherence_proxy meet a minimum bar. Otherwise logged but not surfaced.
@@ -635,7 +643,9 @@ def degenerate_voters(responses: list[VoterResponse]) -> dict[str, str]:
 
 
 def separation_diagnostics(
-    similarity: list[list[float]], threshold: float
+    similarity: list[list[float]],
+    threshold: float,
+    embedded: list[bool] | None = None,
 ) -> dict[str, object]:
     """Report whether the clustering could have separated anything at all.
 
@@ -653,18 +663,36 @@ def separation_diagnostics(
     a future calibration argument can be made from data instead of from memory.
     """
 
-    off_diagonal = [
-        similarity[i][j]
-        for i in range(len(similarity))
-        for j in range(len(similarity))
-        if i != j
-    ]
-    scored = [value for value in off_diagonal if value > 0.0]
+    def _has_embedding(index: int) -> bool:
+        if embedded is None:
+            return True
+        return index < len(embedded) and bool(embedded[index])
+
+    # ONE TRIANGLE. The matrix is symmetric, so iterating the full off-diagonal
+    # visited (i,j) and (j,i) and reported exactly twice the number of distinct
+    # pairs -- six for three voters. Those counts are persisted and presented as
+    # experimental diagnostics, so they were wrong wherever they were read.
+    scored: list[float] = []
+    missing_pairs = 0
+    for i in range(len(similarity)):
+        for j in range(i + 1, len(similarity)):
+            value = similarity[i][j]
+            # pairwise_similarity_matrix writes 0.0 for a voter with no
+            # embedding. A genuine cosine can also be 0.0 or negative, and
+            # dropping those as "missing" hid real disagreement: a panel whose
+            # only separating pairs were negative reported that every scored
+            # pair converged and that separation was impossible, while the
+            # clustering used those same negatives and split the voters.
+            if _has_embedding(i) and _has_embedding(j):
+                scored.append(value)
+            else:
+                missing_pairs += 1
     if not scored:
         return {
             "discriminative": False,
             "reason": "no scored pairs (missing embeddings)",
             "pair_count": 0,
+            "pairs_missing_embeddings": missing_pairs,
             "threshold": threshold,
         }
 
@@ -680,6 +708,7 @@ def separation_diagnostics(
     diagnostics: dict[str, object] = {
         "discriminative": discriminative,
         "pair_count": len(scored),
+        "pairs_missing_embeddings": missing_pairs,
         "threshold": threshold,
         "min": round(low, 4),
         "max": round(high, 4),
@@ -732,6 +761,7 @@ def classify_tier(
     )
     if len(cluster_sizes) == 1:
         tier = "tier1"
+        # Overwritten below if the clustering could not have separated anything.
     elif largest_size >= ceil_half and unique_largest:
         tier = "tier2"
     else:
@@ -746,6 +776,16 @@ def classify_tier(
             if voter.is_coherent:
                 minority_coherent_voters.append(v_id)
 
+    separation = separation_diagnostics(
+        similarity,
+        CLUSTER_SIMILARITY_THRESHOLD,
+        embedded=[r.response_embedding is not None for r in responses],
+    )
+    if tier == "tier1" and not separation.get("discriminative", True):
+        # `tier1` is a claim about the voters. This run made no such claim, and
+        # saying so only in prose let every machine consumer read it as one.
+        tier = TIER_UNMEASURED
+
     return TierClassification(
         tier=tier,
         cluster_assignments=assignments,
@@ -754,7 +794,7 @@ def classify_tier(
         largest_cluster_fraction=round(largest_fraction, 3),
         minority_coherent_voters=minority_coherent_voters,
         similarity_matrix=[[round(v, 3) for v in row] for row in similarity],
-        separation=separation_diagnostics(similarity, CLUSTER_SIMILARITY_THRESHOLD),
+        separation=separation,
     )
 
 
@@ -792,6 +832,13 @@ def write_synthesis(
 
     lines: list[str] = []
     lines.append(f"# Ensemble synthesis — {tier_class.tier.upper()}")
+    if tier_class.tier == TIER_UNMEASURED:
+        lines.append("")
+        lines.append(
+            "_(`tier: unmeasured`, not `tier1`. The clustering could not have "
+            "produced more than one cluster, so this run makes no claim about "
+            "agreement. Machine consumers must not read it as consensus.)_"
+        )
     lines.append("")
     lines.append(
         f"**Voters:** {len(responses)} ({', '.join(r.family for r in responses)})"

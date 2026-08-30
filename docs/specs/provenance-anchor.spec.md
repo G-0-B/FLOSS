@@ -118,10 +118,18 @@ duplicate slots on `DVpMe…` — means later damage cannot be laundered as
 pre-existing. That is a strictly weaker and more honest claim than repairing
 them, which is impossible: those packets are signed and gone.
 
-**Signature scope.** `sig` and `signer` are excluded from the signed bytes;
-everything else is included, so the per-identity head summaries are covered.
-This is stated explicitly because a verifier that guesses the scope wrong gets a
-signature failure indistinguishable from tampering.
+**Signature scope.** **`sig` alone is excluded** from the signed bytes.
+Everything else — including `signer` and the per-identity head summaries — is
+covered. A signature cannot cover itself; the identity must be covered or the
+signature attests the claims without attesting who made them.
+
+Corrected 2026-08-29. This paragraph previously said `signer` was excluded too,
+contradicting `anchor_signing_bytes()` in the same release that moved `signer`
+inside the pre-image. A verifier written from the old text would reject every
+anchor this code emits, and one that implemented the old rule faithfully would
+reintroduce the signer-substitution flaw v2 exists to fix. Stated explicitly
+because a verifier that guesses the scope wrong gets a signature failure
+indistinguishable from tampering.
 
 The anchor series is itself a hash chain via `prev_root`, so dropping an old
 anchor breaks linkage and is visible rather than silent.

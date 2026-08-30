@@ -57,6 +57,7 @@ from packages.activity_log.provenance import (
     Identity,
     _b64url_decode,
     _b64url_encode,
+    _said_digest,
 )
 
 # Bumped from flossi-anchor-1 on 2026-08-29. `signer` moved INSIDE the signed
@@ -200,6 +201,34 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
                 {
                     "path": _relative(path, provenance_root),
                     "error": f"non-integer sequence {sequence!r}",
+                }
+            )
+            continue
+        # THE SAID MUST BE SATISFIED, NOT MERELY CLAIMED.
+        #
+        # The leaf used to be built from `t`/`i`/`s`/`d` copied straight off the
+        # file, so a 129-byte header-only stub asserting the same four fields
+        # reproduced the leaf of a 585-byte signed packet exactly -- signatures,
+        # payload, artifact refs and evidence all deleted, anchor still
+        # VERIFIED. Reproduced before this fix. That defeated the whole point:
+        # the commitment was to what a file SAID about itself.
+        #
+        # `d` is a self-addressing digest over the packet's own content, so a
+        # file merely claiming one cannot also satisfy it. Same reasoning
+        # provenance._cursor_for already uses to pick between files claiming one
+        # digest, and the same implementation -- not a second one.
+        try:
+            recomputed = _said_digest(document)
+        except Exception:  # noqa: BLE001 -- malformed input must not wedge a scan
+            recomputed = None
+        if recomputed != said:
+            unreadable.append(
+                {
+                    "path": _relative(path, provenance_root),
+                    "error": (
+                        f"SAID not satisfied: claims {said[:16]}..., content "
+                        f"digests to {str(recomputed)[:16]}..."
+                    ),
                 }
             )
             continue
@@ -519,7 +548,41 @@ def verify_anchor(
         "current_packets": len(leaves),
         "unreadable_now": unreadable,
     }
+    # The unreadable set is part of the commitment, not a footnote.
+    #
+    # scan_packets excludes malformed and SAID-failing files from `leaves`, so
+    # they do not move the root -- which meant a malformed packet could appear,
+    # or an anchored malformed packet could be DELETED, and verification still
+    # said VERIFIED. The spec's promise that malformed packets are "named rather
+    # than skipped" was true of build and false of verify.
+    #
+    # Compared as sets rather than counted, and compared against the ANCHORED
+    # set rather than required to be empty: the live store carries three
+    # permanently damaged packets, so demanding an empty set would brick
+    # verification forever -- the b0de2fe mistake this register records as CF-1.
+    # Known damage is frozen; new or vanished damage is a finding.
+    anchored_unreadable = {
+        str(entry.get("path"))
+        for entry in (anchor.get("unreadable") or [])
+        if isinstance(entry, dict)
+    }
+    current_unreadable = {entry["path"] for entry in unreadable}
+    result["unreadable_appeared"] = sorted(current_unreadable - anchored_unreadable)
+    result["unreadable_vanished"] = sorted(anchored_unreadable - current_unreadable)
+
     if current_root == anchored_root:
+        if result["unreadable_appeared"] or result["unreadable_vanished"]:
+            result["status"] = ANCHOR_MISMATCH
+            result["findings"] = {
+                "vanished_identities": [],
+                "head_regressions": [],
+                "missing_anchored_heads": [],
+                "missing_anchored_positions": [],
+                "packet_delta": len(leaves) - (anchor.get("packet_count") or 0),
+                "unreadable_appeared": result["unreadable_appeared"],
+                "unreadable_vanished": result["unreadable_vanished"],
+            }
+            return result
         if series["problems"]:
             # The store matches the anchor, but the anchor's own history does
             # not hold together. Reporting VERIFIED here would attest exactly
