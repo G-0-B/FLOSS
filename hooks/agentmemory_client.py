@@ -329,21 +329,21 @@ def save(
 
         text_payload = _extract_text(response)
         if text_payload is None:
-            # NO CONTENT IS NOT A CONFIRMATION.
+            # NO READABLE ACKNOWLEDGEMENT IS NOT A CONFIRMATION.
             #
-            # Two rounds of narrowing here. First this returned True whenever a
-            # result dict was present, so `isError: true` read as a save. Then
-            # it returned True whenever the call had not explicitly failed --
-            # which still accepted `{"result": {}}`, a response carrying no
-            # success indication at all, and a caller that discards its data on
-            # a True is entitled to more than the absence of an error.
+            # Three rounds of narrowing landed here, each accepting a slightly
+            # smaller lie: first any result dict at all (so `isError: true` read
+            # as a save), then any call that had not explicitly failed (so
+            # `{"result": {}}` did), then any non-empty content list (so
+            # `{"content": [{}]}` did -- one malformed item was enough).
             #
-            # A content list that is present but whose text will not parse is
-            # still a save: the tool answered. A missing or empty one is not.
-            if _call_failed(response):
-                return False
-            content = (response.get("result") or {}).get("content")
-            return isinstance(content, list) and len(content) > 0
+            # Each of those asked whether the response looked wrong. The
+            # question a caller about to DISCARD ITS DATA is actually asking is
+            # whether the response says the save happened. _extract_text returns
+            # the server's acknowledgement text; no text is no acknowledgement,
+            # whatever shape the envelope had. Fail closed and let the caller
+            # keep its observation.
+            return False
 
         try:
             parsed = json.loads(text_payload)

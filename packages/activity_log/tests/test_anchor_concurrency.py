@@ -951,3 +951,42 @@ def test_force_still_migrates_an_unauthenticated_anchor(tmp_path, small_store):
     anchor_path.write_text(json.dumps(stored, indent=2), encoding="utf-8")
 
     assert cli.main(base + ["publish", "--force"]) == 0
+
+
+def test_an_attacker_signed_migration_anchor_is_refused(tmp_path, small_store):
+    """The previous fix closed "edit one field". This closes "replace the whole
+    file": generate your own key, sign a truncated-store anchor with an
+    unsupported `v`, and the migration path discarded the predecessor -- past
+    both the loss preflight and the signer-continuity check."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    # The attacker truncates the store and replaces the anchor wholesale with
+    # one their OWN key signs, declaring a version this build will migrate.
+    sorted(small_store.rglob("*.json"))[0].unlink()
+    theirs = load_or_create_identity(tmp_path / "attacker")
+    forged = anchor_lib.sign_anchor(anchor_lib.build_anchor(small_store), theirs)
+    forged["v"] = "flossi-anchor-1"
+    forged = anchor_lib.sign_anchor(forged, theirs)
+    anchor_path.write_text(json.dumps(forged, indent=2), encoding="utf-8")
+
+    # Self-consistent: it authenticates against the key it names.
+    assert anchor_lib.anchor_signature_problem(forged) is None
+
+    code = cli.main(base + ["publish"])
+
+    assert code == 2, "an attacker-signed anchor was accepted as a legacy format"

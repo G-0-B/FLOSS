@@ -258,7 +258,30 @@ def _publish(args: argparse.Namespace) -> int:
         # signature: a GENUINE legacy anchor still authenticates under its own
         # signer, and a doctored one does not. That is the difference this
         # branch has to test before it is allowed to throw the predecessor away.
-        unauthenticated = anchor_lib.anchor_signature_problem(previous)
+        # PINNED, not merely self-consistent.
+        #
+        # anchor_signature_problem() with no expected_signer authenticates an
+        # anchor against the key the anchor itself names -- which an attacker
+        # who can replace the file simply generates. The previous fix closed
+        # "edit one field"; this closes "replace the whole file": sign a
+        # truncated-store anchor with your own key, declare an unsupported `v`,
+        # and the migration path discards the predecessor, skipping both the
+        # loss preflight and the signer-continuity check below.
+        #
+        # The pin is the identity on disk that will sign the replacement. A
+        # format migration is the same operator with a new format; a different
+        # key as well is a rotation, and has to be stated as one. Read from the
+        # aid file rather than resolving the identity here, because resolving
+        # can MINT a key on the paths above that deliberately publish nothing.
+        expected = _identity_aid_on_disk(args.identity_dir)
+        unauthenticated = anchor_lib.anchor_signature_problem(
+            previous, expected_signer=expected
+        )
+        if expected is None:
+            unauthenticated = (
+                "no local identity to pin against at "
+                f"{_display_path(Path(args.identity_dir))}"
+            )
         if unauthenticated is not None and not args.force:
             print(
                 f"refusing to migrate an anchor that does not authenticate: "
@@ -605,6 +628,23 @@ def _verify(args: argparse.Namespace) -> int:
     result["witness"] = _witness_state(args.anchor, stored)
     print(_bounded_json(result, args.max_output))
     return anchor_lib.EXIT_CODES.get(result["status"], 2)
+
+
+def _identity_aid_on_disk(identity_dir: Path | str) -> str | None:
+    """The local signer identifier, WITHOUT creating one.
+
+    load_or_create_identity() mints a key when none exists, which is wrong on
+    the preflight paths that may publish nothing at all. The aid file is written
+    beside the key at creation, so reading it answers "whose anchors should
+    these be" without side effects. None means there is no local identity to
+    pin against, which is itself a reason to refuse a migration.
+    """
+
+    try:
+        aid = (Path(identity_dir) / "aid").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return None
+    return aid or None
 
 
 def _bounded_json(result: dict, limit: int) -> str:

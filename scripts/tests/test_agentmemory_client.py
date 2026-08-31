@@ -284,3 +284,20 @@ def test_the_branch_requires_a_content_list_before_reporting_success(tmp_path):
     # A content list whose text will not parse is still an answer.
     answered = with_result({"content": [{"type": "text", "text": "not json"}]})
     assert module._extract_text(answered) == "not json"
+
+
+def test_malformed_content_items_are_not_an_acknowledgement(tmp_path):
+    """`{"content": [{}]}` is non-empty and says nothing. The previous fix
+    checked the list LENGTH, so one malformed item was enough to restore the
+    false confirmation it had just removed."""
+    module = load_client_module(tmp_path, mode="malformedcontent")
+
+    assert module.save("an observation worth keeping") is False
+
+
+def test_a_readable_acknowledgement_is_still_a_save(tmp_path):
+    """The guard must narrow to responses that say nothing, not reject every
+    reply whose text is not JSON."""
+    module = load_client_module(tmp_path, mode="ok")
+
+    assert module.save("an observation worth keeping") is True

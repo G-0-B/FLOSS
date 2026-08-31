@@ -109,7 +109,11 @@ def main() -> None:
             tool_name = params.get("name")
             arguments = params.get("arguments") or {}
 
-            if MODE == "nocontent":
+            if MODE == "malformedcontent":
+                # A non-empty content list carrying nothing readable: one
+                # malformed item was enough to pass a length check.
+                result = {"content": [{}, {"type": "text", "text": 42}]}
+            elif MODE == "nocontent":
                 # A nominal success envelope carrying no success indication:
                 # no isError, and no content the caller can read.
                 result = {}
