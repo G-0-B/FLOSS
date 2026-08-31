@@ -711,7 +711,16 @@ def _reserve_slot_cli() -> int:
         try:
             observed = _inspect_claim(pid_path)
             observed_sidecar = _inspect_sidecar(pid_path)
-            if observed is not None and not observed.data.strip():
+            # _is_reservation, not emptiness. Marking reservations with a
+            # token made this predicate permanently false, so an abandoned
+            # marked claim reported OCCUPIED forever -- the token was added to
+            # let two reservations be told apart and it disabled the recovery
+            # that tells a dead one from a live one. claim_singleton's two
+            # branches and the PowerShell reader were updated; this one, in the
+            # command that WRITES the marker, was not.
+            if observed is not None and _is_reservation(
+                observed.data.decode("utf-8", "replace").strip()
+            ):
                 if _blank_claim_is_stale(pid_path):
                     # Same ordering as claim_singleton: the sidecar first and
                     # content-checked, then the claim.

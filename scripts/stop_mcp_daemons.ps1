@@ -102,10 +102,29 @@ foreach ($pidFile in $pidFiles) {
             Write-Host "[FLOSS MCP] no usable Python found - identity unverifiable. Set FLOSS_PYTHON."
         }
         if ($verdict -eq 'FOREIGN') {
-            Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon (identity mismatch or process gone) - removing the stale file, killing nothing"
-            # Sidecar first, slot second -- see the ordering note below.
-            Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
-            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+            # BY INSTANCE, through the same helper the start workflow uses.
+            #
+            # Remove-Item deletes whatever is at the path with no snapshot
+            # check, so a start script that reclaimed this same FOREIGN record
+            # and installed a fresh reservation in between had that reservation
+            # deleted here -- freeing the slot for yet another launcher and
+            # letting two daemons start. Stop and start race over exactly the
+            # same records, so they have to reclaim the same way.
+            if ($py) {
+                Push-Location $repoRoot
+                $rc = & $py -m packages.mcp_daemon --reclaim-claim $pidPath 2>$null
+                Pop-Location
+                $rcTok = ($rc | Select-Object -Last 1)
+                if ($rcTok) { $rcTok = $rcTok.ToString().Trim() }
+                if ($rcTok -eq 'RECLAIMED') {
+                    Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon - stale record cleared, killed nothing"
+                } else {
+                    Write-Host "[FLOSS MCP] $pidFile stale record was claimed by another process first - left alone"
+                }
+            } else {
+                Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon, but no Python is available to clear the record safely; leaving it in place"
+                $unresolved += "$pidFile - stale record left in place; set FLOSS_PYTHON"
+            }
             continue
         }
         if ($verdict -ne 'OURS') {
@@ -213,11 +232,22 @@ if ($omniVerdict -eq 'OURS') {
         Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
         Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
     }
+} elseif ($omniVerdict -eq 'FOREIGN' -and $py) {
+    # Same instance-checked reclaim as the daemon branch above, and as the start
+    # script: this had the identical race.
+    Push-Location $repoRoot
+    $rcOmni = & $py -m packages.mcp_daemon --reclaim-claim $omniPid 2>$null
+    Pop-Location
+    $rcOmniTok = ($rcOmni | Select-Object -Last 1)
+    if ($rcOmniTok) { $rcOmniTok = $rcOmniTok.ToString().Trim() }
+    if ($rcOmniTok -eq 'RECLAIMED') {
+        Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared, killed nothing"
+    } else {
+        Write-Host "[FLOSS MCP] OmniRoute stale record was claimed by another process first - left alone"
+    }
 } elseif ($omniVerdict -eq 'FOREIGN') {
-    # Same ordering as the stopped branch above: sidecar first, slot second.
-    Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
-    Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared, killed nothing"
+    Write-Host "[FLOSS MCP] OmniRoute record is stale but no Python is available to clear it safely; leaving it in place"
+    $unresolved += "OmniRoute - stale record left in place; set FLOSS_PYTHON"
 } else {
     Write-Host "[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing"
     if (Test-Path $omniPid) {

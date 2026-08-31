@@ -43,6 +43,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from packages.activity_log import anchor as anchor_lib  # noqa: E402
+from packages.activity_log import filelock  # noqa: E402
 from packages.activity_log import witness as witness_lib  # noqa: E402
 from packages.activity_log.provenance import (  # noqa: E402
     load_or_create_identity,
@@ -177,6 +178,27 @@ def _resolve_identity(identity_dir: Path, allow_new: bool):
 
 
 def _publish(args: argparse.Namespace) -> int:
+    # ONE LOCK ACROSS THE WHOLE PUBLICATION.
+    #
+    # build_anchor takes the scan lock and releases it before anything is
+    # retained or installed, so two publishers could read the same
+    # predecessor, build two different signed children of it, and race to
+    # os.replace the pointer. Whichever landed last rolled the pointer back
+    # to its own older snapshot and orphaned the newer child from every
+    # future walk_series traversal -- a published anchor no history reaches.
+    #
+    # Serialising only the scans was never enough: the decision being
+    # protected is `which child of this predecessor becomes the head`, and
+    # that spans loading the predecessor, the preflight, the build, series
+    # retention and the pointer swap.
+    args.anchor.parent.mkdir(parents=True, exist_ok=True)
+    with filelock.held(
+        args.anchor.parent / ".anchor-publish.lock", timeout_seconds=120.0
+    ):
+        return _publish_locked(args)
+
+
+def _publish_locked(args: argparse.Namespace) -> int:
     previous = anchor_lib.load_anchor(args.anchor)
 
     # ABSENT AND UNREADABLE ARE NOT THE SAME ANSWER.

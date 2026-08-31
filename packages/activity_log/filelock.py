@@ -40,6 +40,7 @@ import base64
 import os
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple
 
@@ -180,6 +181,21 @@ def _acquire_lock(
 
     _HELD[token] = (fd, lock_path)
     return token
+
+
+@contextmanager
+def held(lock_path: Path, *, timeout_seconds: float | None = None):
+    """Hold `lock_path` for the block. One definition of acquire/release.
+
+    Callers were pairing _acquire_lock with _release_lock by hand, which is one
+    early return away from a lock held for the life of the process.
+    """
+
+    token = _acquire_lock(lock_path, timeout_seconds=timeout_seconds)
+    try:
+        yield lock_path
+    finally:
+        _release_lock(lock_path, token)
 
 
 def _release_lock(lock_path: Path, token: str) -> None:

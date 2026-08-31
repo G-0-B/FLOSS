@@ -1464,3 +1464,31 @@ def test_the_sidecar_we_actually_inspected_is_still_removed(tmp_path):
 
     assert mcp_daemon._sidecar_cleared(pid_path, seen) is True
     assert not sidecar.exists()
+
+
+def test_an_abandoned_marked_reservation_is_reclaimable(tmp_path):
+    """Marking reservations with a token made the recovery predicate -- which
+    tested emptiness -- permanently false, so a launcher that died between
+    --reserve-slot and --record-identity disabled OmniRoute until someone
+    deleted the file. The token was added to tell two reservations apart and it
+    disabled the check that tells a dead one from a live one."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+
+    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "RESERVED"
+    assert pid_path.read_text(encoding="utf-8").startswith(
+        mcp_daemon._RESERVATION_MARKER
+    ), "fixture is not a marked reservation"
+
+    # Fresh: still blocks.
+    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "OCCUPIED"
+
+    # Abandoned: reclaimable.
+    old = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (old, old))
+
+    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "RESERVED"

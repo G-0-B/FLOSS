@@ -1631,3 +1631,65 @@ def test_a_lock_file_is_not_created_world_readable(tmp_path):
                 ), f"a permissive literal mode is still passed: {line.strip()}"
     finally:
         filelock._release_lock(lock_path, token)
+
+
+def test_publication_is_serialised_end_to_end(tmp_path, small_store):
+    """build_anchor took the scan lock and released it before anything was
+    retained or installed, so two publishers could build two different children
+    of one predecessor and race the pointer -- the later landing rolling it back
+    to its own older snapshot and orphaning the newer child from every future
+    walk_series traversal."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    lock_path = anchor_path.parent / ".anchor-publish.lock"
+    assert lock_path.exists(), "publication took no lock of its own"
+
+    # A second publisher must WAIT for the first, not interleave with it.
+    from packages.activity_log import filelock
+
+    held_token = filelock._acquire_lock(lock_path)
+    try:
+        provenance.create_packet(
+            [{"kind": "note", "detail": "second"}],
+            identity_dir=tmp_path / "id",
+            output_root=small_store,
+        )
+        started = time.monotonic()
+        with pytest.raises(TimeoutError):
+            filelock._acquire_lock(lock_path, timeout_seconds=0.3)
+        assert time.monotonic() - started >= 0.2
+    finally:
+        filelock._release_lock(lock_path, held_token)
+
+
+def test_the_publication_lock_spans_the_pointer_write():
+    """Serialising only the scans was never enough: the decision protected is
+    which child of a predecessor becomes the head, and that spans loading the
+    predecessor, the preflight, the build, retention and the pointer swap."""
+    source = (REPO_ROOT / "scripts" / "provenance_anchor.py").read_text(
+        encoding="utf-8"
+    )
+
+    outer = source.split("def _publish(", 1)[1].split("def _publish_locked(", 1)[0]
+    assert "filelock.held(" in outer, "publication is not held under one lock"
+    assert "_publish_locked(args)" in outer
+
+    inner = source.split("def _publish_locked(", 1)[1].split("\ndef ", 1)[0]
+    for step in (
+        "load_anchor",
+        "verify_anchor",
+        "build_anchor",
+        "_retain_series",
+        "os.replace",
+    ):
+        assert step in inner, f"{step} is outside the publication lock"
