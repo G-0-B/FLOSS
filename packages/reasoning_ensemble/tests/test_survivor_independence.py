@@ -14,6 +14,7 @@ pool-side check was itself added to fix.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -98,3 +99,86 @@ def test_a_check_that_cannot_run_does_not_abort_the_deliberation(monkeypatch):
     survivors = [_r("a", "groq/llama-3.1-8b-instant", "llama")]
 
     assert synthesizer._survivor_independence_problem(survivors, "online") is None
+
+
+# ---------------------------------------------------------------------------
+# A degraded round must say what actually failed, and must still be readable
+# afterwards. Both were consequences of adding the survivor check.
+# ---------------------------------------------------------------------------
+
+
+def test_the_writeup_names_the_independence_failure_not_a_voter_shortage():
+    """Enough voters embedded; the survivors are the problem. An operator told
+    'fewer than 3 voters embedded' goes looking for dead voters that are fine."""
+    embedded = [_r("a", "m", "f"), _r("b", "m", "f"), _r("c", "m", "f")]
+
+    reason = synthesizer._degraded_reason(embedded, embedded, "2 surfaces, 2 families")
+
+    assert "Fewer than" not in reason
+    assert "independence bar" in reason
+    assert "2 surfaces, 2 families" in reason
+
+
+def test_the_writeup_still_names_a_genuine_voter_shortage():
+    embedded = [_r("a", "m", "f")]
+    responses = embedded + [_r("b", "m", "f"), _r("c", "m", "f")]
+
+    reason = synthesizer._degraded_reason(embedded, responses, None)
+
+    assert "Fewer than" in reason and "(1/3)" in reason
+    assert "independence bar" not in reason
+
+
+def test_both_failures_are_reported_when_both_hold():
+    embedded = [_r("a", "m", "f")]
+    responses = embedded + [_r("b", "m", "f")]
+
+    reason = synthesizer._degraded_reason(embedded, responses, "1 surface, 1 family")
+
+    assert "Fewer than" in reason
+    assert "independence bar" in reason
+
+
+def test_a_degraded_round_still_writes_a_durable_draft(tmp_path, monkeypatch):
+    """The run an operator most needs to inspect was the only one with nothing
+    to inspect: it returned before the staging block."""
+    staging = tmp_path / "staging"
+    monkeypatch.setattr(synthesizer, "ENSEMBLE_STAGING", staging)
+    monkeypatch.setattr(synthesizer, "WORKSPACE_ROOT", tmp_path)
+    monkeypatch.setattr(synthesizer, "_log_synthesis_action", lambda *a, **k: None)
+    monkeypatch.setattr(
+        synthesizer.transport,
+        "resolve_embedder",
+        lambda *a, **k: ("mxbai-embed-large", lambda text: [0.1]),
+    )
+    # One embedding short of MIN_VOTERS: degraded by COUNT, no independence
+    # involvement, so this pins the staging fix on its own.
+    survivors = [_r("a", "m", "f"), _r("b", "m", "f")]
+    survivors.append(
+        synthesizer.VoterResponse(
+            voter_id="c",
+            model="m",
+            family="f",
+            response="",
+            response_hash="h",
+            response_embedding=None,
+            duration_seconds=0.1,
+            error="timeout",
+        )
+    )
+    monkeypatch.setattr(synthesizer, "dispatch_parallel", lambda *a, **k: survivors)
+
+    result = synthesizer.synthesize(
+        "prompt",
+        voter_pool=[
+            {"voter_id": v.voter_id, "model": "m", "family": "f"} for v in survivors
+        ],
+    )
+
+    assert result.tier_classification.tier == "degraded"
+    assert result.staging_path is not None, "degraded round staged nothing"
+    written = list(staging.glob("*_synthesis.json"))
+    assert len(written) == 1
+    staged = json.loads(written[0].read_text(encoding="utf-8"))
+    assert staged["tier"] == "degraded"
+    assert len(staged["voter_responses"]) == 3, "raw responses must survive"

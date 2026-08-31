@@ -181,13 +181,33 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
         $recTok = ($recOut | Select-Object -Last 1)
         if ($recTok) { $recTok = $recTok.ToString().Trim() }
         if ($recTok -ne 'RECORDED') {
+            # RELEASING A SLOT WHOSE SERVER IS STILL RUNNING IS THE WORSE BUG.
+            #
             # The reservation is an EMPTY file, which every reader treats as an
-            # in-progress claim and therefore as occupied. Left behind after a
-            # failed recording it would block every future start with nothing
-            # running. We hold it exclusively, so clearing it is ours to do.
-            Write-Host "[FLOSS MCP] WARNING: could not record the OmniRoute identity ($recTok); releasing the reservation so a later start is not blocked"
-            Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-            Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+            # in-progress claim and therefore as occupied, so leaving it behind
+            # after a failed recording blocks every future start. But dropping
+            # it while the server we just launched is alive is worse: that
+            # server becomes untracked, and the next start launches a duplicate
+            # onto a bound port. Stop the server first, and only release the
+            # slot once nothing is listening under it.
+            Write-Host "[FLOSS MCP] WARNING: could not record the OmniRoute identity ($recTok)"
+            $gone = $false
+            try {
+                Stop-Process -Id $serverPid -Force -ErrorAction Stop
+                $gone = $true
+            } catch {
+                if (-not (Get-Process -Id $serverPid -ErrorAction SilentlyContinue)) { $gone = $true }
+            }
+            if ($gone) {
+                Write-Host "[FLOSS MCP] Stopped the unrecorded OmniRoute (PID $serverPid) and released the reservation"
+                Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+                Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+            } else {
+                # Keep the reservation: an occupied-but-unverifiable slot blocks
+                # the next start, which is the conservative failure. An operator
+                # can clear it once they have dealt with the process.
+                Write-Host "[FLOSS MCP] OmniRoute PID $serverPid is ALIVE and unrecorded; KEEPING $omniPid so a later start does not launch a duplicate. Stop PID $serverPid and delete that file once handled."
+            }
         }
     } elseif ($reserved) {
         # Reserved the slot and then failed to launch: release it rather than

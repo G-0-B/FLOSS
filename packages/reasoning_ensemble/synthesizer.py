@@ -349,6 +349,88 @@ def _local_embed_probe(text: str) -> list[float]:
     return ollama_embed(text, timeout=EMBED_PROBE_TIMEOUT_SECONDS)
 
 
+def _stage_synthesis(
+    prompt: str,
+    p_hash: str,
+    started_iso: str,
+    tier_class: "TierClassification",
+    responses: list["VoterResponse"],
+    embedded: list["VoterResponse"],
+    final: str,
+) -> Optional[str]:
+    """Write the durable draft. Returns its workspace-relative path, or None.
+
+    Extracted because the DEGRADED path returned before ever reaching it: a run
+    that lost voters mid-flight -- exactly the run an operator most needs to
+    inspect -- reported a null staging path, and its raw responses survived only
+    in the transient reply. The Action keeps hashes and a 400-character preview,
+    which cannot reproduce an outage. One writer, both paths.
+    """
+
+    ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
+    ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
+    try:
+        out_path.write_text(
+            json.dumps(
+                {
+                    "prompt": prompt,
+                    "prompt_hash": p_hash,
+                    "timestamp": started_iso,
+                    "tier": tier_class.tier,
+                    "voter_count": len(responses),
+                    "embedded_voter_count": len(embedded),
+                    "cluster_assignments": tier_class.cluster_assignments,
+                    "cluster_sizes": tier_class.cluster_sizes,
+                    "largest_cluster_fraction": tier_class.largest_cluster_fraction,
+                    "minority_coherent_voters": tier_class.minority_coherent_voters,
+                    "similarity_matrix": tier_class.similarity_matrix,
+                    "separation": tier_class.separation,
+                    "degenerate_voters": degenerate_voters(embedded),
+                    "voter_responses": [asdict(r) for r in responses],
+                    "final_synthesis": final,
+                },
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+        return str(out_path.relative_to(WORKSPACE_ROOT).as_posix())
+    except OSError as e:
+        print(f"[synthesizer] WARN: failed to stage artifact: {e}", file=sys.stderr)
+        return None
+
+
+def _degraded_reason(
+    embedded: list["VoterResponse"],
+    responses: list["VoterResponse"],
+    independence: Optional[str],
+) -> str:
+    """Say which gate actually failed.
+
+    The degraded writeup always read "Fewer than N voters produced embeddings",
+    including when enough voters embedded and the SURVIVING roster was the
+    problem. An operator reading that diagnoses an outage and goes looking for
+    dead voters, while the real fault is that the ones which lived are not
+    independent of each other. Both conditions can hold at once, so both are
+    reported.
+    """
+
+    reasons = []
+    if len(embedded) < MIN_VOTERS:
+        reasons.append(
+            f"Fewer than {MIN_VOTERS} voters produced embeddings "
+            f"({len(embedded)}/{len(responses)})."
+        )
+    if independence is not None:
+        reasons.append(
+            f"The voters that survived do not meet the independence bar: "
+            f"{independence}"
+        )
+    return " ".join(reasons) or "Degraded run."
+
+
 def _survivor_independence_problem(
     embedded: list["VoterResponse"], resolved_mode: str | None
 ) -> Optional[str]:
@@ -1158,9 +1240,9 @@ def synthesize(
             ),
             final_synthesis=(
                 f"# Ensemble synthesis — DEGRADED\n\n"
-                f"Fewer than {MIN_VOTERS} voters produced embeddings "
-                f"({len(embedded)}/{len(responses)}). Cannot run cluster-based Tier "
-                f"classification. Raw voter responses follow:\n\n"
+                f"{_degraded_reason(embedded, responses, independence)} "
+                f"Cannot run cluster-based Tier classification. Raw voter "
+                f"responses follow:\n\n"
                 + "\n\n---\n\n".join(
                     f"**{r.voter_id} ({r.family})** "
                     f"{'OK' if not r.error else 'ERR: ' + r.error}\n\n{r.response}"
@@ -1168,6 +1250,20 @@ def synthesize(
                 )
             ),
         )
+        # STAGE THE DEGRADED ROUND TOO, and before logging, so the Action's
+        # staging_paths names it. A run that lost voters is the one an operator
+        # most needs to read afterwards, and it was the only run with no durable
+        # draft to read.
+        if stage_artifact:
+            result.staging_path = _stage_synthesis(
+                prompt,
+                p_hash,
+                started_iso,
+                result.tier_classification,
+                responses,
+                embedded,
+                result.final_synthesis,
+            )
         _log_synthesis_action(
             result,
             prompt,
@@ -1195,40 +1291,13 @@ def synthesize(
     final = write_synthesis(prompt, embedded, tier_class, all_responses=responses)
 
     # 7: stage artifact
-    staging_path: Optional[str] = None
-    if stage_artifact:
-        ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
-        ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
-        try:
-            out_path.write_text(
-                json.dumps(
-                    {
-                        "prompt": prompt,
-                        "prompt_hash": p_hash,
-                        "timestamp": started_iso,
-                        "tier": tier_class.tier,
-                        "voter_count": len(responses),
-                        "embedded_voter_count": len(embedded),
-                        "cluster_assignments": tier_class.cluster_assignments,
-                        "cluster_sizes": tier_class.cluster_sizes,
-                        "largest_cluster_fraction": tier_class.largest_cluster_fraction,
-                        "minority_coherent_voters": tier_class.minority_coherent_voters,
-                        "similarity_matrix": tier_class.similarity_matrix,
-                        "separation": tier_class.separation,
-                        "degenerate_voters": degenerate_voters(embedded),
-                        "voter_responses": [asdict(r) for r in responses],
-                        "final_synthesis": final,
-                    },
-                    indent=2,
-                    ensure_ascii=False,
-                    default=str,
-                ),
-                encoding="utf-8",
-            )
-            staging_path = str(out_path.relative_to(WORKSPACE_ROOT).as_posix())
-        except OSError as e:
-            print(f"[synthesizer] WARN: failed to stage artifact: {e}", file=sys.stderr)
+    staging_path = (
+        _stage_synthesis(
+            prompt, p_hash, started_iso, tier_class, responses, embedded, final
+        )
+        if stage_artifact
+        else None
+    )
 
     duration = time.perf_counter() - started_perf
     result = EnsembleSynthesis(
