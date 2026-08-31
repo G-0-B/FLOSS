@@ -1376,7 +1376,7 @@ def test_reclaiming_does_not_delete_a_lock_taken_since_it_was_inspected(tmp_path
 
     lock_path = tmp_path / ".contended.lock"
     lock_path.write_bytes(b"the-abandoned-instance")
-    observed = lock_path.read_bytes()
+    observed = filelock.inspect_for_reclaim(lock_path)
 
     # The faster reclaimer wins and a NEW holder takes the slot.
     assert filelock.reclaim_if_unchanged(lock_path, observed) is True
@@ -1394,7 +1394,7 @@ def test_only_one_reclaimer_reports_success(tmp_path):
 
     lock_path = tmp_path / ".once.lock"
     lock_path.write_bytes(b"abandoned")
-    observed = lock_path.read_bytes()
+    observed = filelock.inspect_for_reclaim(lock_path)
 
     outcomes = [filelock.reclaim_if_unchanged(lock_path, observed) for _ in range(3)]
 
@@ -1408,7 +1408,7 @@ def test_reclaiming_leaves_no_quarantine_files_behind(tmp_path):
     lock_path = tmp_path / ".tidy.lock"
     lock_path.write_bytes(b"abandoned")
 
-    filelock.reclaim_if_unchanged(lock_path, b"abandoned")
+    filelock.reclaim_if_unchanged(lock_path, filelock.inspect_for_reclaim(lock_path))
 
     assert list(tmp_path.iterdir()) == []
 
@@ -1422,7 +1422,7 @@ def test_rolling_back_a_live_lock_never_overwrites_a_newer_one(tmp_path):
 
     lock_path = tmp_path / ".rollback.lock"
     lock_path.write_bytes(b"instance-A")
-    stale_observed = b"an-older-instance-we-inspected"
+    stale_observed = filelock.Inspection(0, 0, b"an-older-instance-we-inspected")
 
     real_open = os.open
 
@@ -1454,7 +1454,12 @@ def test_rolling_back_restores_the_live_lock_when_the_slot_is_free(tmp_path):
     lock_path = tmp_path / ".restore.lock"
     lock_path.write_bytes(b"instance-A")
 
-    assert filelock.reclaim_if_unchanged(lock_path, b"a-different-instance") is False
+    assert (
+        filelock.reclaim_if_unchanged(
+            lock_path, filelock.Inspection(0, 0, b"a-different-instance")
+        )
+        is False
+    )
 
     assert lock_path.read_bytes() == b"instance-A", "a live lock was not restored"
     assert not list(tmp_path.glob("*.reclaim-*"))

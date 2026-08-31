@@ -989,7 +989,7 @@ def test_two_launchers_cannot_both_reclaim_one_stale_reservation(tmp_path):
     importlib.reload(mcp_daemon)
     pid_path = tmp_path / "omniroute.pid"
     pid_path.write_bytes(b"")
-    observed = pid_path.read_bytes()
+    observed = mcp_daemon._inspect_claim(pid_path)
 
     first = mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed)
     pid_path.write_bytes(b"31337")  # the winner's fresh claim
@@ -1263,3 +1263,58 @@ def test_reclamation_fails_closed_without_the_shared_helper(tmp_path, monkeypatc
 
     assert mcp_daemon._reclaim_claim_if_unchanged(record, b"a-live-record") is False
     assert record.read_bytes() == b"a-live-record", "removed by pathname anyway"
+
+
+def test_two_blank_reservations_are_told_apart(tmp_path):
+    """Every blank reservation is b"", so a content check could not distinguish
+    an abandoned empty claim from the fresh empty claim a faster launcher had
+    just created in its place -- and both reclaimers removed "the old one",
+    both got RESERVED, and two servers started on one port."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"")
+    observed = mcp_daemon._inspect_claim(pid_path)
+
+    # The winner reclaims and reserves again -- same path, same bytes.
+    assert mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed) is True
+    pid_path.write_bytes(b"")
+    assert pid_path.read_bytes() == observed.data, "fixture is not byte-identical"
+
+    # The loser arrives with what it inspected. Bytes match; the file does not.
+    assert mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed) is False
+    assert pid_path.exists(), "the winner's fresh reservation was deleted"
+
+
+def test_an_inspection_carries_filesystem_identity(tmp_path):
+    """Identity survives a rename and differs for a new file at the same path;
+    that is the whole basis for telling two byte-identical claims apart."""
+    from packages.activity_log import filelock
+
+    a = tmp_path / "claim"
+    a.write_bytes(b"")
+    first = filelock.inspect_for_reclaim(a)
+
+    moved = tmp_path / "claim.moved"
+    os.rename(a, moved)
+    assert filelock.inspect_for_reclaim(moved)[:2] == first[:2], "rename changed it"
+
+    a.write_bytes(b"")
+    assert filelock.inspect_for_reclaim(a)[:2] != first[:2], "a new file matched"
+
+
+def test_a_file_rewritten_in_place_is_still_caught(tmp_path):
+    """Identity alone is not enough either: a file rewritten in place keeps it,
+    so contents are still compared."""
+    from packages.activity_log import filelock
+
+    path = tmp_path / "claim"
+    path.write_bytes(b"first")
+    observed = filelock.inspect_for_reclaim(path)
+    path.write_bytes(b"second")
+
+    assert filelock.reclaim_if_unchanged(path, observed) is False
+    assert path.read_bytes() == b"second"

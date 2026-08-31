@@ -41,6 +41,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 # How long an acquirer waits for a live holder before giving up.
 _LOCK_TIMEOUT_SECONDS = 5.0
@@ -202,7 +203,49 @@ def _release_lock(lock_path: Path, token: str) -> None:
             pass
 
 
-def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
+class Inspection(NamedTuple):
+    """What a caller saw when it decided a record was abandoned.
+
+    Identity FIRST, contents second. Bytes alone cannot tell two instances
+    apart when the bytes are equal -- and every blank reservation is `b""`, so
+    a content check could not distinguish an abandoned empty claim from the
+    fresh empty claim a faster launcher had just created in its place. Both
+    reclaimers then removed "the old one" and both reported success.
+
+    (st_dev, st_ino) is the filesystem's own answer to "is this the same
+    file": it survives a rename, and a newly created file at the same path has
+    a different one. Contents are still compared, because a file rewritten in
+    place keeps its identity.
+    """
+
+    dev: int
+    ino: int
+    data: bytes
+
+
+def inspect_for_reclaim(path: Path) -> Inspection | None:
+    """Capture what a later reclaim must prove it is still looking at."""
+
+    try:
+        st = os.stat(path)
+        data = path.read_bytes()
+    except OSError:
+        return None
+    return Inspection(st.st_dev, st.st_ino, data)
+
+
+def _is_same_instance(path: Path, inspected: Inspection) -> bool:
+    try:
+        st = os.stat(path)
+        data = path.read_bytes()
+    except OSError:
+        return False
+    if (st.st_dev, st.st_ino) != (inspected.dev, inspected.ino):
+        return False
+    return data == inspected.data
+
+
+def reclaim_if_unchanged(path: Path, inspected: Inspection | None) -> bool:
     """Remove `path` only if it is still the exact file that was inspected.
 
     Check-then-unlink-by-pathname is not reclamation, it is a race. Two writers
@@ -229,12 +272,13 @@ def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
         # to delete and the caller should just retry.
         return False
 
-    if observed is not None:
+    if inspected is not None:
+        current = None
         try:
             current = quarantine.read_bytes()
         except OSError:
             current = None
-        if current != observed:
+        if not _is_same_instance(quarantine, inspected):
             # A different instance: released and re-taken while we looked, so
             # what we moved aside was a LIVE lock. Put it back.
             #

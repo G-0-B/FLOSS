@@ -29,7 +29,24 @@ from pathlib import Path
 _RESERVATION_STALE_SECONDS = 60.0
 
 
-def _reclaim_claim_if_unchanged(pid_path: Path, observed: bytes | None) -> bool:
+def _inspect_claim(path: Path):
+    """Capture identity + contents so a later reclaim can prove it is the same.
+
+    Bytes alone cannot tell two blank reservations apart, and blank is exactly
+    what --reserve-slot writes: two launchers inspecting one abandoned empty
+    claim would both reclaim, because both files contained b"". Delegates so
+    there is one definition of what "the same instance" means.
+    """
+
+    try:
+        from packages.activity_log.filelock import inspect_for_reclaim
+
+        return inspect_for_reclaim(path)
+    except ImportError:
+        return None
+
+
+def _reclaim_claim_if_unchanged(pid_path: Path, observed) -> bool:
     """Remove a claim only if it is still the file the checks inspected.
 
     Delegates to the shared filelock implementation rather than growing a third
@@ -79,11 +96,13 @@ def _sidecar_cleared(pid_path: Path) -> bool:
     except OSError:
         return False
 
-    try:
-        observed = sidecar.read_bytes()
-    except OSError:
-        # Present but unreadable -- a dangling link, a permission denial, a
-        # directory. We cannot tell whose it is, so the slot stays claimed.
+    # Present, so it must be inspectable. _inspect_claim returns None rather
+    # than raising, and None here means unreadable -- a dangling link, a
+    # permission denial, a directory. lstat already proved it exists, so None
+    # cannot mean absent: we cannot tell whose it is, and the slot stays
+    # claimed.
+    observed = _inspect_claim(sidecar)
+    if observed is None:
         return False
     return _reclaim_claim_if_unchanged(sidecar, observed)
 
@@ -270,7 +289,7 @@ def claim_singleton(pid_filename: str) -> bool:
             # Captured before every check below, so the reclaim can prove it is
             # removing the same claim those checks inspected.
             try:
-                observed = pid_path.read_bytes()
+                observed = _inspect_claim(pid_path)
             except OSError:
                 observed = None
             try:
@@ -400,8 +419,12 @@ def claim_singleton(pid_filename: str) -> bool:
         claim.
         """
         try:
-            mine = pid_path.read_bytes()
-            if mine.decode("utf-8", "replace").strip() == str(me):
+            # Identity captured with the contents, so the reclaims below prove
+            # they are removing the same files this ownership test read.
+            mine = _inspect_claim(pid_path)
+            if mine is not None and mine.data.decode("utf-8", "replace").strip() == str(
+                me
+            ):
                 # SIDECAR FIRST, exactly as the stale-reclaim path does.
                 # Unlinking the PID file first opens a window in which a
                 # replacement launcher claims the freed slot and writes ITS
@@ -414,11 +437,8 @@ def claim_singleton(pid_filename: str) -> bool:
                 # stale and reclaimed between that read and these unlinks, and
                 # then this would delete the replacement's record by pathname.
                 # Same defect as the reclaim paths, on the way out instead of in.
-                try:
-                    identity_bytes = _identity_path(pid_path).read_bytes()
-                except OSError:
-                    identity_bytes = None
-                _reclaim_claim_if_unchanged(_identity_path(pid_path), identity_bytes)
+                identity_seen = _inspect_claim(_identity_path(pid_path))
+                _reclaim_claim_if_unchanged(_identity_path(pid_path), identity_seen)
                 _reclaim_claim_if_unchanged(pid_path, mine)
         except (OSError, ValueError):
             pass
@@ -633,8 +653,8 @@ def _reserve_slot_cli() -> int:
         # checks, which know how to probe it.
         reclaimed = False
         try:
-            observed = pid_path.read_bytes()
-            if not observed.strip():
+            observed = _inspect_claim(pid_path)
+            if observed is not None and not observed.data.strip():
                 if _blank_claim_is_stale(pid_path):
                     # Same ordering as claim_singleton: the sidecar first and
                     # content-checked, then the claim.
@@ -680,16 +700,22 @@ def _reclaim_claim_cli() -> int:
         print("usage: --reclaim-claim <pid_file>", file=sys.stderr)
         return 2
     pid_path = Path(sys.argv[2])
-    try:
-        observed = pid_path.read_bytes()
-    except FileNotFoundError:
-        print("RECLAIMED")
-        return 0
-    except OSError:
+    observed = _inspect_claim(pid_path)
+    if observed is None:
+        # ABSENT IS SUCCESS; UNREADABLE IS NOT -- the same distinction
+        # _sidecar_cleared makes, decided the same way. _inspect_claim
+        # returns None for both, and the try/except that used to separate
+        # them stopped firing the moment it stopped raising: a third place
+        # this one None had to be pulled back apart.
+        try:
+            pid_path.lstat()
+        except FileNotFoundError:
+            print("RECLAIMED")
+            return 0
+        except OSError:
+            pass
         print("NOT_RECLAIMED")
         return 1
-    # Sidecar first and content-checked, matching claim_singleton: the record is
-    # freed only once no foreign identity is left sitting beside it.
     if _sidecar_cleared(pid_path) and _reclaim_claim_if_unchanged(pid_path, observed):
         print("RECLAIMED")
         return 0
