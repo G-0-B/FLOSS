@@ -853,3 +853,47 @@ def test_a_clean_shutdown_still_reports_success(tmp_path):
     assert result.returncode == 0, result.stdout[-500:]
     assert "All daemons stopped" in result.stdout
     assert "SHUTDOWN INCOMPLETE" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "script,collector,banner,success",
+    [
+        (
+            "start_mcp_daemons.ps1",
+            "$skipped",
+            "STARTUP INCOMPLETE",
+            'Write-Host "[FLOSS MCP] Daemons started (consensus',
+        ),
+        (
+            "stop_mcp_daemons.ps1",
+            "$unresolved",
+            "SHUTDOWN INCOMPLETE",
+            'Write-Host "[FLOSS MCP] All daemons stopped',
+        ),
+    ],
+)
+def test_no_script_claims_success_it_did_not_achieve(
+    script, collector, banner, success
+):
+    """Both scripts deliberately decline to act in several branches, and both
+    then reported a clean run regardless. Fixed in stop first; the start script
+    was the unswept sibling. Asserted as a property over both so the next
+    script with a closing summary is covered before a reviewer finds it.
+
+    Structural rather than behavioural for the start script specifically:
+    running it launches real daemons, which a test must not do.
+    """
+    text = (SCRIPTS / script).read_text(encoding="utf-8")
+
+    assert f"{collector} = @()" in text, "collector must be an explicit array"
+    assert f"{collector} +=" in text, "nothing ever records a declined action"
+    assert f"{collector}.Count -gt 0" in text, "the summary is unguarded"
+
+    guard_at = text.find(f"{collector}.Count -gt 0")
+    success_at = text.find(success)
+    # The EMITTING STATEMENT, not the first mention: both files explain their
+    # own summaries in comments above the code, and matching the prose made an
+    # earlier version of this test compare a comment against the guard.
+    assert success_at != -1, "the success line has moved"
+    assert guard_at < success_at, "the success line is claimed before the guard"
+    assert "exit 1" in text[guard_at:success_at], "an incomplete run exits 0"

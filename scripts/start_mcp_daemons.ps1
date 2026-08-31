@@ -102,6 +102,12 @@ if ($py -and (Test-Path $omniPid)) {
     if ($tok) { $tok = $tok.ToString().Trim() }
     if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
+# Anything this script declines to start, or starts without being able to
+# record, lands here and the closing summary reports it. Explicit array: in
+# PowerShell `$undefined + "text"` yields a STRING, and .Count on a scalar is
+# not the count of anything.
+$skipped = @()
+
 # UNKNOWN IS OCCUPIED, not free.
 #
 # The stop path and claim_singleton both treat an unverifiable holder as
@@ -113,6 +119,7 @@ if ($py -and (Test-Path $omniPid)) {
 # read it optimistically.
 if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."
+    $skipped += "OmniRoute (:20128) - not started; existing record is unverifiable"
 } elseif ($omniVerdict -eq 'OURS') {
     Write-Host "[FLOSS MCP] OmniRoute already running (recorded PID $(Get-Content $omniPid -Raw))"
 } else {
@@ -147,6 +154,7 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
         # NOT `return`: this is script scope, so returning here would also skip
         # the summary line at the end of the file. Only the launch is skipped.
         Write-Host "[FLOSS MCP] OmniRoute slot is already claimed by another launcher - not starting a duplicate"
+        $skipped += "OmniRoute (:20128) - not started; slot claimed by another launcher"
         $proc = $null
     } else {
         $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'
@@ -200,6 +208,7 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
             }
             if ($gone) {
                 Write-Host "[FLOSS MCP] Stopped the unrecorded OmniRoute (PID $serverPid) and released the reservation"
+                $skipped += "OmniRoute (:20128) - launched but could not be recorded, so it was stopped again"
                 Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
                 Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
             } else {
@@ -207,18 +216,37 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
                 # the next start, which is the conservative failure. An operator
                 # can clear it once they have dealt with the process.
                 Write-Host "[FLOSS MCP] OmniRoute PID $serverPid is ALIVE and unrecorded; KEEPING $omniPid so a later start does not launch a duplicate. Stop PID $serverPid and delete that file once handled."
+                $skipped += "OmniRoute PID $serverPid - running but UNRECORDED; stop it manually"
             }
         }
     } elseif ($reserved) {
         # Reserved the slot and then failed to launch: release it rather than
         # leaving an empty claim that blocks forever.
         Write-Host "[FLOSS MCP] OmniRoute did not start; releasing the reserved slot"
+        $skipped += "OmniRoute (:20128) - launch failed"
         Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
         Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     }
     if ($proc) {
         Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $serverPid)"
     }
+}
+
+# THE SUMMARY MUST DESCRIBE WHAT HAPPENED.
+#
+# Sibling of the same defect in stop_mcp_daemons.ps1: the branches above
+# deliberately decline to launch -- an unverifiable record may be a live
+# server, a claimed slot belongs to another launcher -- and this line then
+# reported all three daemons up regardless. An operator reads that and assumes
+# :20128 is served by this stack when startup specifically declined to
+# establish it.
+if ($skipped.Count -gt 0) {
+    Write-Host "[FLOSS MCP] STARTUP INCOMPLETE - $($skipped.Count) item(s) not started:"
+    foreach ($item in $skipped) {
+        Write-Host "[FLOSS MCP]   $item"
+    }
+    Write-Host "[FLOSS MCP] Consensus :7331 and ensemble :7332 are up. Do not assume the items above are being served."
+    exit 1
 }
 
 Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."

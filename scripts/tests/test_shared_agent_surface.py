@@ -107,7 +107,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
             "server_overrides": {
                 "flossiullk-reasoning-ensemble": {
                     "startup_timeout_sec": 120,
-                    "tool_timeout_sec": 240,
+                    "tool_timeout_sec": 300,
                     "sampling_enabled": False,
                 }
             },
@@ -117,7 +117,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
     assert 'name = "flossiullk-reasoning-ensemble"' in config
     assert "C:/~shit/.mcp/lenses/flossiullk-reasoning-ensemble.yaml" in config
     assert "startup_timeout_sec = 120.0" in config
-    assert "tool_timeout_sec = 240.0" in config
+    assert "tool_timeout_sec = 300.0" in config
     assert "sampling_enabled = false" in config
 
 
@@ -438,3 +438,62 @@ def test_repo_scope_hermes_guard_drift_never_raises_and_leaves_key_untouched(
     # must never be silently reset back to the expected value.
     updated = hermes_config.read_text(encoding="utf-8")
     assert "hooks_auto_accept: true" in updated
+
+
+# ---------------------------------------------------------------------------
+# A client timeout below the server's own work budget fails runs that are
+# behaving correctly. Derived from the synthesizer's constants, not typed in,
+# so raising a budget cannot silently outgrow the timeouts that wait on it.
+# ---------------------------------------------------------------------------
+
+
+def _reasoning_budget_seconds() -> int:
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.reasoning_ensemble import synthesizer
+
+    # Worst case for one call: probe the local embedder, generate, embed the
+    # response. Logging and staging ride on top of that.
+    return (
+        synthesizer.EMBED_PROBE_TIMEOUT_SECONDS
+        + synthesizer.VOTER_TIMEOUT_SECONDS
+        + synthesizer.EMBED_TIMEOUT_SECONDS
+    )
+
+
+def _reasoning_timeouts() -> list[tuple[str, int]]:
+    surface = json.loads(
+        (FLOSS_ROOT / "shared-agent-surface.json").read_text(encoding="utf-8")
+    )
+    found: list[tuple[str, int]] = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "flossiullk-reasoning-ensemble" and isinstance(value, dict):
+                    for tkey in ("tool_timeout_sec", "timeout"):
+                        if isinstance(value.get(tkey), (int, float)):
+                            found.append((f"{path}.{key}.{tkey}", value[tkey]))
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                walk(item, f"{path}[{i}]")
+
+    walk(surface, "surface")
+    return found
+
+
+def test_every_reasoning_ensemble_timeout_clears_the_servers_own_budget():
+    """A voter may legitimately take 180s and its embedding another 90s. A 120s
+    client timeout fails that run while the server is inside every budget it was
+    configured with -- and the operator sees a client error for a working
+    server."""
+    budget = _reasoning_budget_seconds()
+    timeouts = _reasoning_timeouts()
+
+    assert timeouts, "no reasoning-ensemble timeouts found -- has the shape moved?"
+    too_small = [(where, value) for where, value in timeouts if value < budget]
+    assert not too_small, (
+        f"timeout(s) below the {budget}s server budget: {too_small}. "
+        "Raise them, or lower the synthesizer's budgets to match."
+    )
