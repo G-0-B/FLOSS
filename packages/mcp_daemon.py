@@ -274,11 +274,19 @@ def claim_singleton(pid_filename: str) -> bool:
                     # mistaken for a dead one: a FRESH blank file still blocks,
                     # which is the property the wait above was added to protect.
                     if _blank_claim_is_stale(pid_path):
-                        try:
-                            _identity_path(pid_path).unlink(missing_ok=True)
-                        except OSError:
-                            return False
-                        _reclaim_claim_if_unchanged(pid_path, observed)
+                        # THE PID FILE GOES FIRST NOW, and the sidecar only if
+                        # we won it. Removing the sidecar up front was correct
+                        # when the reclaim was an unconditional unlink; with an
+                        # instance-checked reclaim that can REFUSE, deleting it
+                        # first destroys the winner's freshly written identity
+                        # whenever we lose -- and --check-identity then reports
+                        # UNKNOWN, so the stop script refuses to manage a live
+                        # daemon. Losing the race must cost us nothing.
+                        if _reclaim_claim_if_unchanged(pid_path, observed):
+                            try:
+                                _identity_path(pid_path).unlink(missing_ok=True)
+                            except OSError:
+                                pass
                         continue
                     return False
             try:
@@ -309,11 +317,15 @@ def claim_singleton(pid_filename: str) -> bool:
             # second then deletes THAT -- so both return success and both start
             # a daemon on one port. The rename is the atomic part: exactly one
             # caller moves a given file aside and the rest retry.
-            try:
-                _identity_path(pid_path).unlink(missing_ok=True)
-            except OSError:
-                return False
-            _reclaim_claim_if_unchanged(pid_path, observed)
+            #
+            # Sidecar AFTER, and only if the reclaim was ours. See the blank
+            # branch above: an instance-checked reclaim can refuse, and a
+            # sidecar removed before that answer is known is the winner's.
+            if _reclaim_claim_if_unchanged(pid_path, observed):
+                try:
+                    _identity_path(pid_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
             continue
         else:
             try:
@@ -573,8 +585,11 @@ def _reserve_slot_cli() -> int:
             observed = pid_path.read_bytes()
             if not observed.strip():
                 if _blank_claim_is_stale(pid_path):
-                    _identity_path(pid_path).unlink(missing_ok=True)
+                    # Same ordering as claim_singleton: win the slot, then take
+                    # the sidecar. Losing must leave the winner's record intact.
                     reclaimed = _reclaim_claim_if_unchanged(pid_path, observed)
+                    if reclaimed:
+                        _identity_path(pid_path).unlink(missing_ok=True)
         except OSError:
             reclaimed = False
         if not reclaimed:
@@ -595,6 +610,42 @@ def _reserve_slot_cli() -> int:
     os.close(fd)
     print("RESERVED")
     return 0
+
+
+def _reclaim_claim_cli() -> int:
+    """`--reclaim-claim <pid_file>` -> instance-checked removal of a dead claim.
+
+    Exists so the PowerShell start script stops reclaiming by pathname. Two
+    scripts can both read the same record as FOREIGN; the first deletes it and
+    reserves, and the second then deletes THAT reservation and reserves too --
+    both launch a server on one port, and the loser overwrites the winner's
+    identity record. One implementation, four callers.
+
+    Prints RECLAIMED / NOT_RECLAIMED on stdout for the same reason the other
+    verdicts live there: PowerShell cannot catch a native command's failure.
+    """
+
+    if len(sys.argv) < 3:
+        print("usage: --reclaim-claim <pid_file>", file=sys.stderr)
+        return 2
+    pid_path = Path(sys.argv[2])
+    try:
+        observed = pid_path.read_bytes()
+    except FileNotFoundError:
+        print("RECLAIMED")
+        return 0
+    except OSError:
+        print("NOT_RECLAIMED")
+        return 1
+    if _reclaim_claim_if_unchanged(pid_path, observed):
+        try:
+            _identity_path(pid_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+        print("RECLAIMED")
+        return 0
+    print("NOT_RECLAIMED")
+    return 1
 
 
 def _identity_cli() -> int:
@@ -652,6 +703,8 @@ def _identity_cli() -> int:
 
 
 if __name__ == "__main__":
+    if "--reclaim-claim" in sys.argv:
+        raise SystemExit(_reclaim_claim_cli())
     if "--reserve-slot" in sys.argv:
         raise SystemExit(_reserve_slot_cli())
     if "--check-identity" in sys.argv:

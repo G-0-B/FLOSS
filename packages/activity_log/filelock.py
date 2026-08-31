@@ -164,15 +164,35 @@ def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
         except OSError:
             current = None
         if current != observed:
-            # A different instance: released and re-taken while we looked. Put
-            # it back if the slot is still free.
+            # A different instance: released and re-taken while we looked, so
+            # what we moved aside was a LIVE lock. Put it back.
+            #
+            # Not with rename. POSIX rename REPLACES an existing destination
+            # silently, so a contender that acquired the momentarily-free path
+            # while we were comparing would have its lock overwritten by our
+            # rollback -- two owners in the sequence section, which is the
+            # failure this whole function exists to prevent, reintroduced by its
+            # own recovery path. O_EXCL cannot overwrite anything: either the
+            # slot is still free and we restore, or someone holds it and the
+            # copy in our hand is superseded.
             try:
-                os.rename(quarantine, path)
-                return False
+                fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             except OSError:
-                # The slot has been taken again since. The file in hand is a
-                # superseded copy, so dropping it destroys nothing live.
+                # Someone holds the slot now. The copy in our hand is
+                # superseded, so dropping it destroys nothing live.
+                fd = None
+            if fd is not None:
+                try:
+                    with os.fdopen(fd, "wb") as handle:
+                        handle.write(current if current is not None else b"")
+                except OSError:
+                    pass
+            try:
+                quarantine.unlink(missing_ok=True)
+            except OSError:
                 pass
+            # Either way this caller did NOT reclaim: a live lock stands.
+            return False
 
     try:
         quarantine.unlink(missing_ok=True)

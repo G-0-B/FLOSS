@@ -1008,3 +1008,84 @@ def test_the_daemon_reclaim_delegates_to_the_shared_implementation():
     assert "from packages.activity_log.filelock import reclaim_if_unchanged" in source
     body = source.split("def _reclaim_claim_if_unchanged(", 1)[1].split("\ndef ", 1)[0]
     assert "os.rename" not in body, "reimplemented the rename here"
+
+
+def test_losing_a_reclaim_race_leaves_the_winners_sidecar_intact(tmp_path):
+    """Removing the sidecar up front was correct when the reclaim was an
+    unconditional unlink. With an instance-checked reclaim that can REFUSE, it
+    destroys the winner's freshly written identity whenever we lose --
+    --check-identity then reports UNKNOWN and the stop script refuses to manage
+    a live daemon."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+    pid_path.write_bytes(b"")
+    stale_mtime = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (stale_mtime, stale_mtime))
+    sidecar.write_text("the-winners-identity", encoding="utf-8")
+
+    # Drive the CALLER, not the helper: the helper was already instance-checked
+    # a commit ago and what changed here is the ORDER the caller removes the
+    # sidecar in. A test against the helper alone passes either way.
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(mcp_daemon, "_reclaim_claim_if_unchanged", lambda p, o: False)
+    monkey.setattr(sys, "argv", ["mcp_daemon", "--reserve-slot", str(pid_path)])
+    try:
+        assert mcp_daemon._reserve_slot_cli() == 1
+    finally:
+        monkey.undo()
+
+    assert sidecar.read_text(encoding="utf-8") == "the-winners-identity"
+    assert pid_path.exists(), "the record we lost the race for was removed"
+
+
+def test_claim_singleton_removes_the_sidecar_only_after_winning():
+    """Structural, because orchestrating the interleaving inside the retry loop
+    from outside it is not something a test can do honestly. Both reclaim sites
+    must take the pid file first and the sidecar only under the win."""
+    source = (Path(__file__).resolve().parents[1] / "mcp_daemon.py").read_text(
+        encoding="utf-8"
+    )
+    body = source.split("def claim_singleton(", 1)[1].split("\ndef ", 1)[0]
+
+    for block in body.split("_reclaim_claim_if_unchanged(pid_path, observed)")[:-1]:
+        tail = block.rsplit("\n", 6)[-6:]
+        assert not any(
+            "_identity_path(pid_path).unlink" in line for line in tail
+        ), "the sidecar is removed before the reclaim answer is known"
+    assert body.count("if _reclaim_claim_if_unchanged(pid_path, observed):") == 2
+
+
+def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
+    """PowerShell cannot catch a native command's failure, so the verdict is a
+    token, exactly as --check-identity and --reserve-slot do it."""
+    import subprocess
+    import sys as _sys
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"stale-record")
+
+    def run():
+        return subprocess.run(
+            [
+                _sys.executable,
+                "-m",
+                "packages.mcp_daemon",
+                "--reclaim-claim",
+                str(pid_path),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        )
+
+    first = run()
+    assert first.stdout.strip().splitlines()[-1] == "RECLAIMED"
+    assert not pid_path.exists()
+
+    # Already gone is success, not an error: the slot is free either way.
+    assert run().stdout.strip().splitlines()[-1] == "RECLAIMED"

@@ -182,10 +182,27 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not (Get-Content 
     # every later run would repeat the failure. Clear a record we have proven
     # stale before reserving. UNKNOWN is untouched -- it is handled above and
     # stays conservative, because an unverifiable holder may be alive.
-    if ($omniVerdict -eq 'FOREIGN') {
-        Write-Host "[FLOSS MCP] OmniRoute record is stale (that PID is not ours) - clearing it before reserving"
-        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+    if ($omniVerdict -eq 'FOREIGN' -and $py) {
+        # BY INSTANCE, through the same helper the Python paths use. Removing
+        # the record by pathname here let two start scripts both read it as
+        # FOREIGN: the first deleted it and reserved, the second then deleted
+        # THAT reservation and reserved too, so both launched a server on one
+        # port and the loser overwrote the winner's identity record. Losing this
+        # race must cost nothing -- NOT_RECLAIMED simply means someone else got
+        # there, and --reserve-slot below will report OCCUPIED.
+        Push-Location $repoRoot
+        $reclaimOut = & $py -m packages.mcp_daemon --reclaim-claim $omniPid 2>$null
+        Pop-Location
+        $reclaimTok = ($reclaimOut | Select-Object -Last 1)
+        if ($reclaimTok) { $reclaimTok = $reclaimTok.ToString().Trim() }
+        if ($reclaimTok -eq 'RECLAIMED') {
+            Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared before reserving"
+        } else {
+            Write-Host "[FLOSS MCP] OmniRoute stale record was claimed by another launcher first - deferring to it"
+        }
+    } elseif ($omniVerdict -eq 'FOREIGN') {
+        Write-Host "[FLOSS MCP] OmniRoute record is stale but no Python is available to clear it safely; leaving it in place"
+        $skipped += "OmniRoute (:20128) - stale record left in place; set FLOSS_PYTHON"
     }
     $reserved = $false
     if ($py) {

@@ -1537,3 +1537,50 @@ def test_a_stale_lock_is_still_reclaimed_end_to_end(tmp_path):
     token = filelock._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
 
     assert filelock._lock_token(lock_path) == token
+
+
+def test_rolling_back_a_live_lock_never_overwrites_a_newer_one(tmp_path):
+    """POSIX rename REPLACES its destination, so a contender that acquired the
+    momentarily-free path while we compared would have had its lock overwritten
+    by our own rollback -- two owners in the sequence section, reintroduced by
+    the recovery path of the fix that prevents it."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".rollback.lock"
+    lock_path.write_bytes(b"instance-A")
+    stale_observed = b"an-older-instance-we-inspected"
+
+    real_open = os.open
+
+    def steal_the_slot(path, flags, *args, **kwargs):
+        # Fires when the rollback tries to restore: a contender has already
+        # taken the freed path.
+        if str(path) == str(lock_path) and flags & os.O_EXCL:
+            if not lock_path.exists():
+                lock_path.write_bytes(b"contender-C")
+            raise FileExistsError(17, "File exists", str(path))
+        return real_open(path, flags, *args, **kwargs)
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(os, "open", steal_the_slot)
+    try:
+        assert filelock.reclaim_if_unchanged(lock_path, stale_observed) is False
+    finally:
+        monkey.undo()
+
+    assert lock_path.read_bytes() == b"contender-C", "the contender was overwritten"
+    assert not list(tmp_path.glob("*.reclaim-*")), "quarantine left behind"
+
+
+def test_rolling_back_restores_the_live_lock_when_the_slot_is_free(tmp_path):
+    """The rollback still has to happen: refusing to overwrite must not become
+    refusing to restore."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".restore.lock"
+    lock_path.write_bytes(b"instance-A")
+
+    assert filelock.reclaim_if_unchanged(lock_path, b"a-different-instance") is False
+
+    assert lock_path.read_bytes() == b"instance-A", "a live lock was not restored"
+    assert not list(tmp_path.glob("*.reclaim-*"))
