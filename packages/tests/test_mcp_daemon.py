@@ -797,3 +797,59 @@ def test_the_conservative_unknown_branch_is_left_alone():
 
     assert "$omniVerdict -eq 'UNKNOWN'" in text
     assert "not starting a duplicate" in text
+
+
+# ---------------------------------------------------------------------------
+# The stop script's closing summary must describe what actually happened.
+# ---------------------------------------------------------------------------
+
+
+def _run_stop_script(agent_dir: Path):
+    import shutil
+    import subprocess
+
+    powershell = shutil.which("powershell") or shutil.which("pwsh")
+    if powershell is None:  # pragma: no cover - non-Windows CI
+        pytest.skip("no PowerShell available")
+    env = dict(os.environ, FLOSS_AGENT_DIR=str(agent_dir))
+    return subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(SCRIPTS / "stop_mcp_daemons.ps1"),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+
+def test_an_incomplete_shutdown_is_reported_and_exits_nonzero(tmp_path):
+    """Every branch that keeps a pid file does so deliberately, but the closing
+    line claimed a clean shutdown regardless -- so the careful refusals read as
+    success and an operator frees a port that is still in use."""
+    agent_dir = tmp_path / "agent"
+    agent_dir.mkdir()
+    (agent_dir / "consensus.pid").write_text("not-a-pid", encoding="utf-8")
+
+    result = _run_stop_script(agent_dir)
+
+    assert result.returncode == 1, result.stdout[-500:]
+    assert "SHUTDOWN INCOMPLETE" in result.stdout
+    assert "All daemons stopped" not in result.stdout
+    assert (agent_dir / "consensus.pid").exists(), "the record must be kept"
+
+
+def test_a_clean_shutdown_still_reports_success(tmp_path):
+    """The guard must narrow to genuine leftovers, not fail every run."""
+    agent_dir = tmp_path / "agent"
+    agent_dir.mkdir()
+
+    result = _run_stop_script(agent_dir)
+
+    assert result.returncode == 0, result.stdout[-500:]
+    assert "All daemons stopped" in result.stdout
+    assert "SHUTDOWN INCOMPLETE" not in result.stdout

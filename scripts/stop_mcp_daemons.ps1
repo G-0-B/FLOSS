@@ -29,6 +29,12 @@ if ($env:FLOSS_PYTHON) {
     $py = if ($cmd) { $cmd.Source } else { $null }
 }
 
+# Anything this script deliberately leaves running or leaves on disk lands
+# here, and the closing summary reports it. Declared as an explicit array: in
+# PowerShell `$undefined + "text"` yields a STRING, and .Count on a scalar is
+# not the count of anything.
+$unresolved = @()
+
 # Kill FLOSS MCP daemons via PID files
 $pidFiles = @("consensus.pid", "reasoning_ensemble.pid")
 foreach ($pidFile in $pidFiles) {
@@ -47,10 +53,12 @@ foreach ($pidFile in $pidFiles) {
         $daemonPid = 0
         if (-not [int]::TryParse($raw, [ref]$daemonPid) -or $daemonPid -le 0) {
             Write-Host "[FLOSS MCP] $pidFile unreadable (contents: '$raw') - leaving it in place"
+            $unresolved += "$pidFile - unreadable pid file, left in place"
             continue
         }
         if ($daemonPid -eq $PID) {
             Write-Host "[FLOSS MCP] $pidFile names this very process ($PID) - refusing to self-terminate"
+            $unresolved += "$pidFile - names this process, left in place"
             continue
         }
         # Do NOT assume every Stop-Process failure means the process is gone.
@@ -102,6 +110,7 @@ foreach ($pidFile in $pidFiles) {
         }
         if ($verdict -ne 'OURS') {
             Write-Host "[FLOSS MCP] $pidFile PID $daemonPid identity UNVERIFIABLE (verdict=$verdict) - refusing to force-kill, and KEEPING the pid file so the daemon stays findable."
+            $unresolved += "$pidFile PID $daemonPid - identity unverifiable, may still be running"
             continue
         }
 
@@ -117,6 +126,7 @@ foreach ($pidFile in $pidFiles) {
             } else {
                 Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is ALIVE but could not be stopped: $($_.Exception.Message)"
                 Write-Host "[FLOSS MCP] Keeping $pidFile so the daemon stays findable."
+                $unresolved += "$pidFile PID $daemonPid - ALIVE, could not be stopped"
             }
         }
         if ($stopped) {
@@ -188,6 +198,7 @@ if ($omniVerdict -eq 'OURS') {
         } else {
             Write-Host "[FLOSS MCP] OmniRoute PID $omniId is ALIVE but could not be stopped: $($_.Exception.Message)"
             Write-Host "[FLOSS MCP] Keeping $omniPid so it stays findable."
+            $unresolved += "OmniRoute PID $omniId - ALIVE, could not be stopped"
         }
     }
     if ($omniStopped) {
@@ -209,6 +220,9 @@ if ($omniVerdict -eq 'OURS') {
     Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared, killed nothing"
 } else {
     Write-Host "[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing"
+    if (Test-Path $omniPid) {
+        $unresolved += "OmniRoute - record present but identity unverifiable, may still be listening on :20128"
+    }
 }
 
 # agentmemory / JanuScope: REPORTED, NOT KILLED.
@@ -235,6 +249,22 @@ if ($candidates) {
         Write-Host "[FLOSS MCP]   PID $($c.ProcessId) (parent $($c.ParentProcessId))"
     }
     Write-Host "[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons."
+}
+
+# THE SUMMARY MUST DESCRIBE WHAT HAPPENED.
+#
+# Every branch above that keeps a pid file does so deliberately -- an
+# unverifiable holder may be alive, and a daemon that would not die stays
+# findable. But the closing line said "All daemons stopped. PID files cleaned."
+# unconditionally, so the careful refusals were reported as a clean shutdown.
+# An operator then restarts, or frees the port, on a false premise.
+if ($unresolved.Count -gt 0) {
+    Write-Host "[FLOSS MCP] SHUTDOWN INCOMPLETE - $($unresolved.Count) item(s) left in place:"
+    foreach ($item in $unresolved) {
+        Write-Host "[FLOSS MCP]   $item"
+    }
+    Write-Host "[FLOSS MCP] Ports and pid files above are still in use. Resolve them before assuming the stack is down."
+    exit 1
 }
 
 Write-Host "[FLOSS MCP] All daemons stopped. PID files cleaned."
