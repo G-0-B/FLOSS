@@ -65,11 +65,45 @@ function Resolve-ServerPid {
     return 0
 }
 
+# Anything this script declines to start, starts without being able to record,
+# or watches die on the spot lands here, and the closing summary reports it.
+# Explicit array: in PowerShell `$undefined + "text"` yields a STRING, and
+# .Count on a scalar is not the count of anything.
+$skipped = @()
+
+function Start-Daemon {
+    <#
+      Fire-and-forget launches were never inspected, so a module that fails to
+      import, a missing dependency, or a port already bound produced no output
+      and no entry anywhere -- and the closing summary still reported the
+      daemon up. A short settle window catches an immediate exit, which is what
+      every one of those failures looks like. It cannot prove readiness; it does
+      prove the process did not die on the spot, and that is the difference
+      between a claim and a guess.
+    #>
+    param([string]$Interpreter, [string]$Module, [string]$Label, [string]$WorkDir)
+
+    $proc = Start-Process -WindowStyle Hidden -PassThru -WorkingDirectory $WorkDir $Interpreter "-m $Module"
+    if (-not $proc) {
+        Write-Host "[FLOSS MCP] $Label failed to launch"
+        return $null
+    }
+    Start-Sleep -Milliseconds 1500
+    $proc.Refresh()
+    if ($proc.HasExited) {
+        Write-Host "[FLOSS MCP] $Label exited immediately (code $($proc.ExitCode)) - run it by hand to see why: $Interpreter -m $Module"
+        return $null
+    }
+    return $proc
+}
+
 # Start consensus gateway daemon (port 7331)
-Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.metacoordinator_mcp.server"
+$consensusProc = Start-Daemon $py "packages.metacoordinator_mcp.server" "consensus gateway (:7331)" $workspace
+if (-not $consensusProc) { $skipped += "consensus gateway (:7331) - exited immediately after launch" }
 
 # Start reasoning ensemble daemon (port 7332)
-Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.reasoning_ensemble.mcp_server"
+$ensembleProc = Start-Daemon $py "packages.reasoning_ensemble.mcp_server" "reasoning ensemble (:7332)" $workspace
+if (-not $ensembleProc) { $skipped += "reasoning ensemble (:7332) - exited immediately after launch" }
 
 # Start OmniRoute daemon (port 20128) — model routing + token compression
 # Match on the COMMAND LINE, not $_.Path. For an npm-installed OmniRoute the
@@ -102,12 +136,6 @@ if ($py -and (Test-Path $omniPid)) {
     if ($tok) { $tok = $tok.ToString().Trim() }
     if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
-# Anything this script declines to start, or starts without being able to
-# record, lands here and the closing summary reports it. Explicit array: in
-# PowerShell `$undefined + "text"` yields a STRING, and .Count on a scalar is
-# not the count of anything.
-$skipped = @()
-
 # UNKNOWN IS OCCUPIED, not free.
 #
 # The stop path and claim_singleton both treat an unverifiable holder as
@@ -245,7 +273,7 @@ if ($skipped.Count -gt 0) {
     foreach ($item in $skipped) {
         Write-Host "[FLOSS MCP]   $item"
     }
-    Write-Host "[FLOSS MCP] Consensus :7331 and ensemble :7332 are up. Do not assume the items above are being served."
+    Write-Host "[FLOSS MCP] Do not assume the items above are being served."
     exit 1
 }
 

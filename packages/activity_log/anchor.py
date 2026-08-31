@@ -57,6 +57,7 @@ from nacl.signing import VerifyKey
 
 from packages.activity_log.provenance import (
     Identity,
+    MAX_SEQUENCE,
     _acquire_lock,
     _b64url_decode,
     _b64url_encode,
@@ -108,11 +109,9 @@ EXIT_CODES = {
 UNAVAILABLE_NOTE = "NOT a pass. Store is unverifiable, not verified."
 
 
-# A per-identity chain position. The live store's deepest chain is single
-# digits; a million is already far past anything a real agent produces, and a
-# packet beyond it is recorded as damage rather than trusted to size a loop.
-MAX_SEQUENCE = 1_000_000
-
+# MAX_SEQUENCE is imported from provenance, not redefined: the same bound has
+# to hold for the chain walk and for this scan, and two copies drift.
+#
 # Even inside that bound one packet at the top can imply a million gaps. The
 # gap list is a DIAGNOSTIC -- it names what is missing so damage cannot later
 # be laundered as pre-existing -- and a diagnostic nobody can read is not worth

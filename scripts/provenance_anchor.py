@@ -33,6 +33,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -447,9 +448,25 @@ def _publish(args: argparse.Namespace) -> int:
     # Pointer written last, through a temp file. A crash mid-write used to leave
     # a corrupt anchor.json that load_anchor read as None, which would then
     # publish a fresh genesis over a real series (part of G10).
-    staging = args.anchor.with_suffix(".json.tmp")
-    staging.write_bytes(payload)
-    staging.replace(args.anchor)
+    # PER-PROCESS staging name. A single shared `anchor.json.tmp` is the same
+    # race the retained series had, one file along: two publishes both write it,
+    # one replaces the path while the other still holds the inode open and
+    # keeps writing -- into the freshly published anchor.json -- and the loser's
+    # replace can raise over a file that is no longer there. mkstemp creates
+    # exclusively in the destination directory, so the rename is still atomic
+    # and same-filesystem.
+    args.anchor.parent.mkdir(parents=True, exist_ok=True)
+    fd, staging_name = tempfile.mkstemp(
+        dir=str(args.anchor.parent), prefix=args.anchor.name + ".", suffix=".tmp"
+    )
+    staging = Path(staging_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+        os.replace(staging, args.anchor)
+    except OSError:
+        staging.unlink(missing_ok=True)
+        raise
 
     if args.witness and signed.get("witnesses"):
         proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])

@@ -592,6 +592,10 @@ def _sequence_index(
             slot = int(sequence)
         except (TypeError, ValueError):
             continue
+        if slot > MAX_SEQUENCE or slot < 0:
+            # Same bound as the walk above and the anchor scan. An implausible
+            # slot is not indexed, so nothing downstream can be sized by it.
+            continue
         for path, digest in entries:
             # EVERY occupant, not the first one found. The index walks candidates
             # in path order, so keeping one entry per slot let an unsigned file
@@ -732,6 +736,17 @@ _SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
 # not a digest is not a hole in the chain; it is a packet that does not name a
 # prior at all.
 _SAID_RE = re.compile(r"^E[A-Za-z0-9_-]{43}\Z")
+
+# A per-identity chain position, not an arbitrary integer. `int()` accepts any
+# decimal, and both this module's gap walk and the anchor's summary enumerate
+# the span below the value they are handed -- so a single validly signed packet
+# claiming s=1000000000000 turns "produce a verdict" into "iterate a trillion
+# times". The live store's deepest chain is single digits.
+#
+# Defined HERE, in the lower layer, and imported by anchor.py: bounding the
+# anchor scan and leaving this walk unbounded is how the same defect got found
+# twice in two files.
+MAX_SEQUENCE = 1_000_000
 # D-A1 (ADR-20). This used to restate the evidence vocabulary as a literal, which
 # made it a fourth allow-list nobody knew existed: the v1.5 D3 widening was applied
 # to the spec, the schema and claim_schema.EVIDENCE_TYPES, but not here — and this
@@ -1109,6 +1124,12 @@ def validate_packet(
                 try:
                     expected_sequence = int(child_sequence) - 1
                 except (TypeError, ValueError):
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                    break
+                if expected_sequence > MAX_SEQUENCE:
+                    # Refuse before materialising the span. A chain position
+                    # this large is damage or a hostile signer, and either way
+                    # the honest answer is a verdict, not an allocation.
                     errors.append("E_PROVENANCE_SEQUENCE_INVALID")
                     break
                 if expected_sequence < 0:

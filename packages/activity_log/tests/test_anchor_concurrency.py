@@ -608,3 +608,62 @@ def test_a_redundant_republish_is_still_a_no_op_even_with_the_rotation_flag(
 
     assert again.returncode == 0
     assert '"status": "unchanged"' in again.stdout
+
+
+def test_the_pointer_is_staged_under_a_name_no_other_publish_shares(
+    tmp_path, small_store, monkeypatch
+):
+    """A single shared anchor.json.tmp is the retained-series race one file
+    along: two publishes write it, one replaces the path while the other still
+    holds the inode, and the loser writes into the freshly published anchor.
+
+    Asserted on the name actually handed to os.replace. Checking that no
+    leftover .tmp remains afterwards does NOT discriminate -- the rename
+    consumes it either way, so that version passed against the shared name.
+    """
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    staged: list[str] = []
+    real_replace = cli.os.replace
+
+    def record(src, dst):
+        staged.append(str(src))
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(cli.os, "replace", record)
+
+    code = cli.main(
+        [
+            "--provenance-root",
+            str(small_store),
+            "--identity-dir",
+            str(tmp_path / "id"),
+            "--anchor",
+            str(anchor_path),
+            "publish",
+            "--allow-new-identity",
+        ]
+    )
+
+    assert code == 0
+    pointer_stages = [name for name in staged if name.endswith(".tmp")]
+    assert pointer_stages, "the pointer was not staged at all"
+    assert all(
+        not name.endswith("anchor.json.tmp") for name in pointer_stages
+    ), f"shared staging name still in use: {pointer_stages}"
+    assert json.loads(anchor_path.read_text(encoding="utf-8"))["v"]
+
+
+def test_the_chain_walk_refuses_an_implausible_sequence_without_expanding_it(
+    tmp_path,
+):
+    """Same bound as the anchor scan, in the module that owns it. Bounding one
+    reader and not the other is how this was found twice in two files."""
+    from packages.activity_log import provenance as prov
+
+    assert prov.MAX_SEQUENCE == anchor_lib.MAX_SEQUENCE, "two copies of one bound"
+
+    index = {("D" + "a" * 43, None, str(prov.MAX_SEQUENCE + 1)): [(tmp_path, "E")]}
+    paths, digests = prov._sequence_index(index)
+
+    assert paths == {} and digests == {}, "an implausible slot was indexed"
