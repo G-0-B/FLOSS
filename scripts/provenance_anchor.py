@@ -595,6 +595,23 @@ def _publish(args: argparse.Namespace) -> int:
     # RETAIN THE SERIES. Overwriting a single anchor.json left `prev_root`
     # pointing backwards into nothing, so the "anchor series is a hash chain"
     # claim was a field on one file rather than a retained history (G5).
+    # THE EVIDENCE GOES DOWN BEFORE ANYTHING THAT CITES IT.
+    #
+    # The proof was written after os.replace, so a crash in between left a
+    # published anchor carrying a `witnesses` claim with no proof on disk --
+    # which _witness_state reports as "the anchor claims a witness but no proof
+    # file is present", reading as tampering rather than an interrupted publish.
+    #
+    # Moving it above the POINTER was not enough: _retain_series persists the
+    # same signed document one step earlier, so the retained copy could cite a
+    # proof that did not exist yet. Two writers of one document, and the fix
+    # went to the one I was looking at -- so this now precedes BOTH. The proof
+    # is content-addressed by root, so writing it first is idempotent and safe.
+    proof_file = None
+    if args.witness and signed.get("witnesses"):
+        proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])
+        _write_atomic(proof_file, stamped["proof"])
+
     series_dir = args.anchor.parent / anchor_lib.SERIES_DIRNAME
     series_dir.mkdir(parents=True, exist_ok=True)
     retained = _retain_series(series_dir, signed["merkle_root"], payload)
@@ -609,20 +626,6 @@ def _publish(args: argparse.Namespace) -> int:
     # replace can raise over a file that is no longer there. mkstemp creates
     # exclusively in the destination directory, so the rename is still atomic
     # and same-filesystem.
-    # THE EVIDENCE GOES DOWN BEFORE THE POINTER THAT CITES IT.
-    #
-    # The proof used to be written AFTER os.replace, so a crash in between left
-    # a published anchor carrying a `witnesses` claim with no proof on disk --
-    # and _witness_state reports exactly that as "the anchor claims a witness
-    # but no proof file is present", which reads as tampering rather than as an
-    # interrupted publish. Same ordering rule as the daemons' identity sidecar:
-    # never publish a record before the thing it cites exists. The proof is
-    # content-addressed by root, so writing it first is idempotent and safe.
-    proof_file = None
-    if args.witness and signed.get("witnesses"):
-        proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])
-        _write_atomic(proof_file, stamped["proof"])
-
     args.anchor.parent.mkdir(parents=True, exist_ok=True)
     fd, staging_name = tempfile.mkstemp(
         dir=str(args.anchor.parent), prefix=args.anchor.name + ".", suffix=".tmp"

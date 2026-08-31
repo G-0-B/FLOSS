@@ -1237,18 +1237,41 @@ def test_a_missing_series_directory_is_not_reported_as_a_missing_ancestor():
     assert "no retained anchor" not in result["problems"][0]
 
 
-def test_a_broken_history_still_blocks_when_the_store_actually_lost_something():
-    """The guard must narrow to history-only breaks. A store that lost an
-    anchored leaf must still be refused, broken series or not."""
-    anchor = {
-        "merkle_root": "E" + "a" * 43,
-        "identities": [
-            {"aid": "D" + "a" * 43, "leaf_saids": [[0, "E" + "z" * 43]]},
-        ],
-        "unreadable": [],
-    }
+def test_a_broken_history_still_blocks_when_the_store_actually_lost_something(
+    tmp_path, small_store
+):
+    """The guard must narrow to history-only breaks: a store that LOST an
+    anchored leaf stays refused whether or not the series is also broken.
 
-    assert anchor_lib.anchored_leaves(anchor), "fixture commits to no leaves"
+    Drives the real preflight. The first version of this asserted only that the
+    fixture committed to some leaves, which is true of the fixture and says
+    nothing about the code -- it would have passed against a guard that let
+    every loss through.
+    """
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    assert cli.main(base + ["publish"]) == 0
+
+    # Break the history AND lose an anchored packet.
+    head = json.loads(anchor_path.read_text(encoding="utf-8"))
+    (tmp_path / "series" / f"{head['prev_root']}.json").unlink()
+    sorted(small_store.rglob("*.json"))[0].unlink()
+
+    assert cli.main(base + ["publish"]) == 2, "a real loss was published anyway"
 
 
 def test_the_upgrade_path_never_overwrites_a_proof_in_place(tmp_path, monkeypatch):
@@ -1270,3 +1293,73 @@ def test_the_upgrade_path_never_overwrites_a_proof_in_place(tmp_path, monkeypatc
 
     assert target.read_bytes() == b"upgraded-proof"
     assert target.name not in written, "final name written directly"
+
+
+def test_no_writer_of_the_signed_document_precedes_its_proof(
+    tmp_path, small_store, monkeypatch
+):
+    """Two writers persist the signed anchor -- _retain_series and the pointer
+    replace -- and moving the proof above only the second still let the RETAINED
+    copy cite a proof that did not exist yet."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    order: list[str] = []
+
+    real_atomic = cli._write_atomic
+    real_retain = cli._retain_series
+    real_replace = cli.os.replace
+
+    monkeypatch.setattr(
+        cli, "_write_atomic", lambda p, b: (order.append("proof"), real_atomic(p, b))[1]
+    )
+    monkeypatch.setattr(
+        cli,
+        "_retain_series",
+        lambda d, r, p: (order.append("retain"), real_retain(d, r, p))[1],
+    )
+    monkeypatch.setattr(
+        cli.os,
+        "replace",
+        lambda s, d: (
+            order.append("pointer") if str(d).endswith("anchor.json") else None,
+            real_replace(s, d),
+        )[1],
+    )
+    monkeypatch.setattr(
+        cli.witness_lib,
+        "stamp_root",
+        lambda root, timeout=None: {
+            "status": "PENDING",
+            "digest": "d",
+            "attested": ["cal"],
+            "proof": b"fake-proof-bytes",
+            "failed": [],
+        },
+    )
+    monkeypatch.setattr(
+        cli.witness_lib,
+        "inspect_proof",
+        lambda payload, expected_digest=None: {"status": "PENDING"},
+    )
+
+    assert (
+        cli.main(
+            [
+                "--provenance-root",
+                str(small_store),
+                "--identity-dir",
+                str(tmp_path / "id"),
+                "--anchor",
+                str(anchor_path),
+                "publish",
+                "--allow-new-identity",
+                "--witness",
+            ]
+        )
+        == 0
+    )
+
+    assert order.index("proof") < order.index(
+        "retain"
+    ), "retained copy cited a proof that did not exist"
+    assert order.index("proof") < order.index("pointer")
