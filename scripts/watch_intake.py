@@ -34,11 +34,17 @@ if str(REPO_ROOT) not in sys.path:
 # the TimeoutError -- intake disabled until a human found the file. Widening
 # the lock to cover the whole scan made that window materially larger.
 #
-# provenance's lock already solves it, in the two places a first attempt here
+# The shared lock already solves it, in the two places a first attempt here
 # would get wrong: Windows leaves a deleted lock in DELETE_PENDING so O_EXCL
-# raises PermissionError rather than FileExistsError, and a crashed holder is
-# reclaimed after 60 seconds. Both were written against observed failures.
-from packages.activity_log.provenance import (  # noqa: E402
+# raises PermissionError rather than FileExistsError, and a holder that has
+# gone is reclaimed. Both were written against observed failures.
+#
+# From `filelock`, NOT from `provenance`. Importing it from provenance pulled
+# blake3, jcs and PyNaCl into a watcher that had been standard-library-only --
+# defeating the lazy-import guard activity_log's __init__ exists to provide,
+# and breaking `watch_intake.py --help` outright on an install without the
+# provenance extras. The lock never needed them.
+from packages.activity_log.filelock import (  # noqa: E402
     _acquire_lock,
     _release_lock,
 )
@@ -654,14 +660,25 @@ def main() -> int:
 
     if args.loop:
         while True:
-            emitted = scan_once(
-                workspace_root=workspace_root,
-                event_root=event_root,
-                state_path=state_path,
-                emit_on_first_scan=args.emit_on_first_scan,
-                debounce_seconds=max(args.debounce_seconds, 0.0),
-            )
-            print(f"[watch_intake] emitted {emitted} event(s)")
+            try:
+                emitted = scan_once(
+                    workspace_root=workspace_root,
+                    event_root=event_root,
+                    state_path=state_path,
+                    emit_on_first_scan=args.emit_on_first_scan,
+                    debounce_seconds=max(args.debounce_seconds, 0.0),
+                )
+            except TimeoutError:
+                # CONTENTION IS NOT A REASON TO STOP WATCHING.
+                #
+                # Widening the lock to cover the whole scan made an overlap with
+                # another healthy watcher ordinary rather than rare -- and one
+                # ordinary overlap terminated the loop permanently, disabling
+                # intake until someone noticed the process was gone. The next
+                # tick is the right response: the other scan is doing the work.
+                print("[watch_intake] another scan holds the lock; retrying next tick")
+            else:
+                print(f"[watch_intake] emitted {emitted} event(s)")
             time.sleep(max(args.interval_seconds, 0.25))
     else:
         emitted = scan_once(

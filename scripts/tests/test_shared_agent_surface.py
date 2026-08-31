@@ -641,3 +641,61 @@ def test_an_abandoned_watcher_lock_is_reclaimed_not_waited_on(tmp_path):
         assert held == abandoned
 
     assert not abandoned.exists(), "the lock was not released"
+
+
+def test_the_intake_watcher_imports_no_provenance_extras():
+    """The watcher was standard-library-only, and importing the shared lock from
+    `provenance` dragged blake3, jcs and PyNaCl in -- defeating the lazy-import
+    guard activity_log's __init__ exists to provide and breaking
+    `watch_intake.py --help` on any install without the provenance extras.
+
+    Asserted by running the module in an interpreter where those extras cannot
+    be imported, because a source grep would miss a transitive pull.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    blocker = textwrap.dedent("""
+        import sys
+
+        class _Blocked:
+            def find_module(self, name, path=None):
+                if name.split(".")[0] in {"blake3", "jcs", "nacl"}:
+                    raise ImportError(f"{name} is not installed in this profile")
+                return None
+
+            def find_spec(self, name, path=None, target=None):
+                if name.split(".")[0] in {"blake3", "jcs", "nacl"}:
+                    raise ImportError(f"{name} is not installed in this profile")
+                return None
+
+        sys.meta_path.insert(0, _Blocked())
+        """)
+    script = FLOSS_ROOT / "scripts" / "watch_intake.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            blocker + f"\nimport runpy, sys\n"
+            f"sys.argv = ['watch_intake.py', '--help']\n"
+            f"runpy.run_path({str(script)!r}, run_name='__main__')",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(FLOSS_ROOT),
+    )
+
+    combined = result.stdout + result.stderr
+    assert "ModuleNotFoundError" not in combined, combined[-600:]
+    assert "is not installed in this profile" not in combined, combined[-600:]
+    assert "usage:" in combined.lower(), combined[-600:]
+
+
+def test_loop_mode_survives_lock_contention():
+    """Widening the lock to the whole scan made an overlap ordinary, and one
+    ordinary overlap terminated a --loop watcher permanently."""
+    source = (FLOSS_ROOT / "scripts" / "watch_intake.py").read_text(encoding="utf-8")
+    loop = source.split("while True:", 1)[1].split("else:", 1)[0]
+
+    assert "except TimeoutError" in loop, "one overlap still ends the watcher"
