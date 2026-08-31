@@ -734,3 +734,66 @@ def test_the_verdict_is_on_stdout_not_only_in_the_exit_code(tmp_path):
     occupied = _reserve(pid_path)
 
     assert "OCCUPIED" in occupied.stdout
+
+
+# ---------------------------------------------------------------------------
+# Slot-release ordering, pinned structurally because the shell scripts are not
+# unit-testable here. Four review rounds hit this ordering in four different
+# sites; a property test over every site is what finally covers the class.
+# ---------------------------------------------------------------------------
+
+
+SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+
+
+def _removal_order(script: Path) -> list[str]:
+    """The pid-file and sidecar removals, in source order, as 'identity'/'pid'."""
+    order = []
+    for line in script.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("Remove-Item"):
+            continue
+        if ".identity" in stripped:
+            order.append("identity")
+        elif "$pidPath" in stripped or "$omniPid" in stripped:
+            order.append("pid")
+    return order
+
+
+def test_every_slot_release_removes_the_identity_sidecar_first():
+    """Freeing the slot first lets a replacement claim it and write its own
+    identity inside the window, which the next line then deletes -- leaving a
+    live daemon with an unverifiable record that start and stop both refuse to
+    touch. mcp_daemon.py documents this on its own release path."""
+    for name in ("start_mcp_daemons.ps1", "stop_mcp_daemons.ps1"):
+        order = _removal_order(SCRIPTS / name)
+        assert order, f"{name}: no removals found -- has the file moved?"
+        assert len(order) % 2 == 0, f"{name}: an unpaired removal: {order}"
+        pairs = list(zip(order[::2], order[1::2]))
+        assert all(
+            pair == ("identity", "pid") for pair in pairs
+        ), f"{name}: removal out of order: {pairs}"
+
+
+def test_a_stale_foreign_record_is_cleared_before_the_slot_is_reserved():
+    """--reserve-slot is O_CREAT|O_EXCL, so a leftover FOREIGN record makes it
+    return OCCUPIED forever and OmniRoute never restarts."""
+    text = (SCRIPTS / "start_mcp_daemons.ps1").read_text(encoding="utf-8")
+
+    clear_at = text.find("OmniRoute record is stale")
+    # The INVOCATION, not the first mention: the explanatory comment above the
+    # clearing block names --reserve-slot too, and matching that made this test
+    # compare a comment against the code it explains.
+    reserve_at = text.find("packages.mcp_daemon --reserve-slot")
+
+    assert clear_at != -1, "the FOREIGN record is never cleared"
+    assert reserve_at != -1, "the reservation call has moved"
+    assert clear_at < reserve_at, "the stale record is cleared after reserving"
+
+
+def test_the_conservative_unknown_branch_is_left_alone():
+    """UNKNOWN may be a live holder we cannot verify; it must still block."""
+    text = (SCRIPTS / "start_mcp_daemons.ps1").read_text(encoding="utf-8")
+
+    assert "$omniVerdict -eq 'UNKNOWN'" in text
+    assert "not starting a duplicate" in text

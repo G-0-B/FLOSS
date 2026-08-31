@@ -123,6 +123,17 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     # recorded last and then exited, leaving the bound server live and
     # untracked. --reserve-slot is O_CREAT|O_EXCL through the same primitive
     # claim_singleton uses, so exactly one launcher gets past this line.
+    # A FOREIGN verdict is PROOF the record is stale, and the record still
+    # exists. --reserve-slot is O_CREAT|O_EXCL, so it would return OCCUPIED
+    # against that dead record forever: OmniRoute would never start again, and
+    # every later run would repeat the failure. Clear a record we have proven
+    # stale before reserving. UNKNOWN is untouched -- it is handled above and
+    # stays conservative, because an unverifiable holder may be alive.
+    if ($omniVerdict -eq 'FOREIGN') {
+        Write-Host "[FLOSS MCP] OmniRoute record is stale (that PID is not ours) - clearing it before reserving"
+        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+    }
     $reserved = $false
     if ($py) {
         Push-Location $repoRoot
@@ -175,12 +186,14 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
             # failed recording it would block every future start with nothing
             # running. We hold it exclusively, so clearing it is ours to do.
             Write-Host "[FLOSS MCP] WARNING: could not record the OmniRoute identity ($recTok); releasing the reservation so a later start is not blocked"
+            Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
             Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
         }
     } elseif ($reserved) {
         # Reserved the slot and then failed to launch: release it rather than
         # leaving an empty claim that blocks forever.
         Write-Host "[FLOSS MCP] OmniRoute did not start; releasing the reserved slot"
+        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
         Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     }
     if ($proc) {

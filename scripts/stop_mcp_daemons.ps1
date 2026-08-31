@@ -95,8 +95,9 @@ foreach ($pidFile in $pidFiles) {
         }
         if ($verdict -eq 'FOREIGN') {
             Write-Host "[FLOSS MCP] $pidFile PID $daemonPid is NOT our daemon (identity mismatch or process gone) - removing the stale file, killing nothing"
-            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+            # Sidecar first, slot second -- see the ordering note below.
             Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
+            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
             continue
         }
         if ($verdict -ne 'OURS') {
@@ -119,6 +120,21 @@ foreach ($pidFile in $pidFiles) {
             }
         }
         if ($stopped) {
+            # THE SIDECAR GOES FIRST, AND IT MUST GO.
+            #
+            # This branch removed only the pid file. The daemon's own atexit
+            # cleanup usually takes the sidecar, but it does not run on a
+            # force-kill or a crash -- so a stale <pid>.identity outlived the
+            # slot. A replacement launcher then created and populated the new
+            # pid file while that stale token still sat beside it, and a
+            # concurrent claimant comparing the two saw a mismatch, judged the
+            # valid claim stale, and reclaimed the slot: two daemons, both
+            # believing they hold it.
+            #
+            # Ordering matters for the same reason mcp_daemon.py documents on
+            # its own release path: freeing the slot first opens a window in
+            # which a replacement writes its identity and this line deletes it.
+            Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
             Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
         }
     }

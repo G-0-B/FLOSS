@@ -320,3 +320,97 @@ def test_an_unreadable_witness_sidecar_does_not_lose_the_store_verdict(tmp_path)
 
     assert state["status"] == witness_lib.WITNESS_UNAVAILABLE
     assert state["claims_in_anchor"] == 1
+
+
+# ---------------------------------------------------------------------------
+# An unreadable anchor is not an absent one.
+# ---------------------------------------------------------------------------
+
+
+def _publish_cmd(tmp_path, store, anchor_path, *extra):
+    import subprocess
+    import sys as _sys
+
+    return subprocess.run(
+        [
+            _sys.executable,
+            str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+            "--provenance-root",
+            str(store),
+            "--identity-dir",
+            str(tmp_path / "id"),
+            "--anchor",
+            str(anchor_path),
+            "publish",
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.fixture
+def small_store(tmp_path):
+    identity = load_or_create_identity(tmp_path / "id")
+    store = tmp_path / "provenance"
+    provenance.create_packet(
+        [{"kind": "note", "detail": "d"}],
+        identity_dir=tmp_path / "id",
+        output_root=store,
+    )
+    assert identity is not None
+    return store
+
+
+@pytest.mark.parametrize(
+    "corrupt", [b"\xff\xfe not utf 8", b"{not json", b"[]", b'"a string"', b"5"]
+)
+def test_publish_refuses_over_an_anchor_it_cannot_read(tmp_path, small_store, corrupt):
+    """load_anchor returns None for absent AND for corrupt. Publish must not
+    read the second as the first and write a fresh genesis over real history."""
+    anchor_path = tmp_path / "anchor.json"
+
+    first = _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+    assert first.returncode == 0, first.stdout + first.stderr[-300:]
+    original = anchor_path.read_bytes()
+
+    anchor_path.write_bytes(corrupt)
+    refused = _publish_cmd(tmp_path, small_store, anchor_path)
+
+    assert refused.returncode == 2, refused.stdout + refused.stderr[-300:]
+    assert "unreadable anchor" in refused.stdout
+    assert anchor_path.read_bytes() == corrupt, "refusal must not rewrite the file"
+    assert original != corrupt
+
+
+def test_the_refusal_points_at_the_retained_series_to_recover_from(
+    tmp_path, small_store
+):
+    anchor_path = tmp_path / "anchor.json"
+    _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+    anchor_path.write_bytes(b"[]")
+
+    refused = _publish_cmd(tmp_path, small_store, anchor_path)
+
+    assert "retained anchor(s) remain" in refused.stdout
+
+
+def test_a_genuinely_absent_anchor_still_publishes(tmp_path, small_store):
+    """The guard must narrow to UNREADABLE, not block a first publication."""
+    anchor_path = tmp_path / "anchor.json"
+
+    first = _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+
+    assert first.returncode == 0, first.stdout + first.stderr[-300:]
+    assert anchor_path.exists()
+
+
+def test_force_still_overrides_an_unreadable_anchor(tmp_path, small_store):
+    anchor_path = tmp_path / "anchor.json"
+    _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+    anchor_path.write_bytes(b"[]")
+
+    forced = _publish_cmd(tmp_path, small_store, anchor_path, "--force")
+
+    assert forced.returncode == 0, forced.stdout + forced.stderr[-300:]
+    assert json.loads(anchor_path.read_text(encoding="utf-8"))["v"]

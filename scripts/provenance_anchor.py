@@ -163,6 +163,45 @@ def _resolve_identity(identity_dir: Path, allow_new: bool):
 def _publish(args: argparse.Namespace) -> int:
     previous = anchor_lib.load_anchor(args.anchor)
 
+    # ABSENT AND UNREADABLE ARE NOT THE SAME ANSWER.
+    #
+    # load_anchor returns None for a file that is not there AND for one that is
+    # there but corrupt -- invalid UTF-8, malformed JSON, or valid JSON of the
+    # wrong shape. That second case was introduced by hardening the loader, and
+    # this caller could not tell them apart: it read None as "no predecessor",
+    # skipped the whole verify-before-overwriting guard, and wrote a fresh
+    # genesis over the pointer. The retained series was never consulted, so
+    # continuity with real history was neither checked nor preserved, and the
+    # next verify reported a valid disconnected series.
+    #
+    # Refusing is right because the two cases need opposite handling: an absent
+    # anchor is a first publication, an unreadable one is either corruption or
+    # tampering and the retained series is still on disk to recover from.
+    # --force remains the deliberate override, as it is for a detected loss.
+    if previous is None and args.anchor.exists() and not args.force:
+        print(
+            f"refusing to publish over an unreadable anchor at "
+            f"{_display_path(args.anchor)}: the file exists but could not be "
+            f"loaded (bad encoding, malformed JSON, or not a JSON object)."
+        )
+        print(
+            "  Publishing now would write a new genesis over it and start a "
+            "series disconnected from the retained history, which the next "
+            "verify would report as valid."
+        )
+        series_dir = args.anchor.parent / anchor_lib.SERIES_DIRNAME
+        retained = anchor_lib.load_series(series_dir)
+        if retained:
+            print(
+                f"  {len(retained)} retained anchor(s) remain in "
+                f"{_display_path(series_dir)} -- restore the pointer from one "
+                "of them, or re-run with --force if starting a new series is "
+                "intended."
+            )
+        else:
+            print("  Investigate, then re-run with --force if this is intended.")
+        return 2
+
     # VERIFY BEFORE OVERWRITING. Publishing used to build a replacement anchor
     # without ever checking the store against the one it was replacing, so an
     # accidental truncation or interior deletion was laundered into the new
