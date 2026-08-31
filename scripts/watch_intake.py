@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import time
 import uuid
 from contextlib import contextmanager
@@ -20,6 +21,24 @@ from pathlib import Path
 from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# REUSED, not reimplemented. This module's lock_file() had no stale
+# reclamation: a watcher killed mid-scan left watch-state.lock behind forever,
+# every later one-shot run waited its timeout and failed, and --loop died on
+# the TimeoutError -- intake disabled until a human found the file. Widening
+# the lock to cover the whole scan made that window materially larger.
+#
+# provenance's lock already solves it, in the two places a first attempt here
+# would get wrong: Windows leaves a deleted lock in DELETE_PENDING so O_EXCL
+# raises PermissionError rather than FileExistsError, and a crashed holder is
+# reclaimed after 60 seconds. Both were written against observed failures.
+from packages.activity_log.provenance import (  # noqa: E402
+    _acquire_lock,
+    _release_lock,
+)
+
 DEFAULT_WORKSPACE_ROOT = REPO_ROOT.parent
 DEFAULT_EVENT_ROOT = DEFAULT_WORKSPACE_ROOT / ".agent-surface" / "events"
 DEFAULT_STATE_PATH = DEFAULT_EVENT_ROOT / "watch-state.json"
@@ -116,26 +135,19 @@ def utcnow_iso() -> str:
 
 @contextmanager
 def lock_file(lock_dir: Path, name: str, *, timeout_seconds: float = 5.0):
+    """Hold a named lock, reclaiming one abandoned by a dead holder.
+
+    `timeout_seconds` is accepted for call-site compatibility; the reclamation
+    window belongs to the shared implementation, which is the point of using it.
+    """
+
     lock_dir.mkdir(parents=True, exist_ok=True)
     path = lock_dir / f"{name}.lock"
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f"Timed out acquiring lock: {path}")
-            time.sleep(LOCK_POLL_SECONDS)
+    token = _acquire_lock(path)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(str(os.getpid()))
         yield path
     finally:
-        try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
+        _release_lock(path, token)
 
 
 def ensure_dirs(event_root: Path) -> None:

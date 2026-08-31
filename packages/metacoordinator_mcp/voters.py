@@ -848,11 +848,60 @@ VOTER_CALL_TIMEOUT_SECONDS = 60.0
 # write a decision afterwards, which is the worst of both: no answer, and a
 # durable record the caller never saw.
 #
-# Summed HERE, next to the terms, for the same reason the ensemble's
-# WORST_CASE_RUN_SECONDS is: a config that has to clear a budget must read the
-# budget, not a number someone copied.
-MAX_ROSTER_FOR_BUDGET = 4
-WORST_CASE_ROUND_SECONDS = int(MAX_ROSTER_FOR_BUDGET * VOTER_CALL_TIMEOUT_SECONDS)
+# Summed from the REGISTRY, for the same reason the ensemble's
+# WORST_CASE_RUN_SECONDS is summed from its own constants: a config that has to
+# clear a budget must read the budget.
+#
+# The first version of this hardcoded four, which is `balanced`. The registry
+# also exposes diverse (6), diverse-plus (8) and diverse-max (12), all
+# selectable -- so a valid diverse-max round costs 720 seconds against a
+# projection derived from 4, recreating the exact failure this budget exists to
+# prevent. Typing a number instead of reading the source of truth is what the
+# comment above was already warning about.
+
+
+def largest_selectable_roster() -> int:
+    """Voter count of the biggest profile the registry offers."""
+
+    try:
+        _aliases, profiles = _load_builtin_registry()
+    except Exception:  # noqa: BLE001 -- an unreadable registry must not crash callers
+        return 0
+    sizes = [len(spec) for spec in profiles.values() if isinstance(spec, dict)]
+    return max(sizes) if sizes else 0
+
+
+def worst_case_round_seconds() -> int:
+    """Wall clock a full round can legitimately take.
+
+    Voters are polled SEQUENTIALLY (tools._collect_new_votes), so the round
+    costs roster size times the per-voter timeout. A client timeout below this
+    fails a round that is behaving correctly, and the server keeps polling and
+    may still write a decision the caller never sees.
+    """
+
+    return int(largest_selectable_roster() * VOTER_CALL_TIMEOUT_SECONDS)
+
+
+def roster_exceeds_projected_budget(resolved: dict[str, str]) -> str | None:
+    """Warn when a CUSTOM roster is larger than any projection could cover.
+
+    FLOSS_VOTER_ROSTER is unbounded, so no static projection can promise to
+    cover it. Saying so is the honest version of a budget: the registry
+    profiles are covered, and anything beyond them is named rather than
+    silently over-running the client.
+    """
+
+    largest = largest_selectable_roster()
+    if largest and len(resolved) > largest:
+        return (
+            f"roster of {len(resolved)} voters exceeds the largest registry "
+            f"profile ({largest}); a sequential round can take "
+            f"{int(len(resolved) * VOTER_CALL_TIMEOUT_SECONDS)}s, beyond the "
+            f"{worst_case_round_seconds()}s the MCP timeouts are projected for"
+        )
+    return None
+
 
 MIN_INDEPENDENT_SURFACES = 3
 MIN_INDEPENDENT_FAMILIES = 4
@@ -908,6 +957,9 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
     voters died mid-run still has responses worth returning verbatim. Two
     callers, two reactions, one definition of independence.
     """
+    oversized = roster_exceeds_projected_budget(resolved)
+    if oversized:
+        print(f"[voters] WARNING: {oversized}", file=sys.stderr)
     if profile in DEGRADED_OK_PROFILES:
         return None
     if os.environ.get(ALLOW_DEGRADED_ENV, "").strip().lower() in {"1", "true", "yes"}:

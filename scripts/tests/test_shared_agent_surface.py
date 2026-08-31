@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
@@ -464,7 +466,8 @@ def _consensus_budget_seconds() -> int:
         sys.path.insert(0, str(FLOSS_ROOT.parent))
     from packages.metacoordinator_mcp import voters
 
-    return voters.WORST_CASE_ROUND_SECONDS
+    # The FUNCTION, which reads the registry, not a constant someone typed.
+    return voters.worst_case_round_seconds()
 
 
 def _server_timeouts(server: str) -> list[tuple[str, int]]:
@@ -572,3 +575,69 @@ def test_the_intake_scan_holds_its_lock_across_counting_and_emitting(tmp_path):
     assert (
         body.count('lock_file(event_root / "locks", "watch-state"') == 1
     ), "two lock acquisitions means two critical sections, which is the defect"
+
+
+def test_the_round_budget_covers_the_largest_profile_the_registry_offers():
+    """The first version of this budget hardcoded four voters, which is
+    `balanced`. diverse-max is twelve and equally selectable, so a valid round
+    cost 720s against a projection derived from 4."""
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    _aliases, profiles = voters._load_builtin_registry()
+    biggest = max(len(spec) for spec in profiles.values() if isinstance(spec, dict))
+
+    assert voters.largest_selectable_roster() == biggest
+    assert voters.worst_case_round_seconds() >= int(
+        biggest * voters.VOTER_CALL_TIMEOUT_SECONDS
+    )
+
+
+def test_a_roster_beyond_every_profile_is_named_rather_than_silently_over_running():
+    """FLOSS_VOTER_ROSTER is unbounded, so no static projection can cover it.
+    Saying so is the honest version of a budget."""
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    huge = {
+        f"v{i}": "groq/model" for i in range(voters.largest_selectable_roster() + 1)
+    }
+
+    warning = voters.roster_exceeds_projected_budget(huge)
+
+    assert warning is not None
+    assert "exceeds the largest registry profile" in warning
+    assert voters.roster_exceeds_projected_budget({"a": "groq/model"}) is None
+
+
+def test_an_abandoned_watcher_lock_is_reclaimed_not_waited_on(tmp_path):
+    """A watcher killed mid-scan left watch-state.lock behind forever: every
+    later one-shot run waited its timeout and failed, --loop died on the
+    TimeoutError, and intake stayed disabled until a human found the file.
+    Widening the lock to cover the whole scan made that window much larger."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "watch_intake_lock_under_test", FLOSS_ROOT / "scripts" / "watch_intake.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    # Registered BEFORE exec: @dataclass resolves its own module through
+    # sys.modules, and a module executed under a name that is not there yet
+    # fails inside dataclasses rather than in anything under test.
+    sys.modules["watch_intake_lock_under_test"] = module
+    spec.loader.exec_module(module)
+
+    locks = tmp_path / "locks"
+    locks.mkdir()
+    abandoned = locks / "watch-state.lock"
+    abandoned.write_text("dead-holder", encoding="utf-8")
+    old = time.time() - 3600
+    os.utime(abandoned, (old, old))
+
+    with module.lock_file(locks, "watch-state", timeout_seconds=2.0) as held:
+        assert held == abandoned
+
+    assert not abandoned.exists(), "the lock was not released"
