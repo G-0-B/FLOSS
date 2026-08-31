@@ -336,6 +336,43 @@ def _publish(args: argparse.Namespace) -> int:
         )
         return 0
 
+    # THE PREFLIGHT CHECKED A DIFFERENT SCAN THAN THE ONE BEING SIGNED.
+    #
+    # verify_anchor() above and build_anchor() here each walk the store
+    # separately, and the lock is released between them. A packet deleted in
+    # that window passes the preflight and is simply absent from the anchor
+    # that gets signed -- which still links to the old root, and the series walk
+    # checks signatures and links, not that a descendant covers its predecessor.
+    # The replacement then verifies cleanly, laundering exactly the loss the
+    # preflight exists to preserve.
+    #
+    # Re-checked against the SNAPSHOT BEING SIGNED, using the same subset the
+    # verifier uses, so no lock has to span the two scans.
+    if previous is not None and not args.force:
+        dropped = anchor_lib.anchored_leaves(previous) - anchor_lib.anchored_leaves(
+            built
+        )
+        if dropped:
+            sample = sorted(dropped)[:10]
+            print(
+                f"refusing to publish: {len(dropped)} leaf/leaves anchored by the "
+                f"current anchor are absent from the snapshot just scanned."
+            )
+            print(
+                "  The preflight and the build are separate scans, so this is a "
+                "packet that went missing between them."
+            )
+            for aid, seq, said in sample:
+                print(f"  missing: {aid[:12]}... seq {seq} said {said[:16]}...")
+            if len(dropped) > len(sample):
+                print(f"  ... and {len(dropped) - len(sample)} more")
+            print(
+                "Publishing now would sign an anchor that omits them while still "
+                "chaining to the anchor that had them. Investigate, then re-run "
+                "with --force if the loss is understood and intended."
+            )
+            return 2
+
     unchanged_root = previous is not None and built["merkle_root"] == previous.get(
         "merkle_root"
     )

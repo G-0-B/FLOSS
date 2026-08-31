@@ -91,6 +91,18 @@ function Start-Daemon {
     Start-Sleep -Milliseconds 1500
     $proc.Refresh()
     if ($proc.HasExited) {
+        # EXIT 0 IS THE SINGLETON DOING ITS JOB, NOT A FAILURE.
+        #
+        # claim_singleton() finds the daemon already running and exits cleanly,
+        # which is the whole point of rerunning this script. Treating every
+        # immediate exit as a failure made an idempotent rerun report STARTUP
+        # INCOMPLETE and exit 1 while both ports were correctly served -- the
+        # mirror of the bug this check was added to fix, in the other
+        # direction: claiming failure it had not observed.
+        if ($proc.ExitCode -eq 0) {
+            Write-Host "[FLOSS MCP] $Label already running (singleton guard declined a duplicate)"
+            return $proc
+        }
         Write-Host "[FLOSS MCP] $Label exited immediately (code $($proc.ExitCode)) - run it by hand to see why: $Interpreter -m $Module"
         return $null
     }

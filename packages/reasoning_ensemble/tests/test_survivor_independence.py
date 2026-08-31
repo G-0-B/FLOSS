@@ -182,3 +182,22 @@ def test_a_degraded_round_still_writes_a_durable_draft(tmp_path, monkeypatch):
     staged = json.loads(written[0].read_text(encoding="utf-8"))
     assert staged["tier"] == "degraded"
     assert len(staged["voter_responses"]) == 3, "raw responses must survive"
+
+
+def test_a_profile_alias_resolves_to_the_same_name_both_checks_use(monkeypatch):
+    """`mistral-free` follows the registry alias to the exempt `mistral`
+    profile for roster resolution, and the independence check received the raw
+    alias -- so it failed to find it in DEGRADED_OK_PROFILES and refused the
+    healthy single-provider roster the alias exists to select."""
+    from packages.reasoning_ensemble import transport
+
+    assert transport.active_online_profile("mistral-free") == "mistral"
+    assert transport.active_online_profile("diverse") == "diverse"
+
+
+def test_the_exempt_profile_is_exempt_when_reached_through_its_alias(monkeypatch):
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "mistral-free")
+    survivors = [_r("a", "mistral/mistral-small-latest", "mistral")]
+
+    assert synthesizer._survivor_independence_problem(survivors, "online") is None

@@ -141,15 +141,27 @@ def _transport_for_model(model: str) -> str:
 
 
 def active_online_profile(profile: str | None = None) -> str:
-    """The online profile a run will actually use.
+    """The online profile a run will actually use, with aliases resolved.
 
     Exposed because the independence bar is re-checked on the SURVIVING voters
     after generation, and that check needs the same profile the pool was built
     from. Deriving it a second time at the call site is how two views of one
     roster end up disagreeing about whether it counts as independent.
+
+    NORMALIZED, because the raw value can be an alias. Roster resolution follows
+    the registry alias -- `mistral-free` selects the deliberately exempt
+    `mistral` profile -- while the independence check received the alias, failed
+    to find it in DEGRADED_OK_PROFILES, and refused the healthy single-provider
+    roster the alias exists to select. One resolved name for both.
     """
 
-    return profile or os.environ.get(ONLINE_PROFILE_ENV, DEFAULT_ONLINE_PROFILE)
+    raw = profile or os.environ.get(ONLINE_PROFILE_ENV, DEFAULT_ONLINE_PROFILE)
+    try:
+        from packages.metacoordinator_mcp.voters import _normalize_profile
+
+        return _normalize_profile(raw)
+    except Exception:  # noqa: BLE001 -- an unreadable registry must not break routing
+        return raw
 
 
 def _online_pool(profile: str | None) -> list[dict]:

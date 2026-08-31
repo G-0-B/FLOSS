@@ -667,3 +667,86 @@ def test_the_chain_walk_refuses_an_implausible_sequence_without_expanding_it(
     paths, digests = prov._sequence_index(index)
 
     assert paths == {} and digests == {}, "an implausible slot was indexed"
+
+
+# ---------------------------------------------------------------------------
+# The preflight and the build are separate scans.
+# ---------------------------------------------------------------------------
+
+
+def test_a_packet_lost_between_the_preflight_and_the_build_is_refused(
+    tmp_path, small_store, monkeypatch
+):
+    """verify_anchor() and build_anchor() each walk the store, and the lock is
+    released between them. A packet deleted in that window passed the preflight
+    and was simply absent from the anchor that got signed -- which still linked
+    to the old root, and the series walk checks signatures and links, not that a
+    descendant covers its predecessor."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    anchored = next(iter(sorted(small_store.rglob("*.json"))))
+
+    # A second packet, so the store legitimately changes and publish proceeds
+    # past the unchanged-root no-op.
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+
+    # Delete the packet the FIRST anchor covered, at exactly the moment the
+    # preflight is done. Deleting an arbitrary one is not the same test: drop
+    # the newer packet and the store returns to the anchored root, which the
+    # unchanged-root no-op correctly reports instead.
+    real_build = cli.anchor_lib.build_anchor
+
+    def delete_then_build(root, previous=None, witnesses=None):
+        anchored.unlink()
+        return real_build(root, previous, witnesses)
+
+    monkeypatch.setattr(cli.anchor_lib, "build_anchor", delete_then_build)
+
+    code = cli.main(base + ["publish"])
+
+    assert code == 2, "signed an anchor that dropped a packet its predecessor had"
+
+
+def test_force_still_publishes_over_a_loss_seen_only_in_the_build(
+    tmp_path, small_store, monkeypatch
+):
+    """--force is the deliberate override for a detected loss and must stay one."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    anchored = next(iter(sorted(small_store.rglob("*.json"))))
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    real_build = cli.anchor_lib.build_anchor
+
+    def delete_then_build(root, previous=None, witnesses=None):
+        anchored.unlink()
+        return real_build(root, previous, witnesses)
+
+    monkeypatch.setattr(cli.anchor_lib, "build_anchor", delete_then_build)
+
+    assert cli.main(base + ["publish", "--force"]) == 0
