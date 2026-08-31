@@ -424,6 +424,23 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
     return summaries
 
 
+def unreadable_set(anchor: dict[str, Any]) -> set[tuple[str, Any]]:
+    """The (path, sha256) damage an anchor committed to.
+
+    Damage is COMMITTED CONTENT, not a footnote: the verifier reports a change
+    to this set as ANCHOR_MISMATCH, because known damage frozen into an anchor
+    is what stops later damage being passed off as pre-existing. Extracted so
+    publish can compare the set it is about to sign against its predecessor
+    using the verifier's own notion of it, rather than a second one.
+    """
+
+    return {
+        (str(entry.get("path")), entry.get("sha256"))
+        for entry in (anchor.get("unreadable") or [])
+        if isinstance(entry, dict)
+    }
+
+
 def anchored_leaves(anchor: dict[str, Any]) -> set[tuple[str, int, str]]:
     """Every (identity, sequence, SAID) the anchor committed to.
 
@@ -855,11 +872,7 @@ def verify_anchor(
     # permanently damaged packets, so demanding an empty set would brick
     # verification forever -- the b0de2fe mistake this register records as CF-1.
     # Known damage is frozen; new or vanished damage is a finding.
-    anchored_unreadable = {
-        (str(entry.get("path")), entry.get("sha256"))
-        for entry in (anchor.get("unreadable") or [])
-        if isinstance(entry, dict)
-    }
+    anchored_unreadable = unreadable_set(anchor)
     current_unreadable = {(entry["path"], entry.get("sha256")) for entry in unreadable}
     result["unreadable_appeared"] = [
         {"path": path, "sha256": digest}

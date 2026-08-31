@@ -412,6 +412,36 @@ def _publish(args: argparse.Namespace) -> int:
     # Re-checked against the SNAPSHOT BEING SIGNED, using the same subset the
     # verifier uses, so no lock has to span the two scans.
     if previous is not None and not args.force:
+        # DAMAGE IS COMMITTED CONTENT TOO.
+        #
+        # The leaf comparison below cannot see this: unreadable files are
+        # excluded from anchored_leaves by construction. But the verifier
+        # reports any change to the unreadable set as ANCHOR_MISMATCH -- that
+        # frozen set is what stops later damage being passed off as
+        # pre-existing -- so a file in the predecessor's unreadable set that is
+        # deleted or replaced in the window between the preflight and this scan
+        # would be signed into a new baseline and verify cleanly afterwards.
+        was = anchor_lib.unreadable_set(previous)
+        now = anchor_lib.unreadable_set(built)
+        if was != now:
+            appeared = sorted(now - was)
+            vanished = sorted(was - now)
+            print(
+                "refusing to publish: the store's KNOWN DAMAGE changed between "
+                "the preflight and the snapshot just scanned."
+            )
+            for path, digest in vanished[:10]:
+                print(f"  no longer damaged: {path} (was {str(digest)[:16]}...)")
+            for path, digest in appeared[:10]:
+                print(f"  newly damaged: {path} ({str(digest)[:16]}...)")
+            print(
+                "Publishing now would freeze the changed set as the new "
+                "baseline, and every later verify would read it as intact. "
+                "Investigate, then re-run with --force if the change is "
+                "understood and intended."
+            )
+            return 2
+
         dropped = anchor_lib.anchored_leaves(previous) - anchor_lib.anchored_leaves(
             built
         )

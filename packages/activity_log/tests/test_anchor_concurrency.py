@@ -990,3 +990,76 @@ def test_an_attacker_signed_migration_anchor_is_refused(tmp_path, small_store):
     code = cli.main(base + ["publish"])
 
     assert code == 2, "an attacker-signed anchor was accepted as a legacy format"
+
+
+def test_damage_that_changes_between_the_preflight_and_the_build_is_refused(
+    tmp_path, small_store, monkeypatch
+):
+    """The leaf recheck cannot see this: unreadable files are excluded from
+    anchored_leaves by construction. But the verifier reports any change to the
+    unreadable set as ANCHOR_MISMATCH, so a damaged file replaced in the window
+    between the two scans would be frozen into a new baseline and verify
+    cleanly ever after -- laundering exactly the change the verifier exists to
+    report."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    damaged = small_store / "2026-08-01" / "Edamaged.json"
+    damaged.parent.mkdir(parents=True, exist_ok=True)
+    damaged.write_text("{not json", encoding="utf-8")
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    assert anchor_lib.unreadable_set(
+        json.loads(anchor_path.read_text(encoding="utf-8"))
+    ), "the fixture never produced damage to freeze"
+
+    # A legitimate store change, so publish proceeds past the no-op...
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+
+    # ...and the damaged file is REPLACED after the preflight passes.
+    real_build = cli.anchor_lib.build_anchor
+
+    def rewrite_then_build(root, previous=None, witnesses=None):
+        damaged.write_text("{also not json but different", encoding="utf-8")
+        return real_build(root, previous, witnesses)
+
+    monkeypatch.setattr(cli.anchor_lib, "build_anchor", rewrite_then_build)
+
+    assert cli.main(base + ["publish"]) == 2
+
+
+def test_an_unchanged_damage_set_publishes_normally(tmp_path, small_store):
+    """The guard must narrow to a CHANGE in the frozen set, not refuse every
+    store that carries known damage -- the live store carries three."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    damaged = small_store / "2026-08-01" / "Edamaged.json"
+    damaged.parent.mkdir(parents=True, exist_ok=True)
+    damaged.write_text("{not json", encoding="utf-8")
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+
+    assert cli.main(base + ["publish"]) == 0
