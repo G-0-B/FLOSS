@@ -45,8 +45,12 @@ from packages.activity_log.filelock import (  # noqa: E402,F401
     # from this module, and moving the implementation must not move the import
     # path out from under them. F401 is suppressed deliberately -- these names
     # are this module's public lock surface, not leftovers.
+    #
+    # `_lock_owner_is_alive` is gone with the ownership machinery: an OS lock
+    # has no owner to probe, because the kernel releases it when the holder
+    # dies. `_LOCK_STALE_SECONDS` survives only as the ignored parameter's
+    # default.
     _LOCK_STALE_SECONDS,
-    _lock_owner_is_alive,
     _lock_token,
 )
 

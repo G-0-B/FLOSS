@@ -5,6 +5,8 @@ import json
 import os
 import sys
 import time
+
+import pytest
 from pathlib import Path
 
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
@@ -612,11 +614,17 @@ def test_a_roster_beyond_every_profile_is_named_rather_than_silently_over_runnin
     assert voters.roster_exceeds_projected_budget({"a": "groq/model"}) is None
 
 
-def test_an_abandoned_watcher_lock_is_reclaimed_not_waited_on(tmp_path):
+def test_an_abandoned_watcher_lock_does_not_disable_intake(tmp_path):
     """A watcher killed mid-scan left watch-state.lock behind forever: every
-    later one-shot run waited its timeout and failed, --loop died on the
-    TimeoutError, and intake stayed disabled until a human found the file.
-    Widening the lock to cover the whole scan made that window much larger."""
+    later run waited its timeout and failed, --loop died, and intake stayed
+    disabled until a human found the file.
+
+    The fixture is a leftover FILE, which is what a killed holder leaves. Under
+    an OS lock that file is inert -- the kernel released the lock when the
+    holder died -- so this now passes without any reclamation logic at all. The
+    version of this test that asserted reclamation was asserting a mechanism,
+    not the guarantee.
+    """
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -624,23 +632,22 @@ def test_an_abandoned_watcher_lock_is_reclaimed_not_waited_on(tmp_path):
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    # Registered BEFORE exec: @dataclass resolves its own module through
-    # sys.modules, and a module executed under a name that is not there yet
-    # fails inside dataclasses rather than in anything under test.
     sys.modules["watch_intake_lock_under_test"] = module
     spec.loader.exec_module(module)
 
     locks = tmp_path / "locks"
     locks.mkdir()
     abandoned = locks / "watch-state.lock"
-    abandoned.write_text("dead-holder", encoding="utf-8")
+    abandoned.write_text("4242\nthe-dead-holders-token", encoding="utf-8")
     old = time.time() - 3600
     os.utime(abandoned, (old, old))
 
     with module.lock_file(locks, "watch-state", timeout_seconds=2.0) as held:
         assert held == abandoned
 
-    assert not abandoned.exists(), "the lock was not released"
+    assert abandoned.exists(), "the handle is not unlinked; released means reacquirable"
+    with module.lock_file(locks, "watch-state", timeout_seconds=2.0):
+        pass
 
 
 def test_the_intake_watcher_imports_no_provenance_extras():
@@ -699,3 +706,42 @@ def test_loop_mode_survives_lock_contention():
     loop = source.split("while True:", 1)[1].split("else:", 1)[0]
 
     assert "except TimeoutError" in loop, "one overlap still ends the watcher"
+
+
+def test_a_windows_only_target_does_not_break_a_posix_surface_run(tmp_path):
+    """`hermes_user` is `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX
+    expandvars leaves `%VAR%` literal -- so resolving it raised before the
+    user-scope skip could run, taking an ordinary repo-scope materialization or
+    --check down with it. The hook materializer already solved this and says so
+    in its docstring; the agent materializer's guard loop never got it."""
+    surface = load_surface_module()
+
+    # POSIX expandvars leaves `%VAR%` literal. Simulated rather than asserted
+    # directly, because on Windows it expands and the raise never happens --
+    # a test that only fails on the platform that does not have the bug is no
+    # test at all.
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(surface.os.path, "expandvars", lambda value: value)
+    try:
+        with pytest.raises(surface.SharedSurfaceError):
+            surface.resolve_manifest_path(tmp_path, "%LOCALAPPDATA%/hermes/config.yaml")
+    finally:
+        monkey.undo()
+
+    # The guard loop lives inside materialize(); assert on the loop itself
+    # rather than inventing an entry point it does not have. The property is
+    # that the resolve is guarded, not that some helper exists.
+    body = (
+        (FLOSS_ROOT / "scripts" / "materialize_shared_agent_surface.py")
+        .read_text(encoding="utf-8")
+        .split("for hermes_key in (", 1)[1]
+        .split("resolved = ", 1)[0]
+    )
+
+    assert "except SharedSurfaceError" in body, (
+        "the Hermes guard resolve is unguarded; a Windows-only target still "
+        "aborts a POSIX surface run"
+    )
+    resolve_at = body.find("resolve_manifest_path(")
+    guard_at = body.find("try:")
+    assert guard_at != -1 and guard_at < resolve_at, "the resolve is outside the try"

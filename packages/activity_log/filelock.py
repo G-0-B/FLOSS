@@ -1,44 +1,117 @@
 """File locking shared by the provenance chain and the intake watcher.
 
-STANDARD LIBRARY ONLY, deliberately. `packages/activity_log/__init__.py`
-already goes out of its way to keep `provenance` lazily imported so lean
-consumers do not pull blake3, jcs and PyNaCl -- and importing the lock from
-`provenance` defeated exactly that, breaking `watch_intake.py --help` on any
-install without the provenance extras. The lock itself never needed them.
+STANDARD LIBRARY ONLY, deliberately. `packages/activity_log/__init__.py` keeps
+`provenance` lazily imported so lean consumers do not pull blake3, jcs and
+PyNaCl; importing the lock from `provenance` defeated that and broke
+`watch_intake.py --help` on installs without the provenance extras. The lock
+never needed them.
 
-One implementation, two callers. The behaviour here was written against
-observed failures and each rule is load-bearing:
+## Why the OS holds this lock and not a file's existence
 
-  * O_EXCL creation, so exactly one acquirer wins at the filesystem level.
-  * Windows raises PermissionError, not FileExistsError, while a deleted lock
-    sits in DELETE_PENDING -- both are contention.
-  * A holder that has gone is reclaimed, or one crash wedges the resource
-    forever.
-  * Age alone does NOT authorise reclamation: a long critical section is not a
-    dead one. The owner pid and its process-creation token decide, and age only
-    bounds how long we keep believing a holder we can no longer see.
+The first eight versions of this module treated "a file exists at this path" as
+the lock. Everything that went wrong followed from that one decision, because a
+holder that dies leaves its marker behind, so the module had to decide when a
+marker was abandoned and then remove it:
+
+  * age alone reclaimed locks whose holders were merely slow;
+  * owner liveness fixed that and made a lock immortal once its pid was reused;
+  * a process-creation token fixed THAT and left the removal itself racy;
+  * an atomic rename fixed the removal and made the ROLLBACK racy, because
+    putting a live holder's lock back requires the path to be free, and any
+    moment the path is free is a moment another contender can take it.
+
+That last one has no fix at this layer. Reclamation cannot be made safe when
+the thing being reclaimed must be removed from the namespace to be examined.
+
+An OS lock has no marker to abandon. The kernel drops it when the holding
+process exits, however it exits, so there is nothing to expire, nothing to
+reclaim, and no window in which the resource looks free while an owner is still
+inside the critical section. The lock FILE is never unlinked -- it is a handle,
+not a claim -- which removes the last operation that could race.
+
+`fcntl.flock` on POSIX, `msvcrt.locking` on Windows; both are standard library.
+Advisory, so every participant must come through this module. Not safe over
+NFS, which this workspace does not use.
 """
 
 from __future__ import annotations
 
+import base64
 import os
+import sys
 import time
 from pathlib import Path
 
-# Defaults. Both are parameters on _acquire_lock: a packet write is
-# milliseconds, while the intake watcher holds its lock across a recursive scan.
+# How long an acquirer waits for a live holder before giving up.
 _LOCK_TIMEOUT_SECONDS = 5.0
+
+# Retained for callers that still pass it. There is no staleness to configure:
+# the kernel releases the lock when its holder dies. Accepting and ignoring it
+# keeps watch_intake and provenance unchanged; it is documented as ignored
+# rather than quietly dropped, because a parameter that looks like it does
+# something is worse than one that says it does not.
 _LOCK_STALE_SECONDS = 60.0
+
+_POLL_SECONDS = 0.05
+
+# The byte the OS lock is taken on, far past any diagnostic content.
+#
+# Windows msvcrt locks are MANDATORY, not advisory: locking byte 0 made the
+# pid/token line unreadable to every other opener, including this module's own
+# _lock_token. Locking a byte beyond the content leaves the file readable while
+# held, which is the whole reason the content is written.
+_LOCK_BYTE = 1 << 20
+
+# token -> (fd, path). The fd IS the lock: closing it releases, and the process
+# exiting closes it. Holding it here keeps it alive for the critical section.
+_HELD: dict[str, tuple[int, Path]] = {}
 
 
 def _b64url_encode(raw: bytes) -> str:
-    import base64
-
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
+if sys.platform == "win32":  # pragma: no cover - platform split
+    import msvcrt
+
+    def _try_lock(fd: int) -> bool:
+        os.lseek(fd, _LOCK_BYTE, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+
+    def _unlock(fd: int) -> None:
+        os.lseek(fd, _LOCK_BYTE, os.SEEK_SET)
+        try:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+
+else:  # pragma: no cover - platform split
+    import fcntl
+
+    def _try_lock(fd: int) -> bool:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return False
+        return True
+
+    def _unlock(fd: int) -> None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+
+
 def _lock_token(lock_path: Path) -> str | None:
-    """The token a lock file carries, independent of the owner line above it."""
+    """The token a lock file carries, for diagnostics and for release checks.
+
+    Historical formats -- token alone, pid+token, pid+start+token -- all put the
+    token last, and so does this one.
+    """
 
     try:
         lines = lock_path.read_text(encoding="utf-8").splitlines()
@@ -46,89 +119,80 @@ def _lock_token(lock_path: Path) -> str | None:
         return None
     if not lines:
         return None
-    # One line is a pre-owner-pid lock: the whole content is the token.
     return lines[-1].strip() if len(lines) > 1 else lines[0].strip()
 
 
-def _owner_start_token() -> str:
-    """This process's creation token, or "" where the platform has none."""
+def _acquire_lock(
+    lock_path: Path,
+    *,
+    timeout_seconds: float | None = None,
+    stale_seconds: float | None = None,
+) -> str:
+    """Take the lock, waiting up to `timeout_seconds`. Returns a release token.
 
-    try:
-        from packages.mcp_daemon import _process_start_token
+    `stale_seconds` is accepted and IGNORED. Nothing goes stale here: the kernel
+    releases the lock when the holder's process exits, including a kill -9 or a
+    power loss, so there is no abandoned state to expire. The parameter stays so
+    callers that pass a scan-sized window keep working unchanged.
 
-        return _process_start_token(os.getpid()) or ""
-    except Exception:  # noqa: BLE001 -- absence degrades to pid-only ownership
-        return ""
-
-
-def _lock_owner_is_alive(lock_path: Path) -> bool | None:
-    """True if the recorded owner still runs, False if it is gone, None if
-    the lock does not say who owns it.
-
-    A lock older than the stale window is only evidence that its holder has had
-    it a long time; across a long critical section that is normal, so age alone
-    must not authorise reclaiming it. Where an owner IS recorded, liveness
-    decides and a running holder is never reclaimed however old the lock is.
-
-    None matters: a lock written by an older build carries only a token, and
-    treating that as "alive" would make every pre-existing lock on disk
-    permanently unreclaimable -- turning a fix for abandoned locks into a way
-    to strand them. Unknown falls back to the age-only policy those locks were
-    written under.
+    Raises TimeoutError if a live holder keeps it for the whole window.
     """
 
+    timeout = _LOCK_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
+    deadline = time.monotonic() + timeout
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # O_CREAT, never O_EXCL: the file is a handle, not a claim. Two processes
+    # opening it is expected and harmless; the lock is what one of them holds.
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
     try:
-        lines = lock_path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeError):
-        return True
-    if len(lines) < 2:
-        return None
+        while True:
+            if _try_lock(fd):
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"timed out acquiring {lock_path} after {timeout:.0f}s; "
+                    f"another process holds it"
+                )
+            time.sleep(_POLL_SECONDS)
+    except BaseException:
+        os.close(fd)
+        raise
+
+    token = _b64url_encode(os.urandom(18))
     try:
-        owner = int(lines[0].strip())
-    except ValueError:
-        return None
-    # A PID IS NOT AN IDENTITY.
-    #
-    # After a crash the lock file survives, the OS reassigns that number, and a
-    # liveness probe then reports the holder as running forever -- so the lock
-    # is never reclaimed however old it is, and every later write to that chain
-    # times out until someone deletes the file. That is the failure the age
-    # window existed to prevent, reintroduced by the ownership check added to
-    # fix a different one.
-    #
-    # mcp_daemon already disambiguates PID reuse by process creation time, for
-    # its own pid files, against the same failure. Recorded locks carry that
-    # token; a mismatch is a reused pid and the holder is gone.
-    recorded_start = lines[1].strip() if len(lines) > 2 else ""
-    if recorded_start:
+        # Diagnostics only. Nothing reads this to decide ownership any more --
+        # that is the point of moving to an OS lock -- but `who holds this` is
+        # the first question an operator asks.
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, f"{os.getpid()}\n{token}".encode("utf-8"))
+    except OSError:
+        pass
+
+    _HELD[token] = (fd, lock_path)
+    return token
+
+
+def _release_lock(lock_path: Path, token: str) -> None:
+    """Release a lock taken by this process. Best-effort, never raises.
+
+    The file is NOT unlinked. Removing it was the operation every earlier
+    version raced on, and it buys nothing: an unlocked lock file is not a lock,
+    and the next acquirer opens the same path and locks it.
+    """
+
+    held = _HELD.pop(token, None)
+    if held is None:
+        return
+    fd, _path = held
+    try:
+        _unlock(fd)
+    finally:
         try:
-            from packages.mcp_daemon import _process_start_token
-
-            current_start = _process_start_token(owner)
-        except Exception:  # noqa: BLE001 -- unknown identity stays conservative
-            current_start = None
-        if current_start is not None and current_start != recorded_start:
-            return False
-
-    # Checked AFTER the token, deliberately. A short-circuit here on "the owner
-    # is me" hid the case the token exists for: our own pid, reused, holding a
-    # lock written by a process that is gone.
-    if owner == os.getpid():
-        return True
-
-    # REUSE the daemon's probe. os.kill(pid, 0) does not distinguish a dead pid
-    # on Windows -- it raises a plain OSError, which a conservative handler
-    # reads as "alive", so liveness could never disprove a holder there and the
-    # whole check silently degraded to "never reclaim". mcp_daemon._pid_alive
-    # already solves that with OpenProcess plus GetExitCodeProcess, written
-    # against an observed failure. Imported lazily: nothing in mcp_daemon
-    # imports this module, so there is no cycle, and a missing daemon module
-    # must not break chain writes.
-    try:
-        from packages.mcp_daemon import _pid_alive
-    except Exception:  # noqa: BLE001 -- unknown liveness stays conservative
-        return True
-    return _pid_alive(owner)
+            os.close(fd)
+        except OSError:
+            pass
 
 
 def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
@@ -199,140 +263,3 @@ def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
     except OSError:
         pass
     return True
-
-
-def _lock_age_seconds(lock_path: Path) -> float | None:
-    """Seconds since the lock file was created, or None if it is gone."""
-    try:
-        return max(0.0, time.time() - lock_path.stat().st_mtime)
-    except (FileNotFoundError, PermissionError, OSError):
-        return None
-
-
-def _acquire_lock(
-    lock_path: Path,
-    *,
-    timeout_seconds: float | None = None,
-    stale_seconds: float | None = None,
-) -> str:
-    """Take the lock, reclaiming one whose holder is gone. Returns the token.
-
-    Both windows are parameters because this is now used for two very different
-    critical sections. A packet write is milliseconds, so a 60s holder is dead.
-    The intake watcher holds its lock across a recursive scan of the workspace
-    and thousands of event writes, which can legitimately exceed 60s -- and a
-    fixed window then let a second watcher DELETE a live holder's lock and enter
-    the same critical section, which is worse than the abandoned lock the
-    reclamation was added to fix.
-
-    Age alone is therefore not proof the holder died. The owner's pid is
-    recorded beside the token, and a holder that is still running is never
-    reclaimed however old the lock is; age only decides when to stop believing a
-    holder we can no longer see.
-    """
-
-    timeout = _LOCK_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
-    stale = _LOCK_STALE_SECONDS if stale_seconds is None else stale_seconds
-    deadline = time.monotonic() + timeout
-    # Real stale reclamation, because there was none. `_release_lock` gives up
-    # on a Windows PermissionError, and a crashed writer never releases at all;
-    # in both cases the lock file simply stays, and an acquire loop that only
-    # retried until its deadline wedged every later write to that chain
-    # permanently after one transient sharing violation.
-    while True:
-        token = _b64url_encode(os.urandom(18))
-        try:
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            with lock_path.open("x", encoding="utf-8") as f:
-                # pid first, token second: the reader wants the owner and a
-                # partial line must not be mistaken for a token.
-                # pid, process-creation token, lock token -- one per line,
-                # lock token LAST so _lock_token stays a last-line read
-                # across all three formats this file has had.
-                f.write(f"{os.getpid()}\n{_owner_start_token()}\n{token}")
-            return token
-        except (FileExistsError, PermissionError):
-            # PermissionError is contention too, on Windows.
-            #
-            # POSIX gives a clean FileExistsError when the lock is held. Windows
-            # does not: while another writer's unlink is in flight the file
-            # enters DELETE_PENDING, and an O_EXCL create against it raises
-            # PermissionError (WinError 5 / errno 13) rather than FileExistsError.
-            # Catching only FileExistsError therefore let that escape and kill
-            # the caller mid-chain, instead of retrying like any other contended
-            # acquire.
-            #
-            # Observed as an intermittent failure of
-            # test_concurrent_first_packet_creation_converges_on_one_identity --
-            # it looked like a chain-integrity flake (two writers both believing
-            # they were genesis) and was in fact this. It reproduced only under
-            # full-suite CPU load on Windows, and never on the Linux CI runner,
-            # which is why the required gate stayed green while local runs did not.
-            # Captured BEFORE the age and owner checks, so the reclaim below
-            # can prove it is removing the same file those checks looked at.
-            try:
-                observed = lock_path.read_bytes()
-            except OSError:
-                observed = None
-            age = _lock_age_seconds(lock_path)
-            if (
-                age is not None
-                and age >= stale
-                # Not `not alive`: unknown ownership must reclaim on age, which
-                # is the policy the locks that lack an owner were written under.
-                and _lock_owner_is_alive(lock_path) is not True
-            ):
-                # Nothing ever touches a lock file after creation, so its mtime
-                # age IS the time the current holder has held it. Past the stale
-                # window that holder is gone -- a crashed writer, or a release
-                # whose unlink lost to a Windows sharing violation -- and the
-                # lock is reclaimed here instead of wedging the chain forever.
-                #
-                # By INSTANCE, not by pathname: an unlink here deleted whatever
-                # sat at this path, including a fresh lock a faster reclaimer had
-                # just taken.
-                if reclaim_if_unchanged(lock_path, observed):
-                    continue
-                # LOSING A RECLAIM IS CONTENTION, NOT PROGRESS.
-                #
-                # An unconditional `continue` skipped the deadline check and the
-                # sleep below, so a reclaim that keeps failing -- a rename
-                # refused by a virus scanner's handle, say -- span the retry
-                # loop at full speed and never timed out. Falling through means
-                # a caller still gets its TimeoutError instead of a hang.
-            if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    f"timed out acquiring provenance lock {lock_path} after "
-                    f"{timeout:.0f}s; holder age "
-                    f"{'unknown' if age is None else format(age, '.1f') + 's'}, "
-                    f"stale reclamation at {stale:.0f}s"
-                )
-            time.sleep(0.05)
-
-
-def _release_lock(lock_path: Path, token: str) -> None:
-    # Retry the unlink before giving up. Same Windows sharing semantics as the
-    # acquire side: another process may hold a transient handle on the lock
-    # file, and a single PermissionError here used to be swallowed outright --
-    # which left the lock in place with nothing to remove it, because the
-    # acquire side only retried until its deadline and then raised. One
-    # transient sharing violation therefore wedged every later write to that
-    # chain. Releasing stays best-effort rather than raising into a completed
-    # chain write, but a lock this fails to remove is now genuinely reclaimed by
-    # _acquire_lock's stale-age path instead of nominally.
-    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
-    while True:
-        try:
-            # The lock file is `pid` then `token`. Comparing the WHOLE file to
-            # the token stopped matching the moment the owner pid was added, so
-            # every release would have silently declined to unlink and left the
-            # lock for the stale path -- read the token line.
-            if _lock_token(lock_path) == token:
-                lock_path.unlink(missing_ok=True)
-            return
-        except FileNotFoundError:
-            return
-        except PermissionError:
-            if time.monotonic() >= deadline:
-                return
-            time.sleep(0.05)

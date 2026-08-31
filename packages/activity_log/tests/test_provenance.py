@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1374,42 +1373,76 @@ def test_a_hole_below_the_head_is_enumerated_not_concealed(tmp_path, monkeypatch
     assert "E_PROVENANCE_CHAIN_FORK" in forked.errors
 
 
-def test_an_abandoned_lock_is_reclaimed(tmp_path, monkeypatch):
+def test_a_lock_whose_holder_died_is_available_again(tmp_path):
     """A lock nobody will ever release must not wedge the chain forever.
 
-    `_release_lock` gives up on a Windows PermissionError and a crashed writer
-    never releases at all. The acquire loop only retried until its deadline and
-    then raised, so one transient sharing violation blocked every later write to
-    that chain permanently -- the comment claimed the timeout was reclamation,
-    and nothing reclaimed anything.
+    This used to require reclamation -- age, then liveness, then a creation
+    token, then an atomic rename, each fixing the previous one's failure. None
+    of that exists now: the kernel drops an OS lock when its holder's process
+    exits, so a killed writer leaves nothing to expire.
+
+    Driven with a real subprocess and a real kill, because the whole claim is
+    about what the OS does on process death, and no in-process fixture can
+    stand in for that.
+    """
+    import subprocess
+    import textwrap
+    import sys as _sys
+    import time as _time
+
+    repo = Path(__file__).resolve().parents[3]
+    holder_src = tmp_path / "holder.py"
+    holder_src.write_text(
+        textwrap.dedent("""
+            import sys, time, pathlib
+            sys.path.insert(0, sys.argv[2])
+            from packages.activity_log import provenance
+            provenance._acquire_lock(pathlib.Path(sys.argv[1]))
+            print('HELD', flush=True)
+            time.sleep(60)
+            """),
+        encoding="utf-8",
+    )
+    lock_path = tmp_path / ".identity.lock"
+
+    from packages.activity_log import provenance
+
+    holder = subprocess.Popen(
+        [_sys.executable, str(holder_src), str(lock_path), str(repo)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "HELD"
+        with pytest.raises(TimeoutError):
+            provenance._acquire_lock(lock_path, timeout_seconds=0.3)
+    finally:
+        holder.kill()
+        holder.wait()
+
+    _time.sleep(0.3)
+    token = provenance._acquire_lock(lock_path, timeout_seconds=5.0)
+    assert token, "a killed holder's lock was never released"
+    provenance._release_lock(lock_path, token)
+
+
+def test_a_fresh_lock_is_not_stolen(tmp_path):
+    """A lock held by a LIVE process is not walked through.
+
+    The fixture is a real holder now, not a file with a token in it. Under an
+    OS lock a leftover file is not a lock at all, so writing bytes to a path
+    can no longer simulate a holder -- and a test that still did would be
+    asserting the mechanism this module deliberately stopped using.
     """
     from packages.activity_log import provenance
 
     lock_path = tmp_path / ".identity.lock"
-    lock_path.write_text("abandoned-token", encoding="utf-8")
-    stale_mtime = time.time() - (provenance._LOCK_STALE_SECONDS + 5)
-    os.utime(lock_path, (stale_mtime, stale_mtime))
-
-    token = provenance._acquire_lock(lock_path)
-
-    # The lock file now carries the owner pid above the token, so the token is
-    # read out rather than compared against the whole file.
-    assert provenance._lock_token(lock_path) == token
-    provenance._release_lock(lock_path, token)
-    assert not lock_path.exists()
-
-
-def test_a_fresh_lock_is_not_stolen(tmp_path):
-    """Reclamation must not become a way to walk through a live lock."""
-    from packages.activity_log import provenance
-
-    lock_path = tmp_path / ".identity.lock"
-    lock_path.write_text("live-token", encoding="utf-8")
-
-    with pytest.raises(TimeoutError):
-        provenance._acquire_lock(lock_path)
-
-    assert lock_path.read_text(encoding="utf-8") == "live-token"
+    held = provenance._acquire_lock(lock_path)
+    try:
+        with pytest.raises(TimeoutError):
+            provenance._acquire_lock(lock_path, timeout_seconds=0.3)
+    finally:
+        provenance._release_lock(lock_path, held)
 
 
 def test_garbage_in_a_vacated_slot_does_not_declare_a_fork(tmp_path, monkeypatch):

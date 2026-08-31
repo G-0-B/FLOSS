@@ -1635,9 +1635,7 @@ def materialize(
             antigravity_path = resolve_manifest_path(
                 workspace_root, str(antigravity_cfg["config_path"])
             )
-            existing = (
-                load_json(antigravity_path) if antigravity_path.exists() else {}
-            )
+            existing = load_json(antigravity_path) if antigravity_path.exists() else {}
             payload = build_antigravity_payload(existing, shared_mcp)
             message, changed = check_or_write(
                 antigravity_path, payload, check=check, dry_run=dry_run
@@ -1645,9 +1643,7 @@ def materialize(
             results.append(message)
             drift_found = drift_found or changed
         else:
-            results.append(
-                "SKIP  antigravity (user scope; pass --include-user-scope)"
-            )
+            results.append("SKIP  antigravity (user scope; pass --include-user-scope)")
 
     gemini_cfg = targets.get("gemini")
     if isinstance(gemini_cfg, dict) and gemini_cfg.get("settings_path"):
@@ -1808,9 +1804,29 @@ def materialize(
         hermes_cfg = targets.get(hermes_key)
         if not (isinstance(hermes_cfg, dict) and hermes_cfg.get("config_path")):
             continue
-        hermes_path = resolve_manifest_path(
-            workspace_root, str(hermes_cfg["config_path"])
-        )
+        try:
+            hermes_path = resolve_manifest_path(
+                workspace_root, str(hermes_cfg["config_path"])
+            )
+        except SharedSurfaceError as exc:
+            # A PLATFORM-SPECIFIC TARGET THAT CANNOT BE EXPRESSED ON THIS OS.
+            #
+            # `hermes_user` is `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX
+            # `os.path.expandvars` leaves `%VAR%` literal, so this raised on
+            # Linux and macOS BEFORE the user-scope skip below could run --
+            # taking an ordinary repo-scope materialization or `--check` down
+            # with it while processing a Windows-only target.
+            #
+            # materialize_shared_hook_surface already solved exactly this and
+            # says so in its own docstring; the guard loop here never got the
+            # same treatment. Skipping keeps the surface refresh completable on
+            # POSIX, and a target whose path cannot be resolved is a target
+            # nothing can be guarding.
+            print(
+                f"[surface] {hermes_key}: skipping guard check -- path not "
+                f"resolvable on this platform ({exc})"
+            )
+            continue
 
         # Guard check runs unconditionally, BEFORE the target_in_scope
         # write-gate below, and regardless of whether this target is about

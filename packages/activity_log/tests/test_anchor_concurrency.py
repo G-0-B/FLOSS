@@ -1367,117 +1367,6 @@ def test_no_writer_of_the_signed_document_precedes_its_proof(
     assert order.index("proof") < order.index("pointer")
 
 
-def test_a_live_holder_keeps_its_lock_however_old_it_is(tmp_path):
-    """The intake watcher holds one lock across a recursive scan and thousands
-    of writes, which can outlast the 60s a packet write is sized for. Age alone
-    let a second watcher DELETE a live holder's lock and enter the same critical
-    section -- worse than the abandoned lock the reclamation was added to fix."""
-    from packages.activity_log import provenance as prov
-
-    lock_path = tmp_path / ".busy.lock"
-    token = prov._acquire_lock(lock_path)
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    # This process IS the recorded owner, so it is provably alive.
-    assert prov._lock_owner_is_alive(lock_path) is True
-    with pytest.raises(TimeoutError):
-        prov._acquire_lock(lock_path, timeout_seconds=0.2, stale_seconds=1.0)
-
-    prov._release_lock(lock_path, token)
-    assert not lock_path.exists()
-
-
-def test_a_lock_whose_owner_is_gone_is_still_reclaimed(tmp_path):
-    """Liveness gates reclamation; it must not disable it."""
-    from packages.activity_log import provenance as prov
-
-    lock_path = tmp_path / ".dead.lock"
-    # A pid that cannot be running: 0 is never a normal user process here.
-    lock_path.write_text("999999999\nsome-token", encoding="utf-8")
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
-
-    assert prov._lock_token(lock_path) == token
-
-
-def test_a_legacy_lock_without_an_owner_line_reclaims_on_age(tmp_path):
-    """Locks written by an older build carry only a token. Treating unknown
-    ownership as ALIVE would strand every one of them permanently."""
-    from packages.activity_log import provenance as prov
-
-    lock_path = tmp_path / ".legacy.lock"
-    lock_path.write_text("token-only", encoding="utf-8")
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    assert prov._lock_owner_is_alive(lock_path) is None
-    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
-    assert prov._lock_token(lock_path) == token
-
-
-def test_a_reused_pid_does_not_keep_a_dead_holders_lock_alive(tmp_path):
-    """After a crash the OS reassigns the pid, and a liveness probe then reports
-    the holder as running forever -- so the lock is never reclaimed however old
-    it is. That is the failure the age window existed to prevent, reintroduced
-    by the ownership check added to fix a different one."""
-    from packages.activity_log import provenance as prov
-
-    lock_path = tmp_path / ".reused.lock"
-    # OUR pid, but a creation token from some other era: the file was written by
-    # a process that is gone and whose number has been handed out again.
-    lock_path.write_text(
-        f"{os.getpid()}\nstart-token-of-a-dead-process\nabandoned-token",
-        encoding="utf-8",
-    )
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    assert prov._lock_owner_is_alive(lock_path) is False
-
-    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
-    assert prov._lock_token(lock_path) == token
-
-
-def test_a_live_holder_with_a_matching_start_token_still_keeps_its_lock(tmp_path):
-    """The reuse check must not become a way to steal a live lock."""
-    from packages.activity_log import provenance as prov
-
-    lock_path = tmp_path / ".mine.lock"
-    token = prov._acquire_lock(lock_path)
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    assert prov._lock_owner_is_alive(lock_path) is True
-    with pytest.raises(TimeoutError):
-        prov._acquire_lock(lock_path, timeout_seconds=0.2, stale_seconds=1.0)
-
-    prov._release_lock(lock_path, token)
-
-
-def test_the_lock_token_is_read_from_every_format_this_file_has_had(tmp_path):
-    """Three formats now: token only, pid+token, pid+start+token. The token is
-    always last, and release compares against it."""
-    from packages.activity_log import provenance as prov
-
-    cases = {
-        "legacy.lock": ("just-a-token", "just-a-token"),
-        "pid.lock": ("4242\nthe-token", "the-token"),
-        "full.lock": ("4242\nstart\nthe-token", "the-token"),
-    }
-    for name, (body, expected) in cases.items():
-        path = tmp_path / name
-        path.write_text(body, encoding="utf-8")
-        assert prov._lock_token(path) == expected, name
-
-
-# ---------------------------------------------------------------------------
-# Reclamation must remove the instance it inspected, not whatever is at the path.
-# ---------------------------------------------------------------------------
-
-
 def test_reclaiming_does_not_delete_a_lock_taken_since_it_was_inspected(tmp_path):
     """Two writers can both judge one abandoned holder dead. The first unlinks
     and takes a fresh lock; the second then unlinks THAT -- and for the
@@ -1522,21 +1411,6 @@ def test_reclaiming_leaves_no_quarantine_files_behind(tmp_path):
     filelock.reclaim_if_unchanged(lock_path, b"abandoned")
 
     assert list(tmp_path.iterdir()) == []
-
-
-def test_a_stale_lock_is_still_reclaimed_end_to_end(tmp_path):
-    """Instance-checking must not disable reclamation, which is the whole point
-    of the stale path."""
-    from packages.activity_log import filelock
-
-    lock_path = tmp_path / ".stale.lock"
-    lock_path.write_text("999999999\nstart\nabandoned-token", encoding="utf-8")
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    token = filelock._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
-
-    assert filelock._lock_token(lock_path) == token
 
 
 def test_rolling_back_a_live_lock_never_overwrites_a_newer_one(tmp_path):
@@ -1586,36 +1460,128 @@ def test_rolling_back_restores_the_live_lock_when_the_slot_is_free(tmp_path):
     assert not list(tmp_path.glob("*.reclaim-*"))
 
 
-def test_a_reclaim_that_keeps_failing_times_out_instead_of_spinning(tmp_path):
-    """An unconditional `continue` after a failed reclaim skipped the deadline
-    check and the sleep, so a rename refused every time -- a virus scanner's
-    handle, say -- span the retry loop at full speed and never timed out."""
+# ---------------------------------------------------------------------------
+# The lock, after the mechanism swap. Eight tests describing staleness,
+# ownership tokens and reclamation were removed with the machinery they
+# described; these assert the guarantee that replaced all of it.
+# ---------------------------------------------------------------------------
+
+
+def _lock_holder_script(tmp_path):
+    import textwrap
+
+    script = tmp_path / "holder.py"
+    script.write_text(
+        textwrap.dedent("""
+            import sys, time, pathlib
+            sys.path.insert(0, sys.argv[2])
+            from packages.activity_log import filelock
+            filelock._acquire_lock(pathlib.Path(sys.argv[1]))
+            print('HELD', flush=True)
+            time.sleep(60)
+            """),
+        encoding="utf-8",
+    )
+    return script
+
+
+def test_two_processes_cannot_hold_one_lock(tmp_path):
+    """The property every earlier version was trying to reach by deciding when
+    a leftover file was abandoned."""
+    import subprocess
+    import sys as _sys
+
     from packages.activity_log import filelock
 
-    lock_path = tmp_path / ".wedged.lock"
-    lock_path.write_text("999999999\nstart\nabandoned", encoding="utf-8")
-    ancient = time.time() - 86400
-    os.utime(lock_path, (ancient, ancient))
-
-    attempts = {"n": 0}
-    real_rename = os.rename
-
-    def refuse(src, dst):
-        if str(src) == str(lock_path):
-            attempts["n"] += 1
-            raise PermissionError(13, "held by another handle", str(src))
-        return real_rename(src, dst)
-
-    monkey = pytest.MonkeyPatch()
-    monkey.setattr(os, "rename", refuse)
+    lock_path = tmp_path / ".exclusive.lock"
+    holder = subprocess.Popen(
+        [
+            _sys.executable,
+            str(_lock_holder_script(tmp_path)),
+            str(lock_path),
+            str(REPO_ROOT),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
     try:
-        started = time.monotonic()
+        assert holder.stdout.readline().strip() == "HELD"
         with pytest.raises(TimeoutError):
-            filelock._acquire_lock(lock_path, timeout_seconds=0.4, stale_seconds=1.0)
-        elapsed = time.monotonic() - started
+            filelock._acquire_lock(lock_path, timeout_seconds=0.3)
     finally:
-        monkey.undo()
+        holder.kill()
+        holder.wait()
 
-    assert attempts["n"] > 0, "the reclaim was never attempted"
-    assert elapsed >= 0.3, "returned before the deadline; it did not wait"
-    assert attempts["n"] < 200, f"spun {attempts['n']} times without sleeping"
+
+def test_a_killed_holder_needs_no_reclamation(tmp_path):
+    """Seven rounds of reclamation logic existed because a dead holder left its
+    marker behind. The kernel drops an OS lock on process exit, so there is
+    nothing to expire and nothing to remove."""
+    import subprocess
+    import sys as _sys
+
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".killed.lock"
+    holder = subprocess.Popen(
+        [
+            _sys.executable,
+            str(_lock_holder_script(tmp_path)),
+            str(lock_path),
+            str(REPO_ROOT),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert holder.stdout.readline().strip() == "HELD"
+    holder.kill()
+    holder.wait()
+    time.sleep(0.3)
+
+    token = filelock._acquire_lock(lock_path, timeout_seconds=5.0)
+
+    assert token
+    filelock._release_lock(lock_path, token)
+
+
+def test_the_lock_file_is_never_unlinked(tmp_path):
+    """Removing it was the operation every earlier version raced on, and an
+    unlocked lock file is not a lock. Released means reacquirable."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".persistent.lock"
+    token = filelock._acquire_lock(lock_path)
+    filelock._release_lock(lock_path, token)
+
+    assert lock_path.exists(), "the handle was unlinked"
+    again = filelock._acquire_lock(lock_path, timeout_seconds=1.0)
+    assert again != token
+    filelock._release_lock(lock_path, again)
+
+
+def test_a_leftover_file_is_not_a_lock(tmp_path):
+    """Under file-existence locking, bytes at a path WERE a lock, which is why
+    a crash wedged the resource. They are inert now."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".leftover.lock"
+    lock_path.write_text("12345\nsome-token-from-a-dead-process", encoding="utf-8")
+
+    token = filelock._acquire_lock(lock_path, timeout_seconds=1.0)
+
+    assert token, "a leftover file still blocked acquisition"
+    filelock._release_lock(lock_path, token)
+
+
+def test_the_holder_is_readable_while_the_lock_is_held(tmp_path):
+    """Windows msvcrt locks are MANDATORY: locking byte 0 made the pid/token
+    line unreadable to every other opener, including _lock_token itself."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".readable.lock"
+    token = filelock._acquire_lock(lock_path)
+    try:
+        assert filelock._lock_token(lock_path) == token
+        assert str(os.getpid()) in lock_path.read_text(encoding="utf-8")
+    finally:
+        filelock._release_lock(lock_path, token)

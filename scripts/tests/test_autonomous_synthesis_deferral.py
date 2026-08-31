@@ -73,7 +73,9 @@ def test_caller_skips_staging_before_it_can_stage_a_deferral():
     )
 
 
-def test_main_actually_runs_the_deferral_branch_without_crashing(tmp_path, capsys, monkeypatch):
+def test_main_actually_runs_the_deferral_branch_without_crashing(
+    tmp_path, capsys, monkeypatch
+):
     """Execute the deferral path in main() rather than reading its source.
 
     The source-text assertion above passed while main() was in fact broken:
@@ -131,9 +133,9 @@ def test_force_full_bypasses_the_cap_check(tmp_path):
     module = load_module()
     source = inspect.getsource(module.extract_semantics)
 
-    assert "not force_full" in source, (
-        "the chunk-cap guard must honour force_full, or the flag does nothing"
-    )
+    assert (
+        "not force_full" in source
+    ), "the chunk-cap guard must honour force_full, or the flag does nothing"
 
 
 def test_rate_limit_retry_still_defers_an_oversized_file(tmp_path, capsys, monkeypatch):
@@ -176,9 +178,48 @@ def test_rate_limit_retry_still_defers_an_oversized_file(tmp_path, capsys, monke
 
     assert module.main() == 0
 
-    assert calls == [True, True], (
-        f"force_full must be threaded through the retry; got {calls}"
-    )
+    assert calls == [
+        True,
+        True,
+    ], f"force_full must be threaded through the retry; got {calls}"
     out = capsys.readouterr().out
     assert "DEFERRED" in out
     assert doc.name in out
+
+
+def test_deferred_files_do_not_consume_the_batch_limit():
+    """`pending_files[:limit]` fixed the batch before knowing which files the
+    extractor would decline. One oversized file with --limit 1 filled the
+    batch, deferred, stayed pending, and the next invocation selected the
+    identical prefix -- starving every normal-sized file after it forever."""
+    source = (
+        Path(__file__).resolve().parents[2] / "scripts" / "autonomous_synthesis_loop.py"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "pending_files[:args.limit]" not in source
+    ), "the batch is still a fixed prefix; deferrals starve the rest"
+    body = source.split("for file_path in to_process:", 1)[1]
+    assert "attempted += 1" in body
+    assert "completed += 1" in body
+    assert "if completed >= args.limit or attempted >= attempt_cap:" in body
+
+
+def test_the_scan_past_deferrals_is_bounded():
+    """A deferral costs an LLM call, so a store full of oversized files must not
+    turn a --limit 1 run into a sweep of everything pending."""
+    source = (
+        Path(__file__).resolve().parents[2] / "scripts" / "autonomous_synthesis_loop.py"
+    ).read_text(encoding="utf-8")
+
+    assert "DEFER_SCAN_FACTOR" in source, "the scan is unbounded"
+    assert "attempt_cap = max(args.limit, args.limit * DEFER_SCAN_FACTOR)" in source
+
+
+def test_an_exhausted_scan_says_so():
+    """Silence here would read as 'the limit was met'."""
+    source = (
+        Path(__file__).resolve().parents[2] / "scripts" / "autonomous_synthesis_loop.py"
+    ).read_text(encoding="utf-8")
+
+    assert "too many consecutive deferrals" in source

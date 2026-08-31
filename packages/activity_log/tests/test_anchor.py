@@ -151,9 +151,10 @@ def test_stale_is_not_a_pass(store, anchored):
 
     result = _status(store, anchored)
     assert anchor_lib.EXIT_CODES[result["status"]] != 0
-    assert anchor_lib.EXIT_CODES[result["status"]] != anchor_lib.EXIT_CODES[
-        anchor_lib.TRUNCATION_DETECTED
-    ]
+    assert (
+        anchor_lib.EXIT_CODES[result["status"]]
+        != anchor_lib.EXIT_CODES[anchor_lib.TRUNCATION_DETECTED]
+    )
 
 
 def test_an_unchanged_store_verifies(store, anchored):
@@ -227,9 +228,9 @@ def test_the_root_is_independent_of_enumeration_order(store, identity):
     leaves, _ = anchor_lib.scan_packets(store)
     forward = anchor_lib._root_of(leaves)
     backward = anchor_lib._root_of(list(reversed(leaves)))
-    assert forward != backward, (
-        "sanity: _root_of is order-sensitive, which is why scan_packets sorts"
-    )
+    assert (
+        forward != backward
+    ), "sanity: _root_of is order-sensitive, which is why scan_packets sorts"
     again, _ = anchor_lib.scan_packets(store)
     assert anchor_lib._root_of(again) == forward
 
@@ -264,7 +265,7 @@ def test_leaf_and_interior_hashes_are_domain_separated():
 
 
 def test_the_empty_tree_has_its_own_root():
-    """"No packets" must never be confusable with a real commitment."""
+    """ "No packets" must never be confusable with a real commitment."""
     assert anchor_lib.merkle_root([]) == "E" + "0" * 43
 
 
@@ -440,9 +441,7 @@ def _series(tmp_path, anchors):
     d = tmp_path / "series"
     d.mkdir(parents=True, exist_ok=True)
     for a in anchors:
-        (d / f"{a['merkle_root']}.json").write_text(
-            json.dumps(a), encoding="utf-8"
-        )
+        (d / f"{a['merkle_root']}.json").write_text(json.dumps(a), encoding="utf-8")
     return d
 
 
@@ -450,9 +449,7 @@ def test_g5_the_walk_reaches_genesis(store, identity, tmp_path):
     """G5, 4 reviewers. prev_root was written and never read."""
     first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
     _write(store, "2026-08-03", "n1", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
-    second = anchor_lib.sign_anchor(
-        anchor_lib.build_anchor(store, first), identity
-    )
+    second = anchor_lib.sign_anchor(anchor_lib.build_anchor(store, first), identity)
 
     result = anchor_lib.verify_anchor(
         store, second, series_dir=_series(tmp_path, [first, second])
@@ -472,9 +469,7 @@ def _two_anchors(store, identity):
     """
     first = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
     _write(store, "2026-08-03", "grow", _packet("D" + "c" * 43, 0, "E" + "n" * 43))
-    second = anchor_lib.sign_anchor(
-        anchor_lib.build_anchor(store, first), identity
-    )
+    second = anchor_lib.sign_anchor(anchor_lib.build_anchor(store, first), identity)
     assert second["merkle_root"] != first["merkle_root"]
     assert second["prev_root"] == first["merkle_root"]
     return first, second
@@ -555,14 +550,19 @@ def test_publish_must_not_launder_a_loss_into_the_new_baseline(tmp_path, identit
     anchor_path = tmp_path / "anchors" / "anchor.json"
     script = REPO_ROOT / "scripts" / "provenance_anchor.py"
     base = [
-        sys.executable, str(script),
-        "--provenance-root", str(store),
-        "--identity-dir", str(tmp_path / "id"),
-        "--anchor", str(anchor_path),
+        sys.executable,
+        str(script),
+        "--provenance-root",
+        str(store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
     ]
 
-    first = subprocess.run(base + ["publish", "--allow-new-identity"],
-                           capture_output=True, text=True)
+    first = subprocess.run(
+        base + ["publish", "--allow-new-identity"], capture_output=True, text=True
+    )
     assert first.returncode == 0, first.stderr[-400:]
 
     (store / "d" / "p3.json").unlink()  # truncate the head
@@ -574,8 +574,12 @@ def test_publish_must_not_launder_a_loss_into_the_new_baseline(tmp_path, identit
     # The refusal must name what is missing, not just decline.
     assert "head_regressions" in refused.stdout
 
-    forced = subprocess.run(base + ["publish", "--force"], capture_output=True, text=True)
-    assert forced.returncode == 0, "an operator who understands the loss can still proceed"
+    forced = subprocess.run(
+        base + ["publish", "--force"], capture_output=True, text=True
+    )
+    assert (
+        forced.returncode == 0
+    ), "an operator who understands the loss can still proceed"
     assert "merkle_root" in forced.stdout
 
 
@@ -591,13 +595,19 @@ def test_the_cli_survives_an_anchor_path_outside_the_repository(tmp_path, identi
     _write(store, "d", "p0", _packet("D" + "a" * 43, 0, "E" + "x" * 43))
     result = subprocess.run(
         [
-            sys.executable, str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
-            "--provenance-root", str(store),
-            "--identity-dir", str(tmp_path / "id"),
-            "--anchor", str(tmp_path / "elsewhere" / "anchor.json"),
-            "publish", "--allow-new-identity",
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+            "--provenance-root",
+            str(store),
+            "--identity-dir",
+            str(tmp_path / "id"),
+            "--anchor",
+            str(tmp_path / "elsewhere" / "anchor.json"),
+            "publish",
+            "--allow-new-identity",
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr[-500:]
     assert "Traceback" not in result.stderr
@@ -670,7 +680,9 @@ def test_known_damage_is_frozen_rather_than_bricking_verification(tmp_path, iden
     (root / "d" / "damaged.json").unlink()
     after = anchor_lib.verify_anchor(root, anchored)
     assert after["status"] != anchor_lib.VERIFIED
-    assert after["unreadable_vanished"], "a deleted malformed packet must not pass silently"
+    assert after[
+        "unreadable_vanished"
+    ], "a deleted malformed packet must not pass silently"
 
 
 def test_republishing_an_unchanged_store_is_a_no_op(tmp_path, identity):
@@ -686,10 +698,14 @@ def test_republishing_an_unchanged_store_is_a_no_op(tmp_path, identity):
     _write(store, "d", "p0", _packet("D" + "a" * 43, 0))
     anchor_path = tmp_path / "anchors" / "anchor.json"
     base = [
-        sys.executable, str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
-        "--provenance-root", str(store),
-        "--identity-dir", str(tmp_path / "id"),
-        "--anchor", str(anchor_path),
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+        "--provenance-root",
+        str(store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
     ]
 
     assert subprocess.run(base + ["publish", "--allow-new-identity"]).returncode == 0
@@ -753,9 +769,7 @@ def test_a_same_slot_substitution_with_growth_is_not_stale(store, identity):
 
 def test_the_anchor_records_every_leaf_not_only_heads(store):
     built = anchor_lib.build_anchor(store)
-    long_chain = next(
-        e for e in built["identities"] if e["count"] == 4
-    )
+    long_chain = next(e for e in built["identities"] if e["count"] == 4)
     assert len(long_chain["leaf_saids"]) == 4
     assert [pair[0] for pair in long_chain["leaf_saids"]] == [0, 1, 2, 3]
     # head_saids stays, and must agree with the tail of leaf_saids
@@ -874,22 +888,18 @@ def test_no_json_reader_omits_unicodeerror():
     """The guard that catches the next one, not just today's three."""
     import re
 
-    source = (
-        Path(anchor_lib.__file__).read_text(encoding="utf-8")
-    )
-    readers = [
-        m for m in re.finditer(r"json\.loads\(path\.read_text", source)
-    ]
+    source = Path(anchor_lib.__file__).read_text(encoding="utf-8")
+    readers = [m for m in re.finditer(r"json\.loads\(path\.read_text", source)]
     assert len(readers) >= 3, "readers moved; update this guard"
     for index, match in enumerate(readers):
         # up to the NEXT reader, so a long explanatory comment between the try
         # and its except does not hide the clause
         stop = readers[index + 1].start() if index + 1 < len(readers) else len(source)
-        clause = re.search(r"except \(([^)]*)\)", source[match.end():stop])
+        clause = re.search(r"except \(([^)]*)\)", source[match.end() : stop])
         assert clause, f"no except clause after reader at {match.start()}"
-        assert "UnicodeError" in clause.group(1), (
-            f"reader at offset {match.start()} does not catch UnicodeError"
-        )
+        assert "UnicodeError" in clause.group(
+            1
+        ), f"reader at offset {match.start()} does not catch UnicodeError"
 
 
 def test_swapping_malformed_bytes_at_the_same_path_is_detected(tmp_path, identity):
@@ -907,7 +917,9 @@ def test_swapping_malformed_bytes_at_the_same_path_is_detected(tmp_path, identit
     store = tmp_path / "prov"
     _write(store, "d", "ok", _packet("D" + "a" * 43, 0))
     damaged = store / "d" / "damaged.json"
-    damaged.write_text('{"t":"prov","i":"D","s":"0","d":"E' + "z" * 43 + '"}', encoding="utf-8")
+    damaged.write_text(
+        '{"t":"prov","i":"D","s":"0","d":"E' + "z" * 43 + '"}', encoding="utf-8"
+    )
 
     anchored = anchor_lib.sign_anchor(anchor_lib.build_anchor(store), identity)
     assert anchored["unreadable"][0]["sha256"], "the anchor commits to the content"
@@ -929,7 +941,9 @@ def test_every_unreadable_entry_carries_a_content_digest(tmp_path):
     (store / "d").mkdir(parents=True)
     (store / "d" / "badjson.json").write_text("{not json", encoding="utf-8")
     (store / "d" / "badutf8.json").write_bytes(b'{"t":"prov","d":"E\xff"}')
-    (store / "d" / "noheader.json").write_text('{"t":"prov","i":1,"s":2,"d":3}', encoding="utf-8")
+    (store / "d" / "noheader.json").write_text(
+        '{"t":"prov","i":1,"s":2,"d":3}', encoding="utf-8"
+    )
     (store / "d" / "badseq.json").write_text(
         '{"t":"prov","i":"D","s":"x","d":"E' + "z" * 43 + '"}', encoding="utf-8"
     )
@@ -956,9 +970,9 @@ def test_load_anchor_rejects_valid_json_of_the_wrong_shape(tmp_path, payload):
     path.write_text(payload, encoding="utf-8")
     assert anchor_lib.load_anchor(path) is None
     # and the whole verdict path stays structured rather than crashing
-    assert anchor_lib.verify_anchor(tmp_path, anchor_lib.load_anchor(path))["status"] == (
-        anchor_lib.ANCHOR_UNAVAILABLE
-    )
+    assert anchor_lib.verify_anchor(tmp_path, anchor_lib.load_anchor(path))[
+        "status"
+    ] == (anchor_lib.ANCHOR_UNAVAILABLE)
 
 
 def test_the_shipped_anchor_verifies_under_this_build():
@@ -983,17 +997,25 @@ def test_the_shipped_anchor_verifies_under_this_build():
 
 
 def test_build_anchor_takes_the_store_lock_and_releases_it(tmp_path):
-    """Reuses provenance's lock rather than adding a third implementation.
+    """Reuses the shared lock rather than adding a third implementation.
 
-    That one already handles the DELETE_PENDING PermissionError on Windows and
-    reclaims after a crashed writer — both written in response to an observed
-    failure, neither of which would have been rediscovered here.
+    RELEASED means reacquirable, not deleted. The lock file is an OS-lock
+    handle now and is deliberately never unlinked -- removing it was the
+    operation every earlier version of that module raced on, and an unlocked
+    lock file is not a lock. Asserting its absence would be asserting the old
+    mechanism.
     """
+    from packages.activity_log import filelock
+
     store = tmp_path / "prov"
     _write(store, "d", "p0", _packet("D" + "a" * 43, 0))
 
     anchor_lib.build_anchor(store)
-    assert not (store / ".anchor-scan.lock").exists(), "the lock must be released"
+
+    lock_path = store / ".anchor-scan.lock"
+    token = filelock._acquire_lock(lock_path, timeout_seconds=1.0)
+    assert token, "the scan lock was not released"
+    filelock._release_lock(lock_path, token)
 
 
 def test_an_unavailable_lock_does_not_block_the_scan(tmp_path, monkeypatch):
