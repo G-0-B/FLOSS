@@ -74,8 +74,14 @@ def test_an_override_that_silences_the_pool_check_silences_this_one(monkeypatch)
     assert synthesizer._survivor_independence_problem(survivors, "online") is None
 
 
-def test_the_raising_and_reporting_forms_share_one_definition():
-    """assert_roster_is_independent must be a wrapper, not a second copy."""
+def test_the_raising_and_reporting_forms_share_one_definition(monkeypatch):
+    """assert_roster_is_independent must be a wrapper, not a second copy.
+
+    Clears FLOSS_ALLOW_DEGRADED_ROSTER like its neighbours: with that set in
+    the operator's environment both forms return None and this test fails for a
+    reason that has nothing to do with what it checks.
+    """
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
     thin = {"a": "groq/llama-3.1-8b-instant"}
 
     problem = voters_lib.roster_independence_problem("diverse", thin)

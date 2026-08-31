@@ -208,6 +208,7 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     # untracked -- the exact orphan the identity mechanism replaced command-line
     # matching to prevent. Walk to the real process before recording.
     $serverPid = 0
+    $recTok = ''
     if ($proc) {
         if ($proc.Name -eq 'node') {
             $serverPid = $proc.Id
@@ -267,8 +268,15 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
         Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
         Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     }
-    if ($proc) {
+    # RECORDED is the only outcome meaning a server is up AND trackable.
+    # This printed whenever $proc was truthy -- including the branch above
+    # that STOPS the unrecorded server, so the script announced 'Stopped the
+    # unrecorded OmniRoute' and 'OmniRoute started' on consecutive lines.
+    # Third instance in this file of claiming a state it did not achieve.
+    if ($proc -and $recTok -eq 'RECORDED') {
         Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $serverPid)"
+    } elseif ($proc) {
+        Write-Host "[FLOSS MCP] OmniRoute was NOT left running and recorded; see above"
     }
 }
 

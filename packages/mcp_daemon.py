@@ -21,6 +21,23 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# A blank reservation older than this is a launcher that died between
+# --reserve-slot and --record-identity. Deliberately far longer than the
+# milliseconds a real launcher needs in between, because the failure modes are
+# asymmetric: reclaiming too early starts a duplicate daemon on a bound port,
+# while reclaiming too late costs one more run.
+_RESERVATION_STALE_SECONDS = 60.0
+
+
+def _blank_claim_is_stale(pid_path: Path) -> bool:
+    """True when an empty claim file is old enough to be a crashed reserver."""
+
+    try:
+        age = time.time() - pid_path.stat().st_mtime
+    except OSError:
+        return False
+    return age >= _RESERVATION_STALE_SECONDS
+
 
 def _pid_alive(pid: int) -> bool:
     """Return True if `pid` is a running process.
@@ -215,6 +232,28 @@ def claim_singleton(pid_filename: str) -> bool:
                 except OSError:
                     raw = ""
                 if not raw:
+                    # A BLANK CLAIM THAT IS OLD IS A CRASHED RESERVER.
+                    #
+                    # The comment above says the stale path "handles it on a
+                    # later pass". It does not -- this returned False, so the
+                    # reclaim below was never reached and a blank file blocked
+                    # the slot forever. --reserve-slot made that reachable in
+                    # normal operation: it creates the file empty and leaves it
+                    # empty until --record-identity runs, so a launcher killed
+                    # in between disabled the daemon until a human deleted the
+                    # file by hand.
+                    #
+                    # Age is the only signal available with no PID to probe, and
+                    # it must stay long enough that a live reserver is never
+                    # mistaken for a dead one: a FRESH blank file still blocks,
+                    # which is the property the wait above was added to protect.
+                    if _blank_claim_is_stale(pid_path):
+                        try:
+                            _identity_path(pid_path).unlink(missing_ok=True)
+                            pid_path.unlink(missing_ok=True)
+                        except OSError:
+                            return False
+                        continue
                     return False
             try:
                 existing = int(raw)

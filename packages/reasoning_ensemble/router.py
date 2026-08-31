@@ -306,6 +306,9 @@ def _read_activity_tail(n_lines: int = ACTIVITY_LOOKBACK) -> list[dict]:
 
 # The embedder behind every historical Tier-4 row and behind ollama_embed().
 # Rows predating prompt_embedding_model are this model by construction.
+# The default for rows written BEFORE prompt_embedding_model existed. It is a
+# statement about history, never a label for a vector being computed now: those
+# must carry the model that actually produced them.
 LEGACY_EMBED_MODEL = "mxbai-embed-large"
 
 
@@ -493,8 +496,14 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     similar_sim: Optional[float] = None
     try:
         prompt_embedding = ollama_embed(prompt)
+        # EMBED_MODEL, not LEGACY_EMBED_MODEL: this vector was just produced by
+        # ollama_embed(), which uses EMBED_MODEL -- and that is operator
+        # overridable via FLOSS_EMBED_MODEL. Labelling a nomic vector "mxbai"
+        # and comparing it against genuinely-mxbai rows is the cross-vector-space
+        # comparison this whole guard exists to prevent, reintroduced by a
+        # hardcoded name. The call four lines below already passed EMBED_MODEL.
         similar_hash, similar_sim = check_tier4_similarity_bias(
-            prompt_embedding, LEGACY_EMBED_MODEL
+            prompt_embedding, EMBED_MODEL
         )
         if similar_hash is not None:
             bias_applied = "tier4_similarity"

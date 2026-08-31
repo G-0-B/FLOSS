@@ -897,3 +897,41 @@ def test_no_script_claims_success_it_did_not_achieve(
     assert success_at != -1, "the success line has moved"
     assert guard_at < success_at, "the success line is claimed before the guard"
     assert "exit 1" in text[guard_at:success_at], "an incomplete run exits 0"
+
+
+def test_a_blank_reservation_blocks_while_fresh(tmp_path, monkeypatch):
+    """--reserve-slot creates the file empty and leaves it empty until
+    --record-identity runs, so a fresh blank claim is a live launcher mid-flight
+    and must still block. Reclaiming it early starts a duplicate on a bound
+    port."""
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "reserved.pid"
+    pid_path.write_text("", encoding="utf-8")
+
+    assert mcp_daemon.claim_singleton("reserved.pid") is False
+    assert pid_path.exists(), "a fresh reservation was reclaimed"
+
+
+def test_a_blank_reservation_is_reclaimed_once_stale(tmp_path, monkeypatch):
+    """A launcher killed between --reserve-slot and --record-identity left an
+    empty file that blocked the slot forever -- the comment claimed the stale
+    path handled it on a later pass, and the code returned False before ever
+    reaching that path."""
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "abandoned.pid"
+    pid_path.write_text("", encoding="utf-8")
+    old = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (old, old))
+
+    assert mcp_daemon.claim_singleton("abandoned.pid") is True
+    assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())

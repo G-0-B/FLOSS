@@ -1421,7 +1421,11 @@ def _log_synthesis_action(
         embedder = embed_fn or ollama_embed
         try:
             row["prompt_embedding"] = embedder(prompt)
-            row["prompt_embedding_model"] = embed_name or "mxbai-embed-large"
+            # EMBED_MODEL is what this module's ollama_embed() uses and is
+            # operator overridable, so the hardcoded string was the same defect
+            # as the router's: a vector labelled with a model that may not have
+            # produced it.
+            row["prompt_embedding_model"] = embed_name or EMBED_MODEL
         except Exception:  # noqa: BLE001 — embedding is best-effort
             row.pop("prompt_embedding", None)
     try:
