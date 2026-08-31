@@ -17,7 +17,9 @@ each other):
 from __future__ import annotations
 
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -1363,3 +1365,54 @@ def test_no_writer_of_the_signed_document_precedes_its_proof(
         "retain"
     ), "retained copy cited a proof that did not exist"
     assert order.index("proof") < order.index("pointer")
+
+
+def test_a_live_holder_keeps_its_lock_however_old_it_is(tmp_path):
+    """The intake watcher holds one lock across a recursive scan and thousands
+    of writes, which can outlast the 60s a packet write is sized for. Age alone
+    let a second watcher DELETE a live holder's lock and enter the same critical
+    section -- worse than the abandoned lock the reclamation was added to fix."""
+    from packages.activity_log import provenance as prov
+
+    lock_path = tmp_path / ".busy.lock"
+    token = prov._acquire_lock(lock_path)
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    # This process IS the recorded owner, so it is provably alive.
+    assert prov._lock_owner_is_alive(lock_path) is True
+    with pytest.raises(TimeoutError):
+        prov._acquire_lock(lock_path, timeout_seconds=0.2, stale_seconds=1.0)
+
+    prov._release_lock(lock_path, token)
+    assert not lock_path.exists()
+
+
+def test_a_lock_whose_owner_is_gone_is_still_reclaimed(tmp_path):
+    """Liveness gates reclamation; it must not disable it."""
+    from packages.activity_log import provenance as prov
+
+    lock_path = tmp_path / ".dead.lock"
+    # A pid that cannot be running: 0 is never a normal user process here.
+    lock_path.write_text("999999999\nsome-token", encoding="utf-8")
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
+
+    assert prov._lock_token(lock_path) == token
+
+
+def test_a_legacy_lock_without_an_owner_line_reclaims_on_age(tmp_path):
+    """Locks written by an older build carry only a token. Treating unknown
+    ownership as ALIVE would strand every one of them permanently."""
+    from packages.activity_log import provenance as prov
+
+    lock_path = tmp_path / ".legacy.lock"
+    lock_path.write_text("token-only", encoding="utf-8")
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    assert prov._lock_owner_is_alive(lock_path) is None
+    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
+    assert prov._lock_token(lock_path) == token

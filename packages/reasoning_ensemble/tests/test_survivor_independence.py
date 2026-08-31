@@ -240,3 +240,47 @@ def test_an_unwritable_staging_directory_does_not_lose_the_degraded_result(
     )
 
     assert path is None, "staging must report failure, not raise"
+
+
+def test_two_runs_of_one_prompt_in_one_second_do_not_share_an_artifact(
+    tmp_path, monkeypatch
+):
+    """The name is a second-resolution timestamp plus the prompt hash, so
+    concurrent runs of the same prompt collide: one overwrites the other's raw
+    voter responses and both Actions cite the same file."""
+    staging = tmp_path / "staging"
+    monkeypatch.setattr(synthesizer, "ENSEMBLE_STAGING", staging)
+    monkeypatch.setattr(synthesizer, "WORKSPACE_ROOT", tmp_path)
+    tier = synthesizer.TierClassification(
+        tier="degraded",
+        cluster_assignments={},
+        cluster_sizes={},
+        largest_cluster_id=0,
+        largest_cluster_fraction=1.0,
+        minority_coherent_voters=[],
+        similarity_matrix=[],
+        separation={},
+    )
+
+    # datetime is immutable, so the clock is pinned by swapping the name the
+    # module resolves rather than by patching the type.
+    class _FixedClock:
+        @staticmethod
+        def now(tz=None):
+            import datetime as _dt
+
+            return _dt.datetime(2026, 8, 31, 12, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(synthesizer, "datetime", _FixedClock)
+
+    first = synthesizer._stage_synthesis("p", "hash", "t", tier, [], [], "first")
+    second = synthesizer._stage_synthesis("p", "hash", "t", tier, [], [], "second")
+
+    assert first is not None and second is not None
+    assert first != second, "two runs shared one artifact path"
+    written = sorted(staging.glob("*_synthesis.json"))
+    assert len(written) == 2
+    bodies = {
+        json.loads(f.read_text(encoding="utf-8"))["final_synthesis"] for f in written
+    }
+    assert bodies == {"first", "second"}, "one run overwrote the other"

@@ -365,6 +365,28 @@ def _local_embed_probe(text: str) -> list[float]:
     return ollama_embed(text, timeout=EMBED_PROBE_TIMEOUT_SECONDS)
 
 
+def _unique_staging_path(directory: Path, stem: str) -> Path:
+    """A path no concurrent run of the same prompt can also be writing.
+
+    O_CREAT|O_EXCL decides, the same way the anchor's retained series does:
+    losing the race is not an error, it means take the next name.
+    """
+
+    attempt = 1
+    while True:
+        suffix = "" if attempt == 1 else f".{attempt}"
+        candidate = directory / f"{stem}{suffix}_synthesis.json"
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            return candidate
+        except FileExistsError:
+            attempt += 1
+        except OSError:
+            # Cannot create here at all; hand back the plain name and let the
+            # caller's own OSError guard report it.
+            return directory / f"{stem}_synthesis.json"
+
+
 def _stage_synthesis(
     prompt: str,
     p_hash: str,
@@ -390,9 +412,20 @@ def _stage_synthesis(
     # just been changed to preserve. A best-effort writer has to be best-effort
     # for the whole write, directory included.
     ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
+    # EXCLUSIVE CREATE. The name is a second-resolution timestamp plus the
+    # prompt hash, so two concurrent runs of the SAME prompt inside one second
+    # derive the same path and race: one overwrites the other's raw voter
+    # responses, or a reader sees a truncated file, and both Actions then cite
+    # the same artifact. That matters most for the degraded path, which exists
+    # specifically to preserve outage evidence.
+    #
+    # The unique-name claim is INSIDE the guard too: it creates the directory
+    # and the file, so calling it above the try put mkdir back outside the
+    # handler -- the same defect this comment block was written about, moved
+    # into a helper one commit later.
     try:
         ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
+        out_path = _unique_staging_path(ENSEMBLE_STAGING, f"{ts_short}_{p_hash}")
         out_path.write_text(
             json.dumps(
                 {

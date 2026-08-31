@@ -1392,7 +1392,9 @@ def test_an_abandoned_lock_is_reclaimed(tmp_path, monkeypatch):
 
     token = provenance._acquire_lock(lock_path)
 
-    assert lock_path.read_text(encoding="utf-8") == token
+    # The lock file now carries the owner pid above the token, so the token is
+    # read out rather than compared against the whole file.
+    assert provenance._lock_token(lock_path) == token
     provenance._release_lock(lock_path, token)
     assert not lock_path.exists()
 
@@ -1767,9 +1769,9 @@ def test_root_level_decoy_does_not_win_the_first_hop(tmp_path, monkeypatch):
     )
 
     result = provenance.validate_packet(head, workspace_root=tmp_path)
-    assert result.ok is True, (
-        f"a root-level decoy must not win the first hop: {result.errors}"
-    )
+    assert (
+        result.ok is True
+    ), f"a root-level decoy must not win the first hop: {result.errors}"
 
 
 def test_unresolved_consent_is_reported_not_silent(tmp_path, monkeypatch):
@@ -1913,12 +1915,12 @@ def test_a_malformed_prior_is_rejected_not_treated_as_a_gap(tmp_path, monkeypatc
         )
         result = provenance.validate_packet(path, workspace_root=tmp_path)
         assert result.ok is False, f"p={bogus!r} was accepted"
-        assert "E_PROVENANCE_PRIOR_INVALID" in result.errors, (
-            f"p={bogus!r} produced {result.errors}"
-        )
-        assert not any("CHAIN_GAP" in w for w in result.warnings), (
-            f"p={bogus!r} was routed into gap recovery"
-        )
+        assert (
+            "E_PROVENANCE_PRIOR_INVALID" in result.errors
+        ), f"p={bogus!r} produced {result.errors}"
+        assert not any(
+            "CHAIN_GAP" in w for w in result.warnings
+        ), f"p={bogus!r} was routed into gap recovery"
         path.unlink()
 
 
@@ -1934,6 +1936,6 @@ def test_a_wellformed_prior_still_reaches_gap_recovery(tmp_path, monkeypatch):
     paths[1].unlink()  # interior hole, prior pointers all well-formed
     result = provenance.validate_packet(paths[-1], workspace_root=tmp_path)
     assert "E_PROVENANCE_PRIOR_INVALID" not in result.errors
-    assert any("CHAIN_GAP" in w for w in result.warnings), (
-        "a genuine hole must still be enumerated"
-    )
+    assert any(
+        "CHAIN_GAP" in w for w in result.warnings
+    ), "a genuine hole must still be enumerated"

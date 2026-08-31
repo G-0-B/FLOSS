@@ -20,6 +20,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+# A full intake scan holds its lock across a recursive walk and up to
+# MAX_INCOMING_QUEUE_DEPTH event writes. Sized for that, not for a packet write.
+SCAN_LOCK_STALE_SECONDS = 900.0
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -143,7 +147,23 @@ def lock_file(lock_dir: Path, name: str, *, timeout_seconds: float = 5.0):
 
     lock_dir.mkdir(parents=True, exist_ok=True)
     path = lock_dir / f"{name}.lock"
-    token = _acquire_lock(path)
+    # The caller's timeout is HONOURED, not accepted and dropped. The first
+    # version of this wrapper documented the parameter as "accepted for call
+    # site compatibility" -- which is a comment excusing a silently ignored
+    # argument: scan_once asks for 30s and got the shared 5s deadline, so an
+    # overlapping one-shot failed 25 seconds early and --loop died on the
+    # TimeoutError.
+    #
+    # The stale window is the scan's, too. A recursive walk of the workspace
+    # plus thousands of event writes can legitimately exceed the 60s a packet
+    # write is sized for, and reclaiming a LIVE holder's lock is worse than
+    # waiting for it. Liveness now gates reclamation as well, so this window
+    # only bounds how long a vanished holder blocks us.
+    token = _acquire_lock(
+        path,
+        timeout_seconds=timeout_seconds,
+        stale_seconds=SCAN_LOCK_STALE_SECONDS,
+    )
     try:
         yield path
     finally:

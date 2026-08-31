@@ -860,6 +860,14 @@ VOTER_CALL_TIMEOUT_SECONDS = 60.0
 # comment above was already warning about.
 
 
+# Everything a round does BESIDES calling voters: building prompts, validating
+# and tallying votes, appending to the source chain, serialising the response.
+# The projections were set equal to the call budget, so a 12-voter round that
+# used its full per-voter time left zero seconds for any of it and the client
+# could time out while the server was still committing the decision.
+ROUND_OVERHEAD_SECONDS = 60.0
+
+
 def largest_selectable_roster() -> int:
     """Voter count of the biggest profile the registry offers."""
 
@@ -880,7 +888,10 @@ def worst_case_round_seconds() -> int:
     may still write a decision the caller never sees.
     """
 
-    return int(largest_selectable_roster() * VOTER_CALL_TIMEOUT_SECONDS)
+    return int(
+        largest_selectable_roster() * VOTER_CALL_TIMEOUT_SECONDS
+        + ROUND_OVERHEAD_SECONDS
+    )
 
 
 def roster_exceeds_projected_budget(resolved: dict[str, str]) -> str | None:

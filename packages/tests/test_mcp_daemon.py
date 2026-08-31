@@ -935,3 +935,43 @@ def test_a_blank_reservation_is_reclaimed_once_stale(tmp_path, monkeypatch):
 
     assert mcp_daemon.claim_singleton("abandoned.pid") is True
     assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_reserve_slot_reclaims_a_stale_blank_reservation(tmp_path):
+    """A launcher killed between --reserve-slot and --record-identity leaves an
+    empty file forever. The blank-claim recovery added to claim_singleton could
+    not help: the OmniRoute path never calls it, and never reaches this function
+    again either, because the file exists and O_EXCL refuses."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("", encoding="utf-8")
+    old = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (old, old))
+
+    result = _reserve(pid_path)
+
+    assert result.stdout.strip().splitlines()[-1] == "RESERVED"
+
+
+def test_reserve_slot_still_refuses_a_fresh_blank_reservation(tmp_path):
+    """A live launcher mid-flight must still block, or two servers start."""
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("", encoding="utf-8")
+
+    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "OCCUPIED"
+
+
+def test_reserve_slot_never_reclaims_a_record_with_a_pid_in_it(tmp_path):
+    """A populated record belongs to the identity checks, which know how to
+    probe it. Age alone must not take it."""
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("4242", encoding="utf-8")
+    old = time.time() - 86400
+    os.utime(pid_path, (old, old))
+
+    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "OCCUPIED"
+    assert pid_path.read_text(encoding="utf-8") == "4242"

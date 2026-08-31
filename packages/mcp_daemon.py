@@ -523,8 +523,36 @@ def _reserve_slot_cli() -> int:
         pid_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        print("OCCUPIED")
-        return 1
+        # THE RECLAMATION HAS TO BE ON THIS PATH, NOT ONLY IN claim_singleton.
+        #
+        # A launcher killed between --reserve-slot and --record-identity leaves
+        # this file empty forever. The blank-claim recovery added to
+        # claim_singleton cannot help: the OmniRoute path never calls it, and it
+        # never reaches this function again either, because the file exists and
+        # O_EXCL refuses. So the recovery sat in the function I was looking at
+        # while the path that actually strands was left alone -- and OmniRoute
+        # stayed disabled until an operator deleted the file by hand.
+        #
+        # Only a BLANK reservation past the stale window is reclaimed here. A
+        # file with a pid in it belongs to --record-identity and the identity
+        # checks, which know how to probe it.
+        reclaimed = False
+        try:
+            if not pid_path.read_text(encoding="utf-8").strip():
+                if _blank_claim_is_stale(pid_path):
+                    _identity_path(pid_path).unlink(missing_ok=True)
+                    pid_path.unlink(missing_ok=True)
+                    reclaimed = True
+        except OSError:
+            reclaimed = False
+        if not reclaimed:
+            print("OCCUPIED")
+            return 1
+        try:
+            fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except OSError:
+            print("OCCUPIED")
+            return 1
     except OSError:
         print("OCCUPIED")
         return 1

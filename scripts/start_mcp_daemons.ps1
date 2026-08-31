@@ -157,7 +157,13 @@ if ($py -and (Test-Path $omniPid)) {
 # OmniRoute is live, untracked, and can no longer be stopped by the
 # companion script. Same verdict, three callers, and this was the one that
 # read it optimistically.
-if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
+if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not (Get-Content $omniPid -Raw -ErrorAction SilentlyContinue).Trim()) {
+    # A BLANK record is a reservation whose launcher never came back, not an
+    # unverifiable holder. --reserve-slot below reclaims one past its stale
+    # window, so fall through and let it decide instead of rejecting here: this
+    # branch is what kept OmniRoute disabled until someone deleted the file.
+    Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - letting the slot claim decide"
+} elseif ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."
     $skipped += "OmniRoute (:20128) - not started; existing record is unverifiable"
 } elseif ($omniVerdict -eq 'OURS') {

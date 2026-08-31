@@ -104,7 +104,7 @@
       "server_overrides": {
         "flossiullk-consensus": {
           "startup_timeout_sec": 20,
-          "tool_timeout_sec": 720,
+          "tool_timeout_sec": 780,
           "sampling_enabled": false
         },
         "flossiullk-reasoning-ensemble": {
@@ -184,7 +184,7 @@
       "overrides": {
         "flossiullk-consensus": {
           "enabled": true,
-          "timeout": 720
+          "timeout": 780
         },
         "flossiullk-reasoning-ensemble": {
           "enabled": true,
