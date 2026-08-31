@@ -205,6 +205,22 @@ EMBED_TIMEOUT_SECONDS = 90
 # timeout, even though the cloud fallback was sitting right there.
 EMBED_PROBE_TIMEOUT_SECONDS = 5
 
+# The worst case a caller must be prepared to wait, summed HERE next to the
+# budgets it adds up rather than in the config that has to clear it. A client
+# timeout below this fails runs that are behaving correctly, and the failure
+# looks like a server fault.
+#
+# probe + slowest voter (dispatch is parallel, so one voter's generate+embed)
+# + the Tier-4 prompt embedding in _log_synthesis_action, which happens AFTER
+# dispatch and was missed when this was first derived: the sum said 275 and the
+# real path was 365.
+WORST_CASE_RUN_SECONDS = (
+    EMBED_PROBE_TIMEOUT_SECONDS
+    + VOTER_TIMEOUT_SECONDS
+    + EMBED_TIMEOUT_SECONDS
+    + EMBED_TIMEOUT_SECONDS
+)
+
 # Cluster-similarity threshold for grouping voter responses into the same cluster.
 # Cosine similarity > THRESHOLD → same cluster.
 # Calibrated based on mxbai-embed-large semantic similarity for related-but-distinct

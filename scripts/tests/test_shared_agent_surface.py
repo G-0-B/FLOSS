@@ -107,7 +107,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
             "server_overrides": {
                 "flossiullk-reasoning-ensemble": {
                     "startup_timeout_sec": 120,
-                    "tool_timeout_sec": 300,
+                    "tool_timeout_sec": 420,
                     "sampling_enabled": False,
                 }
             },
@@ -117,7 +117,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
     assert 'name = "flossiullk-reasoning-ensemble"' in config
     assert "C:/~shit/.mcp/lenses/flossiullk-reasoning-ensemble.yaml" in config
     assert "startup_timeout_sec = 120.0" in config
-    assert "tool_timeout_sec = 300.0" in config
+    assert "tool_timeout_sec = 420.0" in config
     assert "sampling_enabled = false" in config
 
 
@@ -452,13 +452,11 @@ def _reasoning_budget_seconds() -> int:
         sys.path.insert(0, str(FLOSS_ROOT.parent))
     from packages.reasoning_ensemble import synthesizer
 
-    # Worst case for one call: probe the local embedder, generate, embed the
-    # response. Logging and staging ride on top of that.
-    return (
-        synthesizer.EMBED_PROBE_TIMEOUT_SECONDS
-        + synthesizer.VOTER_TIMEOUT_SECONDS
-        + synthesizer.EMBED_TIMEOUT_SECONDS
-    )
+    # Read the sum from the module that owns the budgets. Re-adding the terms
+    # here is what let the Tier-4 logging embed go uncounted: the test agreed
+    # with a derivation that was itself missing a step, so it passed while the
+    # configured timeout sat 65 seconds under the real path.
+    return synthesizer.WORST_CASE_RUN_SECONDS
 
 
 def _reasoning_timeouts() -> list[tuple[str, int]]:

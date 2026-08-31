@@ -109,7 +109,7 @@
         },
         "flossiullk-reasoning-ensemble": {
           "startup_timeout_sec": 120,
-          "tool_timeout_sec": 300,
+          "tool_timeout_sec": 420,
           "sampling_enabled": false
         },
         "agentmemory": {
@@ -188,7 +188,7 @@
         },
         "flossiullk-reasoning-ensemble": {
           "enabled": true,
-          "timeout": 300
+          "timeout": 420
         }
       },
       "guarded_keys": {

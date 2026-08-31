@@ -652,9 +652,9 @@ def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
     nothing to walk.
     """
 
-    series: dict[str, dict[str, Any]] = {}
+    series: dict[str, tuple[dict[str, Any], Path]] = {}
     if series_dir is None or not series_dir.exists():
-        return series
+        return {}
     for path in sorted(series_dir.glob("*.json")):
         try:
             document = json.loads(path.read_text(encoding="utf-8"))
@@ -677,21 +677,49 @@ def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
         # Two retained anchors CAN share a root: the format version and the
         # summary fields live outside the Merkle tree, so a v2 and its v3
         # migration over an unchanged packet set hash identically. Publish now
-        # keeps both files instead of overwriting one. Pick deterministically --
-        # newest generated_at, filename as tie-break -- rather than letting glob
-        # order decide which history the walk sees.
+        # keeps both files instead of overwriting one. Pick deterministically
+        # rather than letting glob order decide which history the walk sees.
         held = series.get(root)
-        if held is None or _series_order(document) > _series_order(held):
-            series[root] = document
-    return series
+        if held is None or _series_order(document, path) > _series_order(*held):
+            series[root] = (document, path)
+    return {root: document for root, (document, _path) in series.items()}
 
 
-def _series_order(document: dict[str, Any]) -> tuple[str, str]:
+def _retention_index(path: Path) -> int:
+    """Which retention attempt wrote this file: `{root}.json` is 1, `.N.` is N.
+
+    _retain_series takes the next free index on a collision, so a HIGHER index
+    is a LATER write. Lexical filename order gets this backwards -- "E….2.json"
+    sorts before "E….json" -- which is why the tie-break has to be the index and
+    not the name.
+    """
+
+    stem = path.name[:-5] if path.name.endswith(".json") else path.name
+    _, _, tail = stem.rpartition(".")
+    try:
+        return int(tail)
+    except ValueError:
+        return 1
+
+
+def _series_order(document: dict[str, Any], path: Path) -> tuple[str, str, int]:
+    """Newest first: generated_at, then version, then retention index.
+
+    The comment above promised a filename tie-break and the tuple did not carry
+    one. Two anchors CAN reach this with an identical root, an identical
+    second-precision `generated_at` and an identical version -- a signer
+    rotation over an unchanged store, published within the same second as its
+    predecessor -- and the base file, visited first, was then never replaced. A
+    later head linking to that shared root made walk_series load the OLD
+    signer's anchor, so the freshly published series returned ANCHOR_UNAVAILABLE.
+    """
+
     generated = document.get("generated_at")
     version = document.get("v")
     return (
         generated if isinstance(generated, str) else "",
         version if isinstance(version, str) else "",
+        _retention_index(path),
     )
 
 

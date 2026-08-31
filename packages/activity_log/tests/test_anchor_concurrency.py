@@ -750,3 +750,47 @@ def test_force_still_publishes_over_a_loss_seen_only_in_the_build(
     monkeypatch.setattr(cli.anchor_lib, "build_anchor", delete_then_build)
 
     assert cli.main(base + ["publish", "--force"]) == 0
+
+
+def test_same_second_duplicates_resolve_by_retention_order_not_glob_order(tmp_path):
+    """A signer rotation over an unchanged store, published in the same second
+    as its predecessor, gives two anchors with the same root, the same
+    second-precision generated_at and the same version. Without a real
+    tie-break the FIRST file visited wins, and a later head linking to that
+    root made walk_series load the older signer's anchor, so the fresh series
+    returned ANCHOR_UNAVAILABLE.
+
+    Indices 2 and 3, not base and 2: sorted() yields "E….2.json" before
+    "E….json", so a base-versus-2 fixture has glob order accidentally picking
+    the newer file and passes against the unfixed code. "E….2.json" before
+    "E….3.json" is where lexical order and retention order disagree.
+    """
+    series_dir = tmp_path / "series"
+    series_dir.mkdir()
+    root = "E" + "r" * 43
+    same = {
+        "merkle_root": root,
+        "generated_at": "2026-08-31T01:00:00+00:00",
+        "v": "flossi-anchor-3",
+    }
+    (series_dir / f"{root}.2.json").write_text(
+        json.dumps({**same, "signer": "OLD"}), encoding="utf-8"
+    )
+    (series_dir / f"{root}.3.json").write_text(
+        json.dumps({**same, "signer": "NEW"}), encoding="utf-8"
+    )
+
+    series = anchor_lib.load_series(series_dir)
+
+    assert series[root]["signer"] == "NEW", "the earlier retention won"
+
+
+def test_the_retention_index_is_read_as_a_number_not_a_name():
+    """Lexically "E….2.json" sorts BEFORE "E….json", so a filename tie-break
+    would have ordered these backwards."""
+    assert anchor_lib._retention_index(Path("Eroot.json")) == 1
+    assert anchor_lib._retention_index(Path("Eroot.2.json")) == 2
+    assert anchor_lib._retention_index(Path("Eroot.10.json")) == 10
+    assert anchor_lib._retention_index(
+        Path("Eroot.10.json")
+    ) > anchor_lib._retention_index(Path("Eroot.2.json"))
