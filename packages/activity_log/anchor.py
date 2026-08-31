@@ -430,6 +430,15 @@ def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
     return positions
 
 
+class StoreContention(RuntimeError):
+    """The packet store never held still long enough to anchor it.
+
+    Raised rather than returned because every caller of `build_anchor` is on
+    its way to signing. A caller that wanted a best-effort snapshot can call
+    `scan_packets` directly and own that choice explicitly.
+    """
+
+
 def _stable_scan(
     provenance_root: Path, attempts: int = 3
 ) -> tuple[list[PacketLeaf], list[dict]]:
@@ -443,10 +452,16 @@ def _stable_scan(
     true.
 
     Two agreeing scans is the cheap, checkable version of a snapshot: it does
-    not stop writes, it establishes that none landed while we looked. Returning
-    the last attempt rather than raising keeps `publish` usable on a store under
-    constant write pressure -- the anchor is then a real point-in-time set, just
-    one taken under contention.
+    not stop writes, it establishes that none landed while we looked.
+
+    Raises StoreContention if no two consecutive scans agree. An earlier version
+    returned the final scan and called it "a real point-in-time set taken under
+    contention". It is not one: `rglob` walks directories in order, so a packet
+    can land in a directory already passed while another lands in one not yet
+    reached, and the resulting set was never the store at any instant. Signing
+    it would put that fiction under a signature, which is worse than failing --
+    the whole value of the anchor is that its set is true. Retrying later is
+    cheap; an anchor nobody can trust is not.
     """
 
     leaves, unreadable = scan_packets(provenance_root)
@@ -455,7 +470,10 @@ def _stable_scan(
         if again_leaves == leaves and again_unreadable == unreadable:
             return leaves, unreadable
         leaves, unreadable = again_leaves, again_unreadable
-    return leaves, unreadable
+    raise StoreContention(
+        f"the packet store changed on every one of {attempts} consecutive scans; "
+        "no snapshot was ever confirmed, so there is nothing safe to sign"
+    )
 
 
 def build_anchor(
@@ -463,7 +481,11 @@ def build_anchor(
     previous: dict[str, Any] | None = None,
     witnesses: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Build (but do not sign or publish) an anchor over the current store."""
+    """Build (but do not sign or publish) an anchor over the current store.
+
+    Raises StoreContention if the store is being written to to the point that
+    no two consecutive scans agree.
+    """
 
     with _store_lock(provenance_root):
         leaves, unreadable = _stable_scan(provenance_root)
@@ -586,9 +608,27 @@ def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
         if not isinstance(document, dict):
             continue
         root = document.get("merkle_root")
-        if isinstance(root, str):
+        if not isinstance(root, str):
+            continue
+        # Two retained anchors CAN share a root: the format version and the
+        # summary fields live outside the Merkle tree, so a v2 and its v3
+        # migration over an unchanged packet set hash identically. Publish now
+        # keeps both files instead of overwriting one. Pick deterministically --
+        # newest generated_at, filename as tie-break -- rather than letting glob
+        # order decide which history the walk sees.
+        held = series.get(root)
+        if held is None or _series_order(document) > _series_order(held):
             series[root] = document
     return series
+
+
+def _series_order(document: dict[str, Any]) -> tuple[str, str]:
+    generated = document.get("generated_at")
+    version = document.get("v")
+    return (
+        generated if isinstance(generated, str) else "",
+        version if isinstance(version, str) else "",
+    )
 
 
 def walk_series(

@@ -34,6 +34,37 @@ if (-not $py -or -not (Test-Path $py)) {
     exit 1
 }
 
+function Resolve-ServerPid {
+    <#
+      npm installs `omniroute` as a .cmd shim on Windows; Start-Process -PassThru
+      returns that shim, not the Node server it spawns. Walk the process tree
+      down from the launcher and return the first node process found, polling
+      because the child does not exist the instant Start-Process returns.
+      Returns 0 if no node descendant appears within the timeout.
+    #>
+    param([int]$RootPid, [int]$TimeoutMs = 8000)
+
+    $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
+    while ((Get-Date) -lt $deadline) {
+        $frontier = @($RootPid)
+        $guard = 0
+        while ($frontier.Count -gt 0 -and $guard -lt 8) {
+            $guard++
+            $next = @()
+            foreach ($parent in $frontier) {
+                $kids = Get-CimInstance Win32_Process -Filter "ParentProcessId=$parent" -ErrorAction SilentlyContinue
+                foreach ($kid in $kids) {
+                    if ($kid.Name -eq 'node.exe') { return [int]$kid.ProcessId }
+                    $next += [int]$kid.ProcessId
+                }
+            }
+            $frontier = $next
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    return 0
+}
+
 # Start consensus gateway daemon (port 7331)
 Start-Process -WindowStyle Hidden -WorkingDirectory $workspace $py "-m packages.metacoordinator_mcp.server"
 
@@ -86,12 +117,35 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     Write-Host "[FLOSS MCP] OmniRoute already running (recorded PID $(Get-Content $omniPid -Raw))"
 } else {
     $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'
-    if ($proc -and $py) {
+    # RECORD THE SERVER, NOT THE SHIM.
+    #
+    # On the documented Windows npm install, `omniroute` is a .cmd shim, so
+    # -PassThru hands back cmd.exe and the Node server is its child. Windows
+    # does not kill children with their parent, so recording the shim let the
+    # stop script delete the sidecars and leave OmniRoute listening and
+    # untracked -- the exact orphan the identity mechanism replaced command-line
+    # matching to prevent. Walk to the real process before recording.
+    $serverPid = 0
+    if ($proc) {
+        if ($proc.Name -eq 'node') {
+            $serverPid = $proc.Id
+        } else {
+            $serverPid = Resolve-ServerPid $proc.Id
+        }
+    }
+    if ($serverPid -eq 0 -and $proc) {
+        # Recording nothing is worse: the duplicate guard reads an absent record
+        # as free and starts a second server. Record the shim so the guard still
+        # holds, and say plainly that stop cannot reach the child.
+        $serverPid = $proc.Id
+        Write-Host "[FLOSS MCP] WARNING: could not identify the OmniRoute Node process under PID $($proc.Id); recording the launcher instead, so stopping may leave the server running. Inspect it with Get-CimInstance Win32_Process -Filter ParentProcessId=$($proc.Id)"
+    }
+    if ($serverPid -and $py) {
         Push-Location $repoRoot
-        & $py -m packages.mcp_daemon --record-identity $omniPid $($proc.Id) | Out-Null
+        & $py -m packages.mcp_daemon --record-identity $omniPid $serverPid | Out-Null
         Pop-Location
     }
-    Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $($proc.Id))"
+    Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $serverPid)"
 }
 
 Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."

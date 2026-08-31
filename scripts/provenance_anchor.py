@@ -84,6 +84,43 @@ def commit_message(anchor: dict) -> str:
     )
 
 
+def _retain_series(series_dir: Path, root: str, payload: bytes) -> Path:
+    """Write a retained anchor without ever destroying one already there.
+
+    The series was keyed purely by merkle_root. Two DIFFERENT anchors can share
+    a root: the format version and the summary fields are outside the Merkle
+    tree, so migrating a v2 anchor over an unchanged packet set produces a v3
+    with the same root -- and the write replaced the v2, discarding its
+    signature, its metadata and its witness claims. The migration path
+    documented that the old anchor "remains as history"; the code deleted it.
+
+    Identical bytes are a no-op (republishing the same anchor is idempotent).
+    A genuinely different anchor with the same root is retained beside it.
+    """
+
+    target = series_dir / f"{root}.json"
+    if not target.exists():
+        target.write_bytes(payload)
+        return target
+    try:
+        if target.read_bytes() == payload:
+            return target
+    except OSError:
+        pass
+    n = 2
+    while True:
+        sibling = series_dir / f"{root}.{n}.json"
+        if not sibling.exists():
+            sibling.write_bytes(payload)
+            return sibling
+        try:
+            if sibling.read_bytes() == payload:
+                return sibling
+        except OSError:
+            pass
+        n += 1
+
+
 def _display_path(path: Path) -> str:
     """Repo-relative when possible, absolute otherwise.
 
@@ -199,7 +236,15 @@ def _publish(args: argparse.Namespace) -> int:
             )
             return 2
 
-    built = anchor_lib.build_anchor(args.provenance_root, previous)
+    try:
+        built = anchor_lib.build_anchor(args.provenance_root, previous)
+    except anchor_lib.StoreContention as exc:
+        # Refusing is the point: an anchor is a signed claim that this exact set
+        # was the store. Under sustained writes no such set was ever observed,
+        # so there is nothing honest to sign. Publishing is cheap to retry.
+        print(f"refusing to anchor a store that will not hold still: {exc}")
+        print("Re-run when the provenance hooks are idle.")
+        return 4
 
     # UNCHANGED ROOT IS A NO-OP, NOT A PUBLICATION.
     #
@@ -286,16 +331,17 @@ def _publish(args: argparse.Namespace) -> int:
         return 3
 
     args.anchor.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(
-        signed, indent=2, ensure_ascii=False, sort_keys=True
-    ).encode("utf-8") + b"\n"
+    payload = (
+        json.dumps(signed, indent=2, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        + b"\n"
+    )
 
     # RETAIN THE SERIES. Overwriting a single anchor.json left `prev_root`
     # pointing backwards into nothing, so the "anchor series is a hash chain"
     # claim was a field on one file rather than a retained history (G5).
     series_dir = args.anchor.parent / anchor_lib.SERIES_DIRNAME
     series_dir.mkdir(parents=True, exist_ok=True)
-    (series_dir / f"{signed['merkle_root']}.json").write_bytes(payload)
+    retained = _retain_series(series_dir, signed["merkle_root"], payload)
 
     # Pointer written last, through a temp file. A crash mid-write used to leave
     # a corrupt anchor.json that load_anchor read as None, which would then
@@ -309,7 +355,8 @@ def _publish(args: argparse.Namespace) -> int:
         proof_file.parent.mkdir(parents=True, exist_ok=True)
         proof_file.write_bytes(stamped["proof"])
         state = witness_lib.inspect_proof(
-            stamped["proof"], expected_digest=witness_lib.root_digest(signed["merkle_root"])
+            stamped["proof"],
+            expected_digest=witness_lib.root_digest(signed["merkle_root"]),
         )
         print(f"  witness: {state['status']} -> {proof_file.name}")
         if state.get("note"):
@@ -318,6 +365,7 @@ def _publish(args: argparse.Namespace) -> int:
         json.dumps(
             {
                 "wrote": _display_path(args.anchor),
+                "retained": _display_path(retained),
                 "merkle_root": signed["merkle_root"],
                 "packet_count": signed["packet_count"],
                 "identity_count": signed["identity_count"],
@@ -380,8 +428,22 @@ def _witness_state(anchor_path: Path, stored: dict | None) -> dict:
             ),
             "claims_in_anchor": len(claims),
         }
+    # The sidecar is operator-writable and may be locked, permission-denied, or
+    # replaced by a directory. read_bytes() then raises straight through a
+    # function whose entire job is to return a structured verdict, so the STORE
+    # verdict is lost to a problem with the witness file. Same reasoning as the
+    # unreadable-packet path: report it, do not raise over it.
+    try:
+        proof_bytes = proof_file.read_bytes()
+    except OSError as exc:
+        return {
+            "status": witness_lib.WITNESS_UNAVAILABLE,
+            "reason": f"the proof file could not be read: {type(exc).__name__}",
+            "proof": proof_file.name,
+            "claims_in_anchor": len(claims),
+        }
     state = witness_lib.inspect_proof(
-        proof_file.read_bytes(), expected_digest=witness_lib.root_digest(str(root))
+        proof_bytes, expected_digest=witness_lib.root_digest(str(root))
     )
     state["proof"] = proof_file.name
     state["claims_in_anchor"] = len(claims)
@@ -398,9 +460,14 @@ def _witness_upgrade(args: argparse.Namespace) -> int:
     if not proof_file.exists():
         print(f"no proof at {proof_file}")
         return 3
-    result = witness_lib.upgrade_proof(
-        proof_file.read_bytes(), timeout=args.witness_timeout
-    )
+    # Sibling of the same reader in _witness_state: an operator-writable sidecar
+    # that exists but cannot be read must be reported, not raised over.
+    try:
+        proof_bytes = proof_file.read_bytes()
+    except OSError as exc:
+        print(f"cannot read {proof_file}: {type(exc).__name__}")
+        return 3
+    result = witness_lib.upgrade_proof(proof_bytes, timeout=args.witness_timeout)
     proof = result.pop("proof", None)
     if proof:
         proof_file.write_bytes(proof)
@@ -414,9 +481,7 @@ def _witness_upgrade(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "command", choices=["publish", "verify", "witness-upgrade"]
-    )
+    parser.add_argument("command", choices=["publish", "verify", "witness-upgrade"])
     parser.add_argument("--provenance-root", type=Path, default=DEFAULT_PROVENANCE_ROOT)
     parser.add_argument("--identity-dir", type=Path, default=DEFAULT_IDENTITY_DIR)
     parser.add_argument("--anchor", type=Path, default=DEFAULT_ANCHOR_PATH)

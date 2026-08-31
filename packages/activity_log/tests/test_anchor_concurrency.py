@@ -105,10 +105,15 @@ def test_a_scan_that_changes_under_us_is_retried(tmp_path, monkeypatch):
     assert leaves == [leaf_a, leaf_b]
 
 
-def test_a_store_under_constant_write_pressure_still_produces_an_anchor(
-    tmp_path, monkeypatch
-):
-    """Never settling must degrade to a real point-in-time set, not an exception."""
+def test_a_store_that_never_settles_is_refused_not_signed(tmp_path, monkeypatch):
+    """This test previously asserted the opposite, and was wrong to.
+
+    It accepted the final unconfirmed scan as "a real point-in-time set taken
+    under contention". rglob walks directories in order, so a packet can land
+    in one already passed while another lands in one not yet reached: the set
+    was never the store at any instant. Signing it puts that fiction under a
+    signature. Refusing is the correct outcome; publishing is cheap to retry.
+    """
     calls = {"n": 0}
 
     def never_settles(root):
@@ -118,10 +123,39 @@ def test_a_store_under_constant_write_pressure_still_produces_an_anchor(
 
     monkeypatch.setattr(anchor_lib, "scan_packets", never_settles)
 
-    leaves, unreadable = anchor_lib._stable_scan(tmp_path)
+    with pytest.raises(anchor_lib.StoreContention):
+        anchor_lib._stable_scan(tmp_path)
 
-    assert len(leaves) == 1
     assert calls["n"] == 3, "bounded; a busy store must not spin"
+
+
+def test_contention_propagates_out_of_build_anchor(tmp_path, monkeypatch):
+    """Every caller of build_anchor is on its way to signing."""
+    calls = {"n": 0}
+
+    def never_settles(root):
+        calls["n"] += 1
+        return [anchor_lib.PacketLeaf("D" + "a" * 43, calls["n"], "E" + "a" * 43)], []
+
+    monkeypatch.setattr(anchor_lib, "scan_packets", never_settles)
+
+    with pytest.raises(anchor_lib.StoreContention):
+        anchor_lib.build_anchor(tmp_path)
+
+
+def test_a_changed_unreadable_set_also_counts_as_unsettled(tmp_path, monkeypatch):
+    """Damage appearing mid-scan is contention too, not a stable observation."""
+    leaf = anchor_lib.PacketLeaf("D" + "a" * 43, 0, "E" + "a" * 43)
+    calls = {"n": 0}
+
+    def churning_damage(root):
+        calls["n"] += 1
+        return [leaf], [{"path": f"p{calls['n']}.json", "error": "x", "sha256": "y"}]
+
+    monkeypatch.setattr(anchor_lib, "scan_packets", churning_damage)
+
+    with pytest.raises(anchor_lib.StoreContention):
+        anchor_lib._stable_scan(tmp_path)
 
 
 def test_a_settled_store_is_not_scanned_more_than_twice(tmp_path, monkeypatch):
@@ -187,3 +221,102 @@ def test_verification_survives_a_malformed_retained_anchor(tmp_path):
         anchor_lib.ANCHOR_MISMATCH,
         anchor_lib.ANCHOR_UNAVAILABLE,
     }
+
+
+# ---------------------------------------------------------------------------
+# Retained history must survive a migration that keeps the same root.
+# ---------------------------------------------------------------------------
+
+
+def _cli_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "provenance_anchor_cli", REPO_ROOT / "scripts" / "provenance_anchor.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_a_second_anchor_with_the_same_root_does_not_destroy_the_first(tmp_path):
+    """v2 and its v3 migration hash identically: the version is outside the tree."""
+    cli = _cli_module()
+    series_dir = tmp_path / "series"
+    series_dir.mkdir()
+    root = "E" + "r" * 43
+    v2 = json.dumps({"v": "flossi-anchor-2", "merkle_root": root}).encode()
+    v3 = json.dumps({"v": "flossi-anchor-3", "merkle_root": root}).encode()
+
+    first = cli._retain_series(series_dir, root, v2)
+    second = cli._retain_series(series_dir, root, v3)
+
+    assert first != second
+    assert first.read_bytes() == v2, "the superseded anchor was overwritten"
+    assert second.read_bytes() == v3
+
+
+def test_republishing_identical_bytes_is_idempotent(tmp_path):
+    cli = _cli_module()
+    series_dir = tmp_path / "series"
+    series_dir.mkdir()
+    root = "E" + "r" * 43
+    payload = json.dumps({"v": "flossi-anchor-3", "merkle_root": root}).encode()
+
+    first = cli._retain_series(series_dir, root, payload)
+    second = cli._retain_series(series_dir, root, payload)
+
+    assert first == second
+    assert len(list(series_dir.glob("*.json"))) == 1
+
+
+def test_duplicate_roots_resolve_to_the_newer_anchor_not_to_glob_order(tmp_path):
+    series_dir = tmp_path / "series"
+    series_dir.mkdir()
+    root = "E" + "r" * 43
+    # sorted() yields "{root}.2.json" before "{root}.json", so last-write-wins
+    # on glob order picks "{root}.json". Put the OLDER anchor there: the test
+    # only discriminates if plain glob order would give the wrong answer.
+    # (The first version of this test had them the other way round and passed
+    # against the unfixed code, which is what red-green is for.)
+    (series_dir / f"{root}.json").write_text(
+        json.dumps(
+            {"v": "flossi-anchor-2", "merkle_root": root, "generated_at": "2026-01-01"}
+        ),
+        encoding="utf-8",
+    )
+    (series_dir / f"{root}.2.json").write_text(
+        json.dumps(
+            {"v": "flossi-anchor-3", "merkle_root": root, "generated_at": "2026-08-30"}
+        ),
+        encoding="utf-8",
+    )
+
+    series = anchor_lib.load_series(series_dir)
+
+    assert series[root]["generated_at"] == "2026-08-30"
+
+
+# ---------------------------------------------------------------------------
+# An operator-writable witness sidecar must not take down the store verdict.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unreadable_witness_sidecar_does_not_lose_the_store_verdict(tmp_path):
+    cli = _cli_module()
+    from packages.activity_log import witness as witness_lib
+
+    root = "E" + "r" * 43
+    anchor_path = tmp_path / "anchor.json"
+    anchor_path.write_text("{}", encoding="utf-8")
+    # A directory where a file is expected: read_bytes raises OSError on every
+    # platform, which is the portable stand-in for locked or permission-denied.
+    proof_path = witness_lib.proof_path(tmp_path, root)
+    proof_path.mkdir(parents=True)
+
+    state = cli._witness_state(
+        anchor_path, {"merkle_root": root, "witnesses": [{"kind": "ots"}]}
+    )
+
+    assert state["status"] == witness_lib.WITNESS_UNAVAILABLE
+    assert state["claims_in_anchor"] == 1
