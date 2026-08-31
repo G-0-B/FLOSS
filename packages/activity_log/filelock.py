@@ -291,8 +291,15 @@ def _acquire_lock(
                 # By INSTANCE, not by pathname: an unlink here deleted whatever
                 # sat at this path, including a fresh lock a faster reclaimer had
                 # just taken.
-                reclaim_if_unchanged(lock_path, observed)
-                continue
+                if reclaim_if_unchanged(lock_path, observed):
+                    continue
+                # LOSING A RECLAIM IS CONTENTION, NOT PROGRESS.
+                #
+                # An unconditional `continue` skipped the deadline check and the
+                # sleep below, so a reclaim that keeps failing -- a rename
+                # refused by a virus scanner's handle, say -- span the retry
+                # loop at full speed and never timed out. Falling through means
+                # a caller still gets its TimeoutError instead of a hang.
             if time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"timed out acquiring provenance lock {lock_path} after "

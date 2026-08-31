@@ -235,6 +235,10 @@ def claim_singleton(pid_filename: str) -> bool:
             except OSError:
                 observed = None
             try:
+                observed_identity = _identity_path(pid_path).read_bytes()
+            except OSError:
+                observed_identity = None
+            try:
                 raw = pid_path.read_text(encoding="utf-8").strip()
             except OSError:
                 raw = ""
@@ -274,19 +278,21 @@ def claim_singleton(pid_filename: str) -> bool:
                     # mistaken for a dead one: a FRESH blank file still blocks,
                     # which is the property the wait above was added to protect.
                     if _blank_claim_is_stale(pid_path):
-                        # THE PID FILE GOES FIRST NOW, and the sidecar only if
-                        # we won it. Removing the sidecar up front was correct
-                        # when the reclaim was an unconditional unlink; with an
-                        # instance-checked reclaim that can REFUSE, deleting it
-                        # first destroys the winner's freshly written identity
-                        # whenever we lose -- and --check-identity then reports
-                        # UNKNOWN, so the stop script refuses to manage a live
-                        # daemon. Losing the race must cost us nothing.
-                        if _reclaim_claim_if_unchanged(pid_path, observed):
-                            try:
-                                _identity_path(pid_path).unlink(missing_ok=True)
-                            except OSError:
-                                pass
+                        # THE SIDECAR GOES FIRST AGAIN -- but content-checked.
+                        #
+                        # Taking it after a successful reclaim still had a
+                        # window: the pid file is free the instant we rename it
+                        # aside, so a new claimant can appear and write ITS
+                        # identity before our unlink lands, and we delete
+                        # theirs. Taking it first was the original order and was
+                        # only unsafe because it deleted by pathname. Routed
+                        # through the same instance check, it is safe in both
+                        # directions: we only ever remove the sidecar we
+                        # inspected, and a winner's fresh one is left alone.
+                        _reclaim_claim_if_unchanged(
+                            _identity_path(pid_path), observed_identity
+                        )
+                        _reclaim_claim_if_unchanged(pid_path, observed)
                         continue
                     return False
             try:
@@ -318,14 +324,11 @@ def claim_singleton(pid_filename: str) -> bool:
             # a daemon on one port. The rename is the atomic part: exactly one
             # caller moves a given file aside and the rest retry.
             #
-            # Sidecar AFTER, and only if the reclaim was ours. See the blank
-            # branch above: an instance-checked reclaim can refuse, and a
-            # sidecar removed before that answer is known is the winner's.
-            if _reclaim_claim_if_unchanged(pid_path, observed):
-                try:
-                    _identity_path(pid_path).unlink(missing_ok=True)
-                except OSError:
-                    pass
+            # Sidecar first and content-checked, as in the blank branch above:
+            # after the pid file is renamed aside the slot is free, so a taker
+            # can write its identity before our unlink would land.
+            _reclaim_claim_if_unchanged(_identity_path(pid_path), observed_identity)
+            _reclaim_claim_if_unchanged(pid_path, observed)
             continue
         else:
             try:
@@ -360,15 +363,26 @@ def claim_singleton(pid_filename: str) -> bool:
         claim.
         """
         try:
-            if pid_path.read_text(encoding="utf-8").strip() == str(me):
+            mine = pid_path.read_bytes()
+            if mine.decode("utf-8", "replace").strip() == str(me):
                 # SIDECAR FIRST, exactly as the stale-reclaim path does.
                 # Unlinking the PID file first opens a window in which a
                 # replacement launcher claims the freed slot and writes ITS
                 # identity -- which this callback then deletes. The replacement
                 # stays alive but unverifiable, so the stop script refuses to
                 # terminate it and every later launch stays blocked.
-                _identity_path(pid_path).unlink(missing_ok=True)
-                pid_path.unlink(missing_ok=True)
+                #
+                # And INSTANCE-CHECKED, like every other removal here. The
+                # ownership test above is a read; a slow shutdown can be judged
+                # stale and reclaimed between that read and these unlinks, and
+                # then this would delete the replacement's record by pathname.
+                # Same defect as the reclaim paths, on the way out instead of in.
+                try:
+                    identity_bytes = _identity_path(pid_path).read_bytes()
+                except OSError:
+                    identity_bytes = None
+                _reclaim_claim_if_unchanged(_identity_path(pid_path), identity_bytes)
+                _reclaim_claim_if_unchanged(pid_path, mine)
         except (OSError, ValueError):
             pass
 
@@ -585,11 +599,15 @@ def _reserve_slot_cli() -> int:
             observed = pid_path.read_bytes()
             if not observed.strip():
                 if _blank_claim_is_stale(pid_path):
-                    # Same ordering as claim_singleton: win the slot, then take
-                    # the sidecar. Losing must leave the winner's record intact.
+                    # Same ordering as claim_singleton: the sidecar first and
+                    # content-checked, then the claim.
+                    identity_path = _identity_path(pid_path)
+                    try:
+                        observed_identity = identity_path.read_bytes()
+                    except OSError:
+                        observed_identity = None
+                    _reclaim_claim_if_unchanged(identity_path, observed_identity)
                     reclaimed = _reclaim_claim_if_unchanged(pid_path, observed)
-                    if reclaimed:
-                        _identity_path(pid_path).unlink(missing_ok=True)
         except OSError:
             reclaimed = False
         if not reclaimed:
@@ -637,11 +655,14 @@ def _reclaim_claim_cli() -> int:
     except OSError:
         print("NOT_RECLAIMED")
         return 1
+    identity_path = _identity_path(pid_path)
+    try:
+        observed_identity = identity_path.read_bytes()
+    except OSError:
+        observed_identity = None
+    # Sidecar first and content-checked, matching claim_singleton.
+    _reclaim_claim_if_unchanged(identity_path, observed_identity)
     if _reclaim_claim_if_unchanged(pid_path, observed):
-        try:
-            _identity_path(pid_path).unlink(missing_ok=True)
-        except OSError:
-            pass
         print("RECLAIMED")
         return 0
     print("NOT_RECLAIMED")

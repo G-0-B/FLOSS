@@ -1584,3 +1584,38 @@ def test_rolling_back_restores_the_live_lock_when_the_slot_is_free(tmp_path):
 
     assert lock_path.read_bytes() == b"instance-A", "a live lock was not restored"
     assert not list(tmp_path.glob("*.reclaim-*"))
+
+
+def test_a_reclaim_that_keeps_failing_times_out_instead_of_spinning(tmp_path):
+    """An unconditional `continue` after a failed reclaim skipped the deadline
+    check and the sleep, so a rename refused every time -- a virus scanner's
+    handle, say -- span the retry loop at full speed and never timed out."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".wedged.lock"
+    lock_path.write_text("999999999\nstart\nabandoned", encoding="utf-8")
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    attempts = {"n": 0}
+    real_rename = os.rename
+
+    def refuse(src, dst):
+        if str(src) == str(lock_path):
+            attempts["n"] += 1
+            raise PermissionError(13, "held by another handle", str(src))
+        return real_rename(src, dst)
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(os, "rename", refuse)
+    try:
+        started = time.monotonic()
+        with pytest.raises(TimeoutError):
+            filelock._acquire_lock(lock_path, timeout_seconds=0.4, stale_seconds=1.0)
+        elapsed = time.monotonic() - started
+    finally:
+        monkey.undo()
+
+    assert attempts["n"] > 0, "the reclaim was never attempted"
+    assert elapsed >= 0.3, "returned before the deadline; it did not wait"
+    assert attempts["n"] < 200, f"spun {attempts['n']} times without sleeping"

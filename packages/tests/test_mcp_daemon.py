@@ -1043,21 +1043,44 @@ def test_losing_a_reclaim_race_leaves_the_winners_sidecar_intact(tmp_path):
     assert pid_path.exists(), "the record we lost the race for was removed"
 
 
-def test_claim_singleton_removes_the_sidecar_only_after_winning():
-    """Structural, because orchestrating the interleaving inside the retry loop
-    from outside it is not something a test can do honestly. Both reclaim sites
-    must take the pid file first and the sidecar only under the win."""
+def test_no_reclaim_site_removes_a_record_by_pathname():
+    """Every reclaim -- claim, sidecar, both branches -- goes through the
+    instance check.
+
+    The ordering assertion this replaced was written for the previous shape
+    (sidecar only after winning) and became wrong when the sidecar moved back to
+    the front, content-checked. Order is not the invariant; removing only what
+    was inspected is.
+    """
     source = (Path(__file__).resolve().parents[1] / "mcp_daemon.py").read_text(
         encoding="utf-8"
     )
     body = source.split("def claim_singleton(", 1)[1].split("\ndef ", 1)[0]
+    reserve = source.split("def _reserve_slot_cli(", 1)[1].split("\ndef ", 1)[0]
+    cli = source.split("def _reclaim_claim_cli(", 1)[1].split("\ndef ", 1)[0]
 
-    for block in body.split("_reclaim_claim_if_unchanged(pid_path, observed)")[:-1]:
-        tail = block.rsplit("\n", 6)[-6:]
-        assert not any(
-            "_identity_path(pid_path).unlink" in line for line in tail
-        ), "the sidecar is removed before the reclaim answer is known"
-    assert body.count("if _reclaim_claim_if_unchanged(pid_path, observed):") == 2
+    # Only the RECLAIM and RELEASE paths are in scope. The two remaining plain
+    # unlinks tidy up a claim this process created microseconds earlier and has
+    # not yet published, which it holds exclusively; they remove nothing another
+    # holder could own.
+    for name, section in (
+        ("_reserve_slot_cli", reserve),
+        ("_reclaim_claim_cli", cli),
+    ):
+        assert (
+            "unlink(missing_ok=True)" not in section
+        ), f"{name} still removes a record by pathname"
+        assert "_reclaim_claim_if_unchanged(" in section, f"{name} does not check"
+
+    reclaim_branches = body.split("_blank_claim_is_stale(pid_path)")[1:]
+    for branch in reclaim_branches:
+        head = branch.split("continue", 1)[0]
+        assert (
+            "unlink(missing_ok=True)" not in head
+        ), "a reclaim branch removes a record by pathname"
+
+    # Claim and sidecar, in both reclaim branches and in the release callback.
+    assert body.count("_reclaim_claim_if_unchanged(") == 6
 
 
 def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
