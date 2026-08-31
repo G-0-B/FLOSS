@@ -245,6 +245,45 @@ def _publish(args: argparse.Namespace) -> int:
     # linking to an unverifiable ancestor is the broken-series condition.
     migrating = False
     if previous is not None and previous.get("v") not in anchor_lib.SUPPORTED_VERSIONS:
+        # AUTHENTICATE BEFORE BELIEVING THE VERSION.
+        #
+        # `v` is a field in a file anyone who can write the repository can edit,
+        # and this branch acts on it by discarding `previous` -- which skips the
+        # entire verify-before-overwriting preflight below. Editing one v3
+        # anchor's `v` to garbage was therefore enough to make an ordinary
+        # publish sign a fresh genesis over a truncated store and launder the
+        # loss, with no --force anywhere.
+        #
+        # `v` is inside the signed pre-image, so tampering with it breaks the
+        # signature: a GENUINE legacy anchor still authenticates under its own
+        # signer, and a doctored one does not. That is the difference this
+        # branch has to test before it is allowed to throw the predecessor away.
+        unauthenticated = anchor_lib.anchor_signature_problem(previous)
+        if unauthenticated is not None and not args.force:
+            print(
+                f"refusing to migrate an anchor that does not authenticate: "
+                f"{unauthenticated}."
+            )
+            print(
+                f"  It claims format {previous.get('v')!r}, which this build "
+                f"does not verify. An unsupported version in a file that also "
+                f"fails its own signature is tampering or corruption, not a "
+                f"format bump -- and treating it as one would discard the "
+                f"predecessor and skip the loss check entirely."
+            )
+            series_dir = args.anchor.parent / anchor_lib.SERIES_DIRNAME
+            retained = anchor_lib.load_series(series_dir)
+            if retained:
+                print(
+                    f"  {len(retained)} retained anchor(s) remain in "
+                    f"{_display_path(series_dir)} to compare against."
+                )
+            print(
+                "  A genuinely old anchor signed under a pre-v2 rule cannot "
+                "authenticate here either; re-run with --force if you have "
+                "confirmed that is what this is."
+            )
+            return 2
         migrating = True
         print(
             f"anchor format migration: the current anchor is "

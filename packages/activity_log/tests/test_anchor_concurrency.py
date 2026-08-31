@@ -860,3 +860,94 @@ def test_the_envelope_survives_even_an_absurd_limit(tmp_path):
     parsed = json.loads(rendered)
     assert parsed["status"] == "TRUNCATION_DETECTED"
     assert parsed["anchored_packets"] == 9
+
+
+# ---------------------------------------------------------------------------
+# The migration path discarded the predecessor on the strength of one field.
+# ---------------------------------------------------------------------------
+
+
+def test_editing_the_version_field_cannot_launder_a_truncated_store(
+    tmp_path, small_store
+):
+    """`v` is a field anyone who can write the repo can edit, and this branch
+    acted on it by discarding `previous` -- skipping the whole loss preflight.
+    One edit was enough to make an ordinary publish sign a fresh genesis over a
+    truncated store with no --force anywhere."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    # Truncate the store, then doctor only the version field.
+    victim = sorted(small_store.rglob("*.json"))[0]
+    victim.unlink()
+    stored = json.loads(anchor_path.read_text(encoding="utf-8"))
+    stored["v"] = "flossi-anchor-1"
+    anchor_path.write_text(json.dumps(stored, indent=2), encoding="utf-8")
+
+    code = cli.main(base + ["publish"])
+
+    assert code == 2, "a doctored version field bypassed the loss preflight"
+
+
+def test_a_genuine_legacy_anchor_still_migrates(tmp_path, small_store, monkeypatch):
+    """The guard must narrow to anchors that fail their own signature, not
+    block every format bump -- which is the escape route a bump needs."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    # Same anchor, unedited and therefore still authentic; this build simply
+    # stops recognising its version.
+    monkeypatch.setattr(
+        cli.anchor_lib, "SUPPORTED_VERSIONS", frozenset({"flossi-anchor-9"})
+    )
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+
+    assert cli.main(base + ["publish"]) == 0
+
+
+def test_force_still_migrates_an_unauthenticated_anchor(tmp_path, small_store):
+    """A genuinely pre-v2 anchor cannot authenticate under today's rule either,
+    so the documented override has to keep working."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    stored = json.loads(anchor_path.read_text(encoding="utf-8"))
+    stored["v"] = "flossi-anchor-1"
+    anchor_path.write_text(json.dumps(stored, indent=2), encoding="utf-8")
+
+    assert cli.main(base + ["publish", "--force"]) == 0
