@@ -49,6 +49,31 @@ def _reclaim_claim_if_unchanged(pid_path: Path, observed: bytes | None) -> bool:
         return True
 
 
+def _sidecar_cleared(pid_path: Path) -> bool:
+    """True when no identity sidecar of the inspected holder remains.
+
+    ABSENT AND UNREADABLE ARE DIFFERENT ANSWERS, and folding both into a None
+    `observed` made them one. Absent is the ordinary case -- most stale claims
+    never had a sidecar -- and reclaiming the pid record then is right.
+    Unreadable means we cannot tell whose identity that is, and freeing the slot
+    while a foreign sidecar remains is the non-conservative failure this file
+    already warns about: the next claimant compares its own pid against someone
+    else's token, reads FOREIGN, and reclaims a record that may be live.
+
+    So the pid record is freed only when the sidecar is provably gone -- never
+    absent by assumption.
+    """
+
+    sidecar = _identity_path(pid_path)
+    try:
+        observed = sidecar.read_bytes()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return _reclaim_claim_if_unchanged(sidecar, observed)
+
+
 def _blank_claim_is_stale(pid_path: Path) -> bool:
     """True when an empty claim file is old enough to be a crashed reserver."""
 
@@ -235,10 +260,6 @@ def claim_singleton(pid_filename: str) -> bool:
             except OSError:
                 observed = None
             try:
-                observed_identity = _identity_path(pid_path).read_bytes()
-            except OSError:
-                observed_identity = None
-            try:
                 raw = pid_path.read_text(encoding="utf-8").strip()
             except OSError:
                 raw = ""
@@ -289,9 +310,10 @@ def claim_singleton(pid_filename: str) -> bool:
                         # through the same instance check, it is safe in both
                         # directions: we only ever remove the sidecar we
                         # inspected, and a winner's fresh one is left alone.
-                        _reclaim_claim_if_unchanged(
-                            _identity_path(pid_path), observed_identity
-                        )
+                        if not _sidecar_cleared(pid_path):
+                            # Someone else's identity, or one we cannot read.
+                            # Freeing the slot under it is the dangerous half.
+                            continue
                         _reclaim_claim_if_unchanged(pid_path, observed)
                         continue
                     return False
@@ -327,7 +349,8 @@ def claim_singleton(pid_filename: str) -> bool:
             # Sidecar first and content-checked, as in the blank branch above:
             # after the pid file is renamed aside the slot is free, so a taker
             # can write its identity before our unlink would land.
-            _reclaim_claim_if_unchanged(_identity_path(pid_path), observed_identity)
+            if not _sidecar_cleared(pid_path):
+                continue
             _reclaim_claim_if_unchanged(pid_path, observed)
             continue
         else:
@@ -601,13 +624,9 @@ def _reserve_slot_cli() -> int:
                 if _blank_claim_is_stale(pid_path):
                     # Same ordering as claim_singleton: the sidecar first and
                     # content-checked, then the claim.
-                    identity_path = _identity_path(pid_path)
-                    try:
-                        observed_identity = identity_path.read_bytes()
-                    except OSError:
-                        observed_identity = None
-                    _reclaim_claim_if_unchanged(identity_path, observed_identity)
-                    reclaimed = _reclaim_claim_if_unchanged(pid_path, observed)
+                    reclaimed = _sidecar_cleared(pid_path) and (
+                        _reclaim_claim_if_unchanged(pid_path, observed)
+                    )
         except OSError:
             reclaimed = False
         if not reclaimed:
@@ -655,14 +674,9 @@ def _reclaim_claim_cli() -> int:
     except OSError:
         print("NOT_RECLAIMED")
         return 1
-    identity_path = _identity_path(pid_path)
-    try:
-        observed_identity = identity_path.read_bytes()
-    except OSError:
-        observed_identity = None
-    # Sidecar first and content-checked, matching claim_singleton.
-    _reclaim_claim_if_unchanged(identity_path, observed_identity)
-    if _reclaim_claim_if_unchanged(pid_path, observed):
+    # Sidecar first and content-checked, matching claim_singleton: the record is
+    # freed only once no foreign identity is left sitting beside it.
+    if _sidecar_cleared(pid_path) and _reclaim_claim_if_unchanged(pid_path, observed):
         print("RECLAIMED")
         return 0
     print("NOT_RECLAIMED")

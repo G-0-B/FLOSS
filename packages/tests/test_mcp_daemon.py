@@ -1079,8 +1079,11 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
             "unlink(missing_ok=True)" not in head
         ), "a reclaim branch removes a record by pathname"
 
-    # Claim and sidecar, in both reclaim branches and in the release callback.
-    assert body.count("_reclaim_claim_if_unchanged(") == 6
+    # The sidecar goes through _sidecar_cleared (which reclaims it by instance
+    # and distinguishes absent from unreadable); the claim goes through the
+    # helper directly. Both reclaim branches, plus the release callback's pair.
+    assert body.count("_sidecar_cleared(pid_path)") == 2
+    assert body.count("_reclaim_claim_if_unchanged(") == 4
 
 
 def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
@@ -1112,3 +1115,87 @@ def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
 
     # Already gone is success, not an error: the slot is free either way.
     assert run().stdout.strip().splitlines()[-1] == "RECLAIMED"
+
+
+def test_an_unreadable_sidecar_stops_the_claim_from_being_freed(tmp_path):
+    """Absent and unreadable are different answers. Absent is ordinary -- most
+    stale claims never had a sidecar. Unreadable means we cannot tell whose
+    identity it is, and freeing the slot under a foreign one is the
+    non-conservative failure: the next claimant compares its own pid against
+    someone else's token, reads FOREIGN, and reclaims a record that may be live.
+    """
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"")
+    stale = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (stale, stale))
+    sidecar = mcp_daemon._identity_path(pid_path)
+    sidecar.write_text("someone-elses-identity", encoding="utf-8")
+
+    monkey = pytest.MonkeyPatch()
+    real_read = Path.read_bytes
+
+    def deny_the_sidecar(self):
+        if self == sidecar:
+            raise PermissionError(13, "denied", str(self))
+        return real_read(self)
+
+    monkey.setattr(Path, "read_bytes", deny_the_sidecar)
+    monkey.setattr(sys, "argv", ["mcp_daemon", "--reserve-slot", str(pid_path)])
+    try:
+        assert mcp_daemon._reserve_slot_cli() == 1
+    finally:
+        monkey.undo()
+
+    assert pid_path.exists(), "the slot was freed under an unreadable sidecar"
+    assert sidecar.read_text(encoding="utf-8") == "someone-elses-identity"
+
+
+def test_an_absent_sidecar_does_not_block_reclamation(tmp_path):
+    """The guard must narrow to unreadable. Most stale claims have no sidecar at
+    all, and refusing those would strand every one of them."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"")
+    stale = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
+    os.utime(pid_path, (stale, stale))
+    assert not mcp_daemon._identity_path(pid_path).exists()
+
+    assert mcp_daemon._sidecar_cleared(pid_path) is True
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(sys, "argv", ["mcp_daemon", "--reserve-slot", str(pid_path)])
+    try:
+        assert mcp_daemon._reserve_slot_cli() == 0
+    finally:
+        monkey.undo()
+
+
+def test_a_foreign_sidecar_stops_the_claim_from_being_freed(tmp_path):
+    """The sidecar reclaim can also REFUSE -- a winner's fresh identity. Freeing
+    the pid record then leaves their token beside a slot anyone may take."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+    sidecar.write_text("the-winners-identity", encoding="utf-8")
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(mcp_daemon, "_reclaim_claim_if_unchanged", lambda p, o: False)
+    try:
+        assert mcp_daemon._sidecar_cleared(pid_path) is False
+    finally:
+        monkey.undo()
+
+    assert sidecar.read_text(encoding="utf-8") == "the-winners-identity"
