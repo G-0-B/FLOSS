@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -98,27 +99,40 @@ def _retain_series(series_dir: Path, root: str, payload: bytes) -> Path:
     A genuinely different anchor with the same root is retained beside it.
     """
 
-    target = series_dir / f"{root}.json"
-    if not target.exists():
-        target.write_bytes(payload)
-        return target
-    try:
-        if target.read_bytes() == payload:
-            return target
-    except OSError:
-        pass
-    n = 2
+    # EXCLUSIVE CREATE, not exists()-then-write.
+    #
+    # The store lock is released by build_anchor() long before this runs, and a
+    # publish that requests a witness spends seconds on the network in between,
+    # so two invocations can both observe the same name absent and both write
+    # it -- one clobbering the other, which is the single thing this function
+    # promises never to do. O_CREAT|O_EXCL makes exactly one creator win at the
+    # filesystem level, the same primitive claim_singleton and --reserve-slot
+    # use. Losing the race is not an error: fall through, compare, and either
+    # recognise identical bytes or take the next name.
+    candidate = 1
     while True:
-        sibling = series_dir / f"{root}.{n}.json"
-        if not sibling.exists():
-            sibling.write_bytes(payload)
-            return sibling
+        name = f"{root}.json" if candidate == 1 else f"{root}.{candidate}.json"
+        path = series_dir / name
         try:
-            if sibling.read_bytes() == payload:
-                return sibling
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                if path.read_bytes() == payload:
+                    return path
+            except OSError:
+                pass
+            candidate += 1
+            continue
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(payload)
         except OSError:
-            pass
-        n += 1
+            # An empty file we created but could not fill is worse than none:
+            # the next publish would compare against it and take a new name
+            # forever. Remove it and let the caller see the failure.
+            path.unlink(missing_ok=True)
+            raise
+        return path
 
 
 def _display_path(path: Path) -> str:
@@ -296,7 +310,14 @@ def _publish(args: argparse.Namespace) -> int:
     # A test in test_anchor.py already documented that anchoring an unchanged
     # store twice produces prev_root == merkle_root. Noticing the property and
     # not guarding the caller is how this shipped.
-    if previous is not None and built["merkle_root"] == previous.get("merkle_root"):
+    #
+    # BUT THE ROOT IS NOT THE WHOLE ANCHOR. The signer is outside the Merkle
+    # tree, so a key rotation over an unchanged store produces a genuinely
+    # different anchor that this check called a no-op -- making rotation
+    # impossible in precisely the case an operator rotates in: swap the key,
+    # re-anchor the same store. When a rotation is being requested, the decision
+    # moves below, after the signer is known; the guard is unchanged otherwise.
+    def _unchanged_noop() -> int:
         print(
             json.dumps(
                 {
@@ -314,7 +335,14 @@ def _publish(args: argparse.Namespace) -> int:
         )
         return 0
 
+    unchanged_root = previous is not None and built["merkle_root"] == previous.get(
+        "merkle_root"
+    )
+    if unchanged_root and not args.allow_signer_change:
+        return _unchanged_noop()
+
     identity = _resolve_identity(args.identity_dir, args.allow_new_identity)
+    rotating = False
 
     # Signer continuity. If a previous anchor exists, its signer is the implicit
     # pin: changing it mid-series is precisely the rotation attack the spec
@@ -334,6 +362,40 @@ def _publish(args: argparse.Namespace) -> int:
                 f"Pass --allow-signer-change if the rotation is intended."
             )
             return 3
+        elif isinstance(prior_signer, str) and prior_signer != identity.aid:
+            # A ROTATION STARTS A NEW SERIES.
+            #
+            # verify pins the signer from the head and checks every ancestor
+            # against it, so a series that spans a rotation fails its own
+            # default verification on the first ancestor -- the publish command
+            # would allow a rotation that verify can never accept. The same
+            # reasoning the format-migration path already uses: an ancestor this
+            # build cannot verify must not be chained to, it must be superseded.
+            # The old series stays on disk as history; it is simply no longer
+            # walked from this head.
+            rotating = True
+            print(
+                f"anchor signer rotation: previous={prior_signer} "
+                f"now={identity.aid}."
+            )
+            print(
+                "  Starting a NEW series. The previous anchors remain retained "
+                "as history, but this head does not chain to them: verify pins "
+                "the head's signer for the whole walk, so a series spanning a "
+                "rotation could never verify."
+            )
+
+    if unchanged_root and not rotating:
+        # --allow-signer-change was passed but the key is the same, so this is
+        # the redundant republish the guard above exists to stop.
+        return _unchanged_noop()
+
+    if rotating:
+        # Break the link BEFORE signing, so the rotation is inside the signed
+        # bytes rather than an unsigned edit afterwards. The identity check runs
+        # after build_anchor, so the anchor already carries the old head's root.
+        built["prev_root"] = None
+        built["prev_generated_at"] = None
 
     # Witness BEFORE signing. The root is computed over leaves only, so
     # attaching a witness record does not change it -- but the record must be

@@ -414,3 +414,197 @@ def test_force_still_overrides_an_unreadable_anchor(tmp_path, small_store):
 
     assert forced.returncode == 0, forced.stdout + forced.stderr[-300:]
     assert json.loads(anchor_path.read_text(encoding="utf-8"))["v"]
+
+
+# ---------------------------------------------------------------------------
+# A store-supplied sequence must not size a loop.
+# ---------------------------------------------------------------------------
+
+
+def test_an_implausible_sequence_is_damage_not_a_chain_position(tmp_path):
+    """One packet at s=10^12 made publish build a trillion-element gap list
+    before it could sign or report anything: a denial of service supplied by
+    the store, against the command that inspects the store."""
+    identity = load_or_create_identity(tmp_path / "id")
+    store = tmp_path / "provenance"
+    packet, path = provenance.create_packet(
+        [{"kind": "note", "detail": "d"}],
+        identity_dir=tmp_path / "id",
+        output_root=store,
+    )
+    assert identity is not None
+    # Re-sign at an absurd sequence so the SAID is genuinely satisfied -- a
+    # fixture that merely claims one is rejected earlier for the wrong reason.
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["s"] = str(anchor_lib.MAX_SEQUENCE + 1)
+    document["d"] = ""
+    document["sigs"] = []
+    import blake3
+    import jcs
+
+    document["d"] = (
+        "E"
+        + __import__("base64")
+        .urlsafe_b64encode(blake3.blake3(jcs.canonicalize(document)).digest())
+        .decode()[:43]
+    )
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    leaves, unreadable = anchor_lib.scan_packets(store)
+
+    assert leaves == [], "an implausible sequence must not become a leaf"
+    assert any("implausible sequence" in u["error"] for u in unreadable)
+
+
+def test_the_gap_diagnostic_is_bounded(monkeypatch):
+    """Even inside the sequence bound, one packet at the top implies a million
+    gaps. The list is a diagnostic; an unreadable one is not worth the memory."""
+    monkeypatch.setattr(anchor_lib, "MAX_REPORTED_GAPS", 5)
+    leaves = [
+        anchor_lib.PacketLeaf("D" + "a" * 43, 0, "E" + "a" * 43),
+        anchor_lib.PacketLeaf("D" + "a" * 43, 50, "E" + "b" * 43),
+    ]
+
+    summary = anchor_lib._identity_summaries(leaves)[0]
+
+    assert len(summary["interior_gaps"]) == 5
+    assert summary["interior_gaps_truncated"] is True
+
+
+def test_positions_come_from_the_leaves_not_from_subtraction():
+    """anchored_positions reconstructed {0..max_seq} minus gaps, which costs
+    max_seq rather than the packet count -- and is simply wrong once the gap
+    list is truncated."""
+    anchor = {
+        "identities": [
+            {
+                "aid": "D" + "a" * 43,
+                "max_seq": 900_000,
+                "leaf_saids": [[0, "E" + "a" * 43], [900_000, "E" + "b" * 43]],
+                "interior_gaps": [1, 2, 3],
+                "interior_gaps_truncated": True,
+            }
+        ]
+    }
+
+    positions = anchor_lib.anchored_positions(anchor)
+
+    assert positions == {("D" + "a" * 43, 0), ("D" + "a" * 43, 900_000)}
+
+
+def test_a_truncated_gap_list_is_never_subtracted_from(tmp_path):
+    """Without leaf_saids there is nothing exact to read, and subtracting an
+    incomplete gap list would INVENT occupied slots. Report none instead."""
+    anchor = {
+        "identities": [
+            {
+                "aid": "D" + "a" * 43,
+                "max_seq": 900_000,
+                "interior_gaps": [1],
+                "interior_gaps_truncated": True,
+            }
+        ]
+    }
+
+    assert anchor_lib.anchored_positions(anchor) == set()
+
+
+# ---------------------------------------------------------------------------
+# Retention must not lose a race, and a rotation must produce a series that
+# the default verify can actually accept.
+# ---------------------------------------------------------------------------
+
+
+def test_retention_never_clobbers_a_file_that_appeared_mid_write(tmp_path, monkeypatch):
+    """The store lock is released by build_anchor long before retention runs,
+    and a witnessed publish spends seconds on the network in between. exists()
+    then write() let both invocations pick the same name."""
+    cli = _cli_module()
+    series_dir = tmp_path / "series"
+    series_dir.mkdir()
+    root = "E" + "r" * 43
+    rival = json.dumps({"v": "flossi-anchor-3", "merkle_root": root, "n": 1}).encode()
+    mine = json.dumps({"v": "flossi-anchor-3", "merkle_root": root, "n": 2}).encode()
+
+    (series_dir / f"{root}.json").write_bytes(rival)
+    # Simulate the RACE, not merely the collision: the rival lands after our
+    # existence check and before our write. exists() reporting False over a
+    # file that is really there is exactly what the loser of that race sees.
+    # Without this the test passes against the old code, which handled a
+    # collision it had already observed.
+    monkeypatch.setattr(Path, "exists", lambda self: False)
+    written = cli._retain_series(series_dir, root, mine)
+    monkeypatch.undo()
+
+    assert written.name == f"{root}.2.json"
+    assert (series_dir / f"{root}.json").read_bytes() == rival, "rival was clobbered"
+    assert written.read_bytes() == mine
+
+
+def test_a_rotation_starts_a_new_series_instead_of_an_unverifiable_one(
+    tmp_path, small_store
+):
+    """verify pins the head's signer for the WHOLE walk, so a series spanning a
+    rotation fails its own default verification on the first ancestor: publish
+    would allow a rotation verify could never accept."""
+    anchor_path = tmp_path / "anchor.json"
+    first = _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+    assert first.returncode == 0, first.stdout
+
+    import subprocess
+    import sys as _sys
+
+    rotated = subprocess.run(
+        [
+            _sys.executable,
+            str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+            "--provenance-root",
+            str(small_store),
+            "--identity-dir",
+            str(tmp_path / "id2"),
+            "--anchor",
+            str(anchor_path),
+            "publish",
+            "--allow-new-identity",
+            "--allow-signer-change",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert rotated.returncode == 0, rotated.stdout + rotated.stderr[-300:]
+    assert "signer rotation" in rotated.stdout
+    head = json.loads(anchor_path.read_text(encoding="utf-8"))
+    assert head["prev_root"] is None, "rotated head still chains to the old signer"
+
+    verified = subprocess.run(
+        [
+            _sys.executable,
+            str(REPO_ROOT / "scripts" / "provenance_anchor.py"),
+            "--provenance-root",
+            str(small_store),
+            "--identity-dir",
+            str(tmp_path / "id2"),
+            "--anchor",
+            str(anchor_path),
+            "verify",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    verdict = json.loads(verified.stdout)
+    assert verdict["status"] == anchor_lib.VERIFIED, verdict
+
+
+def test_a_redundant_republish_is_still_a_no_op_even_with_the_rotation_flag(
+    tmp_path, small_store
+):
+    """--allow-signer-change must not become a way to publish an anchor that is
+    its own predecessor, which is the cycle the no-op guard exists to stop."""
+    anchor_path = tmp_path / "anchor.json"
+    _publish_cmd(tmp_path, small_store, anchor_path, "--allow-new-identity")
+
+    again = _publish_cmd(tmp_path, small_store, anchor_path, "--allow-signer-change")
+
+    assert again.returncode == 0
+    assert '"status": "unchanged"' in again.stdout

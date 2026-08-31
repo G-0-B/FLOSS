@@ -108,6 +108,18 @@ EXIT_CODES = {
 UNAVAILABLE_NOTE = "NOT a pass. Store is unverifiable, not verified."
 
 
+# A per-identity chain position. The live store's deepest chain is single
+# digits; a million is already far past anything a real agent produces, and a
+# packet beyond it is recorded as damage rather than trusted to size a loop.
+MAX_SEQUENCE = 1_000_000
+
+# Even inside that bound one packet at the top can imply a million gaps. The
+# gap list is a DIAGNOSTIC -- it names what is missing so damage cannot later
+# be laundered as pre-existing -- and a diagnostic nobody can read is not worth
+# unbounded memory. Past this many, the list is truncated and says so.
+MAX_REPORTED_GAPS = 10_000
+
+
 @dataclass(frozen=True)
 class PacketLeaf:
     identity: str
@@ -299,6 +311,28 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
                 }
             )
             continue
+        # A SEQUENCE IS A CHAIN POSITION, NOT AN ARBITRARY INTEGER.
+        #
+        # `int()` accepts any decimal, and the per-identity summary below
+        # enumerates every missing slot up to the highest one seen. A single
+        # SAID-satisfying packet claiming s=1000000000000 therefore made
+        # `publish` build a trillion-element list before it could sign or
+        # report anything -- a store-supplied denial of service on the command
+        # that inspects the store. Bounded HERE rather than at each consumer:
+        # one guard covers the summary, the position reconstruction, and any
+        # later reader, which is the sweep this file keeps needing.
+        if slot > MAX_SEQUENCE:
+            unreadable.append(
+                {
+                    "path": _relative(path, provenance_root),
+                    "error": (
+                        f"implausible sequence {slot} (limit {MAX_SEQUENCE}); "
+                        "a chain position this large is damage, not a chain"
+                    ),
+                    "sha256": _file_digest(path),
+                }
+            )
+            continue
         # THE SAID MUST BE SATISFIED, NOT MERELY CLAIMED.
         #
         # The leaf used to be built from `t`/`i`/`s`/`d` copied straight off the
@@ -356,6 +390,15 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
         for slot in sequences:
             counts[slot] = counts.get(slot, 0) + 1
         top = max(sequences)
+        gaps: list[int] = []
+        truncated = False
+        for n in range(top + 1):
+            if n in present:
+                continue
+            if len(gaps) >= MAX_REPORTED_GAPS:
+                truncated = True
+                break
+            gaps.append(n)
         summaries.append(
             {
                 "aid": aid,
@@ -374,7 +417,8 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
                 # Recorded IN the anchor on purpose. Freezing the store's known
                 # damage means later damage cannot be laundered as
                 # pre-existing.
-                "interior_gaps": [n for n in range(top + 1) if n not in present],
+                "interior_gaps": gaps,
+                "interior_gaps_truncated": truncated,
                 "duplicate_seqs": sorted(n for n, c in counts.items() if c > 1),
             }
         )
@@ -422,8 +466,29 @@ def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
     positions: set[tuple[str, int]] = set()
     for entry in anchor.get("identities", []) or []:
         aid = entry.get("aid")
+        if not isinstance(aid, str):
+            continue
+        # PREFER leaf_saids: it lists what was anchored, so the set is exact and
+        # its cost is the number of packets. The reconstruction below derives
+        # the same set by SUBTRACTION -- {0..max_seq} minus the gaps -- which
+        # costs max_seq rather than count, and is wrong outright if the gap list
+        # was truncated. v3 always records leaf_saids; the fallback exists for
+        # anchors published before it did.
+        leaves = entry.get("leaf_saids")
+        if isinstance(leaves, list) and leaves:
+            for item in leaves:
+                if (
+                    isinstance(item, list)
+                    and len(item) == 2
+                    and isinstance(item[0], int)
+                ):
+                    positions.add((aid, item[0]))
+            continue
         top = entry.get("max_seq")
-        if not isinstance(aid, str) or not isinstance(top, int) or top < 0:
+        if not isinstance(top, int) or top < 0 or top > MAX_SEQUENCE:
+            continue
+        if entry.get("interior_gaps_truncated"):
+            # Subtracting an incomplete gap list would invent occupied slots.
             continue
         gaps = {g for g in (entry.get("interior_gaps") or []) if isinstance(g, int)}
         positions.update((aid, n) for n in range(top + 1) if n not in gaps)
