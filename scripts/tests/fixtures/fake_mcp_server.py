@@ -109,7 +109,14 @@ def main() -> None:
             tool_name = params.get("name")
             arguments = params.get("arguments") or {}
 
-            if tool_name == "memory_save":
+            if MODE == "toolerror":
+                # A well-formed JSON-RPC RESULT that reports tool failure. Not a
+                # transport error: the envelope is valid, the call failed.
+                result = {
+                    "content": [{"type": "text", "text": "quota exceeded"}],
+                    "isError": True,
+                }
+            elif tool_name == "memory_save":
                 result = _fake_save_result(arguments)
             elif tool_name == "memory_recall":
                 result = _fake_recall_result()

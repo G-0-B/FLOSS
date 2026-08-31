@@ -207,3 +207,49 @@ def test_timeout_path_never_writes_to_stdout(tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+# ---------------------------------------------------------------------------
+# An explicit tool error is not a confirmed save.
+# ---------------------------------------------------------------------------
+
+
+def test_save_reports_failure_for_an_explicit_tool_error(tmp_path):
+    """`isError: true` returned True, from a function documented otherwise.
+
+    _extract_text() correctly refused the result, and save() read that refusal
+    as "unparseable payload" and fell through to "a result dict is present, so
+    it worked" -- reporting confirmed persistence for a tool that failed. Two
+    readers of one envelope, each deciding for itself what an error was.
+    """
+    module = load_client_module(tmp_path, mode="toolerror")
+
+    assert module.save("some observation") is False
+
+
+def test_the_recall_paths_also_report_failure_for_an_explicit_tool_error(tmp_path):
+    """Both readers already failed closed here; pin that they still do."""
+    module = load_client_module(tmp_path, mode="toolerror")
+
+    ok, results = module.recall_status("query")
+
+    assert ok is False
+    assert results == []
+    assert module.recall("query") == []
+
+
+def test_an_unparseable_payload_on_a_successful_call_is_still_a_save(tmp_path):
+    """The fix must narrow to explicit failures, not swallow ordinary success."""
+    module = load_client_module(tmp_path, mode="ok")
+
+    ok_envelope = {"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text"}]}}
+
+    assert module._call_failed(ok_envelope) is False
+    assert module._extract_text(ok_envelope) is None
+
+
+def test_a_transport_error_and_a_missing_result_are_both_failures(tmp_path):
+    module = load_client_module(tmp_path, mode="ok")
+
+    assert module._call_failed({"error": {"code": -32000}}) is True
+    assert module._call_failed({"jsonrpc": "2.0", "id": 1}) is True

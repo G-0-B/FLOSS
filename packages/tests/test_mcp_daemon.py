@@ -3,6 +3,7 @@
 Tests PID-singleton enforcement and audit-append functionality.
 Run: C:\\Python313\\python.exe -m pytest FLOSS/packages/tests/test_mcp_daemon.py -v
 """
+
 import os
 import sys
 import tempfile
@@ -48,6 +49,7 @@ def test_audit_appender_writes_jsonl(tmp_path, monkeypatch):
     lines = sink.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     import json
+
     row0 = json.loads(lines[0])
     assert row0["tool"] == "submit_claim"
     assert row0["payload"]["claim_id"] == "test-123"
@@ -211,7 +213,9 @@ def test_claim_singleton_reclaims_a_dead_holder(tmp_path, monkeypatch):
     (tmp_path / "slot.pid").write_text("999999", encoding="utf-8")
 
     assert mcp_daemon.claim_singleton("slot.pid") is True
-    assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == str(os.getpid())
+    assert (tmp_path / "slot.pid").read_text(encoding="utf-8").strip() == str(
+        os.getpid()
+    )
 
 
 def test_release_does_not_delete_another_process_claim(tmp_path, monkeypatch):
@@ -357,7 +361,9 @@ def test_identity_cli_exit_codes(tmp_path, monkeypatch):
     pid_path = tmp_path / "cli.pid"
 
     def run() -> int:
-        monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--check-identity", str(pid_path)])
+        monkeypatch.setattr(
+            sys, "argv", ["mcp_daemon", "--check-identity", str(pid_path)]
+        )
         return mcp_daemon._identity_cli()
 
     pid_path.write_text(str(os.getpid()), encoding="utf-8")
@@ -407,9 +413,15 @@ def test_identity_cli_prints_the_verdict_on_stdout():
 
         def run():
             result = subprocess.run(
-                [sys.executable, "-m", "packages.mcp_daemon",
-                 "--check-identity", str(pid_path)],
-                capture_output=True, text=True,
+                [
+                    sys.executable,
+                    "-m",
+                    "packages.mcp_daemon",
+                    "--check-identity",
+                    str(pid_path),
+                ],
+                capture_output=True,
+                text=True,
                 cwd=str(Path(__file__).resolve().parents[2]),
             )
             return result.stdout.strip(), result.returncode
@@ -432,7 +444,8 @@ def test_a_failed_checker_launch_produces_no_token():
 
     result = subprocess.run(
         [sys.executable, "-c", "import sys; sys.exit(1)"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 1, "a failed launch shares the FOREIGN exit code"
     assert result.stdout.strip() == "", "but it cannot produce the token"
@@ -452,7 +465,7 @@ def test_the_stop_script_resolves_the_repository_interpreter():
 
 
 def test_the_stop_script_does_not_force_kill_shared_node_processes():
-    """"Stop my two daemons" must not take down another agent's live session.
+    """ "Stop my two daemons" must not take down another agent's live session.
 
     The agentmemory/JanuScope block matched every node.exe on the host mentioning
     those names and force-killed all of them, checking neither parent liveness
@@ -505,9 +518,9 @@ def test_pid_alive_is_false_for_a_terminated_process():
     proc.kill()
     proc.wait()
     time.sleep(1.0)
-    assert mcp_daemon._pid_alive(proc.pid) is False, (
-        "a killed and reaped process must not read as alive"
-    )
+    assert (
+        mcp_daemon._pid_alive(proc.pid) is False
+    ), "a killed and reaped process must not read as alive"
     assert mcp_daemon._pid_alive(999999999) is False
     assert mcp_daemon._pid_alive(os.getpid()) is True
 
@@ -524,7 +537,8 @@ def test_record_identity_writes_a_verifiable_pair(tmp_path):
         def run(*args):
             result = subprocess.run(
                 [sys.executable, "-m", "packages.mcp_daemon", *args],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
                 cwd=str(Path(__file__).resolve().parents[2]),
             )
             return result.stdout.strip(), result.returncode
@@ -538,8 +552,15 @@ def test_record_identity_writes_a_verifiable_pair(tmp_path):
 
     time.sleep(1.0)
     after = subprocess.run(
-        [sys.executable, "-m", "packages.mcp_daemon", "--check-identity", str(pid_path)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "packages.mcp_daemon",
+            "--check-identity",
+            str(pid_path),
+        ],
+        capture_output=True,
+        text=True,
         cwd=str(Path(__file__).resolve().parents[2]),
     )
     assert after.stdout.strip() == "FOREIGN", "a dead recorded PID is not ours"
@@ -549,9 +570,16 @@ def test_recording_a_dead_pid_is_refused(tmp_path):
     import subprocess
 
     result = subprocess.run(
-        [sys.executable, "-m", "packages.mcp_daemon",
-         "--record-identity", str(tmp_path / "x.pid"), "999999999"],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "packages.mcp_daemon",
+            "--record-identity",
+            str(tmp_path / "x.pid"),
+            "999999999",
+        ],
+        capture_output=True,
+        text=True,
         cwd=str(Path(__file__).resolve().parents[2]),
     )
     assert result.stdout.strip() == "NOT_RUNNING"
@@ -590,9 +618,9 @@ def test_the_start_script_parses_under_windows_powershell_5():
 
 
 def _script(name: str) -> str:
-    return (
-        Path(__file__).resolve().parents[2] / "scripts" / name
-    ).read_text(encoding="utf-8")
+    return (Path(__file__).resolve().parents[2] / "scripts" / name).read_text(
+        encoding="utf-8"
+    )
 
 
 def test_no_stop_process_deletes_a_record_without_confirming(tmp_path):
@@ -606,14 +634,15 @@ def test_no_stop_process_deletes_a_record_without_confirming(tmp_path):
     """
     script = _script("stop_mcp_daemons.ps1")
     kills = [
-        line for line in script.splitlines()
+        line
+        for line in script.splitlines()
         if "Stop-Process" in line and not line.strip().startswith("#")
     ]
     assert len(kills) >= 2, "kill sites moved; update this guard"
     for line in kills:
-        assert "-ErrorAction Stop" in line, (
-            f"a suppressed failure is indistinguishable from success: {line.strip()}"
-        )
+        assert (
+            "-ErrorAction Stop" in line
+        ), f"a suppressed failure is indistinguishable from success: {line.strip()}"
 
 
 def test_unknown_identity_is_conservative_in_every_caller():
@@ -657,3 +686,51 @@ def test_a_genuinely_stale_numeric_claim_is_still_reclaimable(tmp_path, monkeypa
     (tmp_path / "stale.pid").write_text("999999999", encoding="utf-8")
 
     assert mcp_daemon.claim_singleton("stale.pid") is True
+
+
+# ---------------------------------------------------------------------------
+# --reserve-slot: the OmniRoute slot must be claimed BEFORE the server starts.
+# ---------------------------------------------------------------------------
+
+
+def _reserve(pid_path):
+    import subprocess
+    import sys as _sys
+
+    return subprocess.run(
+        [_sys.executable, "-m", "packages.mcp_daemon", "--reserve-slot", str(pid_path)],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+
+
+def test_only_one_launcher_can_reserve_the_slot(tmp_path):
+    """Two start scripts with no pid file both launched, and both recorded."""
+    pid_path = tmp_path / "omniroute.pid"
+
+    first = _reserve(pid_path)
+    second = _reserve(pid_path)
+
+    assert first.stdout.strip().splitlines()[-1] == "RESERVED"
+    assert second.stdout.strip().splitlines()[-1] == "OCCUPIED"
+
+
+def test_the_reservation_is_empty_so_readers_treat_it_as_occupied(tmp_path):
+    """An empty claim is in-progress, not stale: it blocks, it is not reclaimed."""
+    pid_path = tmp_path / "omniroute.pid"
+
+    _reserve(pid_path)
+
+    assert pid_path.exists()
+    assert pid_path.read_text(encoding="utf-8") == ""
+
+
+def test_the_verdict_is_on_stdout_not_only_in_the_exit_code(tmp_path):
+    """PowerShell cannot catch a native command's failure; it reads the token."""
+    pid_path = tmp_path / "omniroute.pid"
+
+    _reserve(pid_path)
+    occupied = _reserve(pid_path)
+
+    assert "OCCUPIED" in occupied.stdout

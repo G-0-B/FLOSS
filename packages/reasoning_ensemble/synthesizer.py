@@ -349,6 +349,33 @@ def _local_embed_probe(text: str) -> list[float]:
     return ollama_embed(text, timeout=EMBED_PROBE_TIMEOUT_SECONDS)
 
 
+def _survivor_independence_problem(
+    embedded: list["VoterResponse"], resolved_mode: str | None
+) -> Optional[str]:
+    """Re-apply the roster independence bar to the voters that survived.
+
+    Reuses `voters.roster_independence_problem` rather than counting families
+    here: a second implementation of "is this roster independent" is how the
+    pool-side and poll-side answers drift apart, which is the defect this
+    guards against. Local and mixed runs are exempt the same way the pool-side
+    check exempts them, through the same DEGRADED_OK_PROFILES list.
+    """
+
+    if not embedded:
+        return None
+    if resolved_mode in {"local", "mixed"}:
+        return None
+    try:
+        from packages.metacoordinator_mcp.voters import roster_independence_problem
+
+        return roster_independence_problem(
+            transport.active_online_profile(),
+            {r.voter_id: r.model for r in embedded},
+        )
+    except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
+        return None
+
+
 def _provider_label(response: "VoterResponse") -> str:
     """Name the transport a voter's call actually went over.
 
@@ -863,9 +890,7 @@ def write_synthesis(
     if lost:
         lines.append(
             f"**Dispatched but not counted:** {len(lost)} of {len(dispatched)} — "
-            + ", ".join(
-                f"{r.voter_id} ({r.error or 'no embedding'})" for r in lost
-            )
+            + ", ".join(f"{r.voter_id} ({r.error or 'no embedding'})" for r in lost)
         )
     lines.append(
         f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
@@ -1066,10 +1091,11 @@ def synthesize(
     headroom. The embedder is resolved once per run (local mxbai preferred, cloud
     fallback) so all voter responses share one vector space.
     """
+    resolved_mode = "local" if voter_pool is not None else None
     if voter_pool is not None:
         pool = voter_pool
     else:
-        pool, _mode = transport.resolve_voter_pool()
+        pool, resolved_mode = transport.resolve_voter_pool()
     if len(pool) < MIN_VOTERS:
         raise ValueError(f"Voter pool too small: {len(pool)} < {MIN_VOTERS}")
 
@@ -1092,7 +1118,17 @@ def synthesize(
 
     # Filter to voters that produced an embedding (others can't be clustered)
     embedded = [r for r in responses if r.response_embedding is not None]
-    if len(embedded) < MIN_VOTERS:
+    # INDEPENDENCE IS A PROPERTY OF WHO SURVIVED, NOT OF WHO WAS INVITED.
+    #
+    # The bar (>=3 provider surfaces, >=4 model families) was enforced once, on
+    # the pool, before any voter ran. MIN_VOTERS is a COUNT and three voters
+    # cannot span four families, so an outage that left three survivors of a
+    # four-family profile passed this gate and went on to report Tier-1
+    # consensus -- the same "two views of one roster" failure the pool-side
+    # check exists to prevent, one stage later. Re-check the same bar, via the
+    # same function, on the voters that actually produced embeddings.
+    independence = _survivor_independence_problem(embedded, resolved_mode)
+    if len(embedded) < MIN_VOTERS or independence is not None:
         # Degraded — log + return a sentinel
         duration = time.perf_counter() - started_perf
         result = EnsembleSynthesis(
@@ -1114,6 +1150,7 @@ def synthesize(
                     "reason": (
                         f"{CONSENSUS_NOT_MEASURED}: degraded run, "
                         f"{len(embedded)}/{len(responses)} voters embedded"
+                        + (f"; {independence}" if independence else "")
                     ),
                     "pair_count": 0,
                     "threshold": CLUSTER_SIMILARITY_THRESHOLD,
@@ -1137,7 +1174,11 @@ def synthesize(
             p_hash,
             started_iso,
             success=False,
-            error=f"insufficient_voters: {len(embedded)}/{len(responses)}",
+            error=(
+                f"insufficient_voters: {len(embedded)}/{len(responses)}"
+                if independence is None
+                else f"roster_not_independent: {independence}"
+            ),
             embed_fn=embed_fn,
             embed_name=embed_name,
         )

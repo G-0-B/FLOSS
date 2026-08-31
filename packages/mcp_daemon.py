@@ -7,6 +7,7 @@ per-tool-call audit line to the same janus-*-audit.jsonl sink the lens used.
 
 This module is transport-only — it does not touch consensus/ensemble domain logic.
 """
+
 from __future__ import annotations
 
 import atexit
@@ -126,7 +127,7 @@ def _process_start_token(pid: int) -> str | None:
     # parens, so split after its LAST ')' rather than tokenising the whole
     # line. starttime is field 22 overall, i.e. index 19 of what follows.
     try:
-        fields = stat[stat.rindex(")") + 1:].split()
+        fields = stat[stat.rindex(")") + 1 :].split()
         return fields[19]
     except (ValueError, IndexError):
         return None
@@ -329,6 +330,7 @@ def _safe_payload(func, args: tuple, kwargs: dict) -> dict:
     chain. Never raises: an unbindable signature or an unrepresentable value
     degrades to a marker rather than losing the audit line entirely.
     """
+
     def clip(v):
         try:
             s = v if isinstance(v, (str, int, float, bool, type(None))) else repr(v)
@@ -361,6 +363,7 @@ def audited(tool, append):
     sync wrapper (or awaiting a sync function) would break registration.
     """
     if inspect.iscoroutinefunction(tool):
+
         @functools.wraps(tool)
         async def _async_wrapper(*args, **kwargs):
             append(tool.__name__, _safe_payload(tool, args, kwargs))
@@ -456,6 +459,45 @@ def _record_identity_cli() -> int:
     return 0
 
 
+def _reserve_slot_cli() -> int:
+    """`--reserve-slot <pid_file>` -> claim the slot atomically before launching.
+
+    OmniRoute is started by the PowerShell script, so nothing claimed its slot
+    until `--record-identity` ran AFTER the server was already up. Two copies of
+    the start script with no pid file could therefore both pass the guard, both
+    launch, and both record -- the one that lost the port bind recording last,
+    then exiting, leaving the bound server live and untracked.
+
+    O_CREAT|O_EXCL at the filesystem level, the same primitive claim_singleton
+    uses, so exactly one launcher wins. Prints RESERVED / OCCUPIED on stdout
+    (verdict on stdout, not in the exit code, for the same reason
+    --check-identity does: PowerShell cannot catch a native command's failure).
+    The reservation is a placeholder: the caller overwrites it with the real
+    server PID via --record-identity once the process exists.
+    """
+
+    if len(sys.argv) < 3:
+        print("usage: --reserve-slot <pid_file>", file=sys.stderr)
+        return 2
+    pid_path = Path(sys.argv[2])
+    try:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print("OCCUPIED")
+        return 1
+    except OSError:
+        print("OCCUPIED")
+        return 1
+    # An EMPTY claim file is read as in-progress (not stale) by claim_singleton
+    # and by --check-identity, which is exactly the state we want between the
+    # reservation and the recording: occupied, unverifiable, and therefore
+    # blocking rather than reclaimable.
+    os.close(fd)
+    print("RESERVED")
+    return 0
+
+
 def _identity_cli() -> int:
     """`python -m packages.mcp_daemon --check-identity <pid_file>`.
 
@@ -511,6 +553,8 @@ def _identity_cli() -> int:
 
 
 if __name__ == "__main__":
+    if "--reserve-slot" in sys.argv:
+        raise SystemExit(_reserve_slot_cli())
     if "--check-identity" in sys.argv:
         raise SystemExit(_identity_cli())
     if "--record-identity" in sys.argv:

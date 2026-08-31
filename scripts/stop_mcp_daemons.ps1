@@ -175,13 +175,21 @@ if ($omniVerdict -eq 'OURS') {
         }
     }
     if ($omniStopped) {
-        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+        # THE SIDECAR GOES FIRST, for the reason mcp_daemon.py already records
+        # against its own release path: freeing the PID slot first lets a
+        # replacement launcher claim it and write ITS identity inside the
+        # window, and the next line then deletes the replacement's identity.
+        # The new server stays live with an unverifiable record, which both
+        # start and stop refuse to act on. Removing the identity first means
+        # the worst case is an unverifiable holder, which blocks.
         Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
         Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
     }
 } elseif ($omniVerdict -eq 'FOREIGN') {
-    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+    # Same ordering as the stopped branch above: sidecar first, slot second.
     Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
+    Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     Write-Host "[FLOSS MCP] OmniRoute record was stale (that PID is not ours) - cleared, killed nothing"
 } else {
     Write-Host "[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing"

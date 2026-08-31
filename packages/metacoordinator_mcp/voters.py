@@ -234,7 +234,9 @@ _PERSONA_SHARED_GATE_SYSTEM = (
 )
 
 
-EXECUTABILITY_REVIEWER_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+EXECUTABILITY_REVIEWER_SYSTEM = (
+    _PERSONA_SHARED_GATE_SYSTEM
+    + """
 
 You are the executability reviewer on a FLOSSI0ULLK consensus roster.
 Every other voter is asking whether a Claim is *right*. You are asking something narrower and more mechanical, which is why you exist: **could a competent contributor act on this Claim without hitting a dead end?**
@@ -278,6 +280,7 @@ Calibrate against the blast radius the Claim carries, because approval threshold
 You are one input to a router, not a decision-maker. The gateway tallies; it does not obey you. If you disagree with the rest of the roster, say so plainly and let the variance stand — preserved disagreement above the polarization threshold surfaces a CONFLICT for a human, which is a better outcome than false agreement.
 
 Emit the WEIGHT/RATIONALE format the user prompt specifies. Rationale is 1-3 sentences naming either what you checked that gave you confidence, or the specific defect and where it is."""
+)
 
 
 def _model_completion(
@@ -295,9 +298,7 @@ def _model_completion(
     if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
         from packages.omniroute_client import completion as _omni
 
-        return _omni(
-            model, messages, max_tokens=max_tokens, temperature=temperature
-        )
+        return _omni(model, messages, max_tokens=max_tokens, temperature=temperature)
     from litellm import completion
 
     resp = completion(
@@ -365,7 +366,9 @@ def make_executability_voter(
     return voter
 
 
-CRITIC_PERSONA_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+CRITIC_PERSONA_SYSTEM = (
+    _PERSONA_SHARED_GATE_SYSTEM
+    + """
 
 You are the anti-sycophancy critic, a practical plan reviewer for the FLOSSI0ULLK project. Your goal is to review the supervisor's proposed claim or plan to ensure it adheres to the "Don't Force Machinery" (UTN) constraint.
 
@@ -385,6 +388,7 @@ Map your verdict into the WEIGHT format the consensus gate expects:
 - Insufficient information to judge → WEIGHT around 0.0
 
 Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific sycophancy/readiness blockers you found."""
+)
 
 
 # Back-compat alias. `make_omo_momus_voter` was the name until 2026-08-12, when
@@ -863,7 +867,7 @@ def _model_index() -> dict[str, dict[str, str]]:
     return {k: v for k, v in index.items() if isinstance(v, dict)}
 
 
-def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None:
+def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str | None:
     """Enforce the registry's independence rule on the roster that will vote.
 
     The registry states the rule and a test checks the file, but the file is not
@@ -879,11 +883,17 @@ def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None
     Refusing is the honest failure. A poll that cannot meet its own independence
     bar has not produced consensus, and reporting one is worse than reporting
     nothing. Set FLOSS_ALLOW_DEGRADED_ROSTER=1 to proceed deliberately.
+
+    Returns the reason as a string, or None if the roster clears the bar.
+    `assert_roster_is_independent` raises on it; the reasoning ensemble uses the
+    same answer to DEGRADE a run rather than abort it, because a poll whose
+    voters died mid-run still has responses worth returning verbatim. Two
+    callers, two reactions, one definition of independence.
     """
     if profile in DEGRADED_OK_PROFILES:
-        return
+        return None
     if os.environ.get(ALLOW_DEGRADED_ENV, "").strip().lower() in {"1", "true", "yes"}:
-        return
+        return None
 
     index = _model_index()
     models = list(resolved.values())
@@ -919,9 +929,9 @@ def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None
         len(surfaces) >= MIN_INDEPENDENT_SURFACES
         and len(families) >= MIN_INDEPENDENT_FAMILIES
     ):
-        return
+        return None
 
-    raise RuntimeError(
+    return (
         f"Profile {profile!r} resolved to a roster below its own independence "
         f"rule: {len(surfaces)} provider surface(s) {sorted(surfaces)} and "
         f"{len(families)} model family/families {sorted(families)}, against a "
@@ -933,6 +943,14 @@ def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None
         f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
         "accept that the result is not independent consensus."
     )
+
+
+def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None:
+    """Raise if the roster that will vote is below the independence bar."""
+
+    problem = roster_independence_problem(profile, resolved)
+    if problem is not None:
+        raise RuntimeError(problem)
 
 
 def build_default_voters(profile: str | None = None) -> list[Voter]:

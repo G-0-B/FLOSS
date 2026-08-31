@@ -63,7 +63,9 @@ def _default_node_path() -> str:
 
 def _default_mcp_server_path() -> str:
     if sys.platform == "win32":
-        return r"C:\Users\kalis\AppData\Roaming\npm\node_modules\@agentmemory\mcp\bin.mjs"
+        return (
+            r"C:\Users\kalis\AppData\Roaming\npm\node_modules\@agentmemory\mcp\bin.mjs"
+        )
     # npm's global prefix differs by platform and installation
     # (/usr/local, /usr/lib, ~/.npm-global, nvm, homebrew...), so try the
     # common layouts and fall back to the most standard one. A caller on an
@@ -259,14 +261,30 @@ def _call_tool(tool_name: str, arguments: dict, timeout: float) -> dict | None:
     return outcome.get("response")
 
 
+def _call_failed(response: dict) -> bool:
+    """True when the envelope itself reports failure.
+
+    `_extract_text` already refused an `isError` result by returning None, but
+    `save()` read that None as "unparseable payload" and fell back to "a result
+    dict is present, so it worked" -- reporting confirmed persistence for an
+    explicit tool failure. The two readers disagreed because each decided for
+    itself what an error was. One definition, both callers.
+    """
+
+    if "error" in response:
+        return True
+    result = response.get("result")
+    if not isinstance(result, dict):
+        return True
+    return bool(result.get("isError"))
+
+
 def _extract_text(response: dict) -> str | None:
     """Pull the `result.content[0].text` string out of a tools/call response."""
-    if "error" in response:
+    if _call_failed(response):
         return None
     result = response.get("result")
     if not isinstance(result, dict):
-        return None
-    if result.get("isError"):
         return None
     content = result.get("content")
     if not isinstance(content, list) or not content:
@@ -311,10 +329,12 @@ def save(
 
         text_payload = _extract_text(response)
         if text_payload is None:
-            # Envelope was well-formed and not an explicit error -- treat
-            # presence of a result as success even if we can't parse the
-            # inner text payload.
-            return "error" not in response and isinstance(response.get("result"), dict)
+            # An unparseable payload on a SUCCESSFUL call is still a save; an
+            # explicit tool failure is not. The old test here ("no top-level
+            # error and a result dict is present") was true of both, so
+            # `isError: true` returned True from a function documented to
+            # return True only on confirmed success.
+            return not _call_failed(response)
 
         try:
             parsed = json.loads(text_payload)

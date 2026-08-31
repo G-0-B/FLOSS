@@ -116,7 +116,30 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
 } elseif ($omniVerdict -eq 'OURS') {
     Write-Host "[FLOSS MCP] OmniRoute already running (recorded PID $(Get-Content $omniPid -Raw))"
 } else {
-    $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'
+    # RESERVE THE SLOT BEFORE LAUNCHING, NOT AFTER.
+    #
+    # Two copies of this script with no omniroute.pid could both reach this
+    # branch, both launch, and both record: the one that lost the port bind
+    # recorded last and then exited, leaving the bound server live and
+    # untracked. --reserve-slot is O_CREAT|O_EXCL through the same primitive
+    # claim_singleton uses, so exactly one launcher gets past this line.
+    $reserved = $false
+    if ($py) {
+        Push-Location $repoRoot
+        $slotOut = & $py -m packages.mcp_daemon --reserve-slot $omniPid 2>$null
+        Pop-Location
+        $slotTok = ($slotOut | Select-Object -Last 1)
+        if ($slotTok) { $slotTok = $slotTok.ToString().Trim() }
+        $reserved = ($slotTok -eq 'RESERVED')
+    }
+    if (-not $reserved) {
+        # NOT `return`: this is script scope, so returning here would also skip
+        # the summary line at the end of the file. Only the launch is skipped.
+        Write-Host "[FLOSS MCP] OmniRoute slot is already claimed by another launcher - not starting a duplicate"
+        $proc = $null
+    } else {
+        $proc = Start-Process -WindowStyle Hidden -PassThru 'omniroute' '--no-open'
+    }
     # RECORD THE SERVER, NOT THE SHIM.
     #
     # On the documented Windows npm install, `omniroute` is a .cmd shim, so
@@ -142,10 +165,27 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
     }
     if ($serverPid -and $py) {
         Push-Location $repoRoot
-        & $py -m packages.mcp_daemon --record-identity $omniPid $serverPid | Out-Null
+        $recOut = & $py -m packages.mcp_daemon --record-identity $omniPid $serverPid
         Pop-Location
+        $recTok = ($recOut | Select-Object -Last 1)
+        if ($recTok) { $recTok = $recTok.ToString().Trim() }
+        if ($recTok -ne 'RECORDED') {
+            # The reservation is an EMPTY file, which every reader treats as an
+            # in-progress claim and therefore as occupied. Left behind after a
+            # failed recording it would block every future start with nothing
+            # running. We hold it exclusively, so clearing it is ours to do.
+            Write-Host "[FLOSS MCP] WARNING: could not record the OmniRoute identity ($recTok); releasing the reservation so a later start is not blocked"
+            Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+        }
+    } elseif ($reserved) {
+        # Reserved the slot and then failed to launch: release it rather than
+        # leaving an empty claim that blocks forever.
+        Write-Host "[FLOSS MCP] OmniRoute did not start; releasing the reserved slot"
+        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $serverPid)"
+    if ($proc) {
+        Write-Host "[FLOSS MCP] OmniRoute started (:20128, PID $serverPid)"
+    }
 }
 
 Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."

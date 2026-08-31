@@ -75,10 +75,30 @@ _CLOUD_EMBED_CANDIDATES: tuple[str, ...] = (
 # Local pool used for mode=local / mode=mixed. Mirrors synthesizer's historical
 # DEFAULT_VOTER_POOL so the local path is unchanged from v0.1.
 LOCAL_VOTER_POOL: list[dict] = [
-    {"voter_id": "phi4-mini", "model": "phi4-mini:latest", "family": "phi", "transport": "ollama"},
-    {"voter_id": "llama3.2-3b", "model": "llama3.2:3b-instruct-q4_K_S", "family": "llama", "transport": "ollama"},
-    {"voter_id": "granite-code-3b", "model": "granite-code:3b-instruct-128k-q4_K_S", "family": "granite", "transport": "ollama"},
-    {"voter_id": "qwen2.5-coder-3b", "model": "hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16", "family": "qwen", "transport": "ollama"},
+    {
+        "voter_id": "phi4-mini",
+        "model": "phi4-mini:latest",
+        "family": "phi",
+        "transport": "ollama",
+    },
+    {
+        "voter_id": "llama3.2-3b",
+        "model": "llama3.2:3b-instruct-q4_K_S",
+        "family": "llama",
+        "transport": "ollama",
+    },
+    {
+        "voter_id": "granite-code-3b",
+        "model": "granite-code:3b-instruct-128k-q4_K_S",
+        "family": "granite",
+        "transport": "ollama",
+    },
+    {
+        "voter_id": "qwen2.5-coder-3b",
+        "model": "hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16",
+        "family": "qwen",
+        "transport": "ollama",
+    },
 ]
 
 # Family keyword → label. First match wins; order matters (gpt-oss before gpt).
@@ -120,9 +140,21 @@ def _transport_for_model(model: str) -> str:
     return "litellm"
 
 
+def active_online_profile(profile: str | None = None) -> str:
+    """The online profile a run will actually use.
+
+    Exposed because the independence bar is re-checked on the SURVIVING voters
+    after generation, and that check needs the same profile the pool was built
+    from. Deriving it a second time at the call site is how two views of one
+    roster end up disagreeing about whether it counts as independent.
+    """
+
+    return profile or os.environ.get(ONLINE_PROFILE_ENV, DEFAULT_ONLINE_PROFILE)
+
+
 def _online_pool(profile: str | None) -> list[dict]:
     """Resolve the online voter pool from the gateway roster (credential-gated)."""
-    prof = profile or os.environ.get(ONLINE_PROFILE_ENV, DEFAULT_ONLINE_PROFILE)
+    prof = active_online_profile(profile)
     specs = resolve_default_voter_specs(profile=prof, include_unavailable=False)
     # The same independence bar the consensus path enforces, on the same roster
     # after the same credential filtering. `synthesize()` only ever checked
@@ -148,7 +180,9 @@ def _online_pool(profile: str | None) -> list[dict]:
     return pool
 
 
-def resolve_voter_pool(mode: str | None = None, online_profile: str | None = None) -> tuple[list[dict], str]:
+def resolve_voter_pool(
+    mode: str | None = None, online_profile: str | None = None
+) -> tuple[list[dict], str]:
     """Return (pool, resolved_mode). Honors FLOSS_ENSEMBLE_VOTER_MODE."""
     resolved_mode = (mode or os.environ.get(MODE_ENV, DEFAULT_MODE)).strip().lower()
     if resolved_mode == "local":
@@ -232,7 +266,9 @@ def _flowith_generate(model: str, prompt: str, timeout: int) -> str:
         timeout=timeout,
     )
     if response.status_code >= 400:
-        raise RuntimeError(f"Flowith HTTP {response.status_code}: {response.text[:200]!r}")
+        raise RuntimeError(
+            f"Flowith HTTP {response.status_code}: {response.text[:200]!r}"
+        )
     payload = json.loads(response.text)
     text = payload["choices"][0]["message"]["content"].strip()
     if not text:
