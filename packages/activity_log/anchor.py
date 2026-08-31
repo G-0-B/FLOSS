@@ -206,10 +206,15 @@ def _store_lock(provenance_root: Path):
     written in response to an observed failure; neither would have been
     rediscovered here.
 
-    Advisory, and deliberately non-fatal: the packet writers do not take this
-    lock today, so it serialises anchor runs against each other and narrows --
-    does not close -- the window against a concurrent hook. Said plainly because
-    a lock that is documented as more than it is, is worse than none.
+    Advisory, and deliberately non-fatal. Review pointed out that packet writers
+    hold a per-identity `.sequence.lock` and never contend for this one, so on
+    its own this lock only serialises anchor runs against each other. That is
+    still worth having, but it was not the fix it read as. The concurrency the
+    reviewer described is handled where it actually occurs: packet writes are
+    atomic (`provenance.create_packet` writes to a temp file and `os.replace`s
+    it), so no reader can see a partial packet, and `_stable_scan` requires two
+    agreeing scans before an anchor commits to a set. Said plainly because a
+    lock documented as more than it is, is worse than none.
     """
 
     lock_path = provenance_root / ".anchor-scan.lock"
@@ -365,9 +370,7 @@ def _identity_summaries(leaves: list[PacketLeaf]) -> list[dict]:
                 # Every leaf, not just the heads. Positions alone cannot detect a
                 # same-slot substitution, and the diagnosis has to be able to
                 # name which digest went rather than only which slot emptied.
-                "leaf_saids": sorted(
-                    [leaf.sequence, leaf.said] for leaf in group
-                ),
+                "leaf_saids": sorted([leaf.sequence, leaf.said] for leaf in group),
                 # Recorded IN the anchor on purpose. Freezing the store's known
                 # damage means later damage cannot be laundered as
                 # pre-existing.
@@ -422,11 +425,37 @@ def anchored_positions(anchor: dict[str, Any]) -> set[tuple[str, int]]:
         top = entry.get("max_seq")
         if not isinstance(aid, str) or not isinstance(top, int) or top < 0:
             continue
-        gaps = {
-            g for g in (entry.get("interior_gaps") or []) if isinstance(g, int)
-        }
+        gaps = {g for g in (entry.get("interior_gaps") or []) if isinstance(g, int)}
         positions.update((aid, n) for n in range(top + 1) if n not in gaps)
     return positions
+
+
+def _stable_scan(
+    provenance_root: Path, attempts: int = 3
+) -> tuple[list[PacketLeaf], list[dict]]:
+    """Scan until two consecutive scans agree, or give up and return the last.
+
+    The store lock does not stop a provenance hook from landing a packet
+    mid-scan: the writers hold a per-identity sequence lock, not this one. Under
+    atomic packet writes a reader can no longer see a torn file, but it can
+    still enumerate the tree just before a packet appears and read it just
+    after -- so the anchor is signed over a set that was never simultaneously
+    true.
+
+    Two agreeing scans is the cheap, checkable version of a snapshot: it does
+    not stop writes, it establishes that none landed while we looked. Returning
+    the last attempt rather than raising keeps `publish` usable on a store under
+    constant write pressure -- the anchor is then a real point-in-time set, just
+    one taken under contention.
+    """
+
+    leaves, unreadable = scan_packets(provenance_root)
+    for _ in range(max(0, attempts - 1)):
+        again_leaves, again_unreadable = scan_packets(provenance_root)
+        if again_leaves == leaves and again_unreadable == unreadable:
+            return leaves, unreadable
+        leaves, unreadable = again_leaves, again_unreadable
+    return leaves, unreadable
 
 
 def build_anchor(
@@ -437,7 +466,7 @@ def build_anchor(
     """Build (but do not sign or publish) an anchor over the current store."""
 
     with _store_lock(provenance_root):
-        leaves, unreadable = scan_packets(provenance_root)
+        leaves, unreadable = _stable_scan(provenance_root)
     return {
         "v": ANCHOR_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -548,6 +577,13 @@ def load_series(series_dir: Path | None) -> dict[str, dict[str, Any]]:
         # anchor crashed the whole verdict instead of producing the structured
         # ANCHOR_UNAVAILABLE the caller is promised.
         except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        # And valid JSON of the wrong SHAPE, for the same reason load_anchor
+        # checks it: `[]`, a bare string or a number parses fine and then
+        # AttributeErrors on .get(), crashing a verdict that is documented never
+        # to raise. Three readers in this file parse this store; the type guard
+        # was added to two of them. This was the third.
+        if not isinstance(document, dict):
             continue
         root = document.get("merkle_root")
         if isinstance(root, str):

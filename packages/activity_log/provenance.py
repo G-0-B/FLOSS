@@ -396,7 +396,17 @@ def create_packet(
 
         packet_path = Path(output_root) / _packet_date(entries) / f"{packet['d']}.json"
         packet_path.parent.mkdir(parents=True, exist_ok=True)
-        packet_path.write_bytes(canonical_bytes(packet) + b"\n")
+        # ATOMIC: temp file then os.replace, the same idiom _write_state uses.
+        #
+        # A direct write_bytes leaves the packet observable half-written. The
+        # anchor scan enumerates this tree holding a lock no writer takes, so it
+        # read torn packets and recorded them as unreadable damage in a signed
+        # anchor -- damage to a store that was fine. Under os.replace a reader
+        # sees the old state or the new one, never a prefix, which fixes it for
+        # every reader of this tree rather than for the one that complained.
+        tmp_path = packet_path.with_suffix(".json.tmp")
+        tmp_path.write_bytes(canonical_bytes(packet) + b"\n")
+        os.replace(tmp_path, packet_path)
         _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
     return packet, packet_path
 
@@ -963,13 +973,17 @@ def validate_packet(
     # the named prior is missing, which is only meaningful if the name was a
     # well-formed digest in the first place.
     prior_shape_invalid = prior_digest is not None and (
-        not isinstance(prior_digest, str)
-        or _SAID_RE.fullmatch(prior_digest) is None
+        not isinstance(prior_digest, str) or _SAID_RE.fullmatch(prior_digest) is None
     )
     if prior_shape_invalid:
         errors.append("E_PROVENANCE_PRIOR_INVALID")
 
-    if prior_digest is not None and _follow_prior and not prior_shape_invalid and _position_index is None:
+    if (
+        prior_digest is not None
+        and _follow_prior
+        and not prior_shape_invalid
+        and _position_index is None
+    ):
         # Build once per validation, here rather than at function entry so a
         # single-packet validation with no chain never pays for the scan.
         # Reused by every ancestor below AND by the fork check; building it per
