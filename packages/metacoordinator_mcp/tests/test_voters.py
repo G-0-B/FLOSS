@@ -359,3 +359,49 @@ def _run_all() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_run_all())
+
+
+def test_both_model_backends_carry_the_per_voter_budget(monkeypatch):
+    """litellm received no timeout at all, so a stalled provider could run past
+    the 60s worst_case_round_seconds() assumes -- and votes are collected
+    sequentially, so a couple of slow calls put the round beyond the client
+    projection while the server carried on voting. OmniRoute only looked
+    correct: it forwarded nothing either and its client happens to default to
+    60s."""
+    from packages.metacoordinator_mcp import voters
+
+    seen = {}
+
+    class _Resp:
+        choices = [type("C", (), {"message": type("M", (), {"content": "ok"})()})()]
+
+    def fake_litellm_completion(**kwargs):
+        seen["litellm_timeout"] = kwargs.get("timeout")
+        return _Resp()
+
+    def fake_omni(model, messages, **kwargs):
+        seen["omni_timeout"] = kwargs.get("timeout")
+        return "ok"
+
+    import sys
+    import types
+
+    monkeypatch.setitem(
+        sys.modules,
+        "litellm",
+        types.SimpleNamespace(completion=fake_litellm_completion),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "packages.omniroute_client",
+        types.SimpleNamespace(completion=fake_omni),
+    )
+
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
+    voters._model_completion("groq/whatever", [{"role": "user", "content": "x"}])
+
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "omniroute")
+    voters._model_completion("groq/whatever", [{"role": "user", "content": "x"}])
+
+    assert seen["litellm_timeout"] == voters.VOTER_CALL_TIMEOUT_SECONDS
+    assert seen["omni_timeout"] == voters.VOTER_CALL_TIMEOUT_SECONDS

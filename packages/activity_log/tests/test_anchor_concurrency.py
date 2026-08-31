@@ -1416,3 +1416,58 @@ def test_a_legacy_lock_without_an_owner_line_reclaims_on_age(tmp_path):
     assert prov._lock_owner_is_alive(lock_path) is None
     token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
     assert prov._lock_token(lock_path) == token
+
+
+def test_a_reused_pid_does_not_keep_a_dead_holders_lock_alive(tmp_path):
+    """After a crash the OS reassigns the pid, and a liveness probe then reports
+    the holder as running forever -- so the lock is never reclaimed however old
+    it is. That is the failure the age window existed to prevent, reintroduced
+    by the ownership check added to fix a different one."""
+    from packages.activity_log import provenance as prov
+
+    lock_path = tmp_path / ".reused.lock"
+    # OUR pid, but a creation token from some other era: the file was written by
+    # a process that is gone and whose number has been handed out again.
+    lock_path.write_text(
+        f"{os.getpid()}\nstart-token-of-a-dead-process\nabandoned-token",
+        encoding="utf-8",
+    )
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    assert prov._lock_owner_is_alive(lock_path) is False
+
+    token = prov._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
+    assert prov._lock_token(lock_path) == token
+
+
+def test_a_live_holder_with_a_matching_start_token_still_keeps_its_lock(tmp_path):
+    """The reuse check must not become a way to steal a live lock."""
+    from packages.activity_log import provenance as prov
+
+    lock_path = tmp_path / ".mine.lock"
+    token = prov._acquire_lock(lock_path)
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    assert prov._lock_owner_is_alive(lock_path) is True
+    with pytest.raises(TimeoutError):
+        prov._acquire_lock(lock_path, timeout_seconds=0.2, stale_seconds=1.0)
+
+    prov._release_lock(lock_path, token)
+
+
+def test_the_lock_token_is_read_from_every_format_this_file_has_had(tmp_path):
+    """Three formats now: token only, pid+token, pid+start+token. The token is
+    always last, and release compares against it."""
+    from packages.activity_log import provenance as prov
+
+    cases = {
+        "legacy.lock": ("just-a-token", "just-a-token"),
+        "pid.lock": ("4242\nthe-token", "the-token"),
+        "full.lock": ("4242\nstart\nthe-token", "the-token"),
+    }
+    for name, (body, expected) in cases.items():
+        path = tmp_path / name
+        path.write_text(body, encoding="utf-8")
+        assert prov._lock_token(path) == expected, name

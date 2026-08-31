@@ -161,6 +161,17 @@ def _lock_token(lock_path: Path) -> str | None:
     return lines[-1].strip() if len(lines) > 1 else lines[0].strip()
 
 
+def _owner_start_token() -> str:
+    """This process's creation token, or "" where the platform has none."""
+
+    try:
+        from packages.mcp_daemon import _process_start_token
+
+        return _process_start_token(os.getpid()) or ""
+    except Exception:  # noqa: BLE001 -- absence degrades to pid-only ownership
+        return ""
+
+
 def _lock_owner_is_alive(lock_path: Path) -> bool | None:
     """True if the recorded owner still runs, False if it is gone, None if
     the lock does not say who owns it.
@@ -187,8 +198,35 @@ def _lock_owner_is_alive(lock_path: Path) -> bool | None:
         owner = int(lines[0].strip())
     except ValueError:
         return None
+    # A PID IS NOT AN IDENTITY.
+    #
+    # After a crash the lock file survives, the OS reassigns that number, and a
+    # liveness probe then reports the holder as running forever -- so the lock
+    # is never reclaimed however old it is, and every later write to that chain
+    # times out until someone deletes the file. That is the failure the age
+    # window existed to prevent, reintroduced by the ownership check added to
+    # fix a different one.
+    #
+    # mcp_daemon already disambiguates PID reuse by process creation time, for
+    # its own pid files, against the same failure. Recorded locks carry that
+    # token; a mismatch is a reused pid and the holder is gone.
+    recorded_start = lines[1].strip() if len(lines) > 2 else ""
+    if recorded_start:
+        try:
+            from packages.mcp_daemon import _process_start_token
+
+            current_start = _process_start_token(owner)
+        except Exception:  # noqa: BLE001 -- unknown identity stays conservative
+            current_start = None
+        if current_start is not None and current_start != recorded_start:
+            return False
+
+    # Checked AFTER the token, deliberately. A short-circuit here on "the owner
+    # is me" hid the case the token exists for: our own pid, reused, holding a
+    # lock written by a process that is gone.
     if owner == os.getpid():
         return True
+
     # REUSE the daemon's probe. os.kill(pid, 0) does not distinguish a dead pid
     # on Windows -- it raises a plain OSError, which a conservative handler
     # reads as "alive", so liveness could never disprove a holder there and the
@@ -249,7 +287,10 @@ def _acquire_lock(
             with lock_path.open("x", encoding="utf-8") as f:
                 # pid first, token second: the reader wants the owner and a
                 # partial line must not be mistaken for a token.
-                f.write(f"{os.getpid()}\n{token}")
+                # pid, process-creation token, lock token -- one per line,
+                # lock token LAST so _lock_token stays a last-line read
+                # across all three formats this file has had.
+                f.write(f"{os.getpid()}\n{_owner_start_token()}\n{token}")
             return token
         except (FileExistsError, PermissionError):
             # PermissionError is contention too, on Windows.

@@ -298,7 +298,25 @@ def _model_completion(
     if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
         from packages.omniroute_client import completion as _omni
 
-        return _omni(model, messages, max_tokens=max_tokens, temperature=temperature)
+        # BOTH paths carry the budgeted timeout.
+        #
+        # litellm received none at all, so a stalled provider could run well
+        # past the 60s worst_case_round_seconds() assumes -- and since votes are
+        # collected sequentially, a couple of slow calls put the round beyond
+        # the 780s client projection while the server carried on voting and
+        # could still persist a decision the caller never saw.
+        #
+        # OmniRoute only looked correct here: it forwarded nothing either, and
+        # its client happens to default to 60s. Passing it explicitly makes the
+        # per-voter budget a real coupling rather than two constants that agree
+        # by accident until one of them moves.
+        return _omni(
+            model,
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=VOTER_CALL_TIMEOUT_SECONDS,
+        )
     from litellm import completion
 
     resp = completion(
@@ -306,6 +324,7 @@ def _model_completion(
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
+        timeout=VOTER_CALL_TIMEOUT_SECONDS,
     )
     return (resp.choices[0].message.content or "").strip()
 
