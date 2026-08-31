@@ -794,3 +794,69 @@ def test_the_retention_index_is_read_as_a_number_not_a_name():
     assert anchor_lib._retention_index(
         Path("Eroot.10.json")
     ) > anchor_lib._retention_index(Path("Eroot.2.json"))
+
+
+# ---------------------------------------------------------------------------
+# A verdict nobody can parse is not a verdict.
+# ---------------------------------------------------------------------------
+
+
+def test_a_large_verdict_is_still_valid_json(tmp_path):
+    """Slicing the serialized document cut it mid-token, so the structured
+    result became unparseable exactly when a store is damaged enough to produce
+    many findings -- the case where a script reading it is most useful."""
+    cli = _cli_module()
+    result = {
+        "status": "ANCHOR_MISMATCH",
+        "anchored_root": "E" + "a" * 43,
+        "current_root": "E" + "b" * 43,
+        "anchored_packets": 500,
+        "current_packets": 12,
+        "unreadable_vanished": [
+            {"path": f"2026-08-01/E{i:043d}.json", "sha256": "0" * 64}
+            for i in range(400)
+        ],
+        "findings": {
+            "missing_anchored_leaves": [
+                ["D" + "a" * 43, i, "E" + str(i).rjust(43, "z")] for i in range(400)
+            ]
+        },
+    }
+
+    rendered = cli._bounded_json(result, 8000)
+
+    assert len(rendered) <= 8000
+    parsed = json.loads(rendered)  # the whole point
+    assert parsed["status"] == "ANCHOR_MISMATCH"
+    assert parsed["anchored_root"] == result["anchored_root"]
+    assert parsed["truncated"], "dropped entries must be declared"
+
+
+def test_a_small_verdict_is_untouched(tmp_path):
+    cli = _cli_module()
+    result = {"status": "VERIFIED", "anchored_root": "E" + "a" * 43}
+
+    rendered = cli._bounded_json(result, 8000)
+
+    assert json.loads(rendered) == result
+    assert "truncated" not in rendered
+
+
+def test_the_envelope_survives_even_an_absurd_limit(tmp_path):
+    """Under a limit no full verdict can meet, emit the part every caller reads
+    rather than a fragment of the part they do not."""
+    cli = _cli_module()
+    result = {
+        "status": "TRUNCATION_DETECTED",
+        "anchored_root": "E" + "a" * 43,
+        "current_root": "E" + "b" * 43,
+        "anchored_packets": 9,
+        "current_packets": 2,
+        "findings": {"missing_anchored_leaves": [["D" + "a" * 43, 1, "E" + "z" * 43]]},
+    }
+
+    rendered = cli._bounded_json(result, 200)
+
+    parsed = json.loads(rendered)
+    assert parsed["status"] == "TRUNCATION_DETECTED"
+    assert parsed["anchored_packets"] == 9

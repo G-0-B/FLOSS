@@ -109,7 +109,11 @@ def main() -> None:
             tool_name = params.get("name")
             arguments = params.get("arguments") or {}
 
-            if MODE == "toolerror":
+            if MODE == "nocontent":
+                # A nominal success envelope carrying no success indication:
+                # no isError, and no content the caller can read.
+                result = {}
+            elif MODE == "toolerror":
                 # A well-formed JSON-RPC RESULT that reports tool failure. Not a
                 # transport error: the envelope is valid, the call failed.
                 result = {

@@ -30,6 +30,7 @@ wolf, while loss must be loud. An unavailable anchor is never a pass.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import sys
@@ -563,8 +564,77 @@ def _verify(args: argparse.Namespace) -> int:
     # witness does not make an intact store a failure -- they answer different
     # questions.
     result["witness"] = _witness_state(args.anchor, stored)
-    print(json.dumps(result, indent=2, ensure_ascii=False)[: args.max_output])
+    print(_bounded_json(result, args.max_output))
     return anchor_lib.EXIT_CODES.get(result["status"], 2)
+
+
+def _bounded_json(result: dict, limit: int) -> str:
+    """Serialize within `limit` characters WITHOUT emitting broken JSON.
+
+    Slicing the serialized document cut it mid-token, so the structured verdict
+    became unparseable exactly when a store is damaged enough to produce a lot
+    of findings -- the case where a script reading this output is most useful.
+    A verdict nobody can parse is not a verdict.
+
+    Diagnostic ARRAYS are shortened instead, longest first, each recording how
+    many entries it dropped. The envelope -- status, roots, counts, witness --
+    is never trimmed, because that is the part every caller reads.
+    """
+
+    def render(document: dict) -> str:
+        return json.dumps(document, indent=2, ensure_ascii=False)
+
+    rendered = render(result)
+    if limit <= 0 or len(rendered) <= limit:
+        return rendered
+
+    trimmed = copy.deepcopy(result)
+
+    def arrays(node, path=()):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                yield from arrays(value, path + (key,))
+        elif isinstance(node, list):
+            yield path, node
+
+    def resolve(document: dict, path):
+        node = document
+        for key in path[:-1]:
+            node = node[key]
+        return node, path[-1]
+
+    while len(rendered) > limit:
+        candidates = [
+            (len(node), path) for path, node in arrays(trimmed) if len(node) > 1
+        ]
+        if not candidates:
+            break
+        candidates.sort(reverse=True)
+        _size, path = candidates[0]
+        parent, key = resolve(trimmed, path)
+        node = parent[key]
+        keep = max(1, len(node) // 2)
+        dropped = len(node) - keep
+        parent[key] = node[:keep]
+        notes = trimmed.setdefault("truncated", {})
+        label = ".".join(str(part) for part in path)
+        notes[label] = notes.get(label, 0) + dropped
+        rendered = render(trimmed)
+
+    if len(rendered) > limit:
+        # Even the envelope is over budget. Emit the part every caller reads
+        # rather than a fragment of the part they do not.
+        return render(
+            {
+                "status": result.get("status"),
+                "anchored_root": result.get("anchored_root"),
+                "current_root": result.get("current_root"),
+                "anchored_packets": result.get("anchored_packets"),
+                "current_packets": result.get("current_packets"),
+                "truncated": "the full verdict does not fit in --max-output",
+            }
+        )
+    return rendered
 
 
 def _witness_state(anchor_path: Path, stored: dict | None) -> dict:

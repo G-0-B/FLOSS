@@ -329,12 +329,21 @@ def save(
 
         text_payload = _extract_text(response)
         if text_payload is None:
-            # An unparseable payload on a SUCCESSFUL call is still a save; an
-            # explicit tool failure is not. The old test here ("no top-level
-            # error and a result dict is present") was true of both, so
-            # `isError: true` returned True from a function documented to
-            # return True only on confirmed success.
-            return not _call_failed(response)
+            # NO CONTENT IS NOT A CONFIRMATION.
+            #
+            # Two rounds of narrowing here. First this returned True whenever a
+            # result dict was present, so `isError: true` read as a save. Then
+            # it returned True whenever the call had not explicitly failed --
+            # which still accepted `{"result": {}}`, a response carrying no
+            # success indication at all, and a caller that discards its data on
+            # a True is entitled to more than the absence of an error.
+            #
+            # A content list that is present but whose text will not parse is
+            # still a save: the tool answered. A missing or empty one is not.
+            if _call_failed(response):
+                return False
+            content = (response.get("result") or {}).get("content")
+            return isinstance(content, list) and len(content) > 0
 
         try:
             parsed = json.loads(text_payload)

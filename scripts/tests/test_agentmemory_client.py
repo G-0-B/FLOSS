@@ -253,3 +253,34 @@ def test_a_transport_error_and_a_missing_result_are_both_failures(tmp_path):
 
     assert module._call_failed({"error": {"code": -32000}}) is True
     assert module._call_failed({"jsonrpc": "2.0", "id": 1}) is True
+
+
+def test_a_contentless_result_is_not_a_confirmed_save(tmp_path):
+    """`{"result": {}}` carries no success indication at all, and a caller that
+    discards its data on a True is entitled to more than the absence of an
+    error. Second narrowing of this branch: explicit errors first, now silence.
+
+    End-to-end through save(), because the earlier version of this test checked
+    the condition rather than the wiring and would have passed either way.
+    """
+    module = load_client_module(tmp_path, mode="nocontent")
+
+    assert module.save("an observation worth keeping") is False
+
+
+def test_the_branch_requires_a_content_list_before_reporting_success(tmp_path):
+    module = load_client_module(tmp_path, mode="ok")
+
+    def with_result(result):
+        return {"jsonrpc": "2.0", "id": 1, "result": result}
+
+    # No content, empty content, and wrong-typed content are all silence.
+    for result in ({}, {"content": []}, {"content": "text"}, {"content": None}):
+        response = with_result(result)
+        assert module._extract_text(response) is None
+        content = (response.get("result") or {}).get("content")
+        assert not (isinstance(content, list) and len(content) > 0)
+
+    # A content list whose text will not parse is still an answer.
+    answered = with_result({"content": [{"type": "text", "text": "not json"}]})
+    assert module._extract_text(answered) == "not json"
