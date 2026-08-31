@@ -1081,7 +1081,7 @@ def synthesize(
     # The local probe is bounded separately from the real embed timeout: see
     # EMBED_PROBE_TIMEOUT_SECONDS. Once resolved, the returned embedder uses the
     # full timeout for actual work.
-    _embed_name, embed_fn = transport.resolve_embedder(
+    embed_name, embed_fn = transport.resolve_embedder(
         _local_embed_probe,
         local_embed_fn=ollama_embed,
         embed_timeout=EMBED_TIMEOUT_SECONDS,
@@ -1138,6 +1138,8 @@ def synthesize(
             started_iso,
             success=False,
             error=f"insufficient_voters: {len(embedded)}/{len(responses)}",
+            embed_fn=embed_fn,
+            embed_name=embed_name,
         )
         return result
 
@@ -1200,7 +1202,15 @@ def synthesize(
     )
 
     # 8: emit Action to global activity log
-    _log_synthesis_action(result, prompt, p_hash, started_iso, success=True)
+    _log_synthesis_action(
+        result,
+        prompt,
+        p_hash,
+        started_iso,
+        success=True,
+        embed_fn=embed_fn,
+        embed_name=embed_name,
+    )
     return result
 
 
@@ -1211,7 +1221,18 @@ def _log_synthesis_action(
     started_iso: str,
     success: bool,
     error: Optional[str] = None,
+    embed_fn=None,
+    embed_name: Optional[str] = None,
 ) -> None:
+    """Emit the run's Action and the reasoning-activity row.
+
+    `embed_fn`/`embed_name` are the run's ALREADY RESOLVED embedder. They are
+    not optional in practice: re-deriving an embedder here would re-probe a
+    backend the run has already ruled out, and -- worse -- could embed the
+    prompt in a different vector space than the one the run used, which
+    `check_tier4_similarity_bias()` then cosine-compares as if it were
+    commensurable. They default to None only so older callers keep working.
+    """
     llm_calls = [
         {
             "model": r.model,
@@ -1265,10 +1286,12 @@ def _log_synthesis_action(
         "tier_classification": tier,
     }
     if tier == "tier4":
+        embedder = embed_fn or ollama_embed
         try:
-            row["prompt_embedding"] = ollama_embed(prompt)
+            row["prompt_embedding"] = embedder(prompt)
+            row["prompt_embedding_model"] = embed_name or "mxbai-embed-large"
         except Exception:  # noqa: BLE001 — embedding is best-effort
-            pass
+            row.pop("prompt_embedding", None)
     try:
         REASONING_ACTIVITY_LOG.parent.mkdir(parents=True, exist_ok=True)
         with REASONING_ACTIVITY_LOG.open("a", encoding="utf-8") as f:

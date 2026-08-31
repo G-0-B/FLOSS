@@ -304,13 +304,26 @@ def _read_activity_tail(n_lines: int = ACTIVITY_LOOKBACK) -> list[dict]:
     return out
 
 
+# The embedder behind every historical Tier-4 row and behind ollama_embed().
+# Rows predating prompt_embedding_model are this model by construction.
+LEGACY_EMBED_MODEL = "mxbai-embed-large"
+
+
 def check_tier4_similarity_bias(
     prompt_embedding: list[float],
+    embed_model: str = LEGACY_EMBED_MODEL,
 ) -> tuple[Optional[str], Optional[float]]:
     """Upgrade A: If a recent activity-log entry has a Tier-4 tag and the
     incoming prompt's embedding is similar to that entry's embedding above
     threshold, return (prior_prompt_hash, similarity_score) to trigger a
     forced ensemble bias. Otherwise return (None, None).
+
+    `embed_model` names the embedder that produced `prompt_embedding`. Rows
+    embedded by a different model are skipped: the synthesizer falls back to a
+    cloud embedder when local Ollama is down, and a cosine between two
+    different vector spaces is not a similarity -- it is a number. Rows written
+    before the model was recorded are treated as LEGACY_EMBED_MODEL, which is
+    what produced every one of them.
     """
     recent = _read_activity_tail(ACTIVITY_LOOKBACK)
     best_hash: Optional[str] = None
@@ -320,6 +333,8 @@ def check_tier4_similarity_bias(
             continue
         prior_embed = entry.get("prompt_embedding")
         if not prior_embed:
+            continue
+        if entry.get("prompt_embedding_model", LEGACY_EMBED_MODEL) != embed_model:
             continue
         sim = cosine_similarity(prompt_embedding, prior_embed)
         if sim > best_sim:
@@ -478,7 +493,9 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     similar_sim: Optional[float] = None
     try:
         prompt_embedding = ollama_embed(prompt)
-        similar_hash, similar_sim = check_tier4_similarity_bias(prompt_embedding)
+        similar_hash, similar_sim = check_tier4_similarity_bias(
+            prompt_embedding, LEGACY_EMBED_MODEL
+        )
         if similar_hash is not None:
             bias_applied = "tier4_similarity"
     except (
