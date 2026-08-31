@@ -39,14 +39,15 @@ def _reclaim_claim_if_unchanged(pid_path: Path, observed: bytes | None) -> bool:
 
     try:
         from packages.activity_log.filelock import reclaim_if_unchanged
-
-        return reclaim_if_unchanged(pid_path, observed)
     except ImportError:
-        try:
-            pid_path.unlink(missing_ok=True)
-        except OSError:
-            return False
-        return True
+        # FAIL CLOSED. The fallback used to unlink by pathname, which is the
+        # exact removal every caller here was changed to stop doing -- and
+        # applied to the identity sidecar it deletes a replacement's token. A
+        # daemon that cannot import a stdlib-only module from its own tree is a
+        # broken install, and refusing to reclaim leaves a stale record for an
+        # operator to clear; deleting the wrong one cannot be undone.
+        return False
+    return reclaim_if_unchanged(pid_path, observed)
 
 
 def _sidecar_cleared(pid_path: Path) -> bool:
@@ -65,11 +66,24 @@ def _sidecar_cleared(pid_path: Path) -> bool:
     """
 
     sidecar = _identity_path(pid_path)
+
+    # EXISTENCE IS lstat's QUESTION, NOT read's. A read failing with
+    # FileNotFoundError does not prove the path is empty: a dangling symlink is
+    # a directory entry whose target is missing, and it raises exactly that.
+    # Reading absence out of it would report the slot clear while an entry a
+    # later write will follow is still sitting there.
     try:
-        observed = sidecar.read_bytes()
+        sidecar.lstat()
     except FileNotFoundError:
         return True
     except OSError:
+        return False
+
+    try:
+        observed = sidecar.read_bytes()
+    except OSError:
+        # Present but unreadable -- a dangling link, a permission denial, a
+        # directory. We cannot tell whose it is, so the slot stays claimed.
         return False
     return _reclaim_claim_if_unchanged(sidecar, observed)
 

@@ -4,6 +4,7 @@ Tests PID-singleton enforcement and audit-append functionality.
 Run: C:\\Python313\\python.exe -m pytest FLOSS/packages/tests/test_mcp_daemon.py -v
 """
 
+import builtins
 import os
 import sys
 import tempfile
@@ -1199,3 +1200,66 @@ def test_a_foreign_sidecar_stops_the_claim_from_being_freed(tmp_path):
         monkey.undo()
 
     assert sidecar.read_text(encoding="utf-8") == "the-winners-identity"
+
+
+def test_a_dangling_sidecar_symlink_is_not_read_as_absent(tmp_path):
+    """A read failing with FileNotFoundError does not prove the path is empty:
+    a dangling symlink is a directory entry whose target is missing and raises
+    exactly that. Reporting the slot clear leaves an entry a later write will
+    follow."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+    try:
+        sidecar.symlink_to(tmp_path / "target-that-does-not-exist")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is not permitted in this environment")
+
+    assert sidecar.exists() is False, "fixture is not actually dangling"
+    with pytest.raises(FileNotFoundError):
+        sidecar.read_bytes()
+
+    assert mcp_daemon._sidecar_cleared(pid_path) is False
+
+
+def test_a_genuinely_absent_sidecar_is_still_read_as_absent(tmp_path):
+    """lstat must decide existence, not become a reason to refuse everything."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+
+    assert not mcp_daemon._identity_path(pid_path).exists()
+    assert mcp_daemon._sidecar_cleared(pid_path) is True
+
+
+def test_reclamation_fails_closed_without_the_shared_helper(tmp_path, monkeypatch):
+    """The ImportError fallback unlinked by pathname -- the exact removal every
+    caller was changed to stop doing, and applied to the sidecar it deletes a
+    replacement's token. Refusing leaves a stale record for an operator; a wrong
+    deletion cannot be undone."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    record = tmp_path / "some.pid"
+    record.write_bytes(b"a-live-record")
+
+    real_import = builtins.__import__
+
+    def block_filelock(name, *args, **kwargs):
+        if name == "packages.activity_log.filelock":
+            raise ImportError("filelock unavailable in this install")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", block_filelock)
+
+    assert mcp_daemon._reclaim_claim_if_unchanged(record, b"a-live-record") is False
+    assert record.read_bytes() == b"a-live-record", "removed by pathname anyway"
