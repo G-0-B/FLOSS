@@ -206,26 +206,34 @@ def test_one_definition_of_the_local_embedder_name():
     assert derivations == ["transport.py"], f"re-derived in {derivations}"
 
 
-def test_a_legacy_pool_entry_routes_to_ollama_not_litellm():
+def test_every_legacy_pool_entry_routes_to_ollama_not_litellm(monkeypatch):
     """DEFAULT_VOTER_POOL entries carry no `transport`, and defaulting them to
-    litellm sent local models to a provider that has never heard of them: every
-    voter failed provider resolution and the run degraded, so the compatibility
-    the retained pool exists for was the one thing it did not have."""
+    litellm sent local models to a provider that has never heard of them.
+
+    EVERY entry, not the first. The version of this test that checked
+    DEFAULT_VOTER_POOL[0] passed against a slash-based heuristic that still
+    misrouted the fourth entry -- an Ollama tag with two slashes in it -- so a
+    four-family local ensemble quietly ran with three voters.
+    """
     from packages.reasoning_ensemble import synthesizer, transport
 
-    seen = {}
+    routed = []
 
     def fake_ollama(model, prompt, timeout):
-        seen["model"] = model
+        routed.append(model)
         return "local answer"
 
-    legacy = synthesizer.DEFAULT_VOTER_POOL[0]
-    assert "transport" not in legacy, "fixture is no longer a legacy entry"
+    def must_not_run(model, prompt, timeout):
+        raise AssertionError(f"{model} was routed off-box")
 
-    text = transport.generate(legacy, "prompt", 5, fake_ollama)
+    monkeypatch.setattr(transport, "_litellm_generate", must_not_run)
+    monkeypatch.setattr(transport, "_flowith_generate", must_not_run)
+    for voter in synthesizer.DEFAULT_VOTER_POOL:
+        assert "transport" not in voter, f"{voter['voter_id']} is not legacy"
+        assert transport.generate(voter, "prompt", 5, fake_ollama) == "local answer"
 
-    assert text == "local answer"
-    assert seen["model"] == legacy["model"]
+    assert routed == [v["model"] for v in synthesizer.DEFAULT_VOTER_POOL]
+    assert any("/" in model for model in routed), "no slash-bearing tag covered"
 
 
 def test_a_declared_transport_still_wins_over_the_inference(monkeypatch):
@@ -253,21 +261,28 @@ def test_a_declared_transport_still_wins_over_the_inference(monkeypatch):
     assert routed["via"] == "litellm"
 
 
-def test_an_online_model_id_without_a_transport_still_reaches_litellm():
-    """A provider-prefixed id is a litellm id, so the inference must not drag
-    every fieldless entry to ollama."""
+def test_an_online_pool_must_declare_its_transport(monkeypatch):
+    """This test previously asserted the opposite, and was wrong to.
+
+    It encoded the slash heuristic -- provider-prefixed means litellm -- which
+    the retained pool's own `hf.co/...` tag disproves. The wire is not derivable
+    from a model id, which is why the field exists. A fieldless entry is a v0.1
+    LOCAL pool; an online pool has to say so, and every resolved pool does.
+    """
     from packages.reasoning_ensemble import transport
 
-    def must_not_run(model, prompt, timeout):
-        raise AssertionError("a provider-prefixed model was routed to ollama")
+    routed = {}
+    monkeypatch.setattr(
+        transport,
+        "_litellm_generate",
+        lambda model, prompt, timeout: routed.setdefault("via", "litellm"),
+    )
 
-    try:
-        transport.generate(
-            {"model": "groq/llama-3.1-8b-instant"}, "prompt", 1, must_not_run
-        )
-    except AssertionError:
-        raise
-    except Exception:
-        # Reaching litellm and failing there (no credentials in the test env) is
-        # the outcome under test; being handed to ollama is not.
-        pass
+    transport.generate(
+        {"model": "groq/llama-3.1-8b-instant", "transport": "litellm"},
+        "prompt",
+        5,
+        lambda *a: (_ for _ in ()).throw(AssertionError("declared litellm hit ollama")),
+    )
+
+    assert routed["via"] == "litellm"

@@ -308,12 +308,18 @@ def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
     # degraded: the compatibility the retained pool exists to provide was the
     # one thing it did not have.
     #
-    # A bare tag ("phi4-mini:latest") is an Ollama model; a litellm id names its
-    # provider first ("groq/llama-3.1-8b-instant"). Inferring only here leaves
-    # _transport_for_model, which resolved pools use, exactly as it was.
-    transport = voter.get("transport") or (
-        "litellm" if "/" in voter.get("model", "") else "ollama"
-    )
+    # OLLAMA, not an inference from the model id. The first version of this
+    # keyed on a slash -- bare tag means local, provider-prefixed means litellm
+    # -- and the retained pool's fourth entry is
+    # `hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16`, an Ollama tag
+    # with two slashes in it. So the heuristic sent one of four local voters to
+    # a cloud provider and left the nominal four-family ensemble with three.
+    #
+    # The `transport` field exists precisely because the wire is not derivable
+    # from the model id; that tag is the proof. A pool that omits it is a v0.1
+    # local pool, which is the only thing this default is for -- an explicit
+    # pool of online models has to say so, and every resolved pool already does.
+    transport = voter.get("transport") or "ollama"
     if transport == "ollama":
         return ollama_generate(voter["model"], prompt, timeout)
     if transport == "flowith":
