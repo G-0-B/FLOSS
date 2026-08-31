@@ -1471,3 +1471,69 @@ def test_the_lock_token_is_read_from_every_format_this_file_has_had(tmp_path):
         path = tmp_path / name
         path.write_text(body, encoding="utf-8")
         assert prov._lock_token(path) == expected, name
+
+
+# ---------------------------------------------------------------------------
+# Reclamation must remove the instance it inspected, not whatever is at the path.
+# ---------------------------------------------------------------------------
+
+
+def test_reclaiming_does_not_delete_a_lock_taken_since_it_was_inspected(tmp_path):
+    """Two writers can both judge one abandoned holder dead. The first unlinks
+    and takes a fresh lock; the second then unlinks THAT -- and for the
+    provenance chain that means two writers inside the sequence critical
+    section: duplicate reservations and forked heads."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".contended.lock"
+    lock_path.write_bytes(b"the-abandoned-instance")
+    observed = lock_path.read_bytes()
+
+    # The faster reclaimer wins and a NEW holder takes the slot.
+    assert filelock.reclaim_if_unchanged(lock_path, observed) is True
+    lock_path.write_bytes(b"a-live-new-holder")
+
+    # The slower one arrives with what it inspected a moment ago.
+    assert filelock.reclaim_if_unchanged(lock_path, observed) is False
+    assert lock_path.read_bytes() == b"a-live-new-holder", "live lock deleted"
+
+
+def test_only_one_reclaimer_reports_success(tmp_path):
+    """The rename is the atomic part: exactly one caller moves a given file
+    aside and the rest retry the exclusive create."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".once.lock"
+    lock_path.write_bytes(b"abandoned")
+    observed = lock_path.read_bytes()
+
+    outcomes = [filelock.reclaim_if_unchanged(lock_path, observed) for _ in range(3)]
+
+    assert outcomes == [True, False, False]
+    assert not lock_path.exists()
+
+
+def test_reclaiming_leaves_no_quarantine_files_behind(tmp_path):
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".tidy.lock"
+    lock_path.write_bytes(b"abandoned")
+
+    filelock.reclaim_if_unchanged(lock_path, b"abandoned")
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_stale_lock_is_still_reclaimed_end_to_end(tmp_path):
+    """Instance-checking must not disable reclamation, which is the whole point
+    of the stale path."""
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".stale.lock"
+    lock_path.write_text("999999999\nstart\nabandoned-token", encoding="utf-8")
+    ancient = time.time() - 86400
+    os.utime(lock_path, (ancient, ancient))
+
+    token = filelock._acquire_lock(lock_path, timeout_seconds=1.0, stale_seconds=1.0)
+
+    assert filelock._lock_token(lock_path) == token

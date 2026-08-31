@@ -29,6 +29,26 @@ from pathlib import Path
 _RESERVATION_STALE_SECONDS = 60.0
 
 
+def _reclaim_claim_if_unchanged(pid_path: Path, observed: bytes | None) -> bool:
+    """Remove a claim only if it is still the file the checks inspected.
+
+    Delegates to the shared filelock implementation rather than growing a third
+    copy of rename-then-verify here. Falls back to a plain unlink only if that
+    module cannot be imported, which keeps the daemon runnable on its own.
+    """
+
+    try:
+        from packages.activity_log.filelock import reclaim_if_unchanged
+
+        return reclaim_if_unchanged(pid_path, observed)
+    except ImportError:
+        try:
+            pid_path.unlink(missing_ok=True)
+        except OSError:
+            return False
+        return True
+
+
 def _blank_claim_is_stale(pid_path: Path) -> bool:
     """True when an empty claim file is old enough to be a crashed reserver."""
 
@@ -208,6 +228,12 @@ def claim_singleton(pid_filename: str) -> bool:
             fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             raw = ""
+            # Captured before every check below, so the reclaim can prove it is
+            # removing the same claim those checks inspected.
+            try:
+                observed = pid_path.read_bytes()
+            except OSError:
+                observed = None
             try:
                 raw = pid_path.read_text(encoding="utf-8").strip()
             except OSError:
@@ -250,9 +276,9 @@ def claim_singleton(pid_filename: str) -> bool:
                     if _blank_claim_is_stale(pid_path):
                         try:
                             _identity_path(pid_path).unlink(missing_ok=True)
-                            pid_path.unlink(missing_ok=True)
                         except OSError:
                             return False
+                        _reclaim_claim_if_unchanged(pid_path, observed)
                         continue
                     return False
             try:
@@ -277,11 +303,17 @@ def claim_singleton(pid_filename: str) -> bool:
             # then return success and race for the same port. Removing the
             # identity first means the worst case is an unverifiable holder,
             # which blocks, rather than a mismatched one, which does not.
+            #
+            # BY INSTANCE, not by pathname. Two launchers can both judge the
+            # same stale claim dead; the first unlinks and recreates it, and the
+            # second then deletes THAT -- so both return success and both start
+            # a daemon on one port. The rename is the atomic part: exactly one
+            # caller moves a given file aside and the rest retry.
             try:
                 _identity_path(pid_path).unlink(missing_ok=True)
-                pid_path.unlink(missing_ok=True)
             except OSError:
                 return False
+            _reclaim_claim_if_unchanged(pid_path, observed)
             continue
         else:
             try:
@@ -538,11 +570,11 @@ def _reserve_slot_cli() -> int:
         # checks, which know how to probe it.
         reclaimed = False
         try:
-            if not pid_path.read_text(encoding="utf-8").strip():
+            observed = pid_path.read_bytes()
+            if not observed.strip():
                 if _blank_claim_is_stale(pid_path):
                     _identity_path(pid_path).unlink(missing_ok=True)
-                    pid_path.unlink(missing_ok=True)
-                    reclaimed = True
+                    reclaimed = _reclaim_claim_if_unchanged(pid_path, observed)
         except OSError:
             reclaimed = False
         if not reclaimed:

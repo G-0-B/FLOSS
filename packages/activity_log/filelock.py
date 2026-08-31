@@ -131,6 +131,56 @@ def _lock_owner_is_alive(lock_path: Path) -> bool | None:
     return _pid_alive(owner)
 
 
+def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
+    """Remove `path` only if it is still the exact file that was inspected.
+
+    Check-then-unlink-by-pathname is not reclamation, it is a race. Two writers
+    can both judge the same abandoned holder dead; the first unlinks it and
+    takes a fresh lock, and the second then unlinks THAT -- deleting a live
+    owner's lock. Both proceed, and for the provenance chain that means two
+    writers inside the sequence critical section: duplicate reservations and
+    forked heads, the exact corruption the lock exists to prevent.
+
+    Renaming is the atomic part. Exactly one caller can move a given file aside,
+    so everyone else's rename fails and they simply retry the exclusive create.
+    The content check then covers the remaining window -- the holder released
+    and a NEW one took the slot between inspection and rename -- by putting back
+    anything that is not what we looked at.
+
+    Returns True when this caller is the one that removed it.
+    """
+
+    quarantine = path.with_name(f"{path.name}.reclaim-{_b64url_encode(os.urandom(9))}")
+    try:
+        os.rename(path, quarantine)
+    except OSError:
+        # Gone, or another reclaimer moved it first. Either way it is not ours
+        # to delete and the caller should just retry.
+        return False
+
+    if observed is not None:
+        try:
+            current = quarantine.read_bytes()
+        except OSError:
+            current = None
+        if current != observed:
+            # A different instance: released and re-taken while we looked. Put
+            # it back if the slot is still free.
+            try:
+                os.rename(quarantine, path)
+                return False
+            except OSError:
+                # The slot has been taken again since. The file in hand is a
+                # superseded copy, so dropping it destroys nothing live.
+                pass
+
+    try:
+        quarantine.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return True
+
+
 def _lock_age_seconds(lock_path: Path) -> float | None:
     """Seconds since the lock file was created, or None if it is gone."""
     try:
@@ -198,6 +248,12 @@ def _acquire_lock(
             # they were genesis) and was in fact this. It reproduced only under
             # full-suite CPU load on Windows, and never on the Linux CI runner,
             # which is why the required gate stayed green while local runs did not.
+            # Captured BEFORE the age and owner checks, so the reclaim below
+            # can prove it is removing the same file those checks looked at.
+            try:
+                observed = lock_path.read_bytes()
+            except OSError:
+                observed = None
             age = _lock_age_seconds(lock_path)
             if (
                 age is not None
@@ -211,10 +267,11 @@ def _acquire_lock(
                 # window that holder is gone -- a crashed writer, or a release
                 # whose unlink lost to a Windows sharing violation -- and the
                 # lock is reclaimed here instead of wedging the chain forever.
-                try:
-                    lock_path.unlink(missing_ok=True)
-                except (FileNotFoundError, PermissionError):
-                    pass
+                #
+                # By INSTANCE, not by pathname: an unlink here deleted whatever
+                # sat at this path, including a fresh lock a faster reclaimer had
+                # just taken.
+                reclaim_if_unchanged(lock_path, observed)
                 continue
             if time.monotonic() >= deadline:
                 raise TimeoutError(

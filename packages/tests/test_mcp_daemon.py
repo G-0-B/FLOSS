@@ -975,3 +975,36 @@ def test_reserve_slot_never_reclaims_a_record_with_a_pid_in_it(tmp_path):
 
     assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "OCCUPIED"
     assert pid_path.read_text(encoding="utf-8") == "4242"
+
+
+def test_two_launchers_cannot_both_reclaim_one_stale_reservation(tmp_path):
+    """Both can pass the content and age checks; after the first unlinks and
+    recreates the claim, the second deleted THAT and both returned RESERVED --
+    two servers on one port, which is what the reservation exists to prevent."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"")
+    observed = pid_path.read_bytes()
+
+    first = mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed)
+    pid_path.write_bytes(b"31337")  # the winner's fresh claim
+
+    second = mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed)
+
+    assert first is True and second is False
+    assert pid_path.read_bytes() == b"31337", "the winner's claim was deleted"
+
+
+def test_the_daemon_reclaim_delegates_to_the_shared_implementation():
+    """A third copy of rename-then-verify is how the three sites drift apart."""
+    source = (Path(__file__).resolve().parents[1] / "mcp_daemon.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from packages.activity_log.filelock import reclaim_if_unchanged" in source
+    body = source.split("def _reclaim_claim_if_unchanged(", 1)[1].split("\ndef ", 1)[0]
+    assert "os.rename" not in body, "reimplemented the rename here"
