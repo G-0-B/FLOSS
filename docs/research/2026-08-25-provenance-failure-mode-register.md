@@ -6,6 +6,11 @@ found, with the commit that introduced it and the commit that closed it.
 **Scope:** the PR #41 repair sequence — ADR-20, the reuse gate, the post-write hooks,
 and the reasoning-ensemble aggregation that shaped ADR-20's own decision.
 
+**Continued in** `2026-08-31-review-loop-session-learnings.md`, which carries
+FM-9..FM-15 and CF-11..CF-14 from the 32-commit session that followed, plus a
+section on tests that could not fail. Numbering is continuous across the two
+documents; this one is frozen at FM-1..FM-8 and CF-1..CF-10.
+
 This is not a changelog. It records the *shapes* of the mistakes, because the shapes
 repeated and the individual fixes did not stop them. Fourteen commits, eleven review
 rounds, and every single defect was found by an external reviewer rather than by the
