@@ -167,7 +167,15 @@ OLLAMA_BASE_URL = os.environ.get(
 ROUTER_MODEL = os.environ.get(
     "FLOSS_ROUTER_MODEL", "phi4-mini:latest"
 )  # 2.5GB, fits fully on 16GB VRAM alongside mxbai-embed-large; ~10s warm vs gemma3:12b's 40-50s. Equivalent classification accuracy on calibration sample. Set FLOSS_ROUTER_MODEL=gemma3:12b-it-qat to revert.
-EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
+# Imported, not re-derived: three copies of this lookup is how a vector came
+# to be embedded by one model and labelled with another. Same dual-path import
+# the synthesizer uses, so running this module directly still resolves.
+try:
+    from FLOSS.packages.reasoning_ensemble import transport
+except ImportError:
+    from packages.reasoning_ensemble import transport
+
+EMBED_MODEL = transport.EMBED_MODEL
 
 # Upgrade A: activity-log-similarity bias.
 # Scan the last N logged prompts; if any has a Tier-4 tag AND cosine

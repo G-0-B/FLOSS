@@ -131,6 +131,14 @@ def family_from_model(model: str) -> str:
     return tail.split("-")[0] or tail
 
 
+# ONE definition of the local embedder name. router and synthesizer each had
+# their own copy of this env lookup, and resolve_embedder() had a third copy as
+# a hardcoded literal -- so a run could embed with one model and label the row
+# with another. Two earlier fixes corrected the two DOWNSTREAM copies; this is
+# the one that produces the name.
+EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
+
+
 def _transport_for_model(model: str) -> str:
     lower = model.strip().lower()
     if lower.startswith("flowith/"):
@@ -290,7 +298,22 @@ def _flowith_generate(model: str, prompt: str, timeout: int) -> str:
 
 def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
     """Route one generation by voter transport. Raises on failure (caller wraps)."""
-    transport = voter.get("transport", "litellm")
+    # A LEGACY POOL HAS NO TRANSPORT FIELD, AND IS LOCAL.
+    #
+    # resolve_voter_pool() sets `transport` on every entry, so this default only
+    # ever applies to an explicit pool passed by a caller -- which is what
+    # DEFAULT_VOTER_POOL is retained for, and every entry in it is an Ollama
+    # tag. Defaulting those to litellm sent local models to a provider that has
+    # never heard of them, so each voter failed provider resolution and the run
+    # degraded: the compatibility the retained pool exists to provide was the
+    # one thing it did not have.
+    #
+    # A bare tag ("phi4-mini:latest") is an Ollama model; a litellm id names its
+    # provider first ("groq/llama-3.1-8b-instant"). Inferring only here leaves
+    # _transport_for_model, which resolved pools use, exactly as it was.
+    transport = voter.get("transport") or (
+        "litellm" if "/" in voter.get("model", "") else "ollama"
+    )
     if transport == "ollama":
         return ollama_generate(voter["model"], prompt, timeout)
     if transport == "flowith":
@@ -354,7 +377,14 @@ def resolve_embedder(
     try:
         vec = probe_fn("healthcheck")
         if vec:
-            return "mxbai-embed-large", working_fn
+            # The CONFIGURED local model, not the default's name. Returning the
+            # literal meant `embed_name` was always truthy and always "mxbai",
+            # so the `embed_name or EMBED_MODEL` fallbacks added downstream
+            # could never fire: with FLOSS_EMBED_MODEL set, Tier-4 rows were
+            # labelled mxbai while the router labelled its own vector with the
+            # configured model, and the model-match check then skipped every
+            # row it was supposed to compare.
+            return EMBED_MODEL, working_fn
     except Exception:  # noqa: BLE001 — fall through to cloud
         pass
     cloud_model = _available_cloud_embed_model()

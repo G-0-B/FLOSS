@@ -160,3 +160,114 @@ def test_the_two_modules_agree_on_the_legacy_embedder_name(monkeypatch, tmp_path
     rows = _log(monkeypatch, tmp_path, embed_fn=None, embed_name=None)
 
     assert rows[0]["prompt_embedding_model"] == router.LEGACY_EMBED_MODEL
+
+
+# ---------------------------------------------------------------------------
+# The name that labels the vector must be the model that produced it -- at the
+# source, not only at the two places that consume it.
+# ---------------------------------------------------------------------------
+
+
+def test_the_resolved_embedder_reports_the_configured_model(monkeypatch):
+    """resolve_embedder returned the literal "mxbai-embed-large" whatever the
+    probe actually used, so embed_name was always truthy and always wrong under
+    FLOSS_EMBED_MODEL -- which meant the `embed_name or EMBED_MODEL` fallbacks
+    added downstream could never fire.
+
+    Patches the module attribute rather than reloading: a reload rebinds the
+    name to a new object and leaves every module that imported it pointing at
+    the old one, which is a test artefact rather than anything about the code.
+    """
+    from packages.reasoning_ensemble import transport
+
+    monkeypatch.setattr(transport, "EMBED_MODEL", "nomic-embed-text")
+
+    name, fn = transport.resolve_embedder(lambda text: [0.1])
+
+    assert name == "nomic-embed-text"
+    assert fn("x") == [0.1]
+
+
+def test_one_definition_of_the_local_embedder_name():
+    """Three copies of this lookup is how a vector came to be embedded by one
+    model and labelled with another."""
+    from packages.reasoning_ensemble import router, synthesizer, transport
+
+    assert synthesizer.EMBED_MODEL == transport.EMBED_MODEL
+    assert router.EMBED_MODEL == transport.EMBED_MODEL
+
+    source = Path(transport.__file__).parent
+    derivations = sorted(
+        path.name
+        for path in source.glob("*.py")
+        if 'EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL"'
+        in path.read_text(encoding="utf-8")
+    )
+    assert derivations == ["transport.py"], f"re-derived in {derivations}"
+
+
+def test_a_legacy_pool_entry_routes_to_ollama_not_litellm():
+    """DEFAULT_VOTER_POOL entries carry no `transport`, and defaulting them to
+    litellm sent local models to a provider that has never heard of them: every
+    voter failed provider resolution and the run degraded, so the compatibility
+    the retained pool exists for was the one thing it did not have."""
+    from packages.reasoning_ensemble import synthesizer, transport
+
+    seen = {}
+
+    def fake_ollama(model, prompt, timeout):
+        seen["model"] = model
+        return "local answer"
+
+    legacy = synthesizer.DEFAULT_VOTER_POOL[0]
+    assert "transport" not in legacy, "fixture is no longer a legacy entry"
+
+    text = transport.generate(legacy, "prompt", 5, fake_ollama)
+
+    assert text == "local answer"
+    assert seen["model"] == legacy["model"]
+
+
+def test_a_declared_transport_still_wins_over_the_inference(monkeypatch):
+    """The inference applies only where the field is absent. An entry that
+    names litellm must reach litellm even though its model has no slash."""
+    from packages.reasoning_ensemble import transport
+
+    routed = {}
+    monkeypatch.setattr(
+        transport,
+        "_litellm_generate",
+        lambda model, prompt, timeout: routed.setdefault("via", "litellm"),
+    )
+
+    def must_not_run(model, prompt, timeout):
+        raise AssertionError("a declared litellm voter was routed to ollama")
+
+    transport.generate(
+        {"model": "bare-tag-no-slash", "transport": "litellm"},
+        "prompt",
+        5,
+        must_not_run,
+    )
+
+    assert routed["via"] == "litellm"
+
+
+def test_an_online_model_id_without_a_transport_still_reaches_litellm():
+    """A provider-prefixed id is a litellm id, so the inference must not drag
+    every fieldless entry to ollama."""
+    from packages.reasoning_ensemble import transport
+
+    def must_not_run(model, prompt, timeout):
+        raise AssertionError("a provider-prefixed model was routed to ollama")
+
+    try:
+        transport.generate(
+            {"model": "groq/llama-3.1-8b-instant"}, "prompt", 1, must_not_run
+        )
+    except AssertionError:
+        raise
+    except Exception:
+        # Reaching litellm and failing there (no credentials in the test env) is
+        # the outcome under test; being handed to ollama is not.
+        pass

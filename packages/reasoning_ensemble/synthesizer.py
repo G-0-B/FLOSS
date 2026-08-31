@@ -151,7 +151,9 @@ REASONING_ACTIVITY_LOG = (
 )
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
+# Imported, not re-derived: three copies of this lookup is how a vector came
+# to be embedded by one model and labelled with another.
+EMBED_MODEL = transport.EMBED_MODEL
 
 # LEGACY (v0.1) local pool. As of v0.2 the live pools are resolved in
 # `transport.resolve_voter_pool()` (transport.LOCAL_VOTER_POOL mirrors this for
