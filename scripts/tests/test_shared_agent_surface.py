@@ -459,7 +459,15 @@ def _reasoning_budget_seconds() -> int:
     return synthesizer.WORST_CASE_RUN_SECONDS
 
 
-def _reasoning_timeouts() -> list[tuple[str, int]]:
+def _consensus_budget_seconds() -> int:
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    return voters.WORST_CASE_ROUND_SECONDS
+
+
+def _server_timeouts(server: str) -> list[tuple[str, int]]:
     surface = json.loads(
         (FLOSS_ROOT / "shared-agent-surface.json").read_text(encoding="utf-8")
     )
@@ -468,7 +476,7 @@ def _reasoning_timeouts() -> list[tuple[str, int]]:
     def walk(node, path):
         if isinstance(node, dict):
             for key, value in node.items():
-                if key == "flossiullk-reasoning-ensemble" and isinstance(value, dict):
+                if key == server and isinstance(value, dict):
                     for tkey in ("tool_timeout_sec", "timeout"):
                         if isinstance(value.get(tkey), (int, float)):
                             found.append((f"{path}.{key}.{tkey}", value[tkey]))
@@ -479,6 +487,26 @@ def _reasoning_timeouts() -> list[tuple[str, int]]:
 
     walk(surface, "surface")
     return found
+
+
+def _reasoning_timeouts() -> list[tuple[str, int]]:
+    return _server_timeouts("flossiullk-reasoning-ensemble")
+
+
+def test_every_consensus_timeout_clears_a_full_sequential_round():
+    """A round polls voters sequentially, so it costs roster size times the
+    per-voter timeout. Four default voters is 240s against projections that
+    capped the tool at 120 -- a valid round failed at the client while the
+    server kept polling and could still write a decision afterwards."""
+    budget = _consensus_budget_seconds()
+    timeouts = _server_timeouts("flossiullk-consensus")
+
+    assert timeouts, "no consensus timeouts found -- has the shape moved?"
+    too_small = [(where, value) for where, value in timeouts if value < budget]
+    assert not too_small, (
+        f"timeout(s) below the {budget}s round budget: {too_small}. "
+        "Raise them, or bound the round below the client timeout."
+    )
 
 
 def test_every_reasoning_ensemble_timeout_clears_the_servers_own_budget():
@@ -495,3 +523,52 @@ def test_every_reasoning_ensemble_timeout_clears_the_servers_own_budget():
         f"timeout(s) below the {budget}s server budget: {too_small}. "
         "Raise them, or lower the synthesizer's budgets to match."
     )
+
+
+def test_the_hook_filters_read_the_resolved_path_not_the_raw_spelling(tmp_path):
+    """Containment was checked against the resolved path while the filters
+    inspected the raw string, so the two disagreed about the same file:
+    `packages/tests/../prod.py` resolves to production code and was skipped for
+    containing "/tests/"; `packages/../docs/research/x.py` resolves to an
+    intake mouth and was treated as package code."""
+    import importlib.util
+
+    for name in ("hook_post_write", "hook_pre_write"):
+        spec = importlib.util.spec_from_file_location(
+            f"{name}_paths_under_test", FLOSS_ROOT / "hooks" / f"{name}.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        disguised_code = str(FLOSS_ROOT / "packages" / "tests" / ".." / "prod.py")
+        disguised_intake = str(
+            FLOSS_ROOT / "packages" / ".." / "docs" / "research" / "x.py"
+        )
+
+        assert (
+            module.is_substantive(disguised_code) is True
+        ), f"{name}: production code hidden behind a ../ was skipped"
+        assert (
+            module.is_substantive(disguised_intake) is False
+        ), f"{name}: an intake path spelled through packages/ was accepted"
+
+
+def test_the_intake_scan_holds_its_lock_across_counting_and_emitting(tmp_path):
+    """The lock was taken only around save_state, so two overlapping watchers
+    each loaded the same state, counted the same queue, and were independently
+    granted the same remaining capacity -- two scans of the same 5,000 changes
+    could enqueue 10,000 events, defeating the cap outright."""
+    source = (FLOSS_ROOT / "scripts" / "watch_intake.py").read_text(encoding="utf-8")
+    body = source.split("def scan_once(", 1)[1].split("def parse_args(", 1)[0]
+
+    lock_at = body.find('lock_file(event_root / "locks", "watch-state"')
+    load_at = body.find("load_state(state_path)")
+    save_at = body.find("save_state(state_path, current)")
+
+    assert lock_at != -1, "the scan no longer takes the state lock"
+    assert lock_at < load_at, "state is loaded before the lock is held"
+    assert lock_at < save_at, "state is saved outside the lock"
+    assert (
+        body.count('lock_file(event_root / "locks", "watch-state"') == 1
+    ), "two lock acquisitions means two critical sections, which is the defect"

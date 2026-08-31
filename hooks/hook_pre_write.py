@@ -81,6 +81,34 @@ def finish() -> int:
     return 0
 
 
+def _repo_relative(path_str: str) -> str | None:
+    """The RESOLVED repository-relative path, lowercased, or None if outside.
+
+    Containment was checked against the resolved path while every filter below
+    inspected the raw spelling, so the two disagreed about the same file. A
+    tool supplying `packages/tests/../prod.py` resolves to production code and
+    was SKIPPED for containing "/tests/"; `packages/../docs/research/x.py`
+    resolves to an intake mouth and was treated as package code. Both filters
+    now read the path the filesystem agrees on.
+    """
+
+    try:
+        candidate = Path(path_str).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        resolved = candidate.resolve()
+        root = REPO_ROOT.resolve()
+    except (OSError, ValueError):
+        return None
+    if resolved != root and root not in resolved.parents:
+        return None
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError:
+        return ""
+    return "/" + relative.as_posix().lower()
+
+
 def _is_inside_repo(path_str: str) -> bool:
     """Only edits within THIS checkout may be checkpointed.
 
@@ -91,15 +119,7 @@ def _is_inside_repo(path_str: str) -> bool:
     The post-write hook's own containment check does not undo that disclosure --
     it happens after the write is already on disk.
     """
-    try:
-        candidate = Path(path_str).expanduser()
-        if not candidate.is_absolute():
-            candidate = Path.cwd() / candidate
-        resolved = candidate.resolve()
-        root = REPO_ROOT.resolve()
-    except (OSError, ValueError):
-        return False
-    return resolved == root or root in resolved.parents
+    return _repo_relative(path_str) is not None
 
 
 def _is_root_kernel(path_str: str) -> bool:
@@ -130,9 +150,9 @@ def _is_root_kernel(path_str: str) -> bool:
 def is_substantive(path_str: str) -> bool:
     if not path_str:
         return False
-    if not _is_inside_repo(path_str):
+    norm = _repo_relative(path_str)
+    if norm is None:
         return False
-    norm = "/" + path_str.replace("\\", "/").lstrip("/").lower()
     if any(skip in norm for skip in SKIP_SEGMENTS):
         return False
     if norm.endswith(SUBSTANTIVE_EXTENSIONS) and any(

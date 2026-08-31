@@ -369,6 +369,32 @@ def scan_once(
     debounce_seconds: float,
 ) -> int:
     ensure_dirs(event_root)
+    # THE SCAN IS THE CRITICAL SECTION, NOT JUST THE STATE WRITE.
+    #
+    # The lock was taken only around save_state at the end, so two overlapping
+    # watchers each loaded the same previous state, counted the same incoming
+    # queue, and were independently granted the same remaining capacity --
+    # against an empty queue two scans of the same 5,000 changes could enqueue
+    # 10,000 events, which is precisely what the backpressure cap exists to
+    # prevent. Counting capacity and spending it have to be one operation.
+    with lock_file(event_root / "locks", "watch-state", timeout_seconds=30.0):
+        return _scan_once_locked(
+            workspace_root=workspace_root,
+            event_root=event_root,
+            state_path=state_path,
+            emit_on_first_scan=emit_on_first_scan,
+            debounce_seconds=debounce_seconds,
+        )
+
+
+def _scan_once_locked(
+    *,
+    workspace_root: Path,
+    event_root: Path,
+    state_path: Path,
+    emit_on_first_scan: bool,
+    debounce_seconds: float,
+) -> int:
     had_state = state_path.exists()
     previous = load_state(state_path)
     current: dict[str, dict[str, Any]] = {}
@@ -532,8 +558,9 @@ def scan_once(
             f"drain with process_intake_events.py and re-scan"
         )
 
-    with lock_file(event_root / "locks", "watch-state"):
-        save_state(state_path, current)
+    # Already inside the scan lock: counting capacity, emitting against it and
+    # recording what was emitted are one operation or they are none.
+    save_state(state_path, current)
     return emitted
 
 

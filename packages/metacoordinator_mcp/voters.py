@@ -836,6 +836,24 @@ def describe_default_roster(profile: str | None = None) -> list[dict[str, str | 
     return described
 
 
+# Per-voter wall clock. Named here rather than left to the OmniRoute client's
+# default so the round budget below is derived from the same number the call
+# actually uses.
+VOTER_CALL_TIMEOUT_SECONDS = 60.0
+
+# A consensus round polls voters SEQUENTIALLY (tools._collect_new_votes), so the
+# round costs roster size times the per-voter timeout -- four default voters is
+# 240 seconds against MCP projections that capped the tool at 120. A valid round
+# therefore failed at the client while the server kept polling and could still
+# write a decision afterwards, which is the worst of both: no answer, and a
+# durable record the caller never saw.
+#
+# Summed HERE, next to the terms, for the same reason the ensemble's
+# WORST_CASE_RUN_SECONDS is: a config that has to clear a budget must read the
+# budget, not a number someone copied.
+MAX_ROSTER_FOR_BUDGET = 4
+WORST_CASE_ROUND_SECONDS = int(MAX_ROSTER_FOR_BUDGET * VOTER_CALL_TIMEOUT_SECONDS)
+
 MIN_INDEPENDENT_SURFACES = 3
 MIN_INDEPENDENT_FAMILIES = 4
 ALLOW_DEGRADED_ENV = "FLOSS_ALLOW_DEGRADED_ROSTER"
