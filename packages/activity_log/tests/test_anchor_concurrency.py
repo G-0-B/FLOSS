@@ -1585,3 +1585,44 @@ def test_the_holder_is_readable_while_the_lock_is_held(tmp_path):
         assert str(os.getpid()) in lock_path.read_text(encoding="utf-8")
     finally:
         filelock._release_lock(lock_path, token)
+
+
+def test_a_lock_file_is_not_created_world_readable(tmp_path):
+    """The lock carries a pid and a random token and every taker runs as the
+    workspace operator, so world-readable is permission it has no use for.
+
+    Behavioural on POSIX, structural on Windows: NTFS does not honour POSIX
+    mode bits, so asserting 0o600 there would assert the platform rather than
+    the code -- and passing on Windows while the finding is about Linux is the
+    kind of test this branch has already written too many of.
+    """
+    from packages.activity_log import filelock
+
+    lock_path = tmp_path / ".perm.lock"
+    token = filelock._acquire_lock(lock_path)
+    try:
+        assert filelock._LOCK_FILE_MODE == 0o600
+        if sys.platform != "win32":
+            import stat
+
+            mode = stat.S_IMODE(os.stat(lock_path).st_mode)
+            assert not mode & stat.S_IRGRP, f"group-readable: {oct(mode)}"
+            assert not mode & stat.S_IROTH, f"world-readable: {oct(mode)}"
+        else:
+            # The os.open CALLS, not the file: an earlier version of this
+            # matched "0o644" anywhere in the source and hit the comment
+            # explaining why 0o644 was wrong.
+            source = Path(filelock.__file__).read_text(encoding="utf-8")
+            opens = [
+                line
+                for line in source.splitlines()
+                if "os.open(" in line or "_LOCK_FILE_MODE" in line
+            ]
+            creating = [line for line in opens if "O_CREAT" in line]
+            assert creating, "no creating open found -- has the shape moved?"
+            for line in creating:
+                assert (
+                    "0o" not in line or "_LOCK_FILE_MODE" in line
+                ), f"a permissive literal mode is still passed: {line.strip()}"
+    finally:
+        filelock._release_lock(lock_path, token)

@@ -54,6 +54,13 @@ _LOCK_STALE_SECONDS = 60.0
 
 _POLL_SECONDS = 0.05
 
+# OWNER ONLY. The lock file carries a pid and a random token, and every process
+# that takes it runs as the workspace's operator -- there is no cross-user
+# sharing to preserve here, so world-readable is permission this file has no
+# use for. 0o644 was a copied default rather than a decision, which is what
+# CodeQL flagged.
+_LOCK_FILE_MODE = 0o600
+
 # The byte the OS lock is taken on, far past any diagnostic content.
 #
 # Windows msvcrt locks are MANDATORY, not advisory: locking byte 0 made the
@@ -144,7 +151,7 @@ def _acquire_lock(
 
     # O_CREAT, never O_EXCL: the file is a handle, not a claim. Two processes
     # opening it is expected and harmless; the lock is what one of them holds.
-    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, _LOCK_FILE_MODE)
     try:
         while True:
             if _try_lock(fd):
@@ -240,7 +247,9 @@ def reclaim_if_unchanged(path: Path, observed: bytes | None) -> bool:
             # slot is still free and we restore, or someone holds it and the
             # copy in our hand is superseded.
             try:
-                fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                fd = os.open(
+                    path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, _LOCK_FILE_MODE
+                )
             except OSError:
                 # Someone holds the slot now. The copy in our hand is
                 # superseded, so dropping it destroys nothing live.
