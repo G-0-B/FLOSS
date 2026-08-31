@@ -102,44 +102,64 @@ def _reclaim_claim_if_unchanged(pid_path: Path, observed) -> bool:
     return reclaim_if_unchanged(pid_path, observed)
 
 
-def _sidecar_cleared(pid_path: Path) -> bool:
-    """True when no identity sidecar of the inspected holder remains.
+# Distinguishes "no sidecar was there when we looked" from "there was one we
+# could not read". Both used to arrive as None and had to be pulled apart twice.
+_SIDECAR_ABSENT = object()
 
-    ABSENT AND UNREADABLE ARE DIFFERENT ANSWERS, and folding both into a None
-    `observed` made them one. Absent is the ordinary case -- most stale claims
-    never had a sidecar -- and reclaiming the pid record then is right.
-    Unreadable means we cannot tell whose identity that is, and freeing the slot
-    while a foreign sidecar remains is the non-conservative failure this file
-    already warns about: the next claimant compares its own pid against someone
-    else's token, reads FOREIGN, and reclaims a record that may be live.
 
-    So the pid record is freed only when the sidecar is provably gone -- never
-    absent by assumption.
+def _inspect_sidecar(pid_path: Path):
+    """Snapshot the sidecar at the SAME instant as the claim it belongs to.
+
+    Returns _SIDECAR_ABSENT if nothing was there, None if something was there
+    and could not be read, otherwise an Inspection.
     """
 
     sidecar = _identity_path(pid_path)
-
-    # EXISTENCE IS lstat's QUESTION, NOT read's. A read failing with
-    # FileNotFoundError does not prove the path is empty: a dangling symlink is
-    # a directory entry whose target is missing, and it raises exactly that.
-    # Reading absence out of it would report the slot clear while an entry a
-    # later write will follow is still sitting there.
+    # EXISTENCE IS lstat's QUESTION. A read failing with FileNotFoundError does
+    # not prove the path is empty: a dangling symlink is a directory entry
+    # whose target is missing and raises exactly that.
     try:
         sidecar.lstat()
     except FileNotFoundError:
-        return True
+        return _SIDECAR_ABSENT
     except OSError:
-        return False
+        return None
+    return _inspect_claim(sidecar)
 
-    # Present, so it must be inspectable. _inspect_claim returns None rather
-    # than raising, and None here means unreadable -- a dangling link, a
-    # permission denial, a directory. lstat already proved it exists, so None
-    # cannot mean absent: we cannot tell whose it is, and the slot stays
-    # claimed.
-    observed = _inspect_claim(sidecar)
-    if observed is None:
+
+def _sidecar_cleared(pid_path: Path, seen) -> bool:
+    """True when the sidecar belonging to the INSPECTED claim is gone.
+
+    `seen` is what the caller saw at the moment it snapshotted the claim, and
+    the removal is bound to it. Re-inspecting instead -- asking what sidecar
+    exists NOW -- deleted a replacement's live identity: a launcher that took
+    the freed slot after our snapshot wrote its own token, this removed it, and
+    then the claim reclaim correctly refused. The daemon stayed alive with no
+    identity, --check-identity returned UNKNOWN, and the stop script would not
+    manage it.
+
+    So the three answers are about what we SAW, not about what is there:
+
+      * nothing was there -- nothing of ours to clear. If something is there
+        now it is someone else's, and freeing the slot under it is the
+        non-conservative failure this file keeps warning about.
+      * something was there we could not read -- we cannot tell whose it is.
+      * something we inspected -- remove exactly that instance, or nothing.
+    """
+
+    sidecar = _identity_path(pid_path)
+    if seen is _SIDECAR_ABSENT:
+        try:
+            sidecar.lstat()
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        # Appeared since we looked: a replacement's, not ours.
         return False
-    return _reclaim_claim_if_unchanged(sidecar, observed)
+    if seen is None:
+        return False
+    return _reclaim_claim_if_unchanged(sidecar, seen)
 
 
 def _blank_claim_is_stale(pid_path: Path) -> bool:
@@ -325,6 +345,7 @@ def claim_singleton(pid_filename: str) -> bool:
             # removing the same claim those checks inspected.
             try:
                 observed = _inspect_claim(pid_path)
+                observed_sidecar = _inspect_sidecar(pid_path)
             except OSError:
                 observed = None
             try:
@@ -378,7 +399,7 @@ def claim_singleton(pid_filename: str) -> bool:
                         # through the same instance check, it is safe in both
                         # directions: we only ever remove the sidecar we
                         # inspected, and a winner's fresh one is left alone.
-                        if not _sidecar_cleared(pid_path):
+                        if not _sidecar_cleared(pid_path, observed_sidecar):
                             # Someone else's identity, or one we cannot read.
                             # Freeing the slot under it is the dangerous half.
                             continue
@@ -417,7 +438,7 @@ def claim_singleton(pid_filename: str) -> bool:
             # Sidecar first and content-checked, as in the blank branch above:
             # after the pid file is renamed aside the slot is free, so a taker
             # can write its identity before our unlink would land.
-            if not _sidecar_cleared(pid_path):
+            if not _sidecar_cleared(pid_path, observed_sidecar):
                 continue
             _reclaim_claim_if_unchanged(pid_path, observed)
             continue
@@ -689,11 +710,12 @@ def _reserve_slot_cli() -> int:
         reclaimed = False
         try:
             observed = _inspect_claim(pid_path)
+            observed_sidecar = _inspect_sidecar(pid_path)
             if observed is not None and not observed.data.strip():
                 if _blank_claim_is_stale(pid_path):
                     # Same ordering as claim_singleton: the sidecar first and
                     # content-checked, then the claim.
-                    reclaimed = _sidecar_cleared(pid_path) and (
+                    reclaimed = _sidecar_cleared(pid_path, observed_sidecar) and (
                         _reclaim_claim_if_unchanged(pid_path, observed)
                     )
         except OSError:
@@ -740,6 +762,7 @@ def _reclaim_claim_cli() -> int:
         return 2
     pid_path = Path(sys.argv[2])
     observed = _inspect_claim(pid_path)
+    observed_sidecar = _inspect_sidecar(pid_path)
     if observed is None:
         # ABSENT IS SUCCESS; UNREADABLE IS NOT -- the same distinction
         # _sidecar_cleared makes, decided the same way. _inspect_claim
@@ -755,7 +778,9 @@ def _reclaim_claim_cli() -> int:
             pass
         print("NOT_RECLAIMED")
         return 1
-    if _sidecar_cleared(pid_path) and _reclaim_claim_if_unchanged(pid_path, observed):
+    if _sidecar_cleared(pid_path, observed_sidecar) and _reclaim_claim_if_unchanged(
+        pid_path, observed
+    ):
         print("RECLAIMED")
         return 0
     print("NOT_RECLAIMED")

@@ -1103,7 +1103,9 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     # The sidecar goes through _sidecar_cleared (which reclaims it by instance
     # and distinguishes absent from unreadable); the claim goes through the
     # helper directly. Both reclaim branches, plus the release callback's pair.
-    assert body.count("_sidecar_cleared(pid_path)") == 2
+    assert (
+        body.count("_sidecar_cleared(pid_path, observed_sidecar)") == 2
+    ), "a reclaim branch clears the sidecar without binding it to the snapshot"
     assert body.count("_reclaim_claim_if_unchanged(") == 4
 
 
@@ -1190,7 +1192,10 @@ def test_an_absent_sidecar_does_not_block_reclamation(tmp_path):
     os.utime(pid_path, (stale, stale))
     assert not mcp_daemon._identity_path(pid_path).exists()
 
-    assert mcp_daemon._sidecar_cleared(pid_path) is True
+    assert (
+        mcp_daemon._sidecar_cleared(pid_path, mcp_daemon._inspect_sidecar(pid_path))
+        is True
+    )
 
     monkey = pytest.MonkeyPatch()
     monkey.setattr(sys, "argv", ["mcp_daemon", "--reserve-slot", str(pid_path)])
@@ -1215,7 +1220,10 @@ def test_a_foreign_sidecar_stops_the_claim_from_being_freed(tmp_path):
     monkey = pytest.MonkeyPatch()
     monkey.setattr(mcp_daemon, "_reclaim_claim_if_unchanged", lambda p, o: False)
     try:
-        assert mcp_daemon._sidecar_cleared(pid_path) is False
+        assert (
+            mcp_daemon._sidecar_cleared(pid_path, mcp_daemon._inspect_sidecar(pid_path))
+            is False
+        )
     finally:
         monkey.undo()
 
@@ -1243,7 +1251,10 @@ def test_a_dangling_sidecar_symlink_is_not_read_as_absent(tmp_path):
     with pytest.raises(FileNotFoundError):
         sidecar.read_bytes()
 
-    assert mcp_daemon._sidecar_cleared(pid_path) is False
+    assert (
+        mcp_daemon._sidecar_cleared(pid_path, mcp_daemon._inspect_sidecar(pid_path))
+        is False
+    )
 
 
 def test_a_genuinely_absent_sidecar_is_still_read_as_absent(tmp_path):
@@ -1256,7 +1267,10 @@ def test_a_genuinely_absent_sidecar_is_still_read_as_absent(tmp_path):
     pid_path = tmp_path / "consensus.pid"
 
     assert not mcp_daemon._identity_path(pid_path).exists()
-    assert mcp_daemon._sidecar_cleared(pid_path) is True
+    assert (
+        mcp_daemon._sidecar_cleared(pid_path, mcp_daemon._inspect_sidecar(pid_path))
+        is True
+    )
 
 
 def test_reclamation_fails_closed_without_the_shared_helper(tmp_path, monkeypatch):
@@ -1389,3 +1403,64 @@ def test_the_powershell_start_script_knows_the_reservation_marker():
     assert (
         f"'{mcp_daemon._RESERVATION_MARKER}*'" in script
     ), "the start script still recognises only empty reservations"
+
+
+def test_a_replacements_sidecar_written_after_our_snapshot_is_left_alone(tmp_path):
+    """Re-inspecting asked what sidecar exists NOW. A launcher that took the
+    freed slot after our snapshot wrote its own token, that removal deleted it,
+    and the claim reclaim then correctly refused -- leaving a live daemon with
+    no identity, --check-identity returning UNKNOWN, and the stop script
+    refusing to manage it."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+
+    # Nothing there when we look.
+    seen = mcp_daemon._inspect_sidecar(pid_path)
+    assert seen is mcp_daemon._SIDECAR_ABSENT
+
+    # A replacement claims the slot and records its identity.
+    sidecar.write_text("the-replacements-identity", encoding="utf-8")
+
+    assert mcp_daemon._sidecar_cleared(pid_path, seen) is False
+    assert sidecar.read_text(encoding="utf-8") == "the-replacements-identity"
+
+
+def test_a_sidecar_replaced_since_our_snapshot_is_left_alone(tmp_path):
+    """Same window, the other starting state: there WAS one, and it is not the
+    one there now."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+    sidecar.write_text("the-stale-identity", encoding="utf-8")
+
+    seen = mcp_daemon._inspect_sidecar(pid_path)
+    sidecar.write_text("the-replacements-identity", encoding="utf-8")
+
+    assert mcp_daemon._sidecar_cleared(pid_path, seen) is False
+    assert sidecar.read_text(encoding="utf-8") == "the-replacements-identity"
+
+
+def test_the_sidecar_we_actually_inspected_is_still_removed(tmp_path):
+    """Binding to the snapshot must not become refusing to clean up."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "consensus.pid"
+    sidecar = mcp_daemon._identity_path(pid_path)
+    sidecar.write_text("the-stale-identity", encoding="utf-8")
+
+    seen = mcp_daemon._inspect_sidecar(pid_path)
+
+    assert mcp_daemon._sidecar_cleared(pid_path, seen) is True
+    assert not sidecar.exists()
