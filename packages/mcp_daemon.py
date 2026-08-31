@@ -29,6 +29,41 @@ from pathlib import Path
 _RESERVATION_STALE_SECONDS = 60.0
 
 
+# A reservation carries a unique token so two of them are never identical.
+#
+# --reserve-slot used to write an EMPTY file, which made every reservation
+# byte-identical -- and identity by (st_dev, st_ino) does not save it, because
+# inode numbers are RECYCLED: on ext4 a reservation reclaimed and immediately
+# recreated at the same path gets the same inode, so a loser comparing what it
+# inspected found both the identity and the (empty) contents equal and deleted
+# the winner's reservation. Windows does not reuse the index that eagerly,
+# which is why this only ever failed on Linux.
+#
+# A token in the file makes two reservations distinguishable by construction,
+# which no filesystem property can undo.
+_RESERVATION_MARKER = "RESERVED"
+
+
+def _reservation_token() -> str:
+    """A value no other reservation will carry."""
+
+    import base64
+
+    return base64.urlsafe_b64encode(os.urandom(12)).decode("ascii").rstrip("=")
+
+
+def _is_reservation(raw: str) -> bool:
+    """True for a slot claimed but not yet recorded.
+
+    Empty counts, and must: claim_singleton creates its pid file with O_EXCL
+    and writes the pid immediately after, so a concurrent reader can see it
+    empty in between, and reservations written before the marker existed are
+    empty on disk.
+    """
+
+    return raw == "" or raw.startswith(_RESERVATION_MARKER)
+
+
 def _inspect_claim(path: Path):
     """Capture identity + contents so a later reclaim can prove it is the same.
 
@@ -296,8 +331,8 @@ def claim_singleton(pid_filename: str) -> bool:
                 raw = pid_path.read_text(encoding="utf-8").strip()
             except OSError:
                 raw = ""
-            if not raw:
-                # AN EMPTY CLAIM IS AN IN-PROGRESS CLAIM, NOT A STALE ONE.
+            if _is_reservation(raw):
+                # A RESERVATION IS AN IN-PROGRESS CLAIM, NOT A STALE ONE.
                 #
                 # O_EXCL creates the file before its PID is written, so a second
                 # launcher can read it in that window. Converting the empty read
@@ -315,8 +350,8 @@ def claim_singleton(pid_filename: str) -> bool:
                     raw = pid_path.read_text(encoding="utf-8").strip()
                 except OSError:
                     raw = ""
-                if not raw:
-                    # A BLANK CLAIM THAT IS OLD IS A CRASHED RESERVER.
+                if _is_reservation(raw):
+                    # A RESERVATION THAT IS OLD IS A CRASHED RESERVER.
                     #
                     # The comment above says the stale path "handles it on a
                     # later pass". It does not -- this returned False, so the
@@ -678,6 +713,10 @@ def _reserve_slot_cli() -> int:
     # and by --check-identity, which is exactly the state we want between the
     # reservation and the recording: occupied, unverifiable, and therefore
     # blocking rather than reclaimable.
+    try:
+        os.write(fd, f"{_RESERVATION_MARKER} {_reservation_token()}".encode("utf-8"))
+    except OSError:
+        pass
     os.close(fd)
     print("RESERVED")
     return 0

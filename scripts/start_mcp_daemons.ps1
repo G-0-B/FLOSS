@@ -157,8 +157,16 @@ if ($py -and (Test-Path $omniPid)) {
 # OmniRoute is live, untracked, and can no longer be stopped by the
 # companion script. Same verdict, three callers, and this was the one that
 # read it optimistically.
-if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not (Get-Content $omniPid -Raw -ErrorAction SilentlyContinue).Trim()) {
-    # A BLANK record is a reservation whose launcher never came back, not an
+$omniRaw = if (Test-Path $omniPid) { (Get-Content $omniPid -Raw -ErrorAction SilentlyContinue) } else { $null }
+if ($null -ne $omniRaw) { $omniRaw = $omniRaw.Trim() }
+# EMPTY *OR* MARKED. Reservations used to be empty files, and this branch tested
+# for emptiness. They now carry a `RESERVED <token>` line -- because an empty
+# file made every reservation byte-identical and no filesystem identity fixes
+# that once inodes are recycled -- so testing emptiness alone would send every
+# new reservation down the UNVERIFIABLE path and never start OmniRoute again.
+$omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
+if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
+    # A RESERVATION is a claim whose launcher never came back, not an
     # unverifiable holder. --reserve-slot below reclaims one past its stale
     # window, so fall through and let it decide instead of rejecting here: this
     # branch is what kept OmniRoute disabled until someone deleted the file.

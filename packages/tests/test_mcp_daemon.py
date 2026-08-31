@@ -717,14 +717,34 @@ def test_only_one_launcher_can_reserve_the_slot(tmp_path):
     assert second.stdout.strip().splitlines()[-1] == "OCCUPIED"
 
 
-def test_the_reservation_is_empty_so_readers_treat_it_as_occupied(tmp_path):
-    """An empty claim is in-progress, not stale: it blocks, it is not reclaimed."""
-    pid_path = tmp_path / "omniroute.pid"
+def test_a_reservation_is_marked_and_unique(tmp_path):
+    """A reservation is in-progress, not stale: it blocks, it is not reclaimed.
 
-    _reserve(pid_path)
+    It used to be an EMPTY file, which made every reservation byte-identical --
+    and (st_dev, st_ino) cannot rescue that, because inode numbers are recycled:
+    on ext4 a reservation reclaimed and recreated at the same path gets the same
+    inode, so a loser found identity AND contents equal and deleted the winner's.
+    Only Linux ever showed it.
+    """
+    import importlib
 
-    assert pid_path.exists()
-    assert pid_path.read_text(encoding="utf-8") == ""
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+
+    first = tmp_path / "a.pid"
+    second = tmp_path / "b.pid"
+    _reserve(first)
+    _reserve(second)
+
+    a = first.read_text(encoding="utf-8")
+    b = second.read_text(encoding="utf-8")
+    assert a.startswith(mcp_daemon._RESERVATION_MARKER)
+    assert a != b, "two reservations are byte-identical"
+    assert mcp_daemon._is_reservation(a)
+    # Still recognised as in-progress rather than a pid, which is what makes it
+    # block instead of being reclaimed as a stale holder.
+    assert mcp_daemon._is_reservation("")
 
 
 def test_the_verdict_is_on_stdout_not_only_in_the_exit_code(tmp_path):
@@ -1276,17 +1296,19 @@ def test_two_blank_reservations_are_told_apart(tmp_path):
 
     importlib.reload(mcp_daemon)
     pid_path = tmp_path / "omniroute.pid"
-    pid_path.write_bytes(b"")
+    _reserve(pid_path)
     observed = mcp_daemon._inspect_claim(pid_path)
 
-    # The winner reclaims and reserves again -- same path, same bytes.
+    # The winner reclaims and reserves again at the same path. On ext4 that
+    # recreated file can carry the SAME inode, which is why the reservation
+    # needs a token of its own rather than relying on filesystem identity.
     assert mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed) is True
-    pid_path.write_bytes(b"")
-    assert pid_path.read_bytes() == observed.data, "fixture is not byte-identical"
+    _reserve(pid_path)
 
-    # The loser arrives with what it inspected. Bytes match; the file does not.
+    # The loser arrives with what it inspected.
     assert mcp_daemon._reclaim_claim_if_unchanged(pid_path, observed) is False
     assert pid_path.exists(), "the winner's fresh reservation was deleted"
+    assert pid_path.read_bytes() != observed.data, "the two were indistinguishable"
 
 
 def test_an_inspection_carries_filesystem_identity(tmp_path):
@@ -1318,3 +1340,52 @@ def test_a_file_rewritten_in_place_is_still_caught(tmp_path):
 
     assert filelock.reclaim_if_unchanged(path, observed) is False
     assert path.read_bytes() == b"second"
+
+
+def test_an_inode_collision_alone_does_not_authorise_a_reclaim(tmp_path):
+    """The Linux failure, forced rather than waited for.
+
+    ext4 recycles inode numbers, so a reservation reclaimed and recreated at
+    the same path can carry the SAME (st_dev, st_ino) as the one that was
+    inspected. Identity therefore cannot be the only check -- and when both
+    reservations were empty, contents could not separate them either. This
+    pairs a real current identity with the OLD contents and requires a refusal,
+    which is what the token makes possible.
+    """
+    import importlib
+
+    from packages import mcp_daemon
+    from packages.activity_log import filelock
+
+    importlib.reload(mcp_daemon)
+    pid_path = tmp_path / "omniroute.pid"
+    _reserve(pid_path)
+    old_data = pid_path.read_bytes()
+
+    pid_path.unlink()
+    _reserve(pid_path)
+    live = filelock.inspect_for_reclaim(pid_path)
+
+    # Exactly what inode reuse produces: same identity, earlier contents.
+    collided = filelock.Inspection(live.dev, live.ino, old_data)
+
+    assert mcp_daemon._reclaim_claim_if_unchanged(pid_path, collided) is False
+    assert pid_path.exists(), "a colliding inode was enough to delete a live claim"
+
+
+def test_the_powershell_start_script_knows_the_reservation_marker():
+    """Reservations were empty files and the start script tested emptiness.
+    Marking them without teaching it the marker would send every new
+    reservation down the UNVERIFIABLE path and never start OmniRoute again."""
+    import importlib
+
+    from packages import mcp_daemon
+
+    importlib.reload(mcp_daemon)
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "start_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        f"'{mcp_daemon._RESERVATION_MARKER}*'" in script
+    ), "the start script still recognises only empty reservations"
