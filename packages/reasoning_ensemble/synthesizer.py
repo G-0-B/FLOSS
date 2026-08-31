@@ -383,10 +383,16 @@ def _stage_synthesis(
     which cannot reproduce an outage. One writer, both paths.
     """
 
-    ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
+    # mkdir INSIDE the guard. It was outside, so a read-only workspace or a
+    # denied parent raised straight out of a function whose contract is to warn
+    # and return None -- and the caller it broke was the degraded path added in
+    # the same commit, which then discarded the very voter responses it had
+    # just been changed to preserve. A best-effort writer has to be best-effort
+    # for the whole write, directory included.
     ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
     try:
+        ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
         out_path.write_text(
             json.dumps(
                 {

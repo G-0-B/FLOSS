@@ -201,3 +201,36 @@ def test_the_exempt_profile_is_exempt_when_reached_through_its_alias(monkeypatch
     survivors = [_r("a", "mistral/mistral-small-latest", "mistral")]
 
     assert synthesizer._survivor_independence_problem(survivors, "online") is None
+
+
+def test_an_unwritable_staging_directory_does_not_lose_the_degraded_result(
+    tmp_path, monkeypatch
+):
+    """`mkdir` sat outside the OSError guard, so a read-only workspace raised
+    out of a function whose contract is to warn and return None -- and the
+    caller it broke was the degraded path added in the same commit, which then
+    discarded the voter responses it existed to preserve."""
+    blocked = tmp_path / "not-a-dir" / "staging"
+    (tmp_path / "not-a-dir").write_text("I am a file", encoding="utf-8")
+    monkeypatch.setattr(synthesizer, "ENSEMBLE_STAGING", blocked)
+
+    path = synthesizer._stage_synthesis(
+        "prompt",
+        "hash",
+        "2026-08-31T00:00:00Z",
+        synthesizer.TierClassification(
+            tier="degraded",
+            cluster_assignments={},
+            cluster_sizes={},
+            largest_cluster_id=0,
+            largest_cluster_fraction=1.0,
+            minority_coherent_voters=[],
+            similarity_matrix=[],
+            separation={},
+        ),
+        [],
+        [],
+        "synthesis text",
+    )
+
+    assert path is None, "staging must report failure, not raise"

@@ -1063,3 +1063,32 @@ def test_an_unchanged_damage_set_publishes_normally(tmp_path, small_store):
     )
 
     assert cli.main(base + ["publish"]) == 0
+
+
+def test_every_branch_of_the_chain_walk_bounds_the_sequence_it_reads(tmp_path):
+    """The bound was added to the missing-predecessor branch and not to the
+    non-adjacent-predecessor branch beside it, which reaches the same
+    range(prior + 1, child) expansion by a different route."""
+    from packages.activity_log import provenance as prov
+
+    assert prov._walk_sequence("5") == 5
+    assert prov._walk_sequence(str(prov.MAX_SEQUENCE)) == prov.MAX_SEQUENCE
+    assert prov._walk_sequence(str(prov.MAX_SEQUENCE + 1)) is None
+    assert prov._walk_sequence("1000000000000") is None
+    assert prov._walk_sequence("-1") is None
+    assert prov._walk_sequence("nonsense") is None
+    assert prov._walk_sequence(None) is None
+
+
+def test_the_walk_has_one_sequence_parser_not_a_guard_per_branch(tmp_path):
+    """Structural: every int() over a sequence inside validate_packet should go
+    through the bounded parser. A branch that parses its own is the next place
+    this defect appears."""
+    source = (Path(anchor_lib.__file__).parent / "provenance.py").read_text(
+        encoding="utf-8"
+    )
+    walk = source.split("def validate_packet(", 1)[1]
+
+    assert "int(child_sequence)" not in walk, "a branch parses its own sequence"
+    assert 'int(prior_packet.get("s"))' not in walk, "a branch parses its own sequence"
+    assert walk.count("_walk_sequence(") >= 3

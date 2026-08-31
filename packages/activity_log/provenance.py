@@ -575,6 +575,26 @@ def _packet_validates(
     return result.ok
 
 
+def _walk_sequence(value: Any) -> int | None:
+    """Parse a chain position for the walk, or None if it cannot be trusted.
+
+    `int()` accepts any decimal, and the walk sizes loops and gap lists from
+    what it parses -- so an implausible `s` turns "produce a verdict" into
+    "iterate a trillion times". The bound was added to the missing-predecessor
+    branch and NOT to the non-adjacent-predecessor branch beside it, which
+    reaches the same expansion by a different route. One parser, every site,
+    so the next branch that reads a sequence cannot miss it.
+    """
+
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0 or number > MAX_SEQUENCE:
+        return None
+    return number
+
+
 def _sequence_index(
     position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
 ) -> tuple[dict[Any, dict[int, list[Path]]], dict[Any, dict[int, list[Any]]]]:
@@ -1121,17 +1141,15 @@ def validate_packet(
         while True:
             if cursor is None:
                 identity = child_packet.get("i")
-                try:
-                    expected_sequence = int(child_sequence) - 1
-                except (TypeError, ValueError):
+                child_number = _walk_sequence(child_sequence)
+                if child_number is None:
+                    # Refuse before materialising any span. A chain position
+                    # that will not parse, or one large enough to size a loop,
+                    # is damage or a hostile signer -- and either way the honest
+                    # answer is a verdict, not an allocation.
                     errors.append("E_PROVENANCE_SEQUENCE_INVALID")
                     break
-                if expected_sequence > MAX_SEQUENCE:
-                    # Refuse before materialising the span. A chain position
-                    # this large is damage or a hostile signer, and either way
-                    # the honest answer is a verdict, not an allocation.
-                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
-                    break
+                expected_sequence = child_number - 1
                 if expected_sequence < 0:
                     # Sequence 0 is genesis and must carry `p: null`. A packet
                     # that names a prior while sitting at 0 is pointing at
@@ -1221,10 +1239,12 @@ def validate_packet(
             if skip_adjacency:
                 skip_adjacency = False
             else:
-                try:
-                    prior_sequence = int(prior_packet.get("s"))
-                    child_number = int(child_sequence)
-                except (TypeError, ValueError):
+                prior_sequence = _walk_sequence(prior_packet.get("s"))
+                child_number = _walk_sequence(child_sequence)
+                if prior_sequence is None or child_number is None:
+                    # Same parser as the branch above. This one reaches the very
+                    # same expansion -- range(prior + 1, child) -- by a different
+                    # route, and the bound had been added only to the other.
                     errors.append("E_PROVENANCE_SEQUENCE_INVALID")
                 else:
                     if prior_sequence >= child_number:
@@ -1275,13 +1295,17 @@ def validate_packet(
             if next_digest is None:
                 # Genesis has no prior. It must also be sequence 0, or the
                 # chain claims to start somewhere it did not.
-                try:
-                    if int(prior_packet.get("s")) != 0:
-                        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
-                    else:
-                        reached_genesis = True
-                except (TypeError, ValueError):
+                # Third reader of a sequence in this walk. It only compares
+                # against 0, so it cannot size a loop -- but routing it through
+                # the same parser is the point: a branch that parses its own is
+                # exactly where the bound went missing the first two times.
+                genesis_sequence = _walk_sequence(prior_packet.get("s"))
+                if genesis_sequence is None:
                     errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                elif genesis_sequence != 0:
+                    errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                else:
+                    reached_genesis = True
                 break
             key = str(next_digest)
             if key in walked:
