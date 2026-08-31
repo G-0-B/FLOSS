@@ -1693,3 +1693,86 @@ def test_the_publication_lock_spans_the_pointer_write():
         "os.replace",
     ):
         assert step in inner, f"{step} is outside the publication lock"
+
+
+# ---------------------------------------------------------------------------
+# A witness upgrade is read-network-write, and all three are one decision.
+# ---------------------------------------------------------------------------
+
+
+def test_a_witness_upgrade_holds_the_lock_across_the_calendar_call(
+    tmp_path, small_store
+):
+    """Two upgrades of one pending proof read the same bytes, asked the
+    calendars separately, and both got back valid but different upgrades. The
+    atomic replacement then discarded one set of attestations -- and a stamp
+    for a past instant cannot be requested again, so the loss is permanent.
+    Last-writer-wins is only safe when the writers cannot both be right."""
+    from packages.activity_log import filelock
+
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+
+    stored = cli.anchor_lib.load_anchor(anchor_path)
+    root = str(stored["merkle_root"])
+    proof_file = cli.witness_lib.proof_path(anchor_path.parent, root)
+    proof_file.parent.mkdir(parents=True, exist_ok=True)
+    proof_file.write_bytes(b"pending-proof-bytes")
+
+    lock_path = anchor_path.parent / ".anchor-publish.lock"
+    observed = {}
+
+    def _probe(proof_bytes, timeout):
+        # A concurrent upgrade must not be able to start while this one is
+        # talking to the calendars. Same-process acquisition is enough to
+        # prove it: the lock is per open file description, not per process.
+        observed["bytes"] = proof_bytes
+        try:
+            filelock._acquire_lock(lock_path, timeout_seconds=0.3)
+        except TimeoutError:
+            observed["excluded"] = True
+        else:  # pragma: no cover - only reachable when the fix is absent
+            observed["excluded"] = False
+        return {"status": "PENDING", "proof": b"upgraded-proof-bytes"}
+
+    original = cli.witness_lib.upgrade_proof
+    cli.witness_lib.upgrade_proof = _probe
+    try:
+        cli.main(base + ["witness-upgrade"])
+    finally:
+        cli.witness_lib.upgrade_proof = original
+
+    assert observed.get("bytes") == b"pending-proof-bytes", "the upgrade never ran"
+    assert observed.get("excluded") is True, (
+        "the calendar round-trip ran without the publication lock; a second "
+        "upgrade could read the same proof and overwrite this one's attestations"
+    )
+    assert proof_file.read_bytes() == b"upgraded-proof-bytes"
+
+
+def test_the_upgrade_reads_the_proof_inside_the_lock():
+    """Reading before the lock reintroduces the race the lock is for: two
+    processes take the lock in turn and both install a result built from the
+    same pre-lock bytes."""
+    source = (REPO_ROOT / "scripts" / "provenance_anchor.py").read_text(
+        encoding="utf-8"
+    )
+
+    outer = source.split("def _witness_upgrade(", 1)[1].split(
+        "def _witness_upgrade_locked(", 1
+    )[0]
+    assert "filelock.held(" in outer, "the upgrade takes no lock"
+    assert "read_bytes" not in outer, "the proof is read before the lock is taken"
+
+    inner = source.split("def _witness_upgrade_locked(", 1)[1].split("\ndef ", 1)[0]
+    for step in ("read_bytes", "upgrade_proof", "_write_atomic"):
+        assert step in inner, f"{step} is outside the upgrade lock"

@@ -223,3 +223,73 @@ def test_an_exhausted_scan_says_so():
     ).read_text(encoding="utf-8")
 
     assert "too many consecutive deferrals" in source
+
+
+def test_a_dry_run_previews_no_more_files_than_the_limit(tmp_path, capsys, monkeypatch):
+    """--dry-run --limit 1 previewed DEFER_SCAN_FACTOR files, not one.
+
+    The dry-run branch continued without touching `completed`, so the only
+    thing that ended the loop was the deferral scan cap -- which exists to let
+    a run walk PAST declined files, not to multiply the batch. The banner said
+    "up to 1" while five previews scrolled by. A dry run's whole job is to show
+    what the real run would do.
+    """
+    module = load_module()
+
+    docs = []
+    for index in range(module.DEFER_SCAN_FACTOR + 2):
+        doc = tmp_path / f"doc{index}.md"
+        doc.write_text("# doc\n", encoding="utf-8")
+        docs.append(doc)
+
+    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: list(docs))
+    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
+
+    def _no_llm(*a, **k):
+        raise AssertionError("a dry run must not call the extractor")
+
+    monkeypatch.setattr(module, "extract_semantics", _no_llm)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["autonomous_synthesis_loop.py", "--dry-run", "--limit", "1"],
+    )
+
+    assert module.main() == 0
+
+    out = capsys.readouterr().out
+    assert out.count("[DRY RUN]") == 1, (
+        "a dry run previewed more files than --limit allows; the preview is "
+        f"the unit of work, so it consumes the limit (saw {out.count('[DRY RUN]')})"
+    )
+
+
+def test_a_dry_run_under_a_larger_limit_still_previews_up_to_it(
+    tmp_path, capsys, monkeypatch
+):
+    """The cap is the limit, not one: counting previews must not clamp them.
+
+    Written behaviourally on purpose. The first version of this test read the
+    dry-run branch's source and split it on "continue" -- which matched the
+    word inside the comment above the fix, so it failed against the fixed code
+    and would have passed against prose that said anything at all.
+    """
+    module = load_module()
+
+    docs = []
+    for index in range(7):
+        doc = tmp_path / f"doc{index}.md"
+        doc.write_text("# doc" + chr(10), encoding="utf-8")
+        docs.append(doc)
+
+    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: list(docs))
+    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["autonomous_synthesis_loop.py", "--dry-run", "--limit", "3"],
+    )
+
+    assert module.main() == 0
+
+    assert capsys.readouterr().out.count("[DRY RUN]") == 3

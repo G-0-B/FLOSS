@@ -289,7 +289,12 @@ class VoterResponse:
     # Which wire this voter actually went over ("ollama" / "litellm" /
     # "flowith"), carried through so the staged Action can name the real
     # provider instead of guessing from the model id.
-    transport_name: str = "litellm"
+    #
+    # The default is the answer transport.transport_name() gives for a voter
+    # with no `transport` field, and test_synthesizer_attribution asserts the
+    # two are equal rather than trusting them to stay in step. It read
+    # "litellm" while the router sent that same voter to Ollama.
+    transport_name: str = transport.transport_name({})
 
     @property
     def is_coherent(self) -> bool:
@@ -566,13 +571,18 @@ def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterRes
     started = time.perf_counter()
     # Resolved OUTSIDE the try. When it lived inside, the except branch below
     # built its VoterResponse without it and the field fell back to its
-    # "litellm" default -- so every failed ollama or flowith call was attributed
+    # field default -- so every failed ollama or flowith call was attributed
     # to litellm in the staged artifact and in _log_synthesis_action(), which is
     # precisely the data a provider failure-rate audit reads.
+    #
+    # Resolved by transport.transport_name(), the same function generate() uses
+    # to pick the wire, because a second copy of the rule here disagreed with
+    # it: a pool entry with no `transport` (every DEFAULT_VOTER_POOL entry) was
+    # dispatched to Ollama and recorded as LiteLLM.
     try:
-        voter_transport = str(voter.get("transport") or "litellm")
+        voter_transport = transport.transport_name(voter)
     except Exception:  # noqa: BLE001 -- a malformed voter must not raise here
-        voter_transport = "litellm"
+        voter_transport = transport.transport_name({})
     try:
         text = transport.generate(voter, prompt, VOTER_TIMEOUT_SECONDS, ollama_generate)
         duration = time.perf_counter() - started

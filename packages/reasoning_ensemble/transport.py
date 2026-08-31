@@ -296,6 +296,23 @@ def _flowith_generate(model: str, prompt: str, timeout: int) -> str:
     return text
 
 
+def transport_name(voter: dict) -> str:
+    """The wire this voter will actually go over. ONE definition, two readers.
+
+    `generate()` decides the wire and the synthesizer labels the resulting
+    Action with it. Those were two separate expressions with two different
+    defaults for a voter that omits `transport`: this one said ollama, the
+    label said litellm. Nothing failed loudly -- the call went to Ollama and
+    the audit recorded LiteLLM, so provider failure rates and migration
+    progress were computed from the wrong wire for exactly the pool
+    (DEFAULT_VOTER_POOL) whose entries omit the field.
+
+    Two agreeing defaults are a coincidence; one function is a coupling. The
+    default itself is documented at the bottom of this module in `generate`.
+    """
+    return str(voter.get("transport") or "ollama")
+
+
 def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
     """Route one generation by voter transport. Raises on failure (caller wraps)."""
     # A LEGACY POOL HAS NO TRANSPORT FIELD, AND IS LOCAL.
@@ -319,7 +336,7 @@ def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
     # from the model id; that tag is the proof. A pool that omits it is a v0.1
     # local pool, which is the only thing this default is for -- an explicit
     # pool of online models has to say so, and every resolved pool already does.
-    transport = voter.get("transport") or "ollama"
+    transport = transport_name(voter)
     if transport == "ollama":
         return ollama_generate(voter["model"], prompt, timeout)
     if transport == "flowith":

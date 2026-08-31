@@ -906,6 +906,31 @@ def _witness_state(anchor_path: Path, stored: dict | None) -> dict:
 
 
 def _witness_upgrade(args: argparse.Namespace) -> int:
+    # THE READ, THE STAMP AND THE REPLACEMENT ARE ONE DECISION.
+    #
+    # Two concurrent upgrades of the same pending proof read identical bytes,
+    # asked the calendars independently, and got back two different valid
+    # upgrades. Both then _write_atomic over the same path, so the loser's
+    # attestations were discarded -- and a calendar stamp for a past instant
+    # cannot be requested again. Last-writer-wins is only safe when the writers
+    # cannot both be right; here they both are, which is what makes the loss
+    # permanent.
+    #
+    # Same lock as _publish, in the same directory, for the same reason one
+    # lock covers the whole publication: publish also writes proofs into this
+    # directory, so a second lock domain over the same files would serialise
+    # upgrades against each other and against nothing else. The wait budget is
+    # the network budget plus a margin, because this holds the lock across the
+    # calendar round-trip on purpose.
+    args.anchor.parent.mkdir(parents=True, exist_ok=True)
+    with filelock.held(
+        args.anchor.parent / ".anchor-publish.lock",
+        timeout_seconds=float(args.witness_timeout) + 120.0,
+    ):
+        return _witness_upgrade_locked(args)
+
+
+def _witness_upgrade_locked(args: argparse.Namespace) -> int:
     stored = anchor_lib.load_anchor(args.anchor)
     if not isinstance(stored, dict):
         print("no anchor to upgrade")

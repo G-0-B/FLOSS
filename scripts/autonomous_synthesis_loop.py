@@ -451,6 +451,16 @@ def main() -> int:
         attempted += 1
         print(f"\nProcessing: {file_path.name}")
         if args.dry_run:
+            # A PREVIEW IS THE UNIT OF WORK IN DRY-RUN, SO IT CONSUMES THE LIMIT.
+            #
+            # This branch used to `continue` without touching `completed`, so
+            # the only thing that stopped the loop was `attempted >=
+            # attempt_cap`. Once deferrals stopped consuming the limit that cap
+            # became limit * DEFER_SCAN_FACTOR, and `--dry-run --limit 1`
+            # previewed five files under a banner that said "up to 1". A dry run
+            # exists to show what a real run would do; showing five times as
+            # much is the one thing it must not do.
+            completed += 1
             print("[DRY RUN] Would extract semantics and write to staging.")
             continue
 

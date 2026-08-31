@@ -42,19 +42,25 @@ def _response(transport_name: str, model: str) -> synthesizer.VoterResponse:
 
 def test_omniroute_runs_are_attributed_to_omniroute(monkeypatch):
     monkeypatch.setenv("FLOSS_MODEL_BACKEND", "omniroute")
-    label = synthesizer._provider_label(_response("litellm", "groq/openai/gpt-oss-120b"))
+    label = synthesizer._provider_label(
+        _response("litellm", "groq/openai/gpt-oss-120b")
+    )
     assert label == "omniroute", "the wire used, not the model's vendor"
 
 
 def test_litellm_runs_are_attributed_to_litellm(monkeypatch):
     monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
-    label = synthesizer._provider_label(_response("litellm", "groq/openai/gpt-oss-120b"))
+    label = synthesizer._provider_label(
+        _response("litellm", "groq/openai/gpt-oss-120b")
+    )
     assert label == "litellm"
 
 
 def test_local_and_flowith_voters_keep_their_own_labels(monkeypatch):
     monkeypatch.setenv("FLOSS_MODEL_BACKEND", "omniroute")
-    assert synthesizer._provider_label(_response("ollama", "gemma3:12b")) == "ollama-local"
+    assert (
+        synthesizer._provider_label(_response("ollama", "gemma3:12b")) == "ollama-local"
+    )
     assert synthesizer._provider_label(_response("flowith", "flowith/x")) == "flowith"
 
 
@@ -140,9 +146,9 @@ def test_failed_generation_keeps_its_own_transport():
                 "prompt",
             )
             assert result.error.startswith("RuntimeError")
-            assert result.transport_name == wire, (
-                f"{wire} failure attributed to {result.transport_name}"
-            )
+            assert (
+                result.transport_name == wire
+            ), f"{wire} failure attributed to {result.transport_name}"
     finally:
         synthesizer.transport.generate = original
 
@@ -232,3 +238,53 @@ def test_omniroute_embedder_also_receives_the_budget(monkeypatch):
             sys.modules.pop("packages.omniroute_client", None)
         else:
             sys.modules["packages.omniroute_client"] = original
+
+
+# ---------------------------------------------------------------------------
+# One rule for "which wire did this voter go over", not two that agree.
+# ---------------------------------------------------------------------------
+
+
+def test_a_legacy_pool_entry_is_labelled_with_the_wire_it_actually_took(monkeypatch):
+    """DEFAULT_VOTER_POOL entries omit `transport`. generate() sends them to
+    Ollama; the label said LiteLLM. Nothing failed -- the call succeeded and the
+    audit recorded the wrong provider, which is exactly the data a transport
+    migration and a provider failure-rate comparison are read from."""
+    legacy = dict(synthesizer.DEFAULT_VOTER_POOL[0])
+    assert "transport" not in legacy, "the legacy pool now declares a transport"
+
+    monkeypatch.setattr(transport, "generate", lambda *a, **k: "some reasoning text")
+
+    response = synthesizer._dispatch_voter(legacy, "prompt", embed_fn=lambda t: [0.1])
+
+    assert response.transport_name == transport.transport_name(legacy)
+    assert response.transport_name == "ollama"
+
+
+def test_a_failed_legacy_call_is_attributed_to_the_same_wire(monkeypatch):
+    """The except branch is where the wrong default did its damage: a failed
+    Ollama call recorded as a LiteLLM failure inflates one provider's failure
+    rate and hides another's."""
+    legacy = dict(synthesizer.DEFAULT_VOTER_POOL[0])
+
+    def _boom(*a, **k):
+        raise RuntimeError("ollama is down")
+
+    monkeypatch.setattr(transport, "generate", _boom)
+
+    response = synthesizer._dispatch_voter(legacy, "prompt", embed_fn=lambda t: [0.1])
+
+    assert response.error
+    assert response.transport_name == "ollama"
+
+
+def test_the_response_default_is_the_rule_and_not_a_second_copy_of_it():
+    """Two defaults that happen to agree are a coincidence; one function is a
+    coupling. These disagreed for every voter that omitted the field."""
+    import dataclasses
+
+    field = {f.name: f for f in dataclasses.fields(synthesizer.VoterResponse)}[
+        "transport_name"
+    ]
+
+    assert field.default == transport.transport_name({})

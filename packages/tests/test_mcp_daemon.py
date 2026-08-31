@@ -706,6 +706,39 @@ def _reserve(pid_path):
     )
 
 
+def _verdict(result) -> str:
+    """The verdict word from a --reserve-slot run, with its token stripped.
+
+    --reserve-slot prints `RESERVED <token>` now, because the token is the
+    capability --record-identity has to present. A test that compares the whole
+    last line to "RESERVED" reads every successful reservation as a failure --
+    the same mistake the start script's equality test would have made.
+    """
+
+    return result.stdout.strip().splitlines()[-1].split(" ", 1)[0]
+
+
+def _reservation_token(result) -> str:
+    line = result.stdout.strip().splitlines()[-1]
+    return line.split(" ", 1)[1].strip() if " " in line else ""
+
+
+def _record(pid_path, pid, token=None):
+    import subprocess
+    import sys as _sys
+
+    argv = [_sys.executable, "-m", "packages.mcp_daemon", "--record-identity"]
+    argv += [str(pid_path), str(pid)]
+    if token is not None:
+        argv.append(token)
+    return subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+
+
 def test_only_one_launcher_can_reserve_the_slot(tmp_path):
     """Two start scripts with no pid file both launched, and both recorded."""
     pid_path = tmp_path / "omniroute.pid"
@@ -713,7 +746,7 @@ def test_only_one_launcher_can_reserve_the_slot(tmp_path):
     first = _reserve(pid_path)
     second = _reserve(pid_path)
 
-    assert first.stdout.strip().splitlines()[-1] == "RESERVED"
+    assert _verdict(first) == "RESERVED"
     assert second.stdout.strip().splitlines()[-1] == "OCCUPIED"
 
 
@@ -975,7 +1008,7 @@ def test_reserve_slot_reclaims_a_stale_blank_reservation(tmp_path):
 
     result = _reserve(pid_path)
 
-    assert result.stdout.strip().splitlines()[-1] == "RESERVED"
+    assert _verdict(result) == "RESERVED"
 
 
 def test_reserve_slot_still_refuses_a_fresh_blank_reservation(tmp_path):
@@ -1479,7 +1512,7 @@ def test_an_abandoned_marked_reservation_is_reclaimable(tmp_path):
     importlib.reload(mcp_daemon)
     pid_path = tmp_path / "omniroute.pid"
 
-    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "RESERVED"
+    assert _verdict(_reserve(pid_path)) == "RESERVED"
     assert pid_path.read_text(encoding="utf-8").startswith(
         mcp_daemon._RESERVATION_MARKER
     ), "fixture is not a marked reservation"
@@ -1491,4 +1524,97 @@ def test_an_abandoned_marked_reservation_is_reclaimable(tmp_path):
     old = time.time() - (mcp_daemon._RESERVATION_STALE_SECONDS + 60)
     os.utime(pid_path, (old, old))
 
-    assert _reserve(pid_path).stdout.strip().splitlines()[-1] == "RESERVED"
+    assert _verdict(_reserve(pid_path)) == "RESERVED"
+
+
+# ---------------------------------------------------------------------------
+# --record-identity must write into the reservation IT made.
+# ---------------------------------------------------------------------------
+
+
+def test_recording_over_another_launchers_reservation_is_refused(tmp_path):
+    """A suspended launcher must not overwrite the claim that replaced it.
+
+    The reclamation of a reservation past the stale window is deliberate and
+    correct. What was missing is the other half: the launcher that was
+    reclaimed wakes up, runs --record-identity, and -- because that command
+    wrote unconditionally -- installs its own PID over the live claim of the
+    launcher that legitimately took the slot. Both servers are running; the one
+    that survives is tracked under the wrong PID, so stop kills the other.
+    """
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+    assert mine, "a reservation must hand its token back to be presentable"
+
+    # The second launcher reclaimed the slot and reserved it for itself.
+    pid_path.write_text("RESERVED someone-elses-token", encoding="utf-8")
+
+    result = _record(pid_path, os.getpid(), mine)
+
+    assert result.stdout.strip().splitlines()[-1] == "STALE_RESERVATION"
+    assert result.returncode == 1
+    assert pid_path.read_text(encoding="utf-8") == "RESERVED someone-elses-token"
+
+
+def test_a_recorder_that_cannot_name_the_reservation_is_refused(tmp_path):
+    """No token presented is not the same as the right token."""
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    _reserve(pid_path)
+
+    result = _record(pid_path, os.getpid())
+
+    assert result.stdout.strip().splitlines()[-1] == "STALE_RESERVATION"
+    assert result.returncode == 1
+
+
+def test_recording_into_our_own_reservation_still_works(tmp_path):
+    """Fail-closed must not mean fail-always: the normal launch path is this."""
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+
+    result = _record(pid_path, os.getpid(), mine)
+
+    assert result.stdout.strip().splitlines()[-1] == "RECORDED"
+    assert result.returncode == 0
+    assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_a_pre_marker_empty_reservation_is_still_recordable(tmp_path):
+    """An empty claim cannot be attributed to any launcher either way.
+
+    Refusing it would strand every reservation written by a launcher from
+    before the marker existed, which is the failure shape that kept OmniRoute
+    disabled once already.
+    """
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("", encoding="utf-8")
+
+    result = _record(pid_path, os.getpid())
+
+    assert result.stdout.strip().splitlines()[-1] == "RECORDED"
+    assert result.returncode == 0
+
+
+def test_the_start_script_presents_the_token_it_was_given(tmp_path):
+    """The capability is only a capability if the caller carries it through.
+
+    Everything else here can be right while the one production caller drops the
+    token on the floor and gets refused on every launch.
+    """
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "start_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "--record-identity $omniPid $serverPid $omniReserveToken" in script
+    assert "$omniReserveToken = $slotTok.Substring(" in script
+    assert (
+        "$slotTok -eq 'RESERVED'" in script and "$slotTok -like 'RESERVED *'" in script
+    ), "the script must accept both the bare verdict and the tokenised one"

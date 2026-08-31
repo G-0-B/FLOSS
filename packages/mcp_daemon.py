@@ -64,6 +64,21 @@ def _is_reservation(raw: str) -> bool:
     return raw == "" or raw.startswith(_RESERVATION_MARKER)
 
 
+def _reservation_token_of(raw: str):
+    """The token carried by a marked reservation, or None if it carries none.
+
+    None means "this claim cannot prove which launcher made it": either it is
+    not a reservation at all, or it is one of the empty pre-marker
+    reservations. Both are the states --record-identity is allowed to overwrite
+    unconditionally, which is why they share a return value here.
+    """
+
+    if not raw.startswith(_RESERVATION_MARKER):
+        return None
+    rest = raw[len(_RESERVATION_MARKER) :].strip()
+    return rest or None
+
+
 def _inspect_claim(path: Path):
     """Capture identity + contents so a later reclaim can prove it is the same.
 
@@ -642,13 +657,42 @@ def _record_identity_cli() -> int:
     """
 
     if len(sys.argv) < 4:
-        print("usage: --record-identity <pid_file> <pid>", file=sys.stderr)
+        print(
+            "usage: --record-identity <pid_file> <pid> [<reservation_token>]",
+            file=sys.stderr,
+        )
         return 2
     pid_path = Path(sys.argv[2])
     try:
         pid = int(sys.argv[3])
     except ValueError:
         return 2
+    presented = sys.argv[4].strip() if len(sys.argv) > 4 else ""
+
+    # RECORD INTO THE RESERVATION WE MADE, NOT WHATEVER IS THERE NOW.
+    #
+    # This wrote unconditionally. A launcher suspended past
+    # _RESERVATION_STALE_SECONDS has its reservation correctly reclaimed by a
+    # second launcher -- that recovery is deliberate -- and then resumes and
+    # records its PID over the second launcher's live claim. Both OmniRoute
+    # servers are up; the tracked PID belongs to whichever recorded last, so
+    # stop kills one and leaves the other listening and untracked. Every fix
+    # before this one made the reservation distinguishable; none made the
+    # recorder prove it held the one it is writing into.
+    #
+    # Fail closed on a token mismatch, including a caller that presents none:
+    # a marked reservation belongs to a specific launcher, and a recorder that
+    # cannot name it is not that launcher. Absent, empty and PID-bearing claims
+    # are untouched -- an empty claim is a pre-marker reservation that cannot
+    # be attributed either way, and a PID-bearing one is a re-record, both of
+    # which were always allowed.
+    existing = _inspect_claim(pid_path)
+    if existing is not None:
+        held = _reservation_token_of(existing.data.decode("utf-8", "replace").strip())
+        if held is not None and held != presented:
+            print("STALE_RESERVATION")
+            return 1
+
     if not _pid_alive(pid):
         print("NOT_RUNNING")
         return 1
@@ -744,12 +788,25 @@ def _reserve_slot_cli() -> int:
     # and by --check-identity, which is exactly the state we want between the
     # reservation and the recording: occupied, unverifiable, and therefore
     # blocking rather than reclaimable.
+    # THE TOKEN IS A CAPABILITY, SO IT HAS TO REACH THE CALLER.
+    #
+    # It was generated inline and thrown away, which left --record-identity
+    # with nothing to check: a launcher suspended past the 60-second stale
+    # window has its reservation legitimately reclaimed by a second launcher,
+    # then wakes and records its PID over the winner's live claim. Both servers
+    # start and the surviving one is tracked under the wrong PID. Printing it
+    # is what turns "a marker that distinguishes reservations" into "a marker
+    # the holder can present".
+    token = _reservation_token()
     try:
-        os.write(fd, f"{_RESERVATION_MARKER} {_reservation_token()}".encode("utf-8"))
+        os.write(fd, f"{_RESERVATION_MARKER} {token}".encode("utf-8"))
     except OSError:
-        pass
+        # The reservation exists but is empty -- the pre-marker state, still
+        # occupied and still blocking. Claiming a token the file does not carry
+        # would make every later --record-identity refuse, so say what is true.
+        token = ""
     os.close(fd)
-    print("RESERVED")
+    print(f"{_RESERVATION_MARKER} {token}".strip())
     return 0
 
 

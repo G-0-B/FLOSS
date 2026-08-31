@@ -213,13 +213,24 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation
         $skipped += "OmniRoute (:20128) - stale record left in place; set FLOSS_PYTHON"
     }
     $reserved = $false
+    $omniReserveToken = ''
     if ($py) {
         Push-Location $repoRoot
         $slotOut = & $py -m packages.mcp_daemon --reserve-slot $omniPid 2>$null
         Pop-Location
         $slotTok = ($slotOut | Select-Object -Last 1)
         if ($slotTok) { $slotTok = $slotTok.ToString().Trim() }
-        $reserved = ($slotTok -eq 'RESERVED')
+        # `RESERVED <token>`, not `RESERVED`. The token is the proof that the
+        # reservation --record-identity writes into is the one THIS launcher
+        # made: a launcher suspended past the stale window has its reservation
+        # legitimately reclaimed, and without presenting the token it would
+        # wake up and record its PID over the winner's live claim. An exact
+        # equality test here would also read every successful reservation as a
+        # failure and never start OmniRoute again.
+        $reserved = ($slotTok -eq 'RESERVED') -or ($slotTok -like 'RESERVED *')
+        if ($slotTok -like 'RESERVED *') {
+            $omniReserveToken = $slotTok.Substring('RESERVED '.Length).Trim()
+        }
     }
     if (-not $reserved) {
         # NOT `return`: this is script scope, so returning here would also skip
@@ -256,7 +267,7 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation
     }
     if ($serverPid -and $py) {
         Push-Location $repoRoot
-        $recOut = & $py -m packages.mcp_daemon --record-identity $omniPid $serverPid
+        $recOut = & $py -m packages.mcp_daemon --record-identity $omniPid $serverPid $omniReserveToken
         Pop-Location
         $recTok = ($recOut | Select-Object -Last 1)
         if ($recTok) { $recTok = $recTok.ToString().Trim() }
