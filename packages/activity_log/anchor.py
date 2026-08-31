@@ -745,6 +745,7 @@ def walk_series(
     series: dict[str, dict[str, Any]],
     *,
     expected_signer: str | None = None,
+    series_provided: bool = True,
 ) -> dict[str, Any]:
     """Follow `prev_root` back to genesis. Reports, never raises.
 
@@ -783,9 +784,17 @@ def walk_series(
             # A retained series that does not reach genesis is a hole, and the
             # hole is the finding. Do not silently treat the oldest file on disk
             # as the beginning of history.
+            #
+            # But "no retained anchor carries that root" is a claim about the
+            # STORE. With no series directory supplied it is a claim about the
+            # CALLER, and reporting the first when the second is true sends an
+            # operator looking for a deletion that never happened.
             problems.append(
                 f"anchor series breaks at {prev[:16]}...: no retained anchor "
                 f"carries that root"
+                if series_provided
+                else f"anchor series cannot be walked from {prev[:16]}...: no "
+                f"series directory was supplied to verify_anchor"
             )
             break
         ancestor_problem = anchor_signature_problem(
@@ -809,8 +818,19 @@ def verify_anchor(
     *,
     expected_signer: str | None = None,
     series_dir: Path | None = None,
+    stable: bool = False,
 ) -> dict[str, Any]:
-    """Compare the current store against an anchor. Never raises."""
+    """Compare the current store against an anchor. Never raises.
+
+    `stable` requires two agreeing scans, as publishing does. Off by default: a
+    read-only verify tolerates a torn enumeration and a caller running one
+    against a busy store wants a verdict rather than a refusal. It matters for
+    the PUBLISH PREFLIGHT, which refuses on ANCHOR_MISMATCH -- a packet landing
+    mid-enumeration there produced a false finding that blocked a legitimate
+    publication, while the build scan beside it was hardened against exactly
+    that. Contention degrades to ANCHOR_UNAVAILABLE rather than raising,
+    because this function never raises.
+    """
 
     if anchor is None:
         return {
@@ -841,13 +861,26 @@ def verify_anchor(
             "note": UNAVAILABLE_NOTE,
         }
 
-    leaves, unreadable = scan_packets(provenance_root)
+    if stable:
+        try:
+            leaves, unreadable = _stable_scan(provenance_root)
+        except StoreContention as exc:
+            return {
+                "status": ANCHOR_UNAVAILABLE,
+                "reason": f"the store would not hold still to be read: {exc}",
+                "note": UNAVAILABLE_NOTE,
+            }
+    else:
+        leaves, unreadable = scan_packets(provenance_root)
     current_root = _root_of(leaves)
     anchored_root = anchor.get("merkle_root")
 
     # Verify step 2, which the spec has always specified and the code never did.
     series = walk_series(
-        anchor, load_series(series_dir), expected_signer=expected_signer
+        anchor,
+        load_series(series_dir),
+        expected_signer=expected_signer,
+        series_provided=series_dir is not None,
     )
 
     result: dict[str, Any] = {
@@ -907,6 +940,28 @@ def verify_anchor(
         result["status"] = ANCHOR_UNAVAILABLE
         result["reason"] = "; ".join(series["problems"])
         result["note"] = UNAVAILABLE_NOTE
+        # THE STORE VERDICT SURVIVES A BROKEN HISTORY.
+        #
+        # A broken ancestor chain makes the SERIES unverifiable and that stays
+        # the status -- a history anyone can rewrite is not a history. But it
+        # says nothing about the store, and publish's preflight refuses on
+        # ANCHOR_UNAVAILABLE, so deleting one old file in series/ blocked
+        # publication of a provably intact store behind --force, the flag
+        # reserved for a loss understood and intended. Refusing there protects
+        # nothing: the ancestor is already gone and a new anchor cannot bring it
+        # back. Recorded separately so a caller can tell the two apart.
+        #
+        # "Intact" is NOTHING THE ANCHOR COMMITTED TO HAS GONE, not "identical".
+        # Root equality was the first thing written here and it is wrong: a
+        # store that legitimately grew since the anchor has a different root and
+        # has lost nothing, which is the ordinary case an operator is trying to
+        # publish when they hit this.
+        current_leaves = {(leaf.identity, leaf.sequence, leaf.said) for leaf in leaves}
+        result["store_intact"] = (
+            not (anchored_leaves(anchor) - current_leaves)
+            and not result["unreadable_appeared"]
+            and not result["unreadable_vanished"]
+        )
         return result
 
     if result["unreadable_appeared"] or result["unreadable_vanished"]:

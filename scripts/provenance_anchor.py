@@ -243,7 +243,6 @@ def _publish(args: argparse.Namespace) -> int:
     # claimed and none can be ruled out. Publishing proceeds, loudly, and starts
     # a NEW series rather than chaining to a root this build cannot verify:
     # linking to an unverifiable ancestor is the broken-series condition.
-    migrating = False
     if previous is not None and previous.get("v") not in anchor_lib.SUPPORTED_VERSIONS:
         # AUTHENTICATE BEFORE BELIEVING THE VERSION.
         #
@@ -307,7 +306,6 @@ def _publish(args: argparse.Namespace) -> int:
                 "confirmed that is what this is."
             )
             return 2
-        migrating = True
         print(
             f"anchor format migration: the current anchor is "
             f"{previous.get('v')!r} and this build verifies "
@@ -325,8 +323,34 @@ def _publish(args: argparse.Namespace) -> int:
             args.provenance_root,
             previous,
             series_dir=args.anchor.parent / anchor_lib.SERIES_DIRNAME,
+            # Stabilised, like the build scan below. Unstabilised, a packet
+            # landing mid-enumeration here produced a false ANCHOR_MISMATCH and
+            # refused a legitimate publication -- the preflight was the one scan
+            # in this command still exposed to that.
+            stable=True,
         )
-        if prior["status"] in (
+        # A BROKEN HISTORY IS NOT A REASON TO REFUSE A NEW ANCHOR.
+        #
+        # Losing one old file in series/ makes the series unverifiable, and this
+        # refused on ANCHOR_UNAVAILABLE -- so an intact store could not be
+        # anchored without --force, the flag reserved for a loss understood and
+        # intended. Refusing protects nothing: the ancestor is already gone and
+        # publishing cannot bring it back. Report it loudly and continue.
+        if (
+            prior["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+            and prior.get("store_intact") is True
+        ):
+            print(
+                "WARNING: the retained anchor series is broken, but the store "
+                "itself still matches the current anchor."
+            )
+            print(f"  {prior.get('reason')}")
+            print(
+                "  Publishing anyway: the missing ancestor is already gone and "
+                "a new anchor cannot restore it. The break stays visible in "
+                "verify."
+            )
+        elif prior["status"] in (
             anchor_lib.TRUNCATION_DETECTED,
             anchor_lib.ANCHOR_MISMATCH,
             anchor_lib.ANCHOR_UNAVAILABLE,
@@ -585,6 +609,20 @@ def _publish(args: argparse.Namespace) -> int:
     # replace can raise over a file that is no longer there. mkstemp creates
     # exclusively in the destination directory, so the rename is still atomic
     # and same-filesystem.
+    # THE EVIDENCE GOES DOWN BEFORE THE POINTER THAT CITES IT.
+    #
+    # The proof used to be written AFTER os.replace, so a crash in between left
+    # a published anchor carrying a `witnesses` claim with no proof on disk --
+    # and _witness_state reports exactly that as "the anchor claims a witness
+    # but no proof file is present", which reads as tampering rather than as an
+    # interrupted publish. Same ordering rule as the daemons' identity sidecar:
+    # never publish a record before the thing it cites exists. The proof is
+    # content-addressed by root, so writing it first is idempotent and safe.
+    proof_file = None
+    if args.witness and signed.get("witnesses"):
+        proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])
+        _write_atomic(proof_file, stamped["proof"])
+
     args.anchor.parent.mkdir(parents=True, exist_ok=True)
     fd, staging_name = tempfile.mkstemp(
         dir=str(args.anchor.parent), prefix=args.anchor.name + ".", suffix=".tmp"
@@ -598,10 +636,7 @@ def _publish(args: argparse.Namespace) -> int:
         staging.unlink(missing_ok=True)
         raise
 
-    if args.witness and signed.get("witnesses"):
-        proof_file = witness_lib.proof_path(args.anchor.parent, signed["merkle_root"])
-        proof_file.parent.mkdir(parents=True, exist_ok=True)
-        proof_file.write_bytes(stamped["proof"])
+    if proof_file is not None:
         state = witness_lib.inspect_proof(
             stamped["proof"],
             expected_digest=witness_lib.root_digest(signed["merkle_root"]),
@@ -636,15 +671,51 @@ def _publish(args: argparse.Namespace) -> int:
 
 def _verify(args: argparse.Namespace) -> int:
     stored = anchor_lib.load_anchor(args.anchor)
-    # Default the pin to the stored anchor's own signer rather than to None.
-    # `--expect-signer` defaulting to None meant the documented "actual root of
-    # trust" was off unless the operator remembered to switch it on (G9). This
-    # is a weaker pin than an out-of-band one -- it detects a signer change
-    # within a retained series, not a series forged wholesale -- but it is the
-    # strongest default available without asking the operator for a key.
+
+    # ABSENT AND UNREADABLE ARE NOT THE SAME ANSWER, HERE EITHER.
+    #
+    # load_anchor returns None for a file that is not there and for one that is
+    # there and corrupt. `publish` was taught the difference; this command was
+    # not, so an operator whose anchor had been tampered into unparseable JSON
+    # was told "no anchor found" -- the corruption being the entire finding.
+    if stored is None and args.anchor.exists():
+        print(
+            _bounded_json(
+                {
+                    "status": anchor_lib.ANCHOR_UNAVAILABLE,
+                    "reason": (
+                        f"an anchor exists at {_display_path(args.anchor)} but "
+                        f"could not be read (bad encoding, malformed JSON, or "
+                        f"not a JSON object)"
+                    ),
+                    "note": anchor_lib.UNAVAILABLE_NOTE,
+                    "witness": _witness_state(args.anchor, None),
+                },
+                args.max_output,
+            )
+        )
+        return anchor_lib.EXIT_CODES.get(anchor_lib.ANCHOR_UNAVAILABLE, 2)
+
+    # PREFER THE LOCAL IDENTITY OVER THE ANCHOR'S OWN CLAIM.
+    #
+    # `--expect-signer` defaulting to None meant the documented root of trust
+    # was off unless the operator switched it on (G9), so this defaulted to the
+    # anchor's own `signer`. That is self-pinning: it verifies the anchor
+    # against whatever key the anchor names, which an attacker who can replace
+    # the file simply generates. The comment here used to call that "the
+    # strongest default available without asking the operator for a key" --
+    # which stopped being true when publish grew _identity_aid_on_disk().
+    #
+    # Pin to the local identity when there is one: that is an out-of-band key
+    # the anchor cannot choose. A third-party verifier has no local identity and
+    # falls through to the anchor's claim exactly as before, so this costs them
+    # nothing and protects the common case, an operator verifying their own
+    # store.
     pin = args.expect_signer
-    if pin is None and not args.no_pin and isinstance(stored, dict):
-        pin = stored.get("signer")
+    if pin is None and not args.no_pin:
+        pin = _identity_aid_on_disk(args.identity_dir)
+        if pin is None and isinstance(stored, dict):
+            pin = stored.get("signer")
     result = anchor_lib.verify_anchor(
         args.provenance_root,
         stored,
@@ -658,6 +729,31 @@ def _verify(args: argparse.Namespace) -> int:
     result["witness"] = _witness_state(args.anchor, stored)
     print(_bounded_json(result, args.max_output))
     return anchor_lib.EXIT_CODES.get(result["status"], 2)
+
+
+def _write_atomic(path: Path, payload: bytes) -> None:
+    """Write bytes so a reader sees the old content or the new, never a prefix.
+
+    Both `.ots` writes used a bare write_bytes. The upgrade path is the one that
+    matters: it OVERWRITES an existing pending proof, so a crash mid-write
+    destroyed a calendar stamp that cannot be regenerated -- it is bound to the
+    instant it was requested. Every other write in this file that matters
+    already goes through temp-then-replace; these two were the exceptions, and
+    one of them was the only irreplaceable artifact in the set.
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, staging_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + ".", suffix=".tmp"
+    )
+    staging = Path(staging_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+        os.replace(staging, path)
+    except OSError:
+        staging.unlink(missing_ok=True)
+        raise
 
 
 def _identity_aid_on_disk(identity_dir: Path | str) -> str | None:
@@ -804,7 +900,9 @@ def _witness_upgrade(args: argparse.Namespace) -> int:
     result = witness_lib.upgrade_proof(proof_bytes, timeout=args.witness_timeout)
     proof = result.pop("proof", None)
     if proof:
-        proof_file.write_bytes(proof)
+        # Atomic: this OVERWRITES a valid pending proof, and a torn write
+        # destroys a calendar stamp nobody can request again for that instant.
+        _write_atomic(proof_file, proof)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     # Exit 0 requires CONFIRMED, which this code never returns -- verifying a
     # Bitcoin attestation needs block headers the witness layer does not have.

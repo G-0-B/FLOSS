@@ -1092,3 +1092,181 @@ def test_the_walk_has_one_sequence_parser_not_a_guard_per_branch(tmp_path):
     assert "int(child_sequence)" not in walk, "a branch parses its own sequence"
     assert 'int(prior_packet.get("s"))' not in walk, "a branch parses its own sequence"
     assert walk.count("_walk_sequence(") >= 3
+
+
+# ---------------------------------------------------------------------------
+# Cold-read findings: publish/verify paths that had the right check elsewhere.
+# ---------------------------------------------------------------------------
+
+
+def test_the_witness_proof_exists_before_the_pointer_that_cites_it(
+    tmp_path, small_store, monkeypatch
+):
+    """A crash between os.replace and the proof write left a published anchor
+    claiming a witness with no proof on disk -- which _witness_state reports as
+    'the anchor claims a witness but no proof file is present', reading as
+    tampering rather than as an interrupted publish."""
+    cli = _cli_module()
+    from packages.activity_log import witness as witness_lib
+
+    anchor_path = tmp_path / "anchor.json"
+    order: list[str] = []
+    real_replace = cli.os.replace
+
+    def record(src, dst):
+        order.append(f"pointer:{Path(dst).name}")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(cli.os, "replace", record)
+    monkeypatch.setattr(
+        cli.witness_lib,
+        "stamp_root",
+        lambda root, timeout=None: {
+            "status": "PENDING",
+            "digest": "d",
+            "attested": ["cal"],
+            "proof": b"fake-proof-bytes",
+            "failed": [],
+        },
+    )
+    monkeypatch.setattr(
+        cli.witness_lib,
+        "inspect_proof",
+        lambda payload, expected_digest=None: {"status": "PENDING"},
+    )
+
+    code = cli.main(
+        [
+            "--provenance-root",
+            str(small_store),
+            "--identity-dir",
+            str(tmp_path / "id"),
+            "--anchor",
+            str(anchor_path),
+            "publish",
+            "--allow-new-identity",
+            "--witness",
+        ]
+    )
+
+    assert code == 0
+    proof_name = witness_lib.proof_path(
+        tmp_path, json.loads(anchor_path.read_text(encoding="utf-8"))["merkle_root"]
+    ).name
+    pointer_at = next(i for i, e in enumerate(order) if e == "pointer:anchor.json")
+    proof_at = next(i for i, e in enumerate(order) if e == f"pointer:{proof_name}")
+    assert proof_at < pointer_at, "the pointer was published before its evidence"
+
+
+def test_verify_distinguishes_a_corrupt_anchor_from_a_missing_one(
+    tmp_path, small_store, capsys
+):
+    """load_anchor returns None for both. publish was taught the difference and
+    verify was not, so a tampered anchor was reported as 'no anchor found'."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    anchor_path.write_text("{not json", encoding="utf-8")
+
+    cli.main(
+        [
+            "--provenance-root",
+            str(small_store),
+            "--identity-dir",
+            str(tmp_path / "id"),
+            "--anchor",
+            str(anchor_path),
+            "verify",
+        ]
+    )
+
+    out = json.loads(capsys.readouterr().out)
+    assert out["status"] == anchor_lib.ANCHOR_UNAVAILABLE
+    assert "could not be read" in out["reason"]
+    assert "no anchor found" not in out["reason"]
+
+
+def test_a_broken_history_does_not_block_anchoring_an_intact_store(
+    tmp_path, small_store, capsys
+):
+    """Deleting one old file in series/ made the series unverifiable, and the
+    preflight refused on ANCHOR_UNAVAILABLE -- so an intact store could not be
+    anchored without --force. Refusing protects nothing: the ancestor is gone
+    and publishing cannot restore it."""
+    cli = _cli_module()
+    anchor_path = tmp_path / "anchor.json"
+    base = [
+        "--provenance-root",
+        str(small_store),
+        "--identity-dir",
+        str(tmp_path / "id"),
+        "--anchor",
+        str(anchor_path),
+    ]
+    assert cli.main(base + ["publish", "--allow-new-identity"]) == 0
+    provenance.create_packet(
+        [{"kind": "note", "detail": "second"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    assert cli.main(base + ["publish"]) == 0
+
+    # Remove the genesis anchor from the retained series: history now has a hole.
+    head = json.loads(anchor_path.read_text(encoding="utf-8"))
+    (tmp_path / "series" / f"{head['prev_root']}.json").unlink()
+    provenance.create_packet(
+        [{"kind": "note", "detail": "third"}],
+        identity_dir=tmp_path / "id",
+        output_root=small_store,
+    )
+    capsys.readouterr()
+
+    code = cli.main(base + ["publish"])
+
+    assert code == 0, "an intact store was blocked by a broken ancestor chain"
+    assert "retained anchor series is broken" in capsys.readouterr().out
+
+
+def test_a_missing_series_directory_is_not_reported_as_a_missing_ancestor():
+    """'No retained anchor carries that root' is a claim about the store. With
+    no directory supplied it is a claim about the caller."""
+    anchor = {"merkle_root": "E" + "a" * 43, "prev_root": "E" + "b" * 43}
+
+    result = anchor_lib.walk_series(anchor, {}, series_provided=False)
+
+    assert "no series directory was supplied" in result["problems"][0]
+    assert "no retained anchor" not in result["problems"][0]
+
+
+def test_a_broken_history_still_blocks_when_the_store_actually_lost_something():
+    """The guard must narrow to history-only breaks. A store that lost an
+    anchored leaf must still be refused, broken series or not."""
+    anchor = {
+        "merkle_root": "E" + "a" * 43,
+        "identities": [
+            {"aid": "D" + "a" * 43, "leaf_saids": [[0, "E" + "z" * 43]]},
+        ],
+        "unreadable": [],
+    }
+
+    assert anchor_lib.anchored_leaves(anchor), "fixture commits to no leaves"
+
+
+def test_the_upgrade_path_never_overwrites_a_proof_in_place(tmp_path, monkeypatch):
+    """witness-upgrade overwrites a VALID pending proof, so a torn write
+    destroys a calendar stamp nobody can request again for that instant."""
+    cli = _cli_module()
+    target = tmp_path / "proof.ots"
+    target.write_bytes(b"original-pending-proof")
+    written: list[str] = []
+    real_write = Path.write_bytes
+
+    def record(self, data):
+        written.append(self.name)
+        return real_write(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", record)
+
+    cli._write_atomic(target, b"upgraded-proof")
+
+    assert target.read_bytes() == b"upgraded-proof"
+    assert target.name not in written, "final name written directly"
