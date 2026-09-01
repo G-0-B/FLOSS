@@ -45,7 +45,7 @@ The substrate bridge is validated when ALL of the following pass:
 
 ### 3.1 Prerequisites
 
-- Holochain conductor running (holonix main-0.4)
+- Holochain conductor running (holonix main-0.6; authoritative dependency pins are in `ARF/Cargo.toml`)
 - Rose Forest hApp installed with 2 agents (Rust Sweettest handles this)
 - Entry types: `KnowledgeTriple` (integrity zome)
 - Extern functions: `assert_triple`, `query_triples`, `get_triple_record` (coordinator zome)
