@@ -569,6 +569,10 @@ a second operating system.
 - Failure modes FM-1..FM-8, CF-1..CF-10:
   `docs/research/2026-08-25-provenance-failure-mode-register.md`
 - Cross-audit learnings: `docs/research/2026-08-29-cross-audit-learnings.md`
+- The scope/layer finding read against Levin's cognitive-light-cone framework,
+  with a falsifiable prediction for the next PR:
+  `docs/research/2026-05-26-levin-corpus-cces-implications.md` (fourth
+  isomorphism, added 2026-08-31)
 - Ensemble aggregation prior art:
   `docs/research/2026-08-26-ensemble-aggregation-prior-art.md`
 - Manual multi-model review protocol:

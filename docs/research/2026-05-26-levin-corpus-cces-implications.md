@@ -30,6 +30,87 @@ The source's "Implications for Your Architecture" §  surfaces three claims that
 2. **Multi-AI consensus gateway ≅ heterarchical cortical wave coordination.** No privileged "controller" voter; coordination emerges from mutual constraint across voter families. Maps cleanly to the [`ADR-10`](../adr/ADR-10-local-agent-node.md) passive-router design + analog vote model.
 3. **Causal integration ≠ task performance.** Levin MT3 ratchet: causal integration *persists and compounds* even when specific learned content is lost. Implication for FLOSSI0ULLK: metric we should track on our substrate is **causal integration across the 8-layer stack** (mutual information / cross-layer dependence), not per-component task perf. This is a candidate new spec.
 
+### Fourth isomorphism, added 2026-08-31 — cancer ≅ a guard scoped below its property
+
+**Truth status:** the *observation* is Verified (traceable to commits on PR #41);
+the *isomorphism* is Specified and explicitly n=1. Distinguishing the two is the
+point of this entry.
+
+The first three isomorphisms above were distilled from an external synthesis.
+This one runs the other way: it was found in repo data first and matched to
+Levin afterwards, which is both what makes it worth recording and the reason
+to discount it.
+
+Forty-one review rounds on one PR produced ~49 findings
+([`2026-08-31-review-loop-session-learnings.md`](2026-08-31-review-loop-session-learnings.md)).
+Their dominant shape, named there before any of this corpus was re-read, is
+*a correct mechanism attached to a boundary one step smaller than the property
+it protects*. Levin's account of cancer is the same statement in cells: the
+tumour cell's machinery is intact and it is pursuing its goals correctly — what
+contracted is the boundary between self and world, which is what the cognitive
+light cone defines. It now optimises at a scope below the one the tissue needs
+held. His therapeutic follows from the diagnosis: restore the gap-junction
+connection, do not repair or kill the cell.
+
+The session's one strong empirical result is that shape of intervention. The
+file lock produced six consecutive rounds of race and liveness defects under
+increasingly careful policy; replacing the mechanism with a kernel lock ended
+that class outright — not by improving the code but by making the failure
+inexpressible at that scope. Reconnect, do not chemo.
+
+Two secondary mappings, in descending confidence:
+
+1. **The barrier experiment and the red run are one epistemology.** Levin holds
+   that a cognitive light cone cannot be read off an organism: you interpose an
+   obstacle between it and its goal and measure the ingenuity of the detour.
+   The learnings doc reaches the same rule for tests — a test's power cannot be
+   read off its assertions; revert the fix and see whether it still detects.
+   Both say a competence is only visible under perturbation. This reframes the
+   red-green rule from a testing convention into the only available measurement
+   of a test's goal-scope, which is a stronger reason to make it unconditional.
+2. **A reviewer roster is a competency architecture, not a redundancy stack.**
+   CodeQL found a file-permissions defect on a file two model reviewers had
+   each read twice — not from inattention, but because "what mode is this file
+   created with" is outside their goal space. Levin's collective exceeds its
+   parts only when the parts are competent at *different* things; more of the
+   same lens adds nothing. This is already policy for voters (>=3 provider
+   surfaces, >=4 model families per ADR-10) and has no equivalent for
+   reviewers. Candidate rule: enumerate what questions each lens asks, and
+   treat the unasked questions as the coverage gap.
+
+**Falsifiable prediction, for the next PR rather than this one.** If the
+layer/scope framing is doing real work and is not post-hoc pattern-matching:
+components that *have* a layer below them should show finding-rate collapse
+after a mechanism swap, and components that do **not** should show a persistent
+tail no amount of care removes. PR #41 contains exactly one instance of each
+(`filelock` swapped to an OS lock, 0 further defects of that class;
+`mcp_daemon`'s claim protocol, which cannot adopt one because a claim must
+outlive the process that makes it, 6 further defects and still producing them
+at quota exhaustion). n=1 per arm is a hypothesis, not a result. Recording the
+prediction now is what makes the next observation a test rather than another
+match.
+
+**Three corrections to how the light cone gets restated in this workspace**,
+since all three change what one would measure:
+
+- It is **not perceptual**. Levin excludes sensory reach and causal reach by
+  name; his example is that the James Webb telescope has vast sensory reach
+  and a tiny cognitive light cone. It is the scale of the largest goal state
+  actively pursued, in space and time together.
+- It is **not a multiplier on intelligence**. Cone size (how large a goal) and
+  intelligence (ingenuity in reaching it against obstacles) are the two axes
+  his measurement protocol deliberately separates.
+- The nesting is **not fractal**. Multi-scale competency architecture nests
+  scales with *different* goal spaces — cells pursue pH and metabolic states,
+  tissues pursue anatomical ones, and no cell knows what a finger is.
+  Self-similarity predicts the opposite. "Reference frames" is Hawkins; the
+  nested-blanket formalism is Friston; both are compatible with Levin and
+  neither is his claim.
+
+Source for all three: Levin in conversation with Lex Fridman (#486),
+`_reference/transcripts/`. Prior unreconciled treatment, still in intake:
+`intake_raw/2026-06-08-root/reports/Navigating the Infinite ...md`.
+
 ## New research/engineering questions surfaced for the working-todo
 
 Adapted from Levin Corpus §"Open Questions Surfaced by the Corpus" — only including those that are FLOSSI0ULLK-actionable:
