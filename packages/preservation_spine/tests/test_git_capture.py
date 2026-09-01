@@ -664,11 +664,6 @@ def test_exact_ancestor_capture_preserves_source_object_format_deterministically
     }
     for plane_id, expected_sha in expected.items():
         plane_root = first_destination / plane_id.value
-        assert git(
-            plane_root / "source.git",
-            "rev-parse",
-            "--show-object-format=storage",
-        ).stdout.strip() == object_format.encode("ascii")
         identity = json.loads(
             (plane_root / "identity.json").read_text(encoding="utf-8")
         )
@@ -735,14 +730,11 @@ def test_sha256_partial_capture_remains_without_source_mutation(tmp_path: Path) 
 
     partial = destination / "remote-main"
     assert (partial / "repository.bundle").is_file()
-    assert (
-        git(
-            partial / "source.git",
-            "rev-parse",
-            "--show-object-format=storage",
-        ).stdout.strip()
-        == b"sha256"
+    assert not (partial / "source.git").exists()
+    identity = json.loads(
+        (partial / "identity.json").read_text(encoding="utf-8")
     )
+    assert identity["object_format"] == "sha256"
     assert not (destination / "remote-pr").exists()
     assert git(repo, "show-ref", "--head").stdout == refs_before
     assert index_path.read_bytes() == index_before
