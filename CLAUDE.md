@@ -31,14 +31,20 @@ FLOSS/
 │   ├── tests/                                       # Tryorama tests
 │   └── in.finite-nrg/                               # Hardware abstraction layer
 │
-├── packages/                                        # Local agent node (landed in 096b058)
+├── packages/                                        # Local coordination and evidence services
+│   ├── activity_log/                                # Append-only action + provenance records
+│   ├── coordination_room/                           # Exclusive file-path claims + room log
+│   ├── memory/                                      # Pre-existing memory module
 │   ├── metacoordinator_mcp/                         # MCP passive-router consensus gateway
 │   ├── orchestrator/                                # Claim schema + consensus gate + serialization
+│   ├── reasoning_ensemble/                          # Router + multi-model synthesis
 │   ├── source_chain/                                # File-based Holochain-mapped source chain
-│   └── memory/                                      # Pre-existing memory module
+│   ├── mcp_daemon.py                                # PID-guarded MCP daemon wrapper
+│   ├── omniroute_client.py                          # OmniRoute transport adapter
+│   └── tests/                                       # Cross-package tests
 │
 ├── docs/
-│   ├── adr/                                         # ADR-0..6 + ADR-0.1 + ADR-MCP-ORCHESTRATOR + INDEX
+│   ├── adr/                                         # ADR-0..20 + ADR-0.1 + frozen v2.0 suite + INDEX
 │   ├── architecture/                                # 31 files — specs, blueprints, integration plans
 │   ├── governance/                                  # spine-v0.5, uop-v2.1, build-spine-v0.3, seed-packet,
 │   │                                                #   LOADING_ORDER, HARVEST_LOG, LEGAL_DEFINITIONS
@@ -163,7 +169,7 @@ ruff check .
 - **Architecture (operational axis)**: `docs/architecture/META_COORDINATION_KERNEL_v4.0.md` — 9-layer agent-centric stack + RICE overlay + Superalignment Triad + 10 named roles (what agents do, where authority sits). See §21 for the orthogonal-axis composition with CCES. Landed 2026-05-13 via consensus claim `019e2293` APPROVED mean +0.717.
 - **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`
 - **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
-- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (the v2.0 suite file is frozen at ADR-0, 0.1, 1–12; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10 and ADR-N (IPFS) became ADR-11; ADR-12 is the Consent Gate Protocol, `OVERRIDE FORBIDDEN`. **ADR-13..19 live only in `docs/adr/INDEX.md` v2.1.0+, not in the suite file** — always read the ADR INDEX, not the suite, for the current set)
+- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (the v2.0 suite file is frozen at ADR-0, 0.1, 1–12; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10 and ADR-N (IPFS) became ADR-11; ADR-12 is the Consent Gate Protocol, `OVERRIDE FORBIDDEN`. **ADR-13..20 live only in `docs/adr/INDEX.md` v2.1.0+, not in the suite file** — always read the ADR INDEX, not the suite, for the current set)
 - **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
 - **Local agent node**: `docs/adr/ADR-10-local-agent-node.md` (ADR-10 in the v2.0 suite)
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`
