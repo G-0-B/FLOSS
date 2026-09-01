@@ -254,6 +254,7 @@ platforms could have produced:
 | POSIX | The materializer's Hermes path resolved `%LOCALAPPDATA%` and aborted the whole run when it was unset. Passed on Windows forever. |
 | Windows | `msvcrt.locking` is **mandatory**, not advisory. Locking byte 0 made the lock file unreadable to its own token reader. No POSIX run can see this: `flock` is advisory. |
 | Linux | ext4 recycles inode numbers, so a reclaimed-and-recreated reservation matched `(st_dev, st_ino)`. Green locally on Windows; red in CI on the first push. |
+| Linux, again | The same recycling, in a **test written for the fix to the row above**. It rewrote identical bytes into a new file to exercise the identity half of an instance check; on NTFS that is a different inode and on ext4 it is the same one. Green locally, red in CI, third bite. |
 
 The Linux one is the instructive case. The defect was in production code — an
 identity comparison that a recycled inode satisfies — and the test written for
@@ -267,6 +268,23 @@ lock semantics is platform-specific until proven otherwise, and "the suite is
 green" means green on the platform it ran on. Push before believing it. The
 corollary is a design rule: prefer the guarantee the OS actually offers on
 every target over the one that happens to hold on yours.
+
+**And the second-order rule, which the fourth sighting is the argument for.**
+A platform assumption you have already been bitten by does not stay fixed by
+being known. It was documented in this file, in the row directly above, and
+then reintroduced — in a test, which is the one place the reintroduction is
+invisible until CI runs, because a test that cannot discriminate still passes.
+The useful form is not "remember about inodes." It is: **when a test needs two
+files to be distinguishable, make them distinguishable by content, because
+content is the only distinction every filesystem preserves.**
+
+Diagnosing it was also worth more than the fix. The state the test staged — a
+reservation carrying our own token on a different inode — cannot occur: a token
+is 96 random bits, so an instance carrying ours is ours. The test was not
+merely non-portable, it was asserting a property the system does not need. The
+real race is a replacement carrying a *different* token, and testing that
+discriminates on both platforms. A failing test is a claim about the system;
+check the claim before porting the test.
 
 ### FM-17 — A fix's new state breaks the readers that test for the old one
 

@@ -1763,12 +1763,22 @@ def test_recording_refuses_a_reservation_replaced_inside_the_window(
     Between validating the token and writing the PID there are two process
     probes, and a launcher whose reservation went stale can have it reclaimed
     and re-reserved in that gap. An unconditional write then lands on the new
-    owner's claim having verified only the old one -- which is the original
-    two-servers-one-record bug, surviving the fix that was meant to close it.
+    owner's claim having verified only the old one -- the original
+    two-servers-one-record bug surviving the fix meant to close it.
 
     Driven in-process because the window is inside a single invocation: the
     replacement is injected from _pid_alive, which is called after the check
     and before the write.
+
+    THE REPLACEMENT CARRIES A DIFFERENT TOKEN, because that is the only
+    reservation another launcher can write. An earlier version of this test
+    rewrote the same bytes into a new file to exercise the (st_dev, st_ino)
+    half of the instance check -- and passed on NTFS and failed on ext4, where
+    the freed inode is handed straight back, so identity AND contents matched.
+    That is the third time inode recycling has bitten this protocol and the
+    first time it bit a test written for the fix to the previous one. It is
+    also not a real state: a token is 96 random bits, so an instance carrying
+    ours IS ours.
     """
     import sys as _sys
 
@@ -1776,14 +1786,12 @@ def test_recording_refuses_a_reservation_replaced_inside_the_window(
 
     pid_path = tmp_path / "omniroute.pid"
     mine = _reservation_token(_reserve(pid_path))
-    original = pid_path.read_text(encoding="utf-8")
+    usurper = f"RESERVED {mine}-someone-else"
 
     def _replace_then_answer(pid: int) -> bool:
-        # Same bytes, different file: exactly what reclaim-and-re-reserve
-        # leaves behind, and invisible to any check on contents.
         if pid_path.exists():
             pid_path.unlink()
-            pid_path.write_text(original, encoding="utf-8")
+            pid_path.write_text(usurper, encoding="utf-8")
         return True
 
     monkeypatch.setattr(mcp_daemon, "_pid_alive", _replace_then_answer)
@@ -1795,7 +1803,7 @@ def test_recording_refuses_a_reservation_replaced_inside_the_window(
 
     assert code == 1
     assert capsys.readouterr().out.strip().splitlines()[-1] == "STALE_RESERVATION"
-    assert pid_path.read_text(encoding="utf-8") == original, (
-        "the record was overwritten despite the reservation having been "
-        "replaced since it was inspected"
+    assert pid_path.read_text(encoding="utf-8") == usurper, (
+        "the winner's reservation was overwritten by a launcher that validated "
+        "only the reservation it held before the window"
     )
