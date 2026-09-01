@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from pathlib import PurePosixPath
 from pathlib import PureWindowsPath
-from typing import Callable
+from typing import Callable, Iterator
 
 from packages.preservation_spine.models import (
     PlaneEligibility,
@@ -196,7 +197,13 @@ def _shared_index_files(repo: Path) -> list[Path]:
     """
     raw = run_git(repo, "rev-parse", "--path-format=absolute", "--git-dir")
     git_dir = Path(raw.rstrip(b"\r\n").decode("utf-8", errors="surrogateescape"))
-    return sorted(path for path in git_dir.glob("sharedindex.*") if path.is_file())
+    # Use lstat to avoid following symlinks — a sharedindex.* symlink
+    # in a compromised .git would silently redirect the capsule elsewhere.
+    return sorted(
+        path
+        for path in git_dir.glob("sharedindex.*")
+        if path.is_symlink() is False and path.exists()
+    )
 
 
 def _index_path(repo: Path) -> Path:
@@ -688,6 +695,16 @@ def _write_history_plane(
     (plane_root / "refs.txt").write_bytes(
         f"{subject_id} {captured_ref}\n".encode("utf-8")
     )
+
+    # Remove the temporary bare repository; the bundle is the sealed artifact.
+    # Windows-safe: git bare repos contain readonly pack files that rmtree
+    # cannot remove without an onerror handler clearing the readonly bit.
+    def _remove_readonly(func, path, _exc):  # noqa: ANN001
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    shutil.rmtree(bundle_source, onerror=_remove_readonly)
+
     _write_json(
         plane_root / "identity.json",
         {
@@ -703,11 +720,14 @@ def _write_history_plane(
 
 
 def _directory_digest(root: Path) -> str:
-    """Hash sorted relative names and exact file bytes using a length-framed format."""
+    """Hash sorted relative names and exact file bytes using a length-framed format.
+
+    Uses a nofollow walker (lstat-based) so symlinks inside the plane are
+    rejected rather than silently followed — matching seal.py's safety model.
+    """
 
     digest = hashlib.sha256(b"salvage-plane-directory-v1\0")
-    files = sorted(path for path in root.rglob("*") if path.is_file())
-    for path in files:
+    for path in _walk_plane_files(root):
         relative = path.relative_to(root).as_posix().encode("utf-8")
         content = path.read_bytes()
         digest.update(len(relative).to_bytes(8, "big"))
@@ -715,6 +735,32 @@ def _directory_digest(root: Path) -> str:
         digest.update(len(content).to_bytes(8, "big"))
         digest.update(content)
     return digest.hexdigest()
+
+
+def _walk_plane_files(root: Path) -> Iterator[Path]:
+    """Yield regular files under root without following symlinks or reparse points."""
+    pending: list[Path] = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = sorted(os.scandir(directory), key=lambda e: os.fsencode(e.name))
+        except OSError as exc:
+            raise CaptureEvidenceError("plane directory is unreadable") from exc
+        for entry in entries:
+            path = Path(entry.path)
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise CaptureEvidenceError("plane entry is unreadable") from exc
+            mode = metadata.st_mode
+            if stat.S_ISLNK(mode):
+                raise CaptureEvidenceError("plane symlink is not supported")
+            if stat.S_ISDIR(mode):
+                pending.append(path)
+            elif stat.S_ISREG(mode):
+                yield path
+            else:
+                raise CaptureEvidenceError("plane contains an unsupported special file")
 
 
 def capture_planes(
