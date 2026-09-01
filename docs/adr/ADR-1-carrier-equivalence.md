@@ -2,7 +2,9 @@
 
 ## Status
 
-PROPOSED
+ACCEPTED
+
+**Accepted:** 2026-05-25 — reconciled into `FLOSSI0ULLK-ADR-Suite-v2.0.md` and the ADR index by commit `8bfd4f8`.
 
 ## Context
 
@@ -176,7 +178,7 @@ CRDTs and gossip enable agent autonomy (no central coordinator). Trade: brief in
 
 **Proposed By**: FLOSSIØULLK Architecture Review Board  
 **Date**: January 5, 2026  
-**Status**: PROPOSED (awaiting technical committee review + simulation validation)
+**Status**: ACCEPTED (promoted 2026-05-25 in `FLOSSI0ULLK-ADR-Suite-v2.0.md`; technical validation remains tracked by the Truth Status)
 
 ---
 

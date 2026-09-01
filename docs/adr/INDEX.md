@@ -39,7 +39,7 @@ That stopped being true when the files were renamed, and the stale claim outlive
 | **ADR-6** | Four-System Meta-Orchestration Integration | Accepted | Specified (Seam 1 partial) | Medium | 2026-04-04 | `ADR-6-four-system-integration.md` |
 | **ADR-7** | Embracing AGPL-3.0 Copyleft Cascade | Accepted | Verified | Low | 2026-04-15 | `ADR-7-agpl-cascade.md` |
 | **ADR-8** | Radicle as Dev-Plane Code Substrate | Accepted | Specified (bridge unproven) | Medium | 2026-04-16 | `ADR-8-radicle-dev-substrate.md` |
-| **ADR-9** | Self-Perceptual Evolution (n+1) | Accepted | Specified | Medium | 2026-04-17 | `ADR-9-self-perceptual-evolution.md` |
+| **ADR-9** | Self-Perceptual Evolution (n+1) | Proposed | Specified | Medium | 2026-04-17 | `ADR-9-self-perceptual-evolution.md` |
 | **ADR-10** | Local Agent Node (Passive-Router MCP Consensus Gateway) | Accepted | Verified | Medium | 2026-04-10 | `ADR-10-local-agent-node.md` |
 | **ADR-11** | IPFS Large File Integration for VVS-Compliant Git | Accepted | Specified | Medium | 2025-11-11 | `ADR-11-ipfs-large-file-integration.md` |
 | **ADR-12** | Consent Gate Protocol | Draft (implementation-backed) | Specified (substrate verified locally; action-time gating + DID hardening + cross-frame validation pending) | High (OVERRIDE FORBIDDEN; APPROVE ≥ 0.85) | 2026-05-19 | `ADR-12-consent-gate-protocol.md` |
