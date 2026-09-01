@@ -2,6 +2,12 @@
 
 Built for the PR38 salvage in 2026-07, but nothing here is PR-specific:
 the six-plane contract applies to any risky repository operation.
+
+Windows durability note: on NT, parent-directory fsync is a no-op because
+Windows does not expose FlushFileBuffers on directory handles. File-content
+durability (fsync on the file descriptor) is real on both platforms; directory-
+entry durability (create/unlink persistence after crash) is best-effort on
+Windows only.
 """
 
 from __future__ import annotations
