@@ -34,7 +34,6 @@ FLOSS/
 ├── packages/                                        # Local coordination and evidence services
 │   ├── activity_log/                                # Append-only action + provenance records
 │   ├── coordination_room/                           # Exclusive file-path claims + room log
-│   ├── memory/                                      # Pre-existing memory module
 │   ├── metacoordinator_mcp/                         # MCP passive-router consensus gateway
 │   ├── orchestrator/                                # Claim schema + consensus gate + serialization
 │   ├── reasoning_ensemble/                          # Router + multi-model synthesis
