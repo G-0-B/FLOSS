@@ -10,8 +10,19 @@ from pathlib import Path
 import stat
 import sys
 
-from .checkpoint import Checkpoint, append_checkpoint, load_latest_checkpoint
-from .git_capture import SecretPolicy, capture_planes
+from .checkpoint import (
+    Checkpoint,
+    CheckpointIntegrityError,
+    append_checkpoint,
+    load_latest_checkpoint,
+)
+from .git_capture import (
+    CaptureDrift,
+    CaptureEvidenceError,
+    CaptureUnverifiable,
+    SecretPolicy,
+    capture_planes,
+)
 from .github_projection import Evidence, render_check_summary, render_stop_merge_comment
 from .manifest import inventory_change_universe, manifest_digest
 from .models import (
@@ -113,16 +124,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     namespace = build_parser().parse_args(list(argv) if argv is not None else None)
     try:
         return int(namespace.handler(namespace))
-    except (CapsuleVerificationError, CheckpointIntegrityError, ValueError) as exc:
+    except (
+        CapsuleVerificationError,
+        CheckpointIntegrityError,
+        CaptureEvidenceError,
+        ValueError,
+    ) as exc:
         _emit_error(str(exc))
         return 1
     except Exception:
         _emit_error("local-only salvage command failed")
         return 1
-
-
-class CheckpointIntegrityError(RuntimeError):
-    """Local wrapper for checkpoint-related failures surfaced without tracebacks."""
 
 
 def _handle_capture(args: argparse.Namespace) -> int:
