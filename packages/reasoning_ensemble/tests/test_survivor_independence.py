@@ -284,3 +284,60 @@ def test_two_runs_of_one_prompt_in_one_second_do_not_share_an_artifact(
         json.loads(f.read_text(encoding="utf-8"))["final_synthesis"] for f in written
     }
     assert bodies == {"first", "second"}, "one run overwrote the other"
+
+
+# ---------------------------------------------------------------------------
+# Mixed mode judges the pool that actually votes.
+# ---------------------------------------------------------------------------
+
+
+def test_the_local_pool_is_one_surface_not_four():
+    """LOCAL_VOTER_POOL carries bare Ollama tags, and its fourth entry --
+    `hf.co/unsloth/...` -- is an Ollama tag with two slashes in it. Reading the
+    surface off the id turns four local voters into two surfaces (or four, for
+    the bare tags), which would let a mixed roster of nothing but local models
+    clear the surface bar on its own. The transport field is the authority; the
+    same mistake already sent one of these four to a cloud provider once.
+    """
+    from packages.metacoordinator_mcp.voters import _derive_surface
+    from packages.reasoning_ensemble import transport
+
+    routes = [transport._independence_route(v) for v in transport.LOCAL_VOTER_POOL]
+    surfaces = {_derive_surface(route) for route in routes}
+
+    assert surfaces == {"ollama"}, routes
+    assert any("hf.co" in v["model"] for v in transport.LOCAL_VOTER_POOL), (
+        "the slashed-Ollama-tag entry this guards against is gone; if the pool "
+        "changed, re-check that the surface is still read from transport"
+    )
+
+
+def test_mixed_mode_judges_the_combined_pool(monkeypatch):
+    """_online_pool() raised before the local voters were appended, so a narrow
+    credential-filtered online subset refused a run whose combined roster is
+    comfortably independent -- and the only way through was the degraded-roster
+    override, which asserts the opposite of what is true about that roster."""
+    from packages.reasoning_ensemble import transport
+
+    checked: list[dict] = []
+
+    def _narrow_specs(profile=None, include_unavailable=False):
+        # Two surfaces, two families: refused on its own.
+        return {"a": "groq/openai/gpt-oss-120b", "b": "mistral/mistral-large-latest"}
+
+    def _record(profile, resolved):
+        checked.append(dict(resolved))
+
+    monkeypatch.setattr(transport, "resolve_default_voter_specs", _narrow_specs)
+    monkeypatch.setattr(transport, "assert_roster_is_independent", _record)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
+
+    pool, mode = transport.resolve_voter_pool()
+
+    assert mode == "mixed"
+    assert len(checked) == 1, "the online subset must not be judged on its own"
+    judged = checked[0]
+    assert len(judged) == len(pool), "the check saw a different roster than voted"
+    assert any(
+        "ollama/" in route for route in judged.values()
+    ), "the local voters were not part of the roster that was judged"

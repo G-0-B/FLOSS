@@ -433,7 +433,19 @@ def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[st
     transport, spec = classify_transport(name, server)
 
     if transport == "http":
-        return {"type": "remote", "url": spec["url"]}
+        # HEADERS ARE CREDENTIALS, AND DROPPING THEM IS SILENT.
+        #
+        # classify_transport() validates and returns the header map; this
+        # branch emitted only type and url, so an MCP whose auth lives in an
+        # Authorization header was projected as an unauthenticated server. It
+        # parses, it installs, and it fails at connect time against a config
+        # that looks correct -- there is nothing in the generated file to
+        # suggest anything was removed. OpenCode's remote MCP config supports
+        # a `headers` map, so project it.
+        remote: dict[str, Any] = {"type": "remote", "url": spec["url"]}
+        if spec.get("headers"):
+            remote["headers"] = dict(spec["headers"])
+        return remote
 
     payload: dict[str, Any] = {
         "command": [spec["command"], *spec["args"]],

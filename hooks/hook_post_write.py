@@ -298,6 +298,22 @@ def infer_surface(tool_name: str, hook_event_name: str) -> str:
     event_name = (hook_event_name or "").strip()
     if tn in {"write", "edit", "multiedit"}:
         return "claude-code"
+    # HERMES BEFORE GEMINI, BECAUSE THEY SHARE A TOOL NAME.
+    #
+    # There was no Hermes case at all, so every Hermes edit was misattributed:
+    # `write_file` matched the gemini-cli branch below and `patch` fell through
+    # to the generic `agent-tool`. That label reaches the Claim, the signed
+    # packet's `source_systems`, the summary and the background memory, so the
+    # provenance this hook exists to record named the wrong harness for every
+    # edit on the surface it was just extended to cover.
+    #
+    # `write_file` is Gemini's name AND Hermes's, so the tool name alone cannot
+    # separate them -- the event does. Hermes's manifest event_map emits
+    # pre_tool_call/post_tool_call; Gemini emits AfterTool. `patch` is Hermes
+    # only. Ordered first because the overlapping name would otherwise be
+    # claimed by the branch below.
+    if event_name in {"pre_tool_call", "post_tool_call"} or tn == "patch":
+        return "hermes"
     if tn in {"write_file", "replace"} or event_name == "AfterTool":
         return "gemini-cli"
     return "agent-tool"

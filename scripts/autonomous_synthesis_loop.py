@@ -53,6 +53,15 @@ DEFER_SCAN_FACTOR = 5
 
 DEFERRED_PREFIX = "DEFERRED::"
 
+# A source we could not READ is not a source we processed. This used to return
+# a plain "Error reading file: ..." string, which contains neither the deferral
+# prefix nor "LLM Extraction Failed", so the caller's two guards both missed it
+# and stage_draft() recorded the error text as the file's extracted semantics.
+# A later --commit then wrote a completed knowledge_distillation whose entire
+# content was an I/O error, and the file was thereafter treated as processed.
+# Invalid UTF-8, a permissions change or a transient network share is enough.
+UNREADABLE_PREFIX = "UNREADABLE::"
+
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -100,8 +109,8 @@ def extract_semantics(file_path: Path, model: str, force_full: bool = False) -> 
     """
     try:
         content = file_path.read_text(encoding="utf-8")
-    except Exception as e:
-        return f"Error reading file: {e}"
+    except Exception as e:  # noqa: BLE001 -- any read failure is the same verdict
+        return f"{UNREADABLE_PREFIX} {type(e).__name__}: {e}"
 
     chunk_size = 12000
     chunks = [content[i : i + chunk_size] for i in range(0, len(content), chunk_size)]
@@ -442,6 +451,10 @@ def main() -> int:
     # dropped -- reporting them is the whole point of deferring instead of
     # staging a skip marker.
     deferred: list[Path] = []
+    # Reported separately from deferrals: a deferral is "too big, re-run with
+    # --force-full", an unreadable file is "this did not open", and telling an
+    # operator the wrong one sends them to the wrong fix.
+    unreadable: list[Path] = []
     completed = 0
     attempted = 0
 
@@ -465,6 +478,18 @@ def main() -> int:
             continue
 
         insights = extract_semantics(file_path, args.model, force_full=args.force_full)
+
+        if insights.startswith(UNREADABLE_PREFIX):
+            # Unreadable is NOT completion either, and for a harder reason than
+            # a deferral: there is no content to extract, so anything staged
+            # here is fabricated. Left pending and reported, exactly like a
+            # deferral, because the next run may well read it fine.
+            unreadable.append(file_path)
+            print(
+                f"  UNREADABLE (still pending): "
+                f"{insights[len(UNREADABLE_PREFIX):].strip()}"
+            )
+            continue
 
         if insights.startswith(DEFERRED_PREFIX):
             # Deferral is NOT completion. Staging this would exclude the file
@@ -516,6 +541,15 @@ def main() -> int:
             time.sleep(20)
         else:
             time.sleep(3)
+
+    if unreadable:
+        print(f"\n{len(unreadable)} file(s) COULD NOT BE READ and stay pending:")
+        for file_path in unreadable:
+            print(f"  - {file_path.name}")
+        print(
+            "Check encoding and permissions. Nothing was staged for these: "
+            "an I/O error is not a distillation."
+        )
 
     if deferred:
         print(f"\n{len(deferred)} file(s) DEFERRED and still pending:")

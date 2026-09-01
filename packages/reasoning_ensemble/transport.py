@@ -172,8 +172,13 @@ def active_online_profile(profile: str | None = None) -> str:
         return raw
 
 
-def _online_pool(profile: str | None) -> list[dict]:
-    """Resolve the online voter pool from the gateway roster (credential-gated)."""
+def _online_pool(profile: str | None, *, check_independence: bool = True) -> list[dict]:
+    """Resolve the online voter pool from the gateway roster (credential-gated).
+
+    `check_independence=False` is for mixed mode ONLY, which appends the local
+    pool afterwards and judges the combined roster. Checking here as well would
+    refuse a pool that is independent once the local voters are added.
+    """
     prof = active_online_profile(profile)
     specs = resolve_default_voter_specs(profile=prof, include_unavailable=False)
     # The same independence bar the consensus path enforces, on the same roster
@@ -183,7 +188,8 @@ def _online_pool(profile: str | None) -> list[dict]:
     # ensemble result that assert_roster_is_independent() would have refused --
     # two views of one roster disagreeing about whether it counts as
     # independent. Honours FLOSS_ALLOW_DEGRADED_ROSTER like the consensus path.
-    assert_roster_is_independent(prof, specs)
+    if check_independence:
+        assert_roster_is_independent(prof, specs)
     pool: list[dict] = []
     for voter_id, model in specs.items():
         transport = _transport_for_model(model)
@@ -200,6 +206,32 @@ def _online_pool(profile: str | None) -> list[dict]:
     return pool
 
 
+def _independence_route(voter: dict) -> str:
+    """A route the independence check can read the surface out of.
+
+    _online_pool strips the `ollama/` prefix so the tag matches what Ollama
+    expects, and LOCAL_VOTER_POOL carries bare tags for the same reason. Handed
+    to the independence check as-is, `_derive_surface("phi4-mini:latest")`
+    returns the whole tag, so four local voters read as FOUR provider surfaces
+    and a mixed roster of nothing but local models would clear the surface bar
+    on its own. Put the transport back on when the id has no route in it.
+    """
+
+    # TRANSPORT IS THE AUTHORITY, NEVER THE ID.
+    #
+    # The first version of this keyed on "does the id contain a slash", which
+    # is the identical mistake generate() documents sixty lines above: the
+    # retained local pool's fourth entry is
+    # `hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16`, an OLLAMA tag
+    # with two slashes in it, so the heuristic read `hf.co` as a provider
+    # surface and turned four local voters into two. The `transport` field
+    # exists precisely because the wire is not derivable from the model id.
+    model = voter["model"]
+    if (voter.get("transport") or "ollama") == "ollama":
+        return f"ollama/{model}"
+    return model
+
+
 def resolve_voter_pool(
     mode: str | None = None, online_profile: str | None = None
 ) -> tuple[list[dict], str]:
@@ -208,7 +240,26 @@ def resolve_voter_pool(
     if resolved_mode == "local":
         return list(LOCAL_VOTER_POOL), resolved_mode
     if resolved_mode == "mixed":
-        return _online_pool(online_profile) + list(LOCAL_VOTER_POOL), resolved_mode
+        # JUDGE THE POOL THAT ACTUALLY VOTES.
+        #
+        # _online_pool() raised before the local voters were appended, so a
+        # credential-filtered online subset that is narrow ON ITS OWN refused
+        # the run -- even though the same subset plus the four Ollama voters is
+        # three surfaces and seven families, comfortably independent. Mixed
+        # mode existed precisely to make that combination available, and the
+        # only way to get it was the degraded-roster override, which says the
+        # opposite of what is true about that roster.
+        #
+        # The check moves to the combined pool. Nothing is skipped: this is the
+        # same bar on a strictly larger roster.
+        combined = _online_pool(online_profile, check_independence=False) + list(
+            LOCAL_VOTER_POOL
+        )
+        assert_roster_is_independent(
+            active_online_profile(online_profile),
+            {voter["voter_id"]: _independence_route(voter) for voter in combined},
+        )
+        return combined, resolved_mode
     if resolved_mode in {"", "online"}:
         return _online_pool(online_profile), "online"
     # An unknown mode is a configuration error, not a request for the default.

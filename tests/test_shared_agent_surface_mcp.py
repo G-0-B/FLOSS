@@ -36,6 +36,7 @@ def env_ref(name: str) -> str:
     """
     return f"%{name}%" if os.name == "nt" else f"${name}"
 
+
 def test_classify_transport_stdio():
     transport, spec = mas.classify_transport(
         "serena", {"command": "januscope", "args": ["--config", "x.yaml"]}
@@ -1129,3 +1130,33 @@ def test_materialize_reports_clear_error_for_hermes_config_path_that_is_a_direct
 
     with pytest.raises(mas.SharedSurfaceError, match="Hermes config"):
         mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
+
+
+def test_opencode_remote_projection_keeps_its_headers():
+    """classify_transport() validates and returns the header map, and the
+    OpenCode branch emitted only type and url -- so an MCP whose auth lives in
+    an Authorization header was projected as an unauthenticated server. It
+    parses, it installs, and it fails at connect time against a config file
+    that looks correct, with nothing in it to suggest anything was removed.
+    """
+    projected = mas.convert_mcp_server_to_opencode(
+        "authed",
+        {
+            "type": "http",
+            "url": "https://example.invalid/mcp",
+            "headers": {"Authorization": "Bearer token-value"},
+        },
+    )
+
+    assert projected["type"] == "remote"
+    assert projected["url"] == "https://example.invalid/mcp"
+    assert projected["headers"] == {"Authorization": "Bearer token-value"}
+
+
+def test_opencode_remote_projection_omits_absent_headers():
+    """An unauthenticated server must not gain an empty headers key."""
+    projected = mas.convert_mcp_server_to_opencode(
+        "plain", {"type": "http", "url": "https://example.invalid/mcp"}
+    )
+
+    assert projected == {"type": "remote", "url": "https://example.invalid/mcp"}

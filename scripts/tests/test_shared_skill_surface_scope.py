@@ -216,6 +216,68 @@ def test_the_shipped_manifest_uses_portable_separators_and_declares_scope():
         assert cfg.get("scope") in {"repo", "user"}, f"{name} must declare a scope"
         if cfg.get("scope") == "repo":
             continue
-        assert not install_path.startswith("C:/"), (
-            f"{name} hardcodes an absolute Windows path; use a platform variable"
-        )
+        assert not install_path.startswith(
+            "C:/"
+        ), f"{name} hardcodes an absolute Windows path; use a platform variable"
+
+
+def test_a_withdrawn_skill_projection_is_removed(tmp_path):
+    """The materializer visited only skills still IN the registry, so a
+    withdrawn or renamed skill kept its installed directory forever and
+    --check reported no drift -- the one signal an operator acts on said the
+    surface matched the manifest while agents went on discovering and running
+    instructions that had been deliberately retracted."""
+    module = load_module()
+
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("old instructions", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, {"still-here"}, check=False, dry_run=False
+    )
+
+    assert drift is True
+    assert not stale.exists()
+    assert any("retired-skill" in m for m in messages)
+
+
+def test_an_unmanaged_directory_is_never_removed(tmp_path):
+    """The marker is what makes the removal safe. Anything without it belongs
+    to the operator or another tool, and this materializer has no business
+    deleting it."""
+    module = load_module()
+
+    root = tmp_path / "skills"
+    theirs = root / "someone-elses-skill"
+    theirs.mkdir(parents=True)
+    (theirs / "SKILL.md").write_text("not ours", encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, {"still-here"}, check=False, dry_run=False
+    )
+
+    assert drift is False
+    assert theirs.exists()
+    assert messages == []
+
+
+def test_check_reports_a_stale_projection_as_drift(tmp_path):
+    """--check must fail on it rather than silently agreeing the surface is
+    current; that silence is the whole defect."""
+    module = load_module()
+
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=True, dry_run=False
+    )
+
+    assert drift is True
+    assert stale.exists(), "--check must not mutate"
+    assert any("DRIFT" in m for m in messages)

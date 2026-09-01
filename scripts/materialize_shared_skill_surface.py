@@ -192,7 +192,7 @@ def assert_repo_scope_stays_inside(
         raise SkillSurfaceError(
             f"Target {target_name!r} declares scope 'repo' but its install_path "
             f"resolves to {resolved}, outside {root}. Writing outside the "
-            "repository is user scope: declare `\"scope\": \"user\"` and pass "
+            'repository is user scope: declare `"scope": "user"` and pass '
             "--include-user-scope."
         ) from None
 
@@ -409,6 +409,55 @@ def remove_path(path: Path) -> None:
     path.unlink()
 
 
+def prune_stale_projections(
+    target_name: str,
+    target_root: Path,
+    expected: set[str],
+    *,
+    check: bool,
+    dry_run: bool,
+) -> tuple[list[str], bool]:
+    """Remove managed projections whose skill has left the manifest.
+
+    The materializer only ever visited skills still IN the registry, so a
+    withdrawn or renamed skill kept its installed directory forever and
+    `--check` reported no drift -- the one signal an operator would act on said
+    the surface matched the manifest while agents went on discovering and
+    executing instructions that had been deliberately retracted. Renames were
+    the worst shape: the new name installs beside the old one and both are
+    live.
+
+    ONLY directories carrying MANAGED_MARKER are touched. Everything else under
+    the target root belongs to the operator or another tool, and this
+    materializer has no business deleting it -- the marker is what makes the
+    removal safe, and it is why enumerating here is possible at all.
+    """
+
+    results: list[str] = []
+    drift_found = False
+    if not target_root.exists():
+        return results, drift_found
+
+    for child in sorted(target_root.iterdir()):
+        if not child.is_dir() or child.name in expected:
+            continue
+        if not (child / MANAGED_MARKER).is_file():
+            # Unmanaged. Not ours, and silence is the correct behaviour.
+            continue
+        drift_found = True
+        if check:
+            results.append(
+                f"DRIFT {target_name}: {child.name} is an installed managed "
+                f"projection with no skill in the manifest (withdrawn or renamed)"
+            )
+        elif dry_run:
+            results.append(f"would remove {target_name}: {child.name} (stale)")
+        else:
+            remove_path(child)
+            results.append(f"removed {target_name}: {child.name} (stale)")
+    return results, drift_found
+
+
 def install_skill_projection(
     target_name: str,
     skill: dict[str, Any],
@@ -491,8 +540,17 @@ def materialize(
     results.append(message)
     drift_found = drift_found or changed
 
+    expected_names = {skill["skill_name"] for skill in registry["skills"]}
     for target_name, root in writable.items():
         target_root = Path(root)
+        # Prune BEFORE installing. A rename drops the old name and adds the new
+        # one in the same manifest edit, and pruning afterwards would be racing
+        # a directory this run has just written.
+        messages, changed = prune_stale_projections(
+            target_name, target_root, expected_names, check=check, dry_run=dry_run
+        )
+        results.extend(messages)
+        drift_found = drift_found or changed
         for skill in registry["skills"]:
             messages, changed = install_skill_projection(
                 target_name,
@@ -521,7 +579,7 @@ def parse_args() -> argparse.Namespace:
         "--include-user-scope",
         action="store_true",
         help=(
-            "also write targets declaring `\"scope\": \"user\"`, which live "
+            'also write targets declaring `"scope": "user"`, which live '
             "outside the repository (e.g. ~/.codex/skills)"
         ),
     )

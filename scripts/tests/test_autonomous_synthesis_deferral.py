@@ -293,3 +293,48 @@ def test_a_dry_run_under_a_larger_limit_still_previews_up_to_it(
     assert module.main() == 0
 
     assert capsys.readouterr().out.count("[DRY RUN]") == 3
+
+
+def test_an_unreadable_file_is_never_staged(tmp_path, capsys, monkeypatch):
+    """A read failure returned a plain "Error reading file: ..." string, which
+    contains neither DEFERRED_PREFIX nor "LLM Extraction Failed", so both of
+    the caller's guards missed it and stage_draft() recorded the I/O error as
+    the file's extracted semantics. A later --commit then wrote a completed
+    knowledge_distillation whose entire content was that error, and the file
+    was thereafter treated as processed with nothing extracted from it.
+    """
+    module = load_module()
+
+    doc = tmp_path / "broken.md"
+    doc.write_bytes(b"\xff\xfe not utf-8 \xff")
+
+    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: [doc])
+    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
+
+    def _fail_if_staged(*a, **k):
+        raise AssertionError("an unreadable file must never be staged")
+
+    monkeypatch.setattr(module, "stage_draft", _fail_if_staged)
+    monkeypatch.setattr(sys, "argv", ["autonomous_synthesis_loop.py", "--limit", "1"])
+
+    assert module.main() == 0
+
+    out = capsys.readouterr().out
+    assert "COULD NOT BE READ" in out
+    assert doc.name in out
+
+
+def test_the_unreadable_marker_is_distinct_from_the_deferral_marker(tmp_path):
+    """A deferral says 're-run with --force-full'; an unreadable file says
+    'check encoding and permissions'. Sending an operator to the wrong fix is
+    the reason these are two markers and not one."""
+    module = load_module()
+
+    doc = tmp_path / "broken.md"
+    doc.write_bytes(b"\xff\xfe\x00")
+
+    result = module.extract_semantics(doc, "groq/irrelevant")
+
+    assert result.startswith(module.UNREADABLE_PREFIX)
+    assert not result.startswith(module.DEFERRED_PREFIX)
+    assert "LLM Extraction Failed" not in result

@@ -954,6 +954,25 @@ def _derive_surface(model: str) -> str:
     return model.strip().lower().split("/", 1)[0] or model.strip().lower()
 
 
+def _unverified_family(model: str) -> str:
+    """Lineage key for a model the probe index has never seen.
+
+    The mirror of `_derive_surface`: that keeps the provider prefix and drops
+    the rest, this drops the prefix and keeps the rest. `groq/openai/x` and
+    `nvidia/openai/x` are the same weights behind two vendors, so they are ONE
+    unverified family -- counting the full route made four such routes clear a
+    four-family independence bar.
+
+    Named `unverified:` because it remains a claim: two providers can also
+    publish the same model under different suffixes, which this cannot see. It
+    is the conservative direction for the case that actually occurs.
+    """
+
+    text = model.strip().lower()
+    provider, _, rest = text.partition("/")
+    return f"unverified:{rest or provider}"
+
+
 def _model_index() -> dict[str, dict[str, str]]:
     """Model id -> {family, surface} from the registry's probe record."""
     try:
@@ -1008,20 +1027,50 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
         index[model]["surface"] if model in index else _derive_surface(model)
         for model in models
     }
-    # Family is a claim about the model's lineage and cannot be parsed out of an
-    # id, so an unclassified model counts as its own family and is named as
-    # unverified. That is weaker than a probed family -- two ids could be the
-    # same model behind two vendors -- which is exactly why the warning below
-    # exists and why the refusal message lists them.
+    # LINEAGE IS THE ROUTE MINUS ITS PROVIDER, NOT THE WHOLE ROUTE.
+    #
+    # An unclassified model used to count as its own family keyed on the FULL
+    # route, so `groq/openai/x`, `nvidia/openai/x`, `openrouter/openai/x` and
+    # `huggingface/openai/x` -- one model behind four vendors -- cleared a
+    # four-family bar and the gateway reported it as independent consensus.
+    #
+    # Collapsing every unclassified model into one bucket fixes that case and
+    # breaks the one this accounting exists for: a custom FLOSS_VOTER_ROSTER of
+    # four genuinely different models across four providers would be refused,
+    # which is the exact regression the unclassified branch was added to undo.
+    # Both cases are real, and they differ in the SUFFIX, not the count.
+    #
+    # So the unverified family key is the route with its provider prefix
+    # stripped -- the mirror of _derive_surface, which keeps the prefix and
+    # discards the rest. Four routes to `openai/x` are one family; four routes
+    # to four different models are four. Still a claim rather than a probe --
+    # two vendors can rename the same weights -- which is why these stay named
+    # `unverified:` and why the warning below names every one of them.
+    # AN UNPROBED TWIN OF A PROBED MODEL INHERITS ITS FAMILY.
+    #
+    # Otherwise `groq/openai/x` (probed) and `nvidia/openai/x` (not) count as
+    # two families for one model, so three probed families plus one unprobed
+    # twin of any of them reaches four and passes -- the same false claim this
+    # fix is closing, one step further along. The probe index is keyed by full
+    # route, so the lineage suffix is what joins them.
+    probed_by_lineage = {
+        _unverified_family(known): meta["family"] for known, meta in index.items()
+    }
     families = {index[model]["family"] for model in models if model in index}
-    families |= {f"unverified:{model}" for model in unclassified}
+    for model in unclassified:
+        lineage = _unverified_family(model)
+        families.add(probed_by_lineage.get(lineage, lineage))
 
     if unclassified:
+        grouped = sorted({_unverified_family(m) for m in unclassified})
         print(
             f"[voters] independence check: {len(unclassified)} model(s) absent "
-            f"from the registry probe index, counted as distinct unverified "
-            f"families: {', '.join(unclassified)}. Probe them into "
-            f"{VOTER_REGISTRY_PATH.name} to have their real family counted.",
+            f"from the registry probe index: {', '.join(unclassified)}. "
+            f"Counted as {len(grouped)} unverified lineage(s) keyed on the "
+            f"route minus its provider ({', '.join(grouped)}); routes to the "
+            f"same model through different providers are ONE family. Probe "
+            f"them into {VOTER_REGISTRY_PATH.name} to have their real "
+            f"families counted.",
             file=sys.stderr,
         )
 
@@ -1038,7 +1087,8 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
         f"bar of >={MIN_INDEPENDENT_SURFACES} surfaces and "
         f">={MIN_INDEPENDENT_FAMILIES} families. Voters resolved: "
         f"{sorted(resolved)}. Models absent from the probe index, counted as "
-        f"unverified families: {unclassified or 'none'}. "
+        f"unverified lineages keyed on the route minus its provider: "
+        f"{unclassified or 'none'}. "
         f"Load the missing provider credentials, choose a "
         f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
         "accept that the result is not independent consensus."

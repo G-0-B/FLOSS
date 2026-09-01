@@ -79,17 +79,17 @@ def test_local_profile_note_still_explains_its_unprobed_model(registry, model_in
     if all(m in model_index for m in local_models):
         pytest.skip("local profile now uses probed models; exemption can be revisited")
     note = registry["_probe"].get("local_profile_note", "")
-    assert note.strip(), (
-        "the local profile names an unprobed model and no longer says why"
-    )
+    assert (
+        note.strip()
+    ), "the local profile names an unprobed model and no longer says why"
 
 
 @pytest.mark.parametrize("profile_name", sorted(EXEMPT_PROFILES))
 def test_exempt_profiles_are_still_declared_in_the_registry(profile_name, registry):
     """An exemption for a profile that no longer exists is stale bookkeeping."""
-    assert profile_name in registry["profiles"], (
-        f"{profile_name!r} is exempted here but absent from the registry"
-    )
+    assert (
+        profile_name in registry["profiles"]
+    ), f"{profile_name!r} is exempted here but absent from the registry"
 
 
 def test_nontrivial_profiles_meet_the_independence_rule(registry, model_index):
@@ -275,3 +275,76 @@ def test_the_refusal_names_the_unverified_models(monkeypatch):
     message = str(excinfo.value)
     assert "openrouter" in message, "the single surface must be named"
     assert "unverified" in message
+
+
+# One model behind four vendors is one family, not four.
+SAME_LINEAGE_FOUR_SURFACES = {
+    "a": "groq/openai/gpt-oss-120b",
+    "b": "nvidia/openai/gpt-oss-120b",
+    "c": "openrouter/openai/gpt-oss-120b",
+    "d": "huggingface/openai/gpt-oss-120b",
+}
+
+
+def test_one_unprobed_model_behind_four_vendors_is_not_four_families(monkeypatch):
+    """Keying an unverified family on the FULL route made this roster clear the
+    four-family bar while being one model, and the gateway reported it as
+    independent consensus. Four provider surfaces is true here; four families
+    is not, and only the second one is a claim about disagreement.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", SAME_LINEAGE_FOUR_SURFACES)
+
+
+def test_the_same_lineage_refusal_says_it_grouped_them(monkeypatch):
+    """An operator staring at four different-looking ids needs to be told why
+    they counted as one."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    problem = voters.roster_independence_problem("balanced", SAME_LINEAGE_FOUR_SURFACES)
+
+    assert problem is not None
+    # ONE family, not two: `groq/openai/gpt-oss-120b` IS in the probe index, so
+    # its three unprobed twins inherit its probed family rather than adding an
+    # `unverified:` one beside it. Counting them separately would let three
+    # probed families plus one unprobed twin reach the bar.
+    assert "1 model family" in problem, problem
+    assert "gpt-oss-120b" in problem
+
+
+def test_different_unprobed_models_on_one_surface_are_still_one_surface(monkeypatch):
+    """The surface half must not be collapsed with the family half: surfaces
+    ARE derivable from the route without a probe, so they keep counting
+    per-model."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    problem = voters.roster_independence_problem("balanced", CUSTOM_NARROW)
+
+    assert problem is not None
+    assert "1 provider surface(s)" in problem
+
+
+def test_unverified_family_keys_drop_only_the_provider():
+    """The mirror of _derive_surface. Asserted directly because the whole
+    finding turns on which half of the route is the lineage."""
+    voters = _voters_module()
+
+    assert (
+        voters._unverified_family("groq/openai/gpt-oss-120b")
+        == "unverified:openai/gpt-oss-120b"
+    )
+    assert voters._unverified_family(
+        "nvidia/openai/gpt-oss-120b"
+    ) == voters._unverified_family("groq/openai/gpt-oss-120b")
+    assert voters._unverified_family(
+        "openrouter/meta-llama/llama-4-70b"
+    ) != voters._unverified_family("together/deepseek-ai/deepseek-v4")
+    # A bare local tag has no provider to drop.
+    assert (
+        voters._unverified_family("phi4-mini:latest") == "unverified:phi4-mini:latest"
+    )
