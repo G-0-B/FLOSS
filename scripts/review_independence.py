@@ -71,11 +71,13 @@ def load_review(path: Path) -> dict[str, Any]:
     # a model has no introspective access to its own deployment identity, so
     # `model_self_reported` is a claim to be recorded and disagreed with, not an
     # identifier. `model` is accepted as a legacy alias.
-    selected = (
-        reviewer.get("model_selected") or reviewer.get("model") or "?"
-    )
+    selected = reviewer.get("model_selected") or reviewer.get("model") or "?"
     harness = reviewer.get("harness")
-    label = f"{selected}@{harness}" if harness else (selected if selected != "?" else path.stem)
+    label = (
+        f"{selected}@{harness}"
+        if harness
+        else (selected if selected != "?" else path.stem)
+    )
     return {
         "label": str(label),
         "path": path,
@@ -103,9 +105,7 @@ def finding_key(finding: dict[str, Any]) -> str:
     return f"{location}::{claim}" if location else claim
 
 
-def apply_merge(
-    reviews: list[dict], merge_map: dict[str, str]
-) -> None:
+def apply_merge(reviews: list[dict], merge_map: dict[str, str]) -> None:
     """Rewrite finding keys through an operator-supplied equivalence map."""
 
     for review in reviews:
@@ -169,7 +169,9 @@ def kish_neff(vectors: list[list[int]]) -> tuple[float, float, int]:
     return k / denominator, mean_phi, len(values)
 
 
-def power_iteration_max_eigenvalue(matrix: list[list[float]], steps: int = 500) -> float:
+def power_iteration_max_eigenvalue(
+    matrix: list[list[float]], steps: int = 500
+) -> float:
     """Largest eigenvalue of a symmetric matrix, for the n_eff = k/lambda_max check.
 
     Power iteration rather than numpy: this repository declares no numeric stack,
@@ -212,26 +214,56 @@ def build_matrix(reviews: list[dict]) -> tuple[list[str], list[list[int]]]:
 
 
 def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
-    # A reviewer who raised nothing has no variance, so it contributes no
-    # pairwise phi -- but it still counts toward k, and k appears in the
-    # numerator of the Kish formula. A null reviewer therefore INFLATES n_eff
-    # and flatters the panel. The docstring named this risk; a named risk with
-    # no guard is how every other defect in this repository started.
-    empty = [review for review in reviews if not review["findings"]]
-    if empty:
-        for review in empty:
-            print(
-                f"excluding {review['label']}: no findings. A reviewer who "
-                f"raised nothing cannot be correlated with anyone and would "
-                f"raise n_eff by sitting in k.",
-                file=sys.stderr,
-            )
-        reviews = [review for review in reviews if review["findings"]]
+    # CONSTANT MEANS UNMEASURABLE, AND ALL-ONES IS CONSTANT TOO.
+    #
+    # phi() returns NaN for either constant case and says so in its own
+    # comment; kish_neff() then drops those pairs from the mean but the
+    # reviewer stays in k, which sits in the numerator AND in the (k - 1) term.
+    # So an unmeasurable reviewer inflates n_eff and flatters the panel.
+    #
+    # This guard used to exclude only reviewers who raised NOTHING. The
+    # symmetric case -- a reviewer who raised EVERY finding in the union -- is
+    # the more likely one in practice, because a broad automated reviewer run
+    # against a narrow union produces exactly that, and it is the case phi()
+    # explicitly warns about: reading it as 0.0 would say "independent" when
+    # the truth is "cannot be told apart from anyone".
+    #
+    # Iterated, because removing a reviewer removes the keys only it raised,
+    # which can make a survivor's vector constant in turn. One pass fixed the
+    # reviewer in front of it and left the panel it created unexamined.
+    while True:
+        keys, vectors = build_matrix(reviews)
+        if not keys or len(reviews) < 2:
+            break
+        constant = [i for i, vector in enumerate(vectors) if len(set(vector)) == 1]
+        if not constant:
+            break
+        for index in constant:
+            review = reviews[index]
+            if not review["findings"]:
+                reason = (
+                    "raised nothing, so it cannot be correlated with anyone "
+                    "and would raise n_eff by sitting in k"
+                )
+            else:
+                reason = (
+                    f"raised all {len(keys)} findings in the union, so its "
+                    "vector has no variance; phi is undefined against every "
+                    "other reviewer and it would raise n_eff by sitting in k"
+                )
+            print(f"excluding {review['label']}: {reason}.", file=sys.stderr)
+        dropped = set(constant)
+        reviews = [
+            review for index, review in enumerate(reviews) if index not in dropped
+        ]
 
     keys, vectors = build_matrix(reviews)
     k = len(reviews)
     if k < 2:
-        print("Need at least two reviews to measure independence.")
+        print(
+            "Need at least two reviews with measurable variance to measure "
+            "independence."
+        )
         return 2
     if not keys:
         print("No findings across any review; nothing to measure.")
@@ -245,13 +277,24 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
     shared_findings = sum(1 for c in overlap_counts if c > 1)
     overlap_rate = shared_findings / len(keys) if keys else 0.0
     correlation = [
-        [1.0 if i == j else (0.0 if math.isnan(phi(vectors[i], vectors[j]))
-                             else phi(vectors[i], vectors[j]))
-         for j in range(k)]
+        [
+            (
+                1.0
+                if i == j
+                else (
+                    0.0
+                    if math.isnan(phi(vectors[i], vectors[j]))
+                    else phi(vectors[i], vectors[j])
+                )
+            )
+            for j in range(k)
+        ]
         for i in range(k)
     ]
     lambda_max = power_iteration_max_eigenvalue(correlation)
-    eigen_neff = k / lambda_max if lambda_max and not math.isnan(lambda_max) else float("nan")
+    eigen_neff = (
+        k / lambda_max if lambda_max and not math.isnan(lambda_max) else float("nan")
+    )
 
     print(f"Reviewers (k):        {k}")
     print(f"Distinct findings:    {len(keys)}")
@@ -277,9 +320,21 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
             f"construction. Reviewers word the same defect differently."
         )
         print("  Do a human merge pass and re-run with --merge.")
-        REFUSED = True
+        # REFUSED WAS A LOCAL NOBODY READ.
+        #
+        # This branch printed "the formula returns a finite number that is
+        # meaningless" and the function returned 0 regardless, so a refusal was
+        # indistinguishable from a measurement to anything reading the exit
+        # code. Ruff had been reporting the dead assignment (F841) the whole
+        # time. A tool whose purpose is to refuse an untrustworthy number must
+        # be able to say so in the one channel a caller reads -- this repo's
+        # own governance notes record a corpus where it "refuses to report
+        # n_eff, correctly", and that refusal was advisory only.
+        #
+        # 2, the same code the other cannot-measure exits already use.
+        refused = True
     else:
-        REFUSED = False
+        refused = False
         print(f"n_eff (Kish):         {n_eff:.2f}")
         print(f"n_eff (eigenvalue):   {eigen_neff:.2f}")
         ratio = n_eff / k if k else float("nan")
@@ -405,7 +460,7 @@ def report(reviews: list[dict], adjudication: dict[str, Any] | None) -> int:
             "n_eff describes redundancy among findings that were raised; it says "
             "nothing about what everyone missed."
         )
-    return 0
+    return 2 if refused else 0
 
 
 def main(argv: list[str] | None = None) -> int:

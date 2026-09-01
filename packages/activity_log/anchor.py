@@ -310,6 +310,34 @@ def scan_packets(provenance_root: Path) -> tuple[list[PacketLeaf], list[dict]]:
                 }
             )
             continue
+        # NONNEGATIVE, AND SPELLED THE ONE WAY.
+        #
+        # The bound below was upper-only, so `int()` admitted "-1" as a normal
+        # Merkle leaf: publish counted the schema-invalid file as a packet,
+        # emitted an identity summary with max_seq -1, and left it OUT of the
+        # signed unreadable set -- so a later verify reported the anchor intact
+        # and nothing named the malformed entry. The same guard already exists,
+        # written correctly, at the retained-anchor reader below (`top < 0 or
+        # top > MAX_SEQUENCE`); this is the sibling path that never got it.
+        #
+        # Canonical spelling matters beyond tidiness because the leaf binds
+        # `s` as a STRING (see leaf_preimage). "+1", "01", "1_0" and Unicode
+        # digits all int() to the same slot while producing different leaves,
+        # so admitting them lets one chain position occupy several leaves in a
+        # signed tree. Requiring `sequence == str(slot)` rejects every one of
+        # those with a single comparison.
+        if slot < 0 or sequence != str(slot):
+            unreadable.append(
+                {
+                    "path": _relative(path, provenance_root),
+                    "error": (
+                        f"noncanonical sequence {sequence!r}; a chain position "
+                        "is a nonnegative integer with one spelling"
+                    ),
+                    "sha256": _file_digest(path),
+                }
+            )
+            continue
         # A SEQUENCE IS A CHAIN POSITION, NOT AN ARBITRARY INTEGER.
         #
         # `int()` accepts any decimal, and the per-identity summary below

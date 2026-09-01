@@ -1787,3 +1787,79 @@ def test_the_upgrade_reads_the_proof_inside_the_lock():
     inner = source.split("def _witness_upgrade_locked(", 1)[1].split("\ndef ", 1)[0]
     for step in ("read_bytes", "upgrade_proof", "_write_atomic"):
         assert step in inner, f"{step} is outside the upgrade lock"
+
+
+def _resign_with_sequence(path: Path, sequence: str) -> None:
+    """Rewrite a packet's `s` and re-derive its SAID so it is genuinely valid.
+
+    Through anchor_lib's own `_said_digest`, not a hand-rolled second
+    implementation. The version of this fixture written first hashed the
+    document directly, produced a SAID the scanner rejected, and would have
+    "passed" every noncanonical case for the wrong reason -- the sequence guard
+    fires before the SAID check, so the fixture's own invalidity was invisible
+    until a case was added that had to get PAST the sequence guard. The
+    existing implausible-sequence test above has the same hand-rolled shape and
+    is protected by the same accident.
+    """
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["s"] = sequence
+    document["sigs"] = []
+    document["d"] = anchor_lib._said_digest(document)
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "sequence",
+    [
+        "-1",  # int() accepts it and the bound was upper-only
+        "+1",  # same slot, different leaf preimage
+        "01",  # same
+        "1_0",  # Python's underscore separators reach int() too
+    ],
+)
+def test_a_noncanonical_sequence_is_damage_not_a_chain_position(tmp_path, sequence):
+    """The bound was upper-only, so "-1" became an ordinary Merkle leaf: it was
+    counted as a packet, produced an identity summary with max_seq -1, and was
+    left OUT of the signed unreadable set -- so a later verify called the
+    anchor intact and nothing named the malformed entry.
+
+    Spelling matters beyond tidiness because leaf_preimage binds `s` as a
+    STRING: "+1", "01" and "1_0" all int() to the same slot while producing
+    different leaves, so admitting them lets one chain position occupy several
+    leaves in a signed tree.
+    """
+    store = tmp_path / "provenance"
+    _, path = provenance.create_packet(
+        [{"kind": "note", "detail": "d"}],
+        identity_dir=tmp_path / "id",
+        output_root=store,
+    )
+    _resign_with_sequence(path, sequence)
+
+    leaves, unreadable = anchor_lib.scan_packets(store)
+
+    assert leaves == [], f"{sequence!r} became a leaf"
+    assert any(
+        "noncanonical sequence" in entry["error"] for entry in unreadable
+    ), unreadable
+    assert any(entry.get("sha256") for entry in unreadable), (
+        "damage must carry a digest, or the signed unreadable set cannot "
+        "commit to what was wrong"
+    )
+
+
+def test_a_canonical_sequence_is_still_a_leaf(tmp_path):
+    """Fail-closed must not reject the ordinary case: every real packet's `s`
+    is the canonical decimal of a nonnegative int."""
+    store = tmp_path / "provenance"
+    _, path = provenance.create_packet(
+        [{"kind": "note", "detail": "d"}],
+        identity_dir=tmp_path / "id",
+        output_root=store,
+    )
+    _resign_with_sequence(path, "7")
+
+    leaves, unreadable = anchor_lib.scan_packets(store)
+
+    assert unreadable == []
+    assert [leaf.sequence for leaf in leaves] == [7]
