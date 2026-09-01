@@ -1,13 +1,19 @@
-# What thirty-two review rounds taught, 2026-08-31
+# What forty-one review rounds taught, 2026-08-31
 
 **Truth status:** ✅ Verified — every claim here is traceable to a commit on
 `reconcile/pr38-salvage-20260817` (PR #41), a review thread on that PR, or a
 test in the tree. Nothing is inferred.
 
-**Scope.** One continuous session: 32 commits from `08619f0` to `a8afdf5`,
-25 files, +5,732/−351 lines, test suite 908 → 959. Roughly 35 review findings
-from two independent reviewers plus 7 from a cold read. Every finding was
-valid; none was rejected as wrong.
+**Scope.** One continuous session: 41 commits from `08619f0` to `8ab23a3`,
+32 files, +7,660/−517 lines, test suite 908 → 984. Roughly 49 review
+findings from three independent reviewers plus 7 from a cold read. Every
+finding was valid; none was rejected as wrong.
+
+**Why it ends here.** Not because the findings stopped. Codex exhausted its
+review quota for this PR, so the lens that produced the large majority of them
+went offline mid-loop and the last four fixes have been reviewed by nothing.
+The loop terminated by running out of reviewer, not by converging — which is
+the honest reading of every convergence claim below.
 
 **Relationship to existing docs.** This EXTENDS
 `2026-08-25-provenance-failure-mode-register.md`, which holds FM-1..FM-8 and
@@ -19,14 +25,16 @@ Skill-level observations 1..11 live in the operator's observation log
 
 ## 1. The headline number
 
-**Of ~35 findings, 29 were defects in fixes made earlier in the same session.**
+**Of ~49 findings, 41 were defects in fixes made earlier in the same session.**
 
-Nine consecutive rounds found nothing but consequences of the previous round.
-The rate did not fall as the work went on. It fell only when a reviewer moved
-one level down the stack — see FM-9.
+Fifteen consecutive rounds found nothing but consequences of the previous
+round. The rate did not fall as the work went on. It fell in exactly one
+place: the component whose *mechanism* was replaced stopped producing findings
+entirely, while its neighbour — same file, same session, same reviewers, but
+still hand-rolled — kept producing them to the last commit. See FM-9.
 
 That number is the reason this document exists. A green suite, a clean linter
-and a passing spec-gate were true at every one of those 32 commits.
+and a passing spec-gate were true at every one of those 41 commits.
 
 ---
 
@@ -61,6 +69,45 @@ one below:
 
 Two consecutive findings at the policy layer is the signal to go down a level.
 
+**The prediction was then tested, in the same session, by accident.** Round 8
+replaced the mechanism outright: file-existence locking became an OS lock
+(`flock` / `msvcrt`), so the kernel releases on process death and there is no
+liveness policy left to get wrong. The stale-window parameter added in round 5
+is still accepted and deliberately ignored.
+
+Over the six rounds that followed, `filelock.py` was edited three more times
+and the daemon's hand-rolled pid-file claim protocol six. **None of the
+three lock edits was a locking-correctness defect:**
+
+| Commit | Change to `filelock.py` | Was the lock wrong? |
+|--------|--------------------------|---------------------|
+| `4861d00` | Create the file `0o600`, not `0o644` | No — a permissions class, from CodeQL |
+| `c9b6478` | `inspect_for_reclaim` also returns `(st_dev, st_ino)` | No — an addition serving the daemon's protocol |
+| `ec0170e` | Added a `held()` context manager | No — a call-site ergonomics helper |
+
+Zero race conditions, zero liveness defects, zero stale-reclamation defects
+after the mechanism changed — having produced six consecutive rounds of
+exactly those before it. The claim protocol next door, reviewed by the same
+reviewers over the same rounds, produced six more and was still producing them
+in the last commit before the reviewer ran out of quota.
+
+State the result precisely, because the loose version is false: the lock did
+not stop being edited. **The class of defect disappeared.** That is what going
+down a layer buys — not fewer changes, but the elimination of a whole family
+of failure, because the family is no longer expressible.
+
+And the comparison argues against a reading it might otherwise invite: the six
+rounds spent on the claim protocol were not careless. Each fix was correct. The
+protocol reimplements, in application code and across process invocations, what
+an OS lock provides — and it cannot simply adopt one, because the claim has to
+outlive the process that makes it. That is a genuinely different requirement,
+and no OS primitive offers it. So:
+
+> **Going down a layer is only available when a layer below exists.** When it
+> does not, a long tail of findings is the correct expectation, and the
+> decision to make is whether the feature is worth its tail — not how to be
+> more careful.
+
 ### FM-10 — Extending a function's domain silently re-scopes every branch in it
 
 `_reclaim_claim_if_unchanged()` was written for pid files, then also used for
@@ -91,6 +138,22 @@ Three instances in `anchor.py`, each found separately:
 
 In all three the proof was already in the same document; the guard asked the
 cheaper question.
+
+Two more instances landed after this was first written, and they run in
+opposite directions — which is what makes the pair useful:
+
+4. **Content over identity.** Two blank reservations are byte-identical, so a
+   loser comparing contents deleted the winner's claim. Fixed by comparing
+   `(st_dev, st_ino)`.
+5. **Identity over uniqueness.** Inode numbers are recycled. On ext4 a
+   reservation reclaimed and recreated at the same path gets the *same* inode,
+   so identity **and** contents matched and the winner's claim was deleted
+   again. Fixed by writing a unique token into the reservation, which made the
+   contents carry the proof after all.
+
+Neither "identity" nor "contents" is the answer. The question is what in this
+artefact is unique to this holder, and for a file the filesystem supplies
+neither guarantee for free.
 
 **Rule.** For any guard on operator- or attacker-writable data, ask what in the
 artefact cannot be forged and guard on that. `v` is a field; the signature over
@@ -164,11 +227,61 @@ the import was added anyway.**
 import path. Importing a small primitive through a heavy module is a dependency
 decision wearing a code-sharing costume. Extract the primitive.
 
+### FM-16 — A green suite on one platform is not evidence about another
+
+Three sightings this session, one per platform, none of which the other two
+platforms could have produced:
+
+| Platform | What only it showed |
+|----------|---------------------|
+| POSIX | The materializer's Hermes path resolved `%LOCALAPPDATA%` and aborted the whole run when it was unset. Passed on Windows forever. |
+| Windows | `msvcrt.locking` is **mandatory**, not advisory. Locking byte 0 made the lock file unreadable to its own token reader. No POSIX run can see this: `flock` is advisory. |
+| Linux | ext4 recycles inode numbers, so a reclaimed-and-recreated reservation matched `(st_dev, st_ino)`. Green locally on Windows; red in CI on the first push. |
+
+The Linux one is the instructive case. The defect was in production code — an
+identity comparison that a recycled inode satisfies — and the test written for
+it was correct. It simply could not discriminate on NTFS, where the inode is
+not reused, so it went green locally and red on the first CI push. A test can
+be right, targeted at the right defect, and still prove nothing on the machine
+you run it on.
+
+**Rule.** Any guard that reads filesystem metadata, environment variables, or
+lock semantics is platform-specific until proven otherwise, and "the suite is
+green" means green on the platform it ran on. Push before believing it. The
+corollary is a design rule: prefer the guarantee the OS actually offers on
+every target over the one that happens to hold on yours.
+
+### FM-17 — A fix's new state breaks the readers that test for the old one
+
+Reservations were empty files. To tell two of them apart (FM-11 axis 5) they
+gained a `RESERVED <token>` marker. Three separate defects followed from that
+one change, in three separate rounds:
+
+1. The PowerShell start script tested `$omniRaw -eq ''` and would have sent
+   every new reservation down the UNVERIFIABLE path forever. Caught before
+   landing.
+2. `--reserve-slot`'s own recovery tested emptiness, so an abandoned *marked*
+   reservation reported OCCUPIED permanently. The command that **writes** the
+   marker was the one place not updated, and the recovery added to let a dead
+   reservation be reclaimed was disabled by the marker added to tell two of
+   them apart.
+3. The token was generated inline and discarded, so `--record-identity` had
+   nothing to check and still wrote unconditionally — leaving the original
+   race (a suspended launcher overwriting the live claim that replaced it)
+   open through two rounds that were both about the marker.
+
+**Rule.** When a fix introduces a new *state* rather than new code, the diff
+points at the writer and every defect is in a reader. Grep for the old
+**predicate** — `== ''`, `is None`, `len(x) == 0` — not for the changed
+function's name, and include the function you are editing in that sweep. Then
+ask the second question: if the new state carries a capability, who has to
+receive it? A marker nobody can present is a label, not a proof.
+
 ---
 
 ## 3. Tests that could not fail
 
-**Ten instances in one session.** This is the highest-yield section here,
+**Thirteen instances in one session.** This is the highest-yield section here,
 because every one of them was counted as coverage and none of them could have
 caught the defect it was written for.
 
@@ -184,6 +297,9 @@ caught the defect it was written for.
 | 8 | Reservation ordering | Exercised the helper when the change was in the caller's ordering |
 | 9 | Summary guard (x2) | Matched the prose of the comment explaining the code, not the code |
 | 10 | Sidecar ordering | Encoded an *ordering* that later legitimately changed |
+| 11 | Lock file permissions | Matched `0o644` in the comment explaining the mode, not in the `os.open` call |
+| 12 | Sidecar clearing | Drove `_sidecar_cleared` when the change was in the caller's ordering (shape 3, again) |
+| 13 | Dry-run limit | Split the branch's source on the word `continue`, which matched the comment above the fix |
 
 ### The five shapes
 
@@ -204,6 +320,28 @@ caught the defect it was written for.
 after* describing this exact habit in a commit message. The only reliable
 counter was mechanical: run the test against the unfixed code, every time,
 without exception.
+
+**#13 is the sharpest instance, and it was written by the author of this
+section, in the round after this section was drafted, with the description of
+shape 4 on screen.** It grepped the dry-run branch's source and split it on
+the word `continue` — which matched the word inside the comment explaining the
+fix. Naming a pattern, writing it down, and publishing it does not stop you
+reproducing it an hour later.
+
+What caught it is worth stating exactly, because it was **not** the red run:
+it failed on the ordinary green run, against the fixed code, immediately. A
+prose-matching test is often self-detecting in exactly this way — the prose it
+matches is prose you are still editing, so it breaks under you. That is luck,
+not a control, and it only fires when the comment changes in the same commit.
+#9 matched prose that nobody was editing and survived.
+
+The red run's actual contribution this round was different and smaller: it
+confirmed that ten of twelve new tests discriminated, and that the two which
+passed red were the two deliberately written to prove the fix does not break
+the working path. Which is the honest limit of the control: **the red run
+tells you whether a test discriminates, not whether it tests the right thing.**
+A test can fail red for a reason unrelated to the defect. Read the failure
+message; do not just count it.
 
 **Rule.** Red-green verifies the FIXTURE, not just the fix. A test that passes
 red is not "unverified" -- it is misleading, because it is counted. The correct
@@ -231,18 +369,31 @@ re-querying. The correction only came from running the query.
 about what remains outstanding must come from the system of record, at the
 moment of the claim. Do not carry a count across turns.
 
-### CF-12 — Two reviewers, three non-overlapping lenses
+### CF-12 — Three reviewers, four non-overlapping lenses
 
 | Lens | Found |
 |------|-------|
 | Codex (deep single-file reasoning) | Guard logic, race conditions, one-path-of-two |
 | CodeRabbit (diff-wide) | Value provenance, message truthfulness, dependency coupling |
+| CodeQL (security classes) | File permissions — a class neither model reviewer inspects |
 | Cold read (whole-function, unchanged code) | Unswept siblings in code the diff never touched |
 
 **None subsumes the others.** CodeRabbit found four defects the cold read had
 walked past in a file it had just read twice. The cold read found seven that
 neither reviewer could see, because those lines were not in any diff. Codex
 found the two P1s.
+
+CodeQL was added late and is the sharpest illustration, because its finding
+was not subtle: the lock file was created world-readable. Codex and CodeRabbit
+had each reviewed that file twice by then and neither raised it — not because
+they missed it, but because "what mode is this file created with" is not a
+question either of them asks. A lens is defined by its questions, and a
+question nobody asks produces no findings at any level of reviewer attention.
+
+**And a fourth lens does not close the set.** No lens here asks about
+cross-platform semantics; all three of FM-16's sightings were found by running
+the code somewhere else, twice by accident. Enumerate what each lens asks, and
+treat the questions nobody is asking as the actual coverage gap.
 
 **Rule.** Treat "the reviewer is green" as evidence about one lens only. A cold
 read of the whole function is the only thing that inspects code the diff did
@@ -282,7 +433,7 @@ in a commit, grep the diff for every site the principle governs before pushing.
 
 ## 5. The single dominant pattern
 
-Across ~35 findings, one shape accounts for most of them:
+Across ~49 findings, one shape accounts for most of them:
 
 > **A correct mechanism attached to the wrong scope.**
 
@@ -305,6 +456,14 @@ and not to its sibling. Concrete sightings this session:
 - The summary guard added to `stop` and not to `start`.
 - The proof written before the pointer and not before the retained copy.
 - `mkdir` moved inside the guard, then moved back outside inside a new helper.
+- The publication lock placed around the scans rather than around the decision
+  it protects, which is *which child of this predecessor becomes the head*.
+- The same lock then omitted from `witness-upgrade`, which reads, calls the
+  calendars and replaces the same proof file.
+- The deferral scan cap left as the only stop condition for `--dry-run`, so the
+  limit bounded real extractions and nothing bounded previews.
+- The reservation token minted by `--reserve-slot` and never handed to
+  `--record-identity`, the one caller that needs it.
 
 **Rule (the sweep).** After any fix, before reporting it:
 
@@ -317,41 +476,60 @@ and not to its sibling. Concrete sightings this session:
 
 Steps 1 and 3 found real, worse second defects on their first uses.
 
+**The sharper form of step 2.** All four findings in the final round were the
+same sentence: *the mechanism is correct and its boundary is one step smaller
+than the property.* Not the wrong lock — the right lock around the wrong span.
+Not the wrong counter — the right counter incremented on one of two paths. So
+the question to ask of any guard is not "is this correct?" but **"name the
+property, then name the smallest region in which it can be violated, and check
+the guard covers that region and not merely the code that made you think of
+it."** The region is almost always larger than the diff.
+
 ---
 
 ## 6. What the green suite was worth
 
-At all 32 commits: tests passed, ruff was clean, `spec_gate --check` was green.
-Those signals were true and did not discriminate. Specifically:
+At all 41 commits, on the machine they were run on: tests passed, ruff was
+clean, `spec_gate --check` was green. Those signals were true where they were
+taken and did not discriminate. Specifically:
 
-- The suite grew 908 → 959 while containing, at various points, ten tests that
-  could not fail.
+- The suite grew 908 → 984 while containing, at various points, thirteen tests
+  that could not fail.
 - One commit's honest accounting was **"+0 tests"** because it replaced two
-  tests rather than adding any -- the previous count had included one that
+  tests rather than adding any — the previous count had included one that
   could never fail.
 - The most damaging defects (a signed anchor over a truncated store; two
-  writers in the sequence critical section) were invisible to every automated
-  gate in the repo.
+  writers in the sequence critical section; a launcher recording its PID over
+  another launcher's live claim) were invisible to every automated gate in the
+  repo.
+- One commit was green on the developer's platform and red in CI on the first
+  push (FM-16), so "green" was not even true of the machine it was claimed on.
 
 **Rule.** A green gate is a floor, not evidence. The things that caught real
 defects this session were: an independent reviewer, a cold read of unchanged
-code, and running each new test against the unfixed code.
+code, running each new test against the unfixed code, and running the suite on
+a second operating system.
 
 ---
 
 ## 7. What none of this fixed
 
-- **The rate did not fall.** Nine consecutive rounds of self-inflicted defects,
-  with the pattern named explicitly in commit messages throughout. Naming is
-  not mitigation.
-- **The `mcp_daemon` / `filelock` area had eleven passes** and is the least
-  trustworthy code in the branch despite -- or because of -- the attention.
-- **Seven review threads have been open all session**, untouched: three in
-  `materialize_shared_agent_surface.py`, one each in
-  `materialize_shared_skill_surface.py`, `hook_post_write.py`,
-  `autonomous_synthesis_loop.py`, plus two marked outdated. The materializer's
-  POSIX path break still breaks Linux CI.
-- **`a8afdf5` is unreviewed.** Both reviewers were exhausted when it landed.
+- **The rate did not fall.** Fifteen consecutive rounds of self-inflicted
+  defects, with the pattern named explicitly in commit messages throughout.
+  Naming is not mitigation. The single exception is FM-9's layer replacement,
+  and it worked by making a family of defects inexpressible, not by making the
+  code that expressed them better.
+- **The `mcp_daemon` claim protocol had thirteen passes** and is the least
+  trustworthy code in the branch despite — or because of — the attention. It is
+  also the one component with no layer below it to fall back on (FM-9), which
+  is the most useful thing this document can say about it.
+- **Two review threads have been open all session**, untouched: one in
+  `hook_post_write.py` and an earlier one in `autonomous_synthesis_loop.py`.
+  Earlier drafts of this document put the number at seven; that count was
+  restated from memory more than once and was wrong more than once, which is
+  its own small instance of FM-13.
+- **The last four fixes are unreviewed**, and this time not because attention
+  ran out: Codex hit its review quota for the PR. See the scope note above.
 - **The six agent-surface projections were never regenerated**, so the
   consensus (780s) and ensemble (420s) timeouts exist only in
   `shared-agent-surface.json` and no harness sees them.
