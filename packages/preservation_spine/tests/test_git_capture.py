@@ -745,13 +745,13 @@ def test_default_secret_patterns_are_case_insensitive(tmp_path: Path) -> None:
     repo = initialized_repo(tmp_path)
     secret_paths = (
         ".ENV.local",
-        "myTOKEN.txt",
-        "Credentials.json",
+        "my-TOKEN.txt",
+        "my-credential.json",
         "API_KEY.txt",
         "private.KEY",
         "wallet-recovery.txt",
         "seed-phrase.txt",
-        "MNEMONIC.md",
+        "wallet-mnemonic.md",
     )
     for relative in secret_paths:
         (repo / relative).write_bytes(b"must never enter capsule\n")
@@ -779,7 +779,7 @@ def test_tracked_secret_diff_with_pathspec_metacharacters_is_excluded(
     tmp_path: Path,
 ) -> None:
     repo = initialized_repo(tmp_path)
-    relative = ".ENV[prod].local"
+    relative = ".env.prod.local"
     secret = repo / relative
     secret.write_bytes(b"non-secret committed baseline\n")
     git(repo, "add", relative)
@@ -1172,3 +1172,26 @@ def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
     # And they must contain real diff content (blob hashes, not helper text).
     assert b"diff --git" in snapshot.staged_diff or snapshot.staged_diff == b""
     assert b"diff --git" in snapshot.unstaged_diff
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "expected_secret"),
+    [
+        (".env", True),
+        ("my-token.txt", True),
+        ("config/api_key.yaml", True),
+        ("wallet-seed.txt", True),
+        ("docs/seed.md", False),
+        ("seedling.md", False),
+        ("confluence.md", False),
+        ("README.md", False),
+        ("src/main.py", False),
+    ],
+)
+def test_secret_policy_path_component_match(
+    relative_path: str, expected_secret: bool
+) -> None:
+    """Markers match path components and their segments, not substring of
+    the whole relative path.  docs/seed.md is NOT a secret; .env IS."""
+    policy = SecretPolicy.default()
+    assert policy.is_secret(relative_path) is expected_secret
