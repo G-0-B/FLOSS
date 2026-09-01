@@ -242,18 +242,20 @@ def _handle_verify(args: argparse.Namespace) -> int:
                 )
                 return 1
             existing = _load_verification(state_dir)
-            eligible = _verification_inventory_eligible(existing)
+            authenticated = _verification_authenticated(existing)
+            releasable = _verification_releasable(existing)
             _emit_json(
                 {
                     "phase": "verification-complete",
                     "status": existing.status.value,
-                    "inventory_eligible": eligible,
+                    "inventory_eligible": authenticated,
+                    "containment_eligible": releasable,
                     "verification_digest": digest,
                     "idempotent": True,
                     "next_safe_command": latest.next_safe_command,
                 }
             )
-            return 0 if eligible else 1
+            return 0 if authenticated else 1
 
     restore_root = _new_directory_target(Path(args.restore))
     forbidden_roots = tuple(
@@ -269,10 +271,11 @@ def _handle_verify(args: argparse.Namespace) -> int:
         forbidden_roots=(*forbidden_roots, state_dir),
     )
     verification_digest = hashlib.sha256(canonical_json_bytes(result)).hexdigest()
-    inventory_eligible = _verification_inventory_eligible(result)
-    if inventory_eligible:
+    authenticated = _verification_authenticated(result)
+    releasable = _verification_releasable(result)
+    if authenticated:
         next_safe = "python scripts/preservation_spine.py inventory --capsule STATE_DIR"
-        blockers: tuple[str, ...] = ()
+        blockers = () if releasable else result.blockers
     else:
         next_safe = _STATUS_COMMAND
         blockers = result.blockers
@@ -301,12 +304,13 @@ def _handle_verify(args: argparse.Namespace) -> int:
         {
             "phase": checkpoint.phase,
             "status": result.status.value,
-            "inventory_eligible": inventory_eligible,
+            "inventory_eligible": authenticated,
+            "containment_eligible": releasable,
             "verification_digest": verification_digest,
             "next_safe_command": checkpoint.next_safe_command,
         }
     )
-    return 0 if inventory_eligible else 1
+    return 0 if authenticated else 1
 
 
 def _handle_inventory(args: argparse.Namespace) -> int:
@@ -316,8 +320,8 @@ def _handle_inventory(args: argparse.Namespace) -> int:
     verification_digest = hashlib.sha256(canonical_json_bytes(verification)).hexdigest()
     if latest.verification_digest != verification_digest:
         raise ValueError("inventory requires a bound verification digest")
-    if not _verification_inventory_eligible(verification):
-        raise ValueError("inventory requires an inventory-eligible verification record")
+    if not _verification_authenticated(verification):
+        raise ValueError("inventory requires an authenticated verification record (checksums bound, no FAIL planes)")
 
     manifest_path = state_dir / _MANIFEST_FILE
     manifest = inventory_change_universe(state_dir / _CAPSULE_DIRNAME)
@@ -381,9 +385,9 @@ def _handle_render_github(args: argparse.Namespace) -> int:
     digest = manifest_digest(manifest)
     if latest.manifest_digest != digest:
         raise ValueError("render-github requires an inventoried manifest")
-    if not _verification_inventory_eligible(verification):
+    if not _verification_authenticated(verification):
         raise ValueError(
-            "render-github requires an inventory-eligible verification record"
+            "render-github requires an authenticated verification record (checksums bound, no FAIL planes)"
         )
 
     evidence = Evidence(
@@ -468,9 +472,9 @@ def _handle_status(args: argparse.Namespace) -> int:
                 blockers.append("verification-capsule-root-mismatch")
             if (
                 latest.phase in _INVENTORY_PHASES
-                and not _verification_inventory_eligible(verification)
+                and not _verification_authenticated(verification)
             ):
-                blockers.append("verification-not-inventory-eligible")
+                blockers.append("verification-not-authenticated")
     if latest.phase in _INVENTORY_PHASES and latest.manifest_digest is not None:
         manifest_path = state_dir / _MANIFEST_FILE
         if not manifest_path.is_file():
@@ -710,7 +714,42 @@ def _verification_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _verification_inventory_eligible(verification: VerificationRecord) -> bool:
+def _verification_authenticated(verification: VerificationRecord) -> bool:
+    """Evidence is authentic and bound to the capsule, but may have
+    design-ineligible planes (opaque/redacted).  Sufficient for inventory
+    and render-github — those commands produce evidence artifacts, not
+    containment decisions."""
+    if not (
+        verification.checksum_status is ResultStatus.PASS
+        and verification.commit_match
+        and verification.tree_match
+        and verification.artifact_match
+        and bool(verification.planes)
+    ):
+        return False
+    # Blockers must all be from the design-ineligible set — not from
+    # actual verification failures (which would be FAIL, not BLOCKED).
+    _ineligible_only = {
+        "opaque-preservation-ineligible",
+        "redacted-evidence-ineligible",
+        "excluded-evidence-ineligible",
+    }
+    if verification.blockers and not all(
+        b in _ineligible_only for b in verification.blockers
+    ):
+        return False
+    for plane in verification.planes:
+        if plane.status is ResultStatus.FAIL:
+            return False
+        if plane.blockers and not all(
+            b in _ineligible_only for b in plane.blockers
+        ):
+            return False
+    return True
+
+
+def _verification_releasable(verification: VerificationRecord) -> bool:
+    """All planes PASS with zero blockers — required for containment."""
     return (
         verification.status is ResultStatus.PASS
         and verification.checksum_status is ResultStatus.PASS

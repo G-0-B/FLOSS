@@ -147,9 +147,12 @@ def test_capture_refuses_output_inside_source_repository(
     assert "outside" in capsys.readouterr().err
 
 
-def test_cli_flow_capture_verify_stops_before_inventory_when_blocked(
+def test_cli_flow_capture_verify_authenticated_but_not_releasable(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """A real capsule with design-ineligible planes (opaque/redacted) is
+    authenticated (inventory-eligible) but not releasable (containment-blocked).
+    Inventory and render-github should succeed; containment_eligible is False."""
     repo, main_sha, pr_sha = _build_repo(tmp_path)
     before = _repo_snapshot(repo)
     state_dir = tmp_path / "capsule-state-1"
@@ -221,24 +224,22 @@ def test_cli_flow_capture_verify_stops_before_inventory_when_blocked(
                 str(repo),
             ]
         )
-        == 1
+        == 0
     )
     verify_stdout = json.loads(capsys.readouterr().out)
     assert verify_stdout["phase"] == "verification-complete"
     assert verify_stdout["status"] == ResultStatus.BLOCKED.value
-    assert verify_stdout["inventory_eligible"] is False
+    assert verify_stdout["inventory_eligible"] is True
+    assert verify_stdout["containment_eligible"] is False
     assert verify_stdout["verification_digest"]
-    assert not (state_dir / "manifest.json").exists()
 
-    assert main(["inventory", "--capsule", str(state_dir)]) == 1
-    assert "inventory-eligible" in capsys.readouterr().err
+    # Inventory should now succeed (authenticated), even though containment is blocked.
+    assert main(["inventory", "--capsule", str(state_dir)]) == 0
+    capsys.readouterr()
 
-    assert main(["status", "--capsule", str(state_dir)]) == 1
+    assert main(["status", "--capsule", str(state_dir)]) == 0
     final_status = json.loads(capsys.readouterr().out)
-    assert final_status["phase"] == "verification-complete"
-    assert final_status["next_safe_command"].startswith(
-        "python scripts/preservation_spine.py status"
-    )
+    assert final_status["phase"] == "inventory-complete"
 
 
 def test_blocked_verification_is_repeatable_without_rewriting_evidence(
@@ -276,8 +277,11 @@ def test_blocked_verification_is_repeatable_without_rewriting_evidence(
                 str(repo),
             ]
         )
-        == 1
+        == 0
     )
+    first = json.loads(capsys.readouterr().out)
+    assert first["inventory_eligible"] is True
+    assert first["containment_eligible"] is False
     capsys.readouterr()
     verification_before = (state_dir / "capsule" / "verification.json").read_bytes()
     checkpoints_before = (state_dir / "checkpoints.jsonl").read_bytes()
@@ -294,12 +298,14 @@ def test_blocked_verification_is_repeatable_without_rewriting_evidence(
                 str(repo),
             ]
         )
-        == 1
+        == 0
     )
     second = json.loads(capsys.readouterr().out)
     assert second["phase"] == "verification-complete"
     assert second["idempotent"] is True
     assert second["status"] == ResultStatus.BLOCKED.value
+    assert second["inventory_eligible"] is True
+    assert second["containment_eligible"] is False
     assert (
         state_dir / "capsule" / "verification.json"
     ).read_bytes() == verification_before
