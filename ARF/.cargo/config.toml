@@ -12,6 +12,10 @@
 # Cross-reference:
 # - FLOSS/docs/agent-memory/project/holochain-version-line-skew.md
 # - FLOSS/docs/specs/consent-payload.spec.md (validation-status table)
+# - Upstream contract: holochain crates/test_utils/wasm/build.rs:86 sets
+#   `-C opt-level=z --cfg getrandom_backend="custom"` for ALL wasm guest
+#   builds; the HDK defines __getrandom_v03_custom. This config mirrors
+#   that exact guest-build contract so release WASMs are reproducible.
 
 [target.wasm32-unknown-unknown]
 rustflags = ['-C', 'opt-level=z', '--cfg', 'getrandom_backend="custom"']

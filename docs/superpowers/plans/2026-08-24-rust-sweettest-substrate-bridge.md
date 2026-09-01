@@ -1,5 +1,11 @@
 # Rust Sweettest Substrate Bridge Implementation Plan
 
+> **Plan record — checkboxes not maintained.** This file is the approved
+> implementation plan; the `- [ ]` task boxes below were tracked by the
+> implementing agent in its own session state and are not retroactively
+> checked here. The as-executed deviation note in the next paragraph
+> records the one material change from the approved sketch.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove the six substrate-bridge criteria and separate consent-zome behavior against a freshly built four-zome Rose Forest DNA using Rust Sweettest and two distinct agents.
