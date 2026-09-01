@@ -11,6 +11,8 @@ title: This project builds the commitment and improvises the witness
 
 # This project builds the commitment and improvises the witness
 
+FLOSSI0ULLK repeatedly builds strong cryptographic commitments but improvises the outsider-legible witness; the durable rule is to build the commitment and adopt a standard witness.
+
 **Date:** 2026-08-29
 **Status:** ✅ Verified — four independent instances, found by two unrelated review panels
 **Related:** [`scale-mismatch-is-the-recurring-defect.md`](scale-mismatch-is-the-recurring-defect.md), `docs/research/2026-08-29-cross-audit-learnings.md`
