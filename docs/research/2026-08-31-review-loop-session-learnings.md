@@ -1,19 +1,18 @@
-# What forty-one review rounds taught, 2026-08-31
+# What forty-three review rounds taught, 2026-08-31
 
 **Truth status:** ✅ Verified — every claim here is traceable to a commit on
 `reconcile/pr38-salvage-20260817` (PR #41), a review thread on that PR, or a
 test in the tree. Nothing is inferred.
 
-**Scope.** One continuous session: 41 commits from `08619f0` to `8ab23a3`,
-32 files, +7,660/−517 lines, test suite 908 → 984. Roughly 49 review
+**Scope.** One continuous session: 43 commits from `08619f0` to `3fb782b`,
+32 files, +8,224/−523 lines, test suite 908 → 991. Roughly 52 review
 findings from three independent reviewers plus 7 from a cold read. Every
 finding was valid; none was rejected as wrong.
 
-**Why it ends here.** Not because the findings stopped. Codex exhausted its
-review quota for this PR, so the lens that produced the large majority of them
-went offline mid-loop and the last four fixes have been reviewed by nothing.
-The loop terminated by running out of reviewer, not by converging — which is
-the honest reading of every convergence claim below.
+**Why it ends where it ends.** Codex exhausted its review quota for this PR,
+came back, and produced three more findings immediately. So the loop has never
+converged; it has only ever paused when a reviewer stopped. Read every
+convergence claim below against that.
 
 **Relationship to existing docs.** This EXTENDS
 `2026-08-25-provenance-failure-mode-register.md`, which holds FM-1..FM-8 and
@@ -25,16 +24,16 @@ Skill-level observations 1..11 live in the operator's observation log
 
 ## 1. The headline number
 
-**Of ~49 findings, 41 were defects in fixes made earlier in the same session.**
+**Of ~52 findings, 44 were defects in fixes made earlier in the same session.**
 
-Fifteen consecutive rounds found nothing but consequences of the previous
+Eighteen consecutive rounds found nothing but consequences of the previous
 round. The rate did not fall as the work went on. It fell in exactly one
-place: the component whose *mechanism* was replaced stopped producing findings
-entirely, while its neighbour — same file, same session, same reviewers, but
+place: the component whose *mechanism* was replaced stopped producing that
+class of defect entirely, while its neighbour — same session, same reviewers,
 still hand-rolled — kept producing them to the last commit. See FM-9.
 
 That number is the reason this document exists. A green suite, a clean linter
-and a passing spec-gate were true at every one of those 41 commits.
+and a passing spec-gate were true at every one of those 43 commits.
 
 ---
 
@@ -75,9 +74,9 @@ replaced the mechanism outright: file-existence locking became an OS lock
 liveness policy left to get wrong. The stale-window parameter added in round 5
 is still accepted and deliberately ignored.
 
-Over the six rounds that followed, `filelock.py` was edited three more times
-and the daemon's hand-rolled pid-file claim protocol six. **None of the
-three lock edits was a locking-correctness defect:**
+Over the nine rounds that followed, `filelock.py` was edited three more times
+and the daemon's hand-rolled pid-file claim protocol six. **None of the three
+lock edits was a locking-correctness defect:**
 
 | Commit | Change to `filelock.py` | Was the lock wrong? |
 |--------|--------------------------|---------------------|
@@ -86,27 +85,45 @@ three lock edits was a locking-correctness defect:**
 | `ec0170e` | Added a `held()` context manager | No — a call-site ergonomics helper |
 
 Zero race conditions, zero liveness defects, zero stale-reclamation defects
-after the mechanism changed — having produced six consecutive rounds of
-exactly those before it. The claim protocol next door, reviewed by the same
-reviewers over the same rounds, produced six more and was still producing them
-in the last commit before the reviewer ran out of quota.
+after the mechanism changed — having produced six consecutive rounds of exactly
+those before it. The claim protocol next door, reviewed by the same reviewers
+over the same rounds, produced six more.
 
 State the result precisely, because the loose version is false: the lock did
 not stop being edited. **The class of defect disappeared.** That is what going
-down a layer buys — not fewer changes, but the elimination of a whole family
-of failure, because the family is no longer expressible.
+down a layer buys — not fewer changes, but the elimination of a whole family of
+failure, because the family is no longer expressible.
 
-And the comparison argues against a reading it might otherwise invite: the six
-rounds spent on the claim protocol were not careless. Each fix was correct. The
-protocol reimplements, in application code and across process invocations, what
-an OS lock provides — and it cannot simply adopt one, because the claim has to
-outlive the process that makes it. That is a genuinely different requirement,
-and no OS primitive offers it. So:
+#### Correction, three rounds later
 
-> **Going down a layer is only available when a layer below exists.** When it
-> does not, a long tail of findings is the correct expectation, and the
-> decision to make is whether the feature is worth its tail — not how to be
-> more careful.
+An earlier version of this section closed by saying the claim protocol has no
+layer below it — that a claim must outlive the process that makes it, no OS
+primitive offers that, and so a long tail of findings was the correct
+expectation rather than a failure of care. Round 43 falsified the general form
+of that while confirming the specific one.
+
+The *lifetime* of a claim genuinely has no primitive underneath it. But the
+*transitions* do, and the fix that closed three findings at once used them:
+`--record-identity` stopped validating-then-writing and became a CAS-remove of
+the exact inspected instance followed by an `O_CREAT|O_EXCL` create, and the
+four PowerShell `Remove-Item` sites became one instance-checked release. Both
+of those are atomic primitives the OS provides, and both were available from
+the first round.
+
+So the corrected claim, and it is a narrower and more useful one:
+
+> **"No layer below" is almost never true of a whole component. Decompose it
+> into the properties it maintains and ask the question per property.** A
+> claim's lifetime has no primitive; each mutation of that claim has two. Six
+> rounds were spent tuning application-level policy over transitions that
+> could have been atomic from the start.
+
+The honest reading of the whole comparison is therefore worse than the one
+this section originally offered. It is not that the claim protocol was doomed
+to a long tail by the nature of its requirement. It is that going down a layer
+was available for most of it and was taken nine rounds late, because
+"mechanism / policy / recovery" was applied to the component instead of to
+each property the component holds.
 
 ### FM-10 — Extending a function's domain silently re-scopes every branch in it
 
@@ -281,7 +298,7 @@ receive it? A marker nobody can present is a label, not a proof.
 
 ## 3. Tests that could not fail
 
-**Thirteen instances in one session.** This is the highest-yield section here,
+**Fourteen instances in one session.** This is the highest-yield section here,
 because every one of them was counted as coverage and none of them could have
 caught the defect it was written for.
 
@@ -300,6 +317,7 @@ caught the defect it was written for.
 | 11 | Lock file permissions | Matched `0o644` in the comment explaining the mode, not in the `os.open` call |
 | 12 | Sidecar clearing | Drove `_sidecar_cleared` when the change was in the caller's ordering (shape 3, again) |
 | 13 | Dry-run limit | Split the branch's source on the word `continue`, which matched the comment above the fix |
+| 14 | Script call sites (x2) | Stripped `#` lines but not `<# #>` blocks, so a PowerShell docstring naming `Stop-Process` counted as a call |
 
 ### The five shapes
 
@@ -313,6 +331,13 @@ caught the defect it was written for.
    on the emitting statement.
 5. **Encode ordering, not invariant.** Correct until the order legitimately
    changes, then wrong (#10). Assert what must hold under any order.
+
+Shape 4 has now produced five of the fourteen and is the only shape to recur
+*inside its own guard*: #14 is a pair of tests written specifically to stop
+call sites drifting, which read a comment as a call because their
+comment-stripping knew about `#` and not `<# #>`. A source-text assertion is a
+parser you did not write. If the assertion must be textual, strip comments
+properly or anchor on something a comment cannot contain.
 
 ### The meta-finding
 
@@ -433,7 +458,7 @@ in a commit, grep the diff for every site the principle governs before pushing.
 
 ## 5. The single dominant pattern
 
-Across ~49 findings, one shape accounts for most of them:
+Across ~52 findings, one shape accounts for most of them:
 
 > **A correct mechanism attached to the wrong scope.**
 
@@ -464,6 +489,9 @@ and not to its sibling. Concrete sightings this session:
   limit bounded real extractions and nothing bounded previews.
 - The reservation token minted by `--reserve-slot` and never handed to
   `--record-identity`, the one caller that needs it.
+- The instance check applied to the reclaim paths and not to the release
+  paths — so the branches that FAIL removed records safely and the branches
+  that SUCCEED removed them by pathname.
 
 **Rule (the sweep).** After any fix, before reporting it:
 
@@ -489,11 +517,11 @@ it."** The region is almost always larger than the diff.
 
 ## 6. What the green suite was worth
 
-At all 41 commits, on the machine they were run on: tests passed, ruff was
+At all 43 commits, on the machine they were run on: tests passed, ruff was
 clean, `spec_gate --check` was green. Those signals were true where they were
 taken and did not discriminate. Specifically:
 
-- The suite grew 908 → 984 while containing, at various points, thirteen tests
+- The suite grew 908 → 991 while containing, at various points, fourteen tests
   that could not fail.
 - One commit's honest accounting was **"+0 tests"** because it replaced two
   tests rather than adding any — the previous count had included one that
@@ -514,12 +542,12 @@ a second operating system.
 
 ## 7. What none of this fixed
 
-- **The rate did not fall.** Fifteen consecutive rounds of self-inflicted
+- **The rate did not fall.** Eighteen consecutive rounds of self-inflicted
   defects, with the pattern named explicitly in commit messages throughout.
   Naming is not mitigation. The single exception is FM-9's layer replacement,
   and it worked by making a family of defects inexpressible, not by making the
   code that expressed them better.
-- **The `mcp_daemon` claim protocol had thirteen passes** and is the least
+- **The `mcp_daemon` claim protocol had fourteen passes** and is the least
   trustworthy code in the branch despite — or because of — the attention. It is
   also the one component with no layer below it to fall back on (FM-9), which
   is the most useful thing this document can say about it.
@@ -528,8 +556,8 @@ a second operating system.
   Earlier drafts of this document put the number at seven; that count was
   restated from memory more than once and was wrong more than once, which is
   its own small instance of FM-13.
-- **The last four fixes are unreviewed**, and this time not because attention
-  ran out: Codex hit its review quota for the PR. See the scope note above.
+- **The last three fixes are unreviewed.** Codex hit its review quota, came
+  back, and found three more defects in the round before them.
 - **The six agent-surface projections were never regenerated**, so the
   consensus (780s) and ensemble (420s) timeouts exist only in
   `shared-agent-surface.json` and no harness sees them.
