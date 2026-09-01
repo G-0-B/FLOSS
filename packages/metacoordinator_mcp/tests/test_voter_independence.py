@@ -348,3 +348,41 @@ def test_unverified_family_keys_drop_only_the_provider():
     assert (
         voters._unverified_family("phi4-mini:latest") == "unverified:phi4-mini:latest"
     )
+
+
+def test_a_registry_that_disagrees_with_itself_is_not_resolved_silently(
+    monkeypatch, capsys
+):
+    """Two probed routes sharing a lineage must agree on its family. Building
+    the lookup with a dict comprehension resolved a disagreement by iteration
+    order, so an unprobed twin inherited whichever side happened to be later --
+    a wrong family, chosen nondeterministically, inside the check that decides
+    whether a poll counts as independent.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    monkeypatch.setattr(
+        voters,
+        "_model_index",
+        lambda: {
+            "groq/openai/x": {"family": "OpenAI", "surface": "groq"},
+            "nvidia/openai/x": {"family": "SomethingElse", "surface": "nvidia"},
+        },
+    )
+
+    problem = voters.roster_independence_problem(
+        "balanced",
+        {
+            "a": "openrouter/openai/x",
+            "b": "huggingface/openai/x",
+            "c": "together/openai/x",
+        },
+    )
+
+    err = capsys.readouterr().err
+    assert "registry conflict" in err
+    assert "unverified:openai/x" in err
+    # The conflicted lineage must NOT be inherited: the unprobed twins fall
+    # back to the unverified key, so this stays one family and is refused.
+    assert problem is not None
+    assert "1 model family" in problem, problem

@@ -63,6 +63,23 @@ DEFERRED_PREFIX = "DEFERRED::"
 UNREADABLE_PREFIX = "UNREADABLE::"
 
 
+def pending_marker(insights: str) -> str | None:
+    """Which not-processed marker this extraction carries, or None.
+
+    ONE predicate, because there are two places that must apply it: the first
+    attempt and the rate-limit retry. Every time a new marker has been added,
+    the retry site was the one that did not learn about it -- the comment on
+    the retry below records that happening once already with `force_full`, and
+    UNREADABLE:: repeated it immediately. A result that carries a marker is not
+    a distillation, wherever it came from.
+    """
+
+    for marker in (UNREADABLE_PREFIX, DEFERRED_PREFIX):
+        if insights.startswith(marker):
+            return marker
+    return None
+
+
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -516,14 +533,28 @@ def main() -> int:
                 insights = extract_semantics(
                     file_path, args.model, force_full=args.force_full
                 )
-                if insights.startswith(DEFERRED_PREFIX):
-                    # Re-check after the retry. The pre-retry deferral check
-                    # above has already been passed at this point, so without
-                    # this the marker reaches staging.
-                    deferred.append(file_path)
+                # EVERY marker, not just the deferral. The pre-retry checks
+                # have already been passed at this point, so any marker the
+                # retry produces reaches stage_draft unless it is caught here.
+                # This branch knew only about DEFERRED::, so a file that became
+                # unreadable between the two attempts -- a permissions change,
+                # a dropped network share -- was staged with the I/O error as
+                # its extracted semantics. Third marker to reach this site, and
+                # the second to be missed by it; hence one shared predicate.
+                retry_marker = pending_marker(insights)
+                if retry_marker is not None:
+                    bucket = (
+                        unreadable if retry_marker == UNREADABLE_PREFIX else deferred
+                    )
+                    label = (
+                        "UNREADABLE"
+                        if retry_marker == UNREADABLE_PREFIX
+                        else "DEFERRED"
+                    )
+                    bucket.append(file_path)
                     print(
-                        "  DEFERRED after retry (still pending): "
-                        f"{insights[len(DEFERRED_PREFIX):].strip()}"
+                        f"  {label} after retry (still pending): "
+                        f"{insights[len(retry_marker):].strip()}"
                     )
                     continue
                 if "LLM Extraction Failed" in insights:

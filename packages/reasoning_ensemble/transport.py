@@ -255,10 +255,31 @@ def resolve_voter_pool(
         combined = _online_pool(online_profile, check_independence=False) + list(
             LOCAL_VOTER_POOL
         )
-        assert_roster_is_independent(
-            active_online_profile(online_profile),
-            {voter["voter_id"]: _independence_route(voter) for voter in combined},
-        )
+        # THE ROSTER JUDGED MUST BE THE ROSTER THAT VOTES.
+        #
+        # assert_roster_is_independent takes a dict keyed by voter_id, and a
+        # collision between an online voter_id and a LOCAL_VOTER_POOL one would
+        # silently drop an entry -- so the check would approve a SMALLER roster
+        # than the list returned two lines below actually votes with, and a
+        # duplicate id would vote twice. No profile collides today (online ids
+        # are provider-prefixed, local ones are bare), which is exactly what
+        # makes the failure silent if that ever stops being true.
+        judged = {voter["voter_id"]: _independence_route(voter) for voter in combined}
+        if len(judged) != len(combined):
+            seen: set[str] = set()
+            clashes = sorted(
+                {
+                    v["voter_id"]
+                    for v in combined
+                    if v["voter_id"] in seen or seen.add(v["voter_id"])
+                }
+            )
+            raise RuntimeError(
+                "mixed-mode pool has duplicate voter_id(s) "
+                f"{clashes}: the roster judged for independence would not be "
+                "the roster that votes. Rename the colliding voter(s)."
+            )
+        assert_roster_is_independent(active_online_profile(online_profile), judged)
         return combined, resolved_mode
     if resolved_mode in {"", "online"}:
         return _online_pool(online_profile), "online"

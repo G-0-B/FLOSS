@@ -341,3 +341,29 @@ def test_mixed_mode_judges_the_combined_pool(monkeypatch):
     assert any(
         "ollama/" in route for route in judged.values()
     ), "the local voters were not part of the roster that was judged"
+
+
+def test_a_duplicate_voter_id_in_the_mixed_pool_is_refused(monkeypatch):
+    """assert_roster_is_independent takes a dict keyed by voter_id, so a
+    collision between an online id and a LOCAL_VOTER_POOL id silently drops an
+    entry: the check would approve a SMALLER roster than the one returned,
+    and the duplicate would vote twice. No profile collides today, which is
+    exactly what makes it silent if that stops being true."""
+    import pytest
+
+    from packages.reasoning_ensemble import transport
+
+    collide = transport.LOCAL_VOTER_POOL[0]["voter_id"]
+
+    monkeypatch.setattr(
+        transport,
+        "resolve_default_voter_specs",
+        lambda profile=None, include_unavailable=False: {
+            collide: "groq/openai/gpt-oss-120b"
+        },
+    )
+    monkeypatch.setattr(transport, "assert_roster_is_independent", lambda *a, **k: None)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
+
+    with pytest.raises(RuntimeError, match="duplicate voter_id"):
+        transport.resolve_voter_pool()

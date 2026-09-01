@@ -1053,13 +1053,39 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
     # twin of any of them reaches four and passes -- the same false claim this
     # fix is closing, one step further along. The probe index is keyed by full
     # route, so the lineage suffix is what joins them.
-    probed_by_lineage = {
-        _unverified_family(known): meta["family"] for known, meta in index.items()
-    }
+    # A DICT COMPREHENSION HERE WOULD RESOLVE A DISAGREEMENT SILENTLY.
+    #
+    # Two probed routes that share a lineage should agree on its family, and in
+    # the current registry all of them do. If a future probe records different
+    # families for the same lineage, last-write-wins by iteration order would
+    # hand an unprobed twin whichever one happened to be later -- a wrong
+    # family, chosen nondeterministically, inside the check that decides
+    # whether a poll counts as independent. The registry is the thing to fix,
+    # so say so instead of picking.
+    probed_by_lineage: dict[str, str] = {}
+    for known, meta in index.items():
+        lineage = _unverified_family(known)
+        previous = probed_by_lineage.setdefault(lineage, meta["family"])
+        if previous != meta["family"]:
+            print(
+                f"[voters] registry conflict: routes sharing lineage "
+                f"{lineage!r} are probed with different families "
+                f"({previous!r} and {meta['family']!r}). Unprobed twins of this "
+                f"lineage are counted as unverified until "
+                f"{VOTER_REGISTRY_PATH.name} agrees with itself.",
+                file=sys.stderr,
+            )
+            probed_by_lineage[lineage] = ""
+
+    def _family_for_unclassified(model: str) -> str:
+        lineage = _unverified_family(model)
+        # "" is the conflict marker written above: fall back to the unverified
+        # lineage rather than inheriting an arbitrary side of a disagreement.
+        return probed_by_lineage.get(lineage) or lineage
+
     families = {index[model]["family"] for model in models if model in index}
     for model in unclassified:
-        lineage = _unverified_family(model)
-        families.add(probed_by_lineage.get(lineage, lineage))
+        families.add(_family_for_unclassified(model))
 
     if unclassified:
         grouped = sorted({_unverified_family(m) for m in unclassified})
