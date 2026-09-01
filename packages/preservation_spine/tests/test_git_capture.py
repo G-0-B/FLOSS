@@ -1178,12 +1178,25 @@ def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
     ("relative_path", "expected_secret"),
     [
         (".env", True),
+        (".env.local", True),
+        (".env.prod.local", True),
         ("my-token.txt", True),
         ("config/api_key.yaml", True),
         ("wallet-seed.txt", True),
-        ("docs/seed.md", False),
-        ("seedling.md", False),
-        ("confluence.md", False),
+        ("secrets.txt", True),
+        ("credentials.json", True),
+        ("mnemonic.txt", True),
+        ("keystore.jks", True),
+        ("seed.txt", True),
+        ("private.key", True),
+        ("id_rsa", True),
+        # Directory components do not redact: marker must be in the stem.
+        ("config/env/settings.py", False),
+        ("docs/patterns-guide.md", False),  # stem has no marker substring
+        # The old whole-path substring policy also redacted these via the
+        # stem, and still does.  This is the fail-closed default.
+        ("docs/seed.md", True),
+        ("seedling.md", True),
         ("README.md", False),
         ("src/main.py", False),
     ],
@@ -1191,7 +1204,8 @@ def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
 def test_secret_policy_path_component_match(
     relative_path: str, expected_secret: bool
 ) -> None:
-    """Markers match path components and their segments, not substring of
-    the whole relative path.  docs/seed.md is NOT a secret; .env IS."""
+    """Markers match the filename stem (substring), exact components,
+    dotfile prefixes, and suffixes — but never directory components.
+    Over-redaction is the intended fail-closed default."""
     policy = SecretPolicy.default()
     assert policy.is_secret(relative_path) is expected_secret

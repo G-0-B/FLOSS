@@ -49,32 +49,21 @@ def _split_segments(component: str) -> list[str]:
 
 
 def _marker_in_stem(marker: str, stem: str) -> bool:
-    """Check if marker appears as a separator-bounded token in the stem.
+    """Check if marker appears in the filename stem as a substring.
 
-    e.g. 'api_key' in 'api_key' → True (bounded by start/end, has underscore)
-         'token' in 'my-token' → True (dash-bounded)
-         'seed' in 'wallet-seed' → True (dash-bounded)
-         'seed' in 'seedling' → False (not bounded)
-         'seed' in 'seed' → False (bare stem, no separator — too broad)
+    Substring-of-stem (not substring-of-path) is the correct conservative
+    default for a preservation capsule: over-redaction is fail-closed
+    (operator moves the file), under-redaction leaks secrets into the
+    capsule.  The distinction from the old policy is that directory
+    components and the extension no longer contribute — 'docs/seed.md'
+    matches because the stem 'seed' contains the marker, not because
+    'seed' appears somewhere in the path string.
 
-    Bare stems with no separator do NOT match unless the caller handles
-    exact-match separately.  This prevents 'seed.md' (stem 'seed') from
-    matching marker 'seed' while 'wallet-seed.txt' still matches.
+    e.g. 'seed' in 'seed' → True          'secret' in 'secrets' → True
+         'token' in 'my-token' → True      'seed' in 'seedling' → True
+         'seed' in 'wallet-seed' → True    'credential' in 'credentials' → True
     """
-    if "-" not in stem and "_" not in stem:
-        return False  # bare stem, no separators — don't match
-    # Check all separator boundary combinations
-    for sep in ("-", "_"):
-        padded = f"{sep}{stem}{sep}"
-        if f"{sep}{marker}{sep}" in padded:
-            return True
-    # Cross-separator: marker at boundary between dash and underscore
-    # e.g. 'api_key' in 'my-api_key-config' — check both paddings
-    for left in ("-", "_"):
-        for right in ("-", "_"):
-            if f"{left}{marker}{right}" in f"-{stem}-" or f"{left}{marker}{right}" in f"_{stem}_":
-                return True
-    return False
+    return marker in stem
 
 
 @dataclass(frozen=True)
@@ -111,13 +100,15 @@ class SecretPolicy:
 
         Matches markers against:
         - exact path component equality (e.g. '.env' == '.env')
-        - dash-separated segments of the filename stem (e.g. 'token' in 'my-token')
-        - suffix/extension match (e.g. '.key' suffix of 'private.key')
+        - dotfile prefix (e.g. '.env' matches '.env.local')
+        - suffix/extension (e.g. '.key' matches 'private.key')
+        - substring of the filename stem (e.g. 'token' in stem 'my-token')
 
-        Does NOT do substring matching across the whole relative path,
-        so docs/seed.md is NOT redacted (seed is not a dash-segment of
-        stem 'seed', nor a suffix), while wallet-seed.txt IS redacted
-        (seed is a dash-segment of stem 'wallet-seed').
+        The key change from the old policy: directory components and the
+        extension no longer contribute.  'docs/seed.md' matches because the
+        stem 'seed' contains the marker 'seed' — not because 'seed' appears
+        in the path string.  Over-redaction is fail-closed: the operator
+        renames the file, the capsule never leaks a secret by default.
         """
 
         path = PurePosixPath(relative_path)
