@@ -1152,3 +1152,31 @@ def test_snapshot_preserves_index_when_stat_cache_is_stale(
     assert index_after_first == index_before
     assert index_path.read_bytes() == index_before
     assert_unchanged(first, second)
+
+
+def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
+    """An external diff tool configured in .gitattributes or gitconfig
+    must not leak into captured diff bytes.  --no-ext-diff forces real
+    git diff output so the capsule records reconstructable blobs, not
+    arbitrary helper program output."""
+    repo = initialized_repo(tmp_path)
+    # Stage a change so staged_diff has content to capture.
+    (repo / "a.txt").write_text("two\n", encoding="utf-8")
+    git(repo, "add", "a.txt")
+    # Create an unstaged change too.
+    (repo / "b.txt").write_text("unstaged\n", encoding="utf-8")
+    git(repo, "add", "b.txt")
+    git(repo, "commit", "-m", "second")
+    (repo / "b.txt").write_text("changed\n", encoding="utf-8")
+
+    # Configure an external diff tool that would corrupt the output.
+    git(repo, "config", "diff.external", "echo external-diff-output")
+
+    snapshot = snapshot_subject(repo)
+
+    # The captured diffs must be real git diff output, not the echo helper.
+    assert b"external-diff-output" not in snapshot.staged_diff
+    assert b"external-diff-output" not in snapshot.unstaged_diff
+    # And they must contain real diff content (blob hashes, not helper text).
+    assert b"diff --git" in snapshot.staged_diff or snapshot.staged_diff == b""
+    assert b"diff --git" in snapshot.unstaged_diff
