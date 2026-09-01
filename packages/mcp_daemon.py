@@ -697,9 +697,51 @@ def _record_identity_cli() -> int:
         print("NOT_RUNNING")
         return 1
     token = _process_start_token(pid)
+
+    # THE CHECK ABOVE IS A READ, SO IT CANNOT BE THE WHOLE GUARD.
+    #
+    # Validating the token and then writing left the window the token was
+    # introduced to close: the reservation can be legitimately reclaimed
+    # between the two, and an unconditional write then lands on the new
+    # owner's claim having verified only the old one. Every probe in between
+    # (_pid_alive, _process_start_token) widens it.
+    #
+    # There is no compare-and-swap WRITE for a file, so the transition is
+    # expressed with the two primitives that are atomic and are already how
+    # every other mutation in this module works:
+    #
+    #   1. CAS-remove the exact reservation instance we inspected. If someone
+    #      replaced it, this fails and nothing is touched.
+    #   2. O_CREAT|O_EXCL the pid file. If another launcher took the slot in
+    #      between, this fails and we report rather than clobber.
+    #
+    # Step 2 losing means we gave up a reservation we no longer held anyway.
+    # The caller stops the process it launched, which is the correct outcome:
+    # the alternative is two servers and one record.
+    if existing is not None:
+        if not _sidecar_cleared(pid_path, _inspect_sidecar(pid_path)):
+            print("STALE_RESERVATION")
+            return 1
+        if not _reclaim_claim_if_unchanged(pid_path, existing):
+            print("STALE_RESERVATION")
+            return 1
     try:
         pid_path.parent.mkdir(parents=True, exist_ok=True)
-        pid_path.write_text(str(pid), encoding="utf-8")
+        fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print("STALE_RESERVATION")
+        return 1
+    except OSError:
+        print("UNKNOWN")
+        return 2
+    try:
+        os.write(fd, str(pid).encode("utf-8"))
+    except OSError:
+        os.close(fd)
+        print("UNKNOWN")
+        return 2
+    os.close(fd)
+    try:
         if token:
             _identity_path(pid_path).write_text(token, encoding="utf-8")
         else:
@@ -810,6 +852,80 @@ def _reserve_slot_cli() -> int:
     return 0
 
 
+def _release_claim_cli() -> int:
+    """`--release-claim <pid_file> token|pid <value>` -> release a claim we own.
+
+    Four PowerShell sites released claims with `Remove-Item <path>`: the start
+    script when it could not record a launched server and when a launch failed,
+    and the stop script's two OURS branches. Every one of them deleted whatever
+    occupied the pathname rather than the record it had just acted on.
+
+    That is a real race in both directions. On stop: a start script running
+    immediately after Stop-Process reads the record as FOREIGN, reclaims it,
+    and reserves the slot -- and then these deletions remove the NEW launcher's
+    claim, so a later start launches a duplicate. On start: --record-identity
+    returns STALE_RESERVATION precisely because another launcher now owns the
+    slot, and the cleanup that follows deletes that winner's files, leaving it
+    live and untracked.
+
+    So the release has to name what it expects to find:
+
+      token <t>   release only a reservation still marked `RESERVED <t>`
+      pid <n>     release only a claim whose contents are exactly <n>
+
+    Removal is instance-checked through the same shared helper every other path
+    here uses, sidecar first, so losing the race costs nothing: NOT_RELEASED
+    means someone else already owns the slot, which is the state the caller
+    wanted to reach anyway.
+    """
+
+    if len(sys.argv) < 5:
+        print(
+            "usage: --release-claim <pid_file> token|pid <value>",
+            file=sys.stderr,
+        )
+        return 2
+    pid_path = Path(sys.argv[2])
+    kind = sys.argv[3].strip().lower()
+    value = sys.argv[4].strip()
+    if kind not in {"token", "pid"}:
+        print("usage: --release-claim <pid_file> token|pid <value>", file=sys.stderr)
+        return 2
+
+    observed = _inspect_claim(pid_path)
+    if observed is None:
+        # ABSENT IS SUCCESS; UNREADABLE IS NOT -- decided the same way
+        # --reclaim-claim decides it, because _inspect_claim returns None for
+        # both and the caller's next move differs completely.
+        try:
+            pid_path.lstat()
+        except FileNotFoundError:
+            print("RELEASED")
+            return 0
+        except OSError:
+            pass
+        print("NOT_RELEASED")
+        return 1
+
+    raw = observed.data.decode("utf-8", "replace").strip()
+    if kind == "token":
+        if _reservation_token_of(raw) != value:
+            print("NOT_RELEASED")
+            return 1
+    elif raw != value:
+        print("NOT_RELEASED")
+        return 1
+
+    observed_sidecar = _inspect_sidecar(pid_path)
+    if _sidecar_cleared(pid_path, observed_sidecar) and _reclaim_claim_if_unchanged(
+        pid_path, observed
+    ):
+        print("RELEASED")
+        return 0
+    print("NOT_RELEASED")
+    return 1
+
+
 def _reclaim_claim_cli() -> int:
     """`--reclaim-claim <pid_file>` -> instance-checked removal of a dead claim.
 
@@ -908,6 +1024,8 @@ def _identity_cli() -> int:
 
 
 if __name__ == "__main__":
+    if "--release-claim" in sys.argv:
+        raise SystemExit(_release_claim_cli())
     if "--reclaim-claim" in sys.argv:
         raise SystemExit(_reclaim_claim_cli())
     if "--reserve-slot" in sys.argv:

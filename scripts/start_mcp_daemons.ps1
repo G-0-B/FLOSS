@@ -34,6 +34,37 @@ if (-not $py -or -not (Test-Path $py)) {
     exit 1
 }
 
+function Release-OmniClaim {
+    <#
+      Release the OmniRoute claim ONLY if it is still the reservation this
+      launcher made. Four sites across the two scripts used to release with
+      `Remove-Item <path>`, which deletes whatever occupies the pathname --
+      including the record of a launcher that legitimately reclaimed the slot
+      and started a server. NOT_RELEASED simply means someone else owns it now,
+      which is the state this cleanup wanted to reach anyway.
+
+      With no token (a pre-marker or failed reservation) there is nothing to
+      prove ownership with, so nothing is released: an occupied-but-
+      unattributable slot blocks the next start, which is the safe failure.
+    #>
+    param([string]$Token)
+    if (-not $Token) {
+        Write-Host "[FLOSS MCP] No reservation token to release with; leaving $omniPid in place for an operator"
+        return $false
+    }
+    if (-not $py) { return $false }
+    Push-Location $repoRoot
+    $out = & $py -m packages.mcp_daemon --release-claim $omniPid token $Token 2>$null
+    Pop-Location
+    $tok = ($out | Select-Object -Last 1)
+    if ($tok) { $tok = $tok.ToString().Trim() }
+    if ($tok -ne 'RELEASED') {
+        Write-Host "[FLOSS MCP] OmniRoute slot is no longer ours to release - another launcher owns it; leaving its record intact"
+        return $false
+    }
+    return $true
+}
+
 function Resolve-ServerPid {
     <#
       npm installs `omniroute` as a .cmd shim on Windows; Start-Process -PassThru
@@ -292,8 +323,15 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation
             if ($gone) {
                 Write-Host "[FLOSS MCP] Stopped the unrecorded OmniRoute (PID $serverPid) and released the reservation"
                 $skipped += "OmniRoute (:20128) - launched but could not be recorded, so it was stopped again"
-                Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-                Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+                # BY TOKEN, NOT BY PATHNAME.
+                #
+                # The most common reason recording fails here is
+                # STALE_RESERVATION -- which means another launcher now owns
+                # the slot. Deleting the pathname would remove THAT launcher's
+                # pid and identity files, leaving its server live and
+                # untracked, and let a later start launch a duplicate. The
+                # cleanup for losing a race must not destroy the winner.
+                Release-OmniClaim $omniReserveToken
             } else {
                 # Keep the reservation: an occupied-but-unverifiable slot blocks
                 # the next start, which is the conservative failure. An operator
@@ -307,8 +345,9 @@ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation
         # leaving an empty claim that blocks forever.
         Write-Host "[FLOSS MCP] OmniRoute did not start; releasing the reserved slot"
         $skipped += "OmniRoute (:20128) - launch failed"
-        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+        # Same ownership check as the branch above: our reservation may already
+        # have been reclaimed by a launcher that went on to start a server.
+        Release-OmniClaim $omniReserveToken
     }
     # RECORDED is the only outcome meaning a server is up AND trackable.
     # This printed whenever $proc was truthy -- including the branch above

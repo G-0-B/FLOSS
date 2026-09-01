@@ -29,6 +29,37 @@ if ($env:FLOSS_PYTHON) {
     $py = if ($cmd) { $cmd.Source } else { $null }
 }
 
+function Release-Claim {
+    <#
+      Remove a claim record ONLY if it is still the one we acted on. Both OURS
+      branches in this script used `Remove-Item <path>`, which deletes whatever
+      occupies the pathname: a start script that reclaims the record between
+      Stop-Process and the removal owns the slot, and deleting its files leaves
+      its server live and untracked. The FOREIGN branches were taught to
+      reclaim by instance; the branches that SUCCEED were not, which is the
+      more common path.
+
+      NOT_RELEASED means another launcher owns the slot now, and its record is
+      the one that should survive -- so it is reported, not retried.
+    #>
+    param([string]$Path, [string]$Kind, [string]$Value, [string]$Label)
+    if (-not $py) {
+        Write-Host "[FLOSS MCP] No Python available to release $Label safely; leaving $Path in place"
+        $script:unresolved += "$Label - record left in place; set FLOSS_PYTHON"
+        return $false
+    }
+    Push-Location $repoRoot
+    $out = & $py -m packages.mcp_daemon --release-claim $Path $Kind $Value 2>$null
+    Pop-Location
+    $tok = ($out | Select-Object -Last 1)
+    if ($tok) { $tok = $tok.ToString().Trim() }
+    if ($tok -ne 'RELEASED') {
+        Write-Host "[FLOSS MCP] $Label record is no longer the one we stopped - another launcher owns the slot; leaving its record intact"
+        return $false
+    }
+    return $true
+}
+
 # Anything this script deliberately leaves running or leaves on disk lands
 # here, and the closing summary reports it. Declared as an explicit array: in
 # PowerShell `$undefined + "text"` yields a STRING, and .Count on a scalar is
@@ -163,8 +194,15 @@ foreach ($pidFile in $pidFiles) {
             # Ordering matters for the same reason mcp_daemon.py documents on
             # its own release path: freeing the slot first opens a window in
             # which a replacement writes its identity and this line deletes it.
-            Remove-Item "$pidPath.identity" -Force -ErrorAction SilentlyContinue
-            Remove-Item $pidPath -Force -ErrorAction SilentlyContinue
+            #
+            # BY THE PID WE STOPPED, NOT BY PATHNAME. Ordering was not the only
+            # problem here. A start script running immediately after
+            # Stop-Process reads this record as FOREIGN, reclaims it safely,
+            # and installs its own reservation -- and these lines then deleted
+            # THAT launcher's claim, so a later start launched a duplicate.
+            # The FOREIGN branch above was taught to reclaim by instance; this
+            # one, the branch that succeeds, was still removing by pathname.
+            Release-Claim $pidPath 'pid' $daemonPid "$pidFile"
         }
     }
 }
@@ -228,8 +266,12 @@ if ($omniVerdict -eq 'OURS') {
         # The new server stays live with an unverifiable record, which both
         # start and stop refuse to act on. Removing the identity first means
         # the worst case is an unverifiable holder, which blocks.
-        Remove-Item "$omniPid.identity" -Force -ErrorAction SilentlyContinue
-        Remove-Item $omniPid -Force -ErrorAction SilentlyContinue
+        #
+        # And by the PID we stopped, for the same reason as the daemon branch:
+        # a start script that reclaims this record between Stop-Process and
+        # here owns the slot, and deleting its files by pathname leaves its
+        # server live and untracked.
+        Release-Claim $omniPid 'pid' $omniId 'OmniRoute'
         Write-Host "[FLOSS MCP] OmniRoute stopped (PID $omniId)"
     }
 } elseif ($omniVerdict -eq 'FOREIGN' -and $py) {

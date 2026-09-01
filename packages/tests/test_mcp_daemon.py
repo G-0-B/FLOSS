@@ -624,6 +624,35 @@ def _script(name: str) -> str:
     )
 
 
+def _code_lines(text: str) -> list[str]:
+    """Script lines with comments removed -- BLOCK comments included.
+
+    The `startswith("#")` filter these guards used does not see `<# ... #>`
+    blocks, so a PowerShell docstring that merely NAMES Stop-Process or
+    Remove-Item was read as a call site. That is shape 4 from the review-loop
+    learnings (match prose, not code) sitting inside the guard against it: the
+    first block comment written in these scripts failed two tests that were
+    about behaviour it did not change.
+    """
+
+    out = []
+    in_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if in_block:
+            if "#>" in stripped:
+                in_block = False
+            continue
+        if stripped.startswith("<#"):
+            if "#>" not in stripped:
+                in_block = True
+            continue
+        if stripped.startswith("#"):
+            continue
+        out.append(line)
+    return out
+
+
 def test_no_stop_process_deletes_a_record_without_confirming(tmp_path):
     """Both kill sites must confirm before removing the record.
 
@@ -634,11 +663,7 @@ def test_no_stop_process_deletes_a_record_without_confirming(tmp_path):
     of them written without reading the other.
     """
     script = _script("stop_mcp_daemons.ps1")
-    kills = [
-        line
-        for line in script.splitlines()
-        if "Stop-Process" in line and not line.strip().startswith("#")
-    ]
+    kills = [line for line in _code_lines(script) if "Stop-Process" in line]
     assert len(kills) >= 2, "kill sites moved; update this guard"
     for line in kills:
         assert (
@@ -800,33 +825,61 @@ def test_the_verdict_is_on_stdout_not_only_in_the_exit_code(tmp_path):
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 
 
-def _removal_order(script: Path) -> list[str]:
-    """The pid-file and sidecar removals, in source order, as 'identity'/'pid'."""
-    order = []
-    for line in script.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("Remove-Item"):
-            continue
-        if ".identity" in stripped:
-            order.append("identity")
-        elif "$pidPath" in stripped or "$omniPid" in stripped:
-            order.append("pid")
-    return order
+def test_no_script_releases_a_record_by_pathname():
+    """The removals moved into --release-claim, and must not come back.
+
+    Both OURS branches in the stop script and both cleanup branches in the
+    start script used `Remove-Item <path>`, which deletes whatever occupies the
+    pathname. A start script that reclaims a record between Stop-Process and
+    the removal owns the slot; deleting its files left its server live and
+    untracked. The FOREIGN branches had already been taught to reclaim by
+    instance -- it was the branches that SUCCEED that were still removing
+    blind, which is the common path, not the rare one.
+    """
+    for name in ("start_mcp_daemons.ps1", "stop_mcp_daemons.ps1"):
+        for line in _code_lines(_script(name)):
+            if "Remove-Item" not in line:
+                continue
+            assert not any(
+                token in line for token in ("$pidPath", "$omniPid", ".identity")
+            ), f"{name}: a claim record is still removed by pathname: {line.strip()}"
+
+
+def test_every_script_release_goes_through_the_ownership_check():
+    """Not removing by pathname is only half of it: the release still has to
+    happen, or a failed launch leaves the slot claimed forever."""
+    start = _script("start_mcp_daemons.ps1")
+    stop = _script("stop_mcp_daemons.ps1")
+
+    assert start.count("Release-OmniClaim $omniReserveToken") == 2, (
+        "the start script has two release sites -- could-not-record and "
+        "launch-failed -- and both must present the reservation token"
+    )
+    assert "--release-claim $omniPid token $Token" in start
+    assert "Release-Claim $pidPath 'pid' $daemonPid" in stop
+    assert "Release-Claim $omniPid 'pid' $omniId" in stop
+    assert "--release-claim $Path $Kind $Value" in stop
 
 
 def test_every_slot_release_removes_the_identity_sidecar_first():
     """Freeing the slot first lets a replacement claim it and write its own
     identity inside the window, which the next line then deletes -- leaving a
     live daemon with an unverifiable record that start and stop both refuse to
-    touch. mcp_daemon.py documents this on its own release path."""
-    for name in ("start_mcp_daemons.ps1", "stop_mcp_daemons.ps1"):
-        order = _removal_order(SCRIPTS / name)
-        assert order, f"{name}: no removals found -- has the file moved?"
-        assert len(order) % 2 == 0, f"{name}: an unpaired removal: {order}"
-        pairs = list(zip(order[::2], order[1::2]))
-        assert all(
-            pair == ("identity", "pid") for pair in pairs
-        ), f"{name}: removal out of order: {pairs}"
+    touch.
+
+    The scripts no longer remove anything themselves, so this invariant now
+    lives in the one Python path they all call. Asserted there, on the source
+    order of the two removals, because there is no observable difference
+    between the orders except under a race this test cannot stage.
+    """
+    from packages import mcp_daemon
+
+    source = Path(mcp_daemon.__file__).read_text(encoding="utf-8")
+    for func in ("_release_claim_cli", "_reclaim_claim_cli"):
+        body = source.split(f"def {func}(", 1)[1].split(chr(10) + "def ", 1)[0]
+        sidecar = body.index("_sidecar_cleared(")
+        claim = body.index("_reclaim_claim_if_unchanged(")
+        assert sidecar < claim, f"{func}: the pid file is freed before its sidecar"
 
 
 def test_a_stale_foreign_record_is_cleared_before_the_slot_is_reserved():
@@ -1618,3 +1671,131 @@ def test_the_start_script_presents_the_token_it_was_given(tmp_path):
     assert (
         "$slotTok -eq 'RESERVED'" in script and "$slotTok -like 'RESERVED *'" in script
     ), "the script must accept both the bare verdict and the tokenised one"
+
+
+# ---------------------------------------------------------------------------
+# --release-claim: release what we own, never what occupies the pathname.
+# ---------------------------------------------------------------------------
+
+
+def _release(pid_path, kind, value):
+    import subprocess
+    import sys as _sys
+
+    return subprocess.run(
+        [
+            _sys.executable,
+            "-m",
+            "packages.mcp_daemon",
+            "--release-claim",
+            str(pid_path),
+            kind,
+            str(value),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[2]),
+    )
+
+
+def test_a_reservation_is_released_only_by_the_token_that_made_it(tmp_path):
+    """The start script's cleanup runs precisely when another launcher has
+    taken the slot, so releasing by pathname destroys the winner's record and
+    leaves its server live and untracked."""
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+
+    # The slot was reclaimed and re-reserved by someone else.
+    pid_path.write_text("RESERVED someone-elses-token", encoding="utf-8")
+
+    result = _release(pid_path, "token", mine)
+
+    assert result.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+    assert result.returncode == 1
+    assert pid_path.exists(), "the winner's reservation was deleted"
+
+
+def test_our_own_reservation_is_released(tmp_path):
+    """Fail-closed must not strand the slot when we really do own it."""
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+
+    result = _release(pid_path, "token", mine)
+
+    assert result.stdout.strip().splitlines()[-1] == "RELEASED"
+    assert not pid_path.exists()
+
+
+def test_a_stopped_daemons_record_is_released_only_by_its_own_pid(tmp_path):
+    """A start script that reclaims the record between Stop-Process and the
+    removal owns the slot; the stop script must not delete its claim."""
+    pid_path = tmp_path / "consensus.pid"
+    pid_path.write_text("4242", encoding="utf-8")
+
+    assert _release(pid_path, "pid", 4242).stdout.strip().splitlines()[-1] == "RELEASED"
+    assert not pid_path.exists()
+
+    pid_path.write_text("9999", encoding="utf-8")
+    replaced = _release(pid_path, "pid", 4242)
+
+    assert replaced.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+    assert pid_path.read_text(encoding="utf-8") == "9999"
+
+
+def test_releasing_an_absent_record_succeeds_and_an_unreadable_one_does_not(tmp_path):
+    """Absent is the state the caller wanted. Unreadable is not, and reporting
+    it as success is how a live holder gets forgotten."""
+    pid_path = tmp_path / "gone.pid"
+
+    assert _release(pid_path, "pid", 1).stdout.strip().splitlines()[-1] == "RELEASED"
+
+    directory = tmp_path / "dir.pid"
+    directory.mkdir()
+    blocked = _release(directory, "pid", 1)
+    assert blocked.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+
+
+def test_recording_refuses_a_reservation_replaced_inside_the_window(
+    tmp_path, monkeypatch, capsys
+):
+    """The token check is a READ, so it cannot be the whole guard.
+
+    Between validating the token and writing the PID there are two process
+    probes, and a launcher whose reservation went stale can have it reclaimed
+    and re-reserved in that gap. An unconditional write then lands on the new
+    owner's claim having verified only the old one -- which is the original
+    two-servers-one-record bug, surviving the fix that was meant to close it.
+
+    Driven in-process because the window is inside a single invocation: the
+    replacement is injected from _pid_alive, which is called after the check
+    and before the write.
+    """
+    import sys as _sys
+
+    from packages import mcp_daemon
+
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+    original = pid_path.read_text(encoding="utf-8")
+
+    def _replace_then_answer(pid: int) -> bool:
+        # Same bytes, different file: exactly what reclaim-and-re-reserve
+        # leaves behind, and invisible to any check on contents.
+        if pid_path.exists():
+            pid_path.unlink()
+            pid_path.write_text(original, encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(mcp_daemon, "_pid_alive", _replace_then_answer)
+    monkeypatch.setattr(
+        _sys, "argv", ["mcp_daemon", "--record-identity", str(pid_path), "4242", mine]
+    )
+
+    code = mcp_daemon._record_identity_cli()
+
+    assert code == 1
+    assert capsys.readouterr().out.strip().splitlines()[-1] == "STALE_RESERVATION"
+    assert pid_path.read_text(encoding="utf-8") == original, (
+        "the record was overwritten despite the reservation having been "
+        "replaced since it was inspected"
+    )
