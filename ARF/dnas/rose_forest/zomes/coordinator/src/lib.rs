@@ -198,6 +198,11 @@ pub fn assert_triple(input: AssertTripleInput) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
+/// Query triples by subject or predicate.
+///
+/// When both fields are supplied, subject wins and predicate is intentionally
+/// ignored. This is the current public contract; callers that need an
+/// intersection must filter the subject results themselves.
 pub fn query_triples(input: QueryTriplesInput) -> ExternResult<Vec<TripleResult>> {
     let results = match (&input.subject, &input.predicate) {
         (Some(subject), _) => ontology::query_by_subject(subject)?,

@@ -1,4 +1,4 @@
-use holochain::prelude::{ActionHash, AgentPubKey, Record, Timestamp};
+use holochain::prelude::{ActionHash, AgentPubKey, Record, SignedActionHashedExt, Timestamp};
 use rose_forest_sweettest::{
     await_two_agent_consistency, mutated_missing_hash, rose_zome, setup_two_agent_app,
     AssertTripleInput, KnowledgeTriple, QueryTriplesInput, TripleResult,
@@ -70,7 +70,13 @@ async fn criterion_2_provenance_returns_author_timestamp_and_signature() {
     assert!(record.action().timestamp() >= before);
     assert!(record.action().timestamp() <= after);
     assert_eq!(record.action().author(), app.alice.agent_pubkey());
-    assert_eq!(record.signed_action().signature.0.len(), 64);
+    // Verify the signature against the exact hashed action bytes and Alice's
+    // author key. A length check is tautological because Signature is [u8; 64].
+    record
+        .signed_action()
+        .verify_signature()
+        .await
+        .expect("Alice's signature must verify against the signed action");
     assert_eq!(triple.subject, "rose");
     assert_eq!(triple.predicate, "has_property");
     assert_eq!(triple.object, "provenance");
@@ -205,6 +211,23 @@ async fn criterion_4_bob_discovers_by_subject_and_predicate_without_hash() {
         assert_eq!(result.author, published_triple.source);
         assert_eq!(result.created_at, published_triple.created_at);
     }
+
+    // Current contract: subject wins when both filters are supplied. The
+    // deliberately wrong predicate must therefore not suppress the subject hit.
+    let subject_wins: Vec<TripleResult> = app.conductors[1]
+        .call(
+            &bob_zome,
+            "query_triples",
+            QueryTriplesInput {
+                subject: Some("holochain".into()),
+                predicate: Some("does_not_match".into()),
+            },
+        )
+        .await;
+    assert!(
+        subject_wins.iter().any(|result| result.hash == hash),
+        "subject filter must win when subject and predicate are both supplied"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

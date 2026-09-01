@@ -181,6 +181,17 @@ async fn consent_rejects_unrequested_scope_without_creating_a_decision() {
         "new payload must have no decision links before the rejected call"
     );
 
+    let app_entries_before = app.conductors[1]
+        .raw_handle()
+        .dump_full_cell_state(app.bob.cell_id(), None)
+        .await
+        .expect("Bob's authored source chain must be inspectable before the rejection")
+        .source_chain_dump
+        .records
+        .iter()
+        .filter(|record| record.entry.is_some())
+        .count();
+
     let error = app.conductors[1]
         .call_fallible::<_, ActionHash>(
             &bob_zome,
@@ -210,5 +221,24 @@ async fn consent_rejects_unrequested_scope_without_creating_a_decision() {
     assert!(
         decisions.is_empty(),
         "rejected call must not create a decision link"
+    );
+
+    // Links are secondary indexes. Also inspect Bob's authored source chain so
+    // a coordinator bug cannot hide an orphan ConsentDecision behind a missing
+    // link. A rejected call must add no app-entry action at all.
+    let after_dump = app.conductors[1]
+        .raw_handle()
+        .dump_full_cell_state(app.bob.cell_id(), None)
+        .await
+        .expect("Bob's authored source chain must be inspectable after the rejection");
+    let app_entries_after = after_dump
+        .source_chain_dump
+        .records
+        .iter()
+        .filter(|record| record.entry.is_some())
+        .count();
+    assert_eq!(
+        app_entries_after, app_entries_before,
+        "rejected call must not author an orphan ConsentDecision entry"
     );
 }
