@@ -53,11 +53,21 @@ function Release-Claim {
     Pop-Location
     $tok = ($out | Select-Object -Last 1)
     if ($tok) { $tok = $tok.ToString().Trim() }
-    if ($tok -ne 'RELEASED') {
+    if ($tok -eq 'RELEASED') { return $true }
+    if ($tok -eq 'SUPERSEDED') {
+        # Nothing to do and nothing wrong: another launcher owns the slot and
+        # its record is the one that should survive.
         Write-Host "[FLOSS MCP] $Label record is no longer the one we stopped - another launcher owns the slot; leaving its record intact"
-        return $false
+        return $true
     }
-    return $true
+    # COULD NOT ACT. This branch used to be folded into the one above, so an
+    # unreadable or undeletable record was reported as a clean handover and the
+    # script went on to print unconditional success -- while a stale record sat
+    # there ready to block the next start. Third time this file has announced a
+    # state it did not reach.
+    Write-Host "[FLOSS MCP] $Label record could NOT be removed (verdict=$tok); it will block the next start until an operator clears $Path"
+    $script:unresolved += "$Label - record could not be removed; clear $Path by hand"
+    return $false
 }
 
 # Anything this script deliberately leaves running or leaves on disk lands

@@ -875,7 +875,7 @@ def test_every_slot_release_removes_the_identity_sidecar_first():
     from packages import mcp_daemon
 
     source = Path(mcp_daemon.__file__).read_text(encoding="utf-8")
-    for func in ("_release_claim_cli", "_reclaim_claim_cli"):
+    for func in ("_release_claim_guarded", "_reclaim_claim_cli"):
         body = source.split(f"def {func}(", 1)[1].split(chr(10) + "def ", 1)[0]
         sidecar = body.index("_sidecar_cleared(")
         claim = body.index("_reclaim_claim_if_unchanged(")
@@ -1710,8 +1710,12 @@ def test_a_reservation_is_released_only_by_the_token_that_made_it(tmp_path):
 
     result = _release(pid_path, "token", mine)
 
-    assert result.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
-    assert result.returncode == 1
+    # SUPERSEDED, not NOT_RELEASED: another launcher owning the slot is the
+    # expected outcome of this cleanup, not a failure of it. The two were one
+    # verdict, so the scripts could not tell "nothing to do" from "could not
+    # act" and reported a stale record as a clean shutdown.
+    assert result.stdout.strip().splitlines()[-1] == "SUPERSEDED"
+    assert result.returncode == 0
     assert pid_path.exists(), "the winner's reservation was deleted"
 
 
@@ -1738,7 +1742,8 @@ def test_a_stopped_daemons_record_is_released_only_by_its_own_pid(tmp_path):
     pid_path.write_text("9999", encoding="utf-8")
     replaced = _release(pid_path, "pid", 4242)
 
-    assert replaced.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+    assert replaced.stdout.strip().splitlines()[-1] == "SUPERSEDED"
+    assert replaced.returncode == 0
     assert pid_path.read_text(encoding="utf-8") == "9999"
 
 
@@ -1807,3 +1812,122 @@ def test_recording_refuses_a_reservation_replaced_inside_the_window(
         "the winner's reservation was overwritten by a launcher that validated "
         "only the reservation it held before the window"
     )
+
+
+# ---------------------------------------------------------------------------
+# A paired mutation is one transition, and its verdicts are not interchangeable.
+# ---------------------------------------------------------------------------
+
+
+def test_a_release_that_could_not_act_is_not_reported_as_a_handover(tmp_path):
+    """SUPERSEDED and NOT_RELEASED were one verdict, so the scripts could not
+    tell 'another launcher owns it' from 'the record is stuck', treated both as
+    benign, and printed unconditional success over a record that will block the
+    next start.
+
+    This one PASSES against the unfixed code by design: it is the complement of
+    the split, pinning the case that must keep saying NOT_RELEASED so the fix
+    cannot collapse everything into SUPERSEDED. The discriminating half is
+    test_both_scripts_separate_the_two_release_failures and the SUPERSEDED
+    assertions in the release tests above.
+    """
+    stuck = tmp_path / "stuck.pid"
+    stuck.mkdir()
+
+    result = _release(stuck, "pid", 1)
+
+    assert result.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+    assert result.returncode == 1
+
+
+def test_both_scripts_separate_the_two_release_failures(tmp_path):
+    """Only one of the two is worth an operator's attention, and only one of
+    them may be reported as a clean shutdown."""
+    for name, collector in (
+        ("start_mcp_daemons.ps1", "$script:skipped"),
+        ("stop_mcp_daemons.ps1", "$script:unresolved"),
+    ):
+        text = _script(name)
+        assert "-eq 'SUPERSEDED'" in text, f"{name}: the two failures are still one"
+        assert collector in text, f"{name}: a stuck record is never reported"
+        body = text.split("-eq 'SUPERSEDED'", 1)[1]
+        assert (
+            collector in body
+        ), f"{name}: the collector must be on the could-not-act path, not the handover"
+
+
+def test_the_winners_sidecar_survives_a_losers_release(tmp_path):
+    """The sidecar was inspected at deletion time, not snapshotted with the
+    claim. A launcher replacing the record in between had ITS identity deleted
+    by a caller that then declined to touch its claim -- leaving a live daemon
+    whose --check-identity says UNKNOWN, which both scripts refuse to manage.
+    """
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("4242", encoding="utf-8")
+    sidecar = Path(f"{pid_path}.identity")
+    sidecar.write_text("winner-token", encoding="utf-8")
+
+    # We were told to release 1111; the record says 4242, so we own nothing.
+    result = _release(pid_path, "pid", 1111)
+
+    assert result.stdout.strip().splitlines()[-1] == "SUPERSEDED"
+    assert sidecar.read_text(encoding="utf-8") == "winner-token", (
+        "the winner's identity sidecar was deleted by a caller that was not "
+        "allowed to touch its claim"
+    )
+    assert pid_path.read_text(encoding="utf-8") == "4242"
+
+
+def test_a_claim_transition_is_serialised_against_other_mutations(tmp_path):
+    """reclaim_if_unchanged is atomic in its rename and racy around it: a
+    contender replacing the record between the caller's inspection and the
+    rename gets its LIVE claim moved aside, and the rollback then drops it as
+    'superseded'. Sound for a lock, where only a dead holder's file is ever
+    reclaimed. Not sound for a claim, whose owner is still running.
+    """
+    from packages.activity_log import filelock
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text("4242", encoding="utf-8")
+
+    # Hold the guard the transition must take, and prove it blocks.
+    with filelock.guarded(pid_path):
+        import subprocess
+        import sys as _sys
+
+        blocked = subprocess.run(
+            [
+                _sys.executable,
+                "-m",
+                "packages.mcp_daemon",
+                "--release-claim",
+                str(pid_path),
+                "pid",
+                "4242",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        )
+
+    assert blocked.stdout.strip().splitlines()[-1] == "NOT_RELEASED"
+    assert pid_path.exists(), "the record was removed while another mutation held it"
+
+
+def test_the_guard_is_reentrant_within_one_process(tmp_path):
+    """The helper takes it and so does any caller sequencing several helpers.
+    Without re-entrancy the second acquisition deadlocks against the first,
+    which is a hang rather than a test failure -- so it is asserted directly.
+    """
+    from packages.activity_log import filelock
+
+    target = tmp_path / "claim.pid"
+    target.write_text("1", encoding="utf-8")
+
+    with filelock.guarded(target):
+        with filelock.guarded(target):
+            assert filelock.reclaim_if_unchanged(
+                target, filelock.inspect_for_reclaim(target)
+            )
+
+    assert not target.exists()

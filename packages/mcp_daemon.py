@@ -18,6 +18,7 @@ import os
 import signal
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -77,6 +78,28 @@ def _reservation_token_of(raw: str):
         return None
     rest = raw[len(_RESERVATION_MARKER) :].strip()
     return rest or None
+
+
+@contextmanager
+def _claim_guard(pid_path: Path, *, timeout_seconds: float | None = None):
+    """Hold the shared mutation guard across a whole claim transition.
+
+    Every mutation here is really a PAIR -- an identity sidecar and the claim
+    beside it -- and each half was snapshotted at the moment it was about to be
+    touched rather than with the other. A contender replacing the record in
+    between got its sidecar deleted by a caller that then discovered it was not
+    allowed to touch the claim, leaving a live daemon whose --check-identity
+    returns UNKNOWN and which both scripts refuse to manage.
+
+    Fails CLOSED. Without the shared helper there is no way to serialise the
+    pair, and proceeding unserialised is how the sidecar gets deleted out from
+    under a live owner, so the transition does not happen at all.
+    """
+
+    from packages.activity_log.filelock import guarded
+
+    with guarded(pid_path, timeout_seconds=timeout_seconds):
+        yield
 
 
 def _inspect_claim(path: Path):
@@ -669,6 +692,26 @@ def _record_identity_cli() -> int:
         return 2
     presented = sys.argv[4].strip() if len(sys.argv) > 4 else ""
 
+    try:
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        with _claim_guard(pid_path):
+            return _record_identity_guarded(pid_path, pid, presented)
+    except TimeoutError:
+        # Another mutation of this claim is in flight. Reporting a state we did
+        # not reach is the failure this file has made three times; the caller
+        # stops the server it launched, which is correct.
+        print("STALE_RESERVATION")
+        return 1
+    except OSError:
+        print("UNKNOWN")
+        return 2
+    except ImportError:
+        # Fails closed, like every other path that needs the shared helper.
+        print("UNKNOWN")
+        return 2
+
+
+def _record_identity_guarded(pid_path: Path, pid: int, presented: str) -> int:
     # RECORD INTO THE RESERVATION WE MADE, NOT WHATEVER IS THERE NOW.
     #
     # This wrote unconditionally. A launcher suspended past
@@ -676,9 +719,7 @@ def _record_identity_cli() -> int:
     # second launcher -- that recovery is deliberate -- and then resumes and
     # records its PID over the second launcher's live claim. Both OmniRoute
     # servers are up; the tracked PID belongs to whichever recorded last, so
-    # stop kills one and leaves the other listening and untracked. Every fix
-    # before this one made the reservation distinguishable; none made the
-    # recorder prove it held the one it is writing into.
+    # stop kills one and leaves the other listening and untracked.
     #
     # Fail closed on a token mismatch, including a caller that presents none:
     # a marked reservation belongs to a specific launcher, and a recorder that
@@ -686,7 +727,17 @@ def _record_identity_cli() -> int:
     # are untouched -- an empty claim is a pre-marker reservation that cannot
     # be attributed either way, and a PID-bearing one is a re-record, both of
     # which were always allowed.
+    #
+    # BOTH HALVES SNAPSHOTTED HERE, TOGETHER. The sidecar used to be inspected
+    # at the moment it was about to be deleted, which is after the token check
+    # and after two process probes. A launcher that replaced the reservation
+    # and recorded its own PID in that gap had ITS sidecar captured and deleted
+    # by this call, and only then did the claim check reject the write -- so
+    # the winner kept its claim, lost its identity, and became an UNKNOWN that
+    # neither script will manage. One snapshot, one guard, one transition.
     existing = _inspect_claim(pid_path)
+    existing_sidecar = _inspect_sidecar(pid_path)
+
     if existing is not None:
         held = _reservation_token_of(existing.data.decode("utf-8", "replace").strip())
         if held is not None and held != presented:
@@ -698,35 +749,20 @@ def _record_identity_cli() -> int:
         return 1
     token = _process_start_token(pid)
 
-    # THE CHECK ABOVE IS A READ, SO IT CANNOT BE THE WHOLE GUARD.
-    #
-    # Validating the token and then writing left the window the token was
-    # introduced to close: the reservation can be legitimately reclaimed
-    # between the two, and an unconditional write then lands on the new
-    # owner's claim having verified only the old one. Every probe in between
-    # (_pid_alive, _process_start_token) widens it.
-    #
-    # There is no compare-and-swap WRITE for a file, so the transition is
-    # expressed with the two primitives that are atomic and are already how
-    # every other mutation in this module works:
-    #
-    #   1. CAS-remove the exact reservation instance we inspected. If someone
-    #      replaced it, this fails and nothing is touched.
-    #   2. O_CREAT|O_EXCL the pid file. If another launcher took the slot in
-    #      between, this fails and we report rather than clobber.
-    #
-    # Step 2 losing means we gave up a reservation we no longer held anyway.
-    # The caller stops the process it launched, which is the correct outcome:
-    # the alternative is two servers and one record.
+    # Nothing can have moved under the guard, so these removals act on exactly
+    # what was snapshotted above. Sidecar first, as everywhere else: if this
+    # process dies between the two, the survivor is an unverifiable holder,
+    # which blocks -- rather than a claim with a stranger's identity beside it,
+    # which is read as proof the holder is foreign.
     if existing is not None:
-        if not _sidecar_cleared(pid_path, _inspect_sidecar(pid_path)):
+        if not _sidecar_cleared(pid_path, existing_sidecar):
             print("STALE_RESERVATION")
             return 1
         if not _reclaim_claim_if_unchanged(pid_path, existing):
             print("STALE_RESERVATION")
             return 1
+
     try:
-        pid_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         print("STALE_RESERVATION")
@@ -892,7 +928,39 @@ def _release_claim_cli() -> int:
         print("usage: --release-claim <pid_file> token|pid <value>", file=sys.stderr)
         return 2
 
+    try:
+        with _claim_guard(pid_path):
+            return _release_claim_guarded(pid_path, kind, value)
+    except TimeoutError:
+        # Could not act. NOT the same as "someone else owns it" -- see below.
+        print("NOT_RELEASED")
+        return 1
+    except (OSError, ImportError):
+        print("NOT_RELEASED")
+        return 1
+
+
+def _release_claim_guarded(pid_path: Path, kind: str, value: str) -> int:
+    # THREE VERDICTS, BECAUSE THE CALLER'S NEXT MOVE DIFFERS FOR EACH.
+    #
+    # This printed NOT_RELEASED both for "another launcher owns the slot now"
+    # and for "the record is unreadable and still there". The scripts treated
+    # both as the benign first case, dropped the boolean, and went on to print
+    # an unconditional success line -- so a stale record that will block the
+    # next start was reported as a clean shutdown. Fourth instance in these
+    # scripts of announcing a state they did not reach.
+    #
+    #   RELEASED    we removed the record we named
+    #   SUPERSEDED  someone else owns the slot; nothing to do, nothing wrong
+    #   NOT_RELEASED we could not act, and the record is still there
+    #
+    # BOTH HALVES SNAPSHOTTED TOGETHER, under the guard, for the same reason
+    # --record-identity does it: inspecting the sidecar at deletion time meant
+    # capturing a replacement's identity and deleting it before the claim check
+    # refused to remove the replacement's claim.
     observed = _inspect_claim(pid_path)
+    observed_sidecar = _inspect_sidecar(pid_path)
+
     if observed is None:
         # ABSENT IS SUCCESS; UNREADABLE IS NOT -- decided the same way
         # --reclaim-claim decides it, because _inspect_claim returns None for
@@ -910,13 +978,12 @@ def _release_claim_cli() -> int:
     raw = observed.data.decode("utf-8", "replace").strip()
     if kind == "token":
         if _reservation_token_of(raw) != value:
-            print("NOT_RELEASED")
-            return 1
+            print("SUPERSEDED")
+            return 0
     elif raw != value:
-        print("NOT_RELEASED")
-        return 1
+        print("SUPERSEDED")
+        return 0
 
-    observed_sidecar = _inspect_sidecar(pid_path)
     if _sidecar_cleared(pid_path, observed_sidecar) and _reclaim_claim_if_unchanged(
         pid_path, observed
     ):

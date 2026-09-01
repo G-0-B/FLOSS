@@ -20,8 +20,13 @@ marker was abandoned and then remove it:
     putting a live holder's lock back requires the path to be free, and any
     moment the path is free is a moment another contender can take it.
 
-That last one has no fix at this layer. Reclamation cannot be made safe when
-the thing being reclaimed must be removed from the namespace to be examined.
+Reclamation cannot be made safe *on its own* when the thing being reclaimed
+must be removed from the namespace to be examined. It CAN be made safe by
+serialising it, which is what `guarded()` below is for -- and the fact that the
+answer was an OS lock sitting in the same module is the point: `reclaim_if_
+unchanged` is now used only for daemon CLAIM records, where the displaced owner
+may still be alive, and where "someone else holds the path now, so our copy is
+superseded" is false.
 
 An OS lock has no marker to abandon. The kernel drops it when the holding
 process exits, however it exits, so there is nothing to expire, nothing to
@@ -39,6 +44,7 @@ from __future__ import annotations
 import base64
 import os
 import sys
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -261,6 +267,70 @@ def _is_same_instance(path: Path, inspected: Inspection) -> bool:
     return data == inspected.data
 
 
+_GUARD_STATE = threading.Lock()
+_GUARD_LOCKS: dict[str, threading.RLock] = {}
+_GUARD_DEPTH: dict[str, int] = {}
+_GUARD_TOKENS: dict[str, str] = {}
+
+
+def guard_path(path: Path) -> Path:
+    """The lock file serialising mutations of `path`."""
+
+    return path.with_name(f"{path.name}.lock")
+
+
+@contextmanager
+def guarded(path: Path, *, timeout_seconds: float | None = None):
+    """Serialise every mutation of `path` across processes AND threads.
+
+    `reclaim_if_unchanged` is atomic in its rename and racy in everything
+    around it: a contender can replace the record between the caller's
+    inspection and the rename, in which case a LIVE record is moved aside, the
+    pathname is briefly free, a third party can take it, and the rollback's
+    exclusive create then fails -- at which point the helper drops what it is
+    holding as "superseded". For a lock file that is sound, because only a dead
+    holder's lock is ever reclaimed. For a daemon CLAIM it is not: the owner it
+    just deleted is still running, now untracked, while the newcomer starts a
+    second one.
+
+    A paired mutation has the same shape one level up. Removing a claim means
+    removing its identity sidecar too, and snapshotting the two at different
+    moments lets a caller delete the winner's sidecar before discovering it may
+    not touch the winner's claim -- leaving a live daemon whose identity check
+    returns UNKNOWN, which both scripts then refuse to manage.
+
+    Neither is fixable by more careful checking, because the gap is between the
+    check and the act. Both are fixed by holding this guard across the whole
+    transition. It is re-entrant, so the helper may take it and so may a caller
+    sequencing several helpers.
+
+    The guard is an OS lock on a sibling `.lock` file, which is never unlinked
+    and so has nothing to reclaim -- the property that made locks safe is what
+    makes claims safe, one level up.
+    """
+
+    key = os.path.abspath(str(path))
+    with _GUARD_STATE:
+        rlock = _GUARD_LOCKS.setdefault(key, threading.RLock())
+    lock_path = guard_path(path)
+    rlock.acquire()
+    try:
+        depth = _GUARD_DEPTH.get(key, 0)
+        if depth == 0:
+            _GUARD_TOKENS[key] = _acquire_lock(
+                lock_path, timeout_seconds=timeout_seconds
+            )
+        _GUARD_DEPTH[key] = depth + 1
+        try:
+            yield lock_path
+        finally:
+            _GUARD_DEPTH[key] -= 1
+            if _GUARD_DEPTH[key] == 0:
+                _release_lock(lock_path, _GUARD_TOKENS.pop(key))
+    finally:
+        rlock.release()
+
+
 def reclaim_if_unchanged(path: Path, inspected: Inspection | None) -> bool:
     """Remove `path` only if it is still the exact file that was inspected.
 
@@ -278,8 +348,22 @@ def reclaim_if_unchanged(path: Path, inspected: Inspection | None) -> bool:
     anything that is not what we looked at.
 
     Returns True when this caller is the one that removed it.
+
+    Held under `guarded(path)` so no contender can replace the record between
+    the caller's inspection and the rename below. Without that the rollback
+    path is reachable, and its "someone holds the slot now, so the copy in our
+    hand is superseded" is only true for a lock. For a claim the displaced
+    owner is still running.
+
+    The guard is re-entrant, so a caller sequencing a paired mutation (a claim
+    and its sidecar) takes it once around both and this call joins it.
     """
 
+    with guarded(path):
+        return _reclaim_if_unchanged_guarded(path, inspected)
+
+
+def _reclaim_if_unchanged_guarded(path: Path, inspected: Inspection | None) -> bool:
     quarantine = path.with_name(f"{path.name}.reclaim-{_b64url_encode(os.urandom(9))}")
     try:
         os.rename(path, quarantine)

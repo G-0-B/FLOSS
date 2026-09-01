@@ -1403,6 +1403,14 @@ def test_only_one_reclaimer_reports_success(tmp_path):
 
 
 def test_reclaiming_leaves_no_quarantine_files_behind(tmp_path):
+    """A failed or interrupted reclaim must not litter the directory with the
+    `.reclaim-<rand>` names it moves records aside under.
+
+    The guard's own `.lock` sibling is exempt and is the one thing that MUST
+    survive: it is a handle, not a claim, and unlinking it is the operation
+    that made every earlier version of this module racy. The assertion is
+    therefore about quarantine names, not about an empty directory.
+    """
     from packages.activity_log import filelock
 
     lock_path = tmp_path / ".tidy.lock"
@@ -1410,7 +1418,10 @@ def test_reclaiming_leaves_no_quarantine_files_behind(tmp_path):
 
     filelock.reclaim_if_unchanged(lock_path, filelock.inspect_for_reclaim(lock_path))
 
-    assert list(tmp_path.iterdir()) == []
+    leftovers = sorted(p.name for p in tmp_path.iterdir())
+    assert not any(".reclaim-" in name for name in leftovers), leftovers
+    assert leftovers == [filelock.guard_path(lock_path).name], leftovers
+    assert not lock_path.exists()
 
 
 def test_rolling_back_a_live_lock_never_overwrites_a_newer_one(tmp_path):

@@ -58,11 +58,14 @@ function Release-OmniClaim {
     Pop-Location
     $tok = ($out | Select-Object -Last 1)
     if ($tok) { $tok = $tok.ToString().Trim() }
-    if ($tok -ne 'RELEASED') {
+    if ($tok -eq 'RELEASED') { return $true }
+    if ($tok -eq 'SUPERSEDED') {
         Write-Host "[FLOSS MCP] OmniRoute slot is no longer ours to release - another launcher owns it; leaving its record intact"
-        return $false
+        return $true
     }
-    return $true
+    Write-Host "[FLOSS MCP] OmniRoute reservation could NOT be released (verdict=$tok); it will block the next start until an operator clears $omniPid"
+    $script:skipped += "OmniRoute (:20128) - reservation could not be released; clear $omniPid by hand"
+    return $false
 }
 
 function Resolve-ServerPid {
