@@ -245,6 +245,7 @@ def snapshot_subject(
         staged_diff=_diff_with_exclusions(
             repo,
             "diff",
+            "--no-ext-diff",
             "--binary",
             "--full-index",
             "--cached",
@@ -253,6 +254,7 @@ def snapshot_subject(
         unstaged_diff=_diff_with_exclusions(
             repo,
             "diff-files",
+            "--no-ext-diff",
             "--binary",
             "--full-index",
             exclude_paths=exclude_paths,
