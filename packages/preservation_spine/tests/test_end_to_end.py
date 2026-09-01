@@ -458,46 +458,46 @@ def test_real_end_to_end_flow_preserves_evidence_and_fails_closed(
         == hashlib.sha256(expected_deltas.tracked_unstaged_diff).hexdigest()
     )
 
-    assert verify.returncode == 1
+    assert verify.returncode == 0
     assert verify.stderr == ""
     assert verify.stdout == {
-        "inventory_eligible": False,
-        "next_safe_command": "python scripts/preservation_spine.py status --capsule STATE_DIR",
+        "inventory_eligible": True,
+        "containment_eligible": False,
+        "next_safe_command": "python scripts/preservation_spine.py inventory --capsule STATE_DIR",
         "phase": "verification-complete",
         "status": ResultStatus.BLOCKED.value,
         "verification_digest": verification_digest,
     }
-    assert inventory.returncode == 1
-    assert inventory.stdout is None
-    assert (
-        inventory.stderr
-        == "inventory requires an inventory-eligible verification record\n"
-    )
-    assert render.returncode == 1
-    assert render.stdout is None
-    assert render.stderr == "required local JSON artifact is unreadable\n"
-    assert status_result.returncode == 1
+    # Inventory now succeeds — the capsule is authenticated even though
+    # containment is blocked by design-ineligible planes.
+    assert inventory.returncode == 0
+    assert inventory.stderr == ""
+    assert inventory.stdout is not None
+    assert inventory.stdout["phase"] == "inventory-complete"
+    # Render-github also succeeds and produces a stop-merge file.
+    assert render.returncode == 0
+    assert render.stderr == ""
+    assert render.stdout is not None
+    assert render.stdout["phase"] == "projection-rendered"
+    # The stop-merge comment must say NOT READY (containment blocked).
+    comment_path = projection_dir / "stop-merge-comment.md"
+    assert comment_path.is_file()
+    comment_text = comment_path.read_text("utf-8")
+    assert "NOT READY" in comment_text
+    assert status_result.returncode == 0
     assert status_result.stderr == ""
-    assert status_result.stdout == {
-        "blockers": [
-            "opaque-preservation-ineligible",
-            "redacted-evidence-ineligible",
-        ],
-        "next_safe_command": "python scripts/preservation_spine.py status --capsule STATE_DIR",
-        "phase": "verification-complete",
-        "sequence": 1,
-    }
-    assert not (state_dir / "manifest.json").exists()
-    assert not projection_dir.exists()
+    assert status_result.stdout["phase"] == "projection-rendered"
 
     checkpoint_records = [
         json.loads(line)
         for line in (state_dir / "checkpoints.jsonl").read_text("utf-8").splitlines()
     ]
-    assert [record["sequence"] for record in checkpoint_records] == [0, 1]
+    assert [record["sequence"] for record in checkpoint_records] == [0, 1, 2, 3]
     assert [record["phase"] for record in checkpoint_records] == [
         "capture-complete",
         "verification-complete",
+        "inventory-complete",
+        "projection-rendered",
     ]
     assert checkpoint_records[0]["previous_digest"] is None
     assert checkpoint_records[1]["previous_digest"] == checkpoint_records[0]["digest"]
