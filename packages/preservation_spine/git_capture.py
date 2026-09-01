@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -34,6 +35,48 @@ class CaptureUnverifiable(CaptureEvidenceError):
     """Raised when redaction makes requested byte equality unprovable."""
 
 
+def _split_segments(component: str) -> list[str]:
+    """Split a path component on dash and underscore boundaries.
+
+    Dots are NOT separators — extensions are checked via suffix matching
+    in is_secret.
+
+    e.g. 'my-token' → ['my', 'token']
+    e.g. 'api_key' → ['api', 'key']
+    e.g. 'wallet-seed' → ['wallet', 'seed']
+    """
+    return [s for s in re.split(r"[-_]", component) if s]
+
+
+def _marker_in_stem(marker: str, stem: str) -> bool:
+    """Check if marker appears as a separator-bounded token in the stem.
+
+    e.g. 'api_key' in 'api_key' → True (bounded by start/end, has underscore)
+         'token' in 'my-token' → True (dash-bounded)
+         'seed' in 'wallet-seed' → True (dash-bounded)
+         'seed' in 'seedling' → False (not bounded)
+         'seed' in 'seed' → False (bare stem, no separator — too broad)
+
+    Bare stems with no separator do NOT match unless the caller handles
+    exact-match separately.  This prevents 'seed.md' (stem 'seed') from
+    matching marker 'seed' while 'wallet-seed.txt' still matches.
+    """
+    if "-" not in stem and "_" not in stem:
+        return False  # bare stem, no separators — don't match
+    # Check all separator boundary combinations
+    for sep in ("-", "_"):
+        padded = f"{sep}{stem}{sep}"
+        if f"{sep}{marker}{sep}" in padded:
+            return True
+    # Cross-separator: marker at boundary between dash and underscore
+    # e.g. 'api_key' in 'my-api_key-config' — check both paddings
+    for left in ("-", "_"):
+        for right in ("-", "_"):
+            if f"{left}{marker}{right}" in f"-{stem}-" or f"{left}{marker}{right}" in f"_{stem}_":
+                return True
+    return False
+
+
 @dataclass(frozen=True)
 class SecretPolicy:
     """Path-name rules that redact likely secret-bearing files before reads."""
@@ -64,10 +107,44 @@ class SecretPolicy:
         )
 
     def is_secret(self, relative_path: str) -> bool:
-        """Classify a relative path without reading its filesystem target."""
+        """Classify a relative path without reading its filesystem target.
 
-        folded = relative_path.casefold()
-        return any(marker.casefold() in folded for marker in self.markers)
+        Matches markers against:
+        - exact path component equality (e.g. '.env' == '.env')
+        - dash-separated segments of the filename stem (e.g. 'token' in 'my-token')
+        - suffix/extension match (e.g. '.key' suffix of 'private.key')
+
+        Does NOT do substring matching across the whole relative path,
+        so docs/seed.md is NOT redacted (seed is not a dash-segment of
+        stem 'seed', nor a suffix), while wallet-seed.txt IS redacted
+        (seed is a dash-segment of stem 'wallet-seed').
+        """
+
+        path = PurePosixPath(relative_path)
+        for part in path.parts:
+            folded = part.casefold()
+            for marker in self.markers:
+                mf = marker.casefold()
+                # Exact component match (e.g. '.env', 'id_rsa')
+                if folded == mf:
+                    return True
+                # Suffix match (e.g. '.key' matches 'private.key')
+                if folded.endswith(mf) and mf.startswith("."):
+                    return True
+                # Dotfile prefix match (e.g. '.env' matches '.env.local',
+                # '.env.production') — marker starts with dot and is a
+                # dot-prefix of the component.
+                if mf.startswith(".") and folded.startswith(mf + "."):
+                    return True
+                # Marker as a separator-bounded token in the stem.
+                # e.g. 'api_key' matches stem 'api_key' (exact stem),
+                #      'token' matches stem 'my-token' (dash-bounded),
+                #      'seed' matches stem 'wallet-seed' (dash-bounded).
+                # Does NOT match 'seedling' (seed not separator-bounded).
+                stem = PurePosixPath(part).stem.casefold()
+                if _marker_in_stem(mf, stem):
+                    return True
+        return False
 
 
 @dataclass(frozen=True)
