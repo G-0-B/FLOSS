@@ -601,3 +601,39 @@ def test_capture_drift_surfaces_real_exception_message(
     captured = capsys.readouterr()
     assert "source state changed during capture" in captured.err
     assert "local-only salvage command failed" not in captured.err
+
+
+def test_capture_cleans_up_output_dir_on_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If capture fails before the genesis checkpoint is written, the
+    output directory must be removed so a re-run is not blocked by
+    a partial capsule."""
+    repo, main_sha, pr_sha = _build_repo(tmp_path)
+    output = tmp_path / "capsule-state-fail"
+
+    from packages.preservation_spine.git_capture import CaptureDrift
+
+    def _fail_capture(*args: object, **kwargs: object) -> object:
+        raise CaptureDrift("injected failure after mkdir")
+
+    monkeypatch.setattr("packages.preservation_spine.cli.capture_planes", _fail_capture)
+
+    assert (
+        main(
+            [
+                "capture",
+                "--repo",
+                str(repo),
+                "--remote-main-sha",
+                main_sha,
+                "--pr-head-sha",
+                pr_sha,
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+
+    assert not output.exists(), "output dir must be removed on capture failure"
