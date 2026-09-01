@@ -1111,6 +1111,11 @@ def test_the_daemon_reclaim_delegates_to_the_shared_implementation():
     source = (Path(__file__).resolve().parents[1] / "mcp_daemon.py").read_text(
         encoding="utf-8"
     )
+    # The guarded bodies, not the thin wrappers that take the guard. Each
+    # transition moved into a _*_guarded function when every mutator was
+    # brought under one lock, and a split that follows the old name reads a
+    # section with no removals in it and passes. Third time a source-splitting
+    # guard has needed this edit: the standing cost of asserting on text.
 
     assert "from packages.activity_log.filelock import reclaim_if_unchanged" in source
     body = source.split("def _reclaim_claim_if_unchanged(", 1)[1].split("\ndef ", 1)[0]
@@ -1162,8 +1167,8 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     source = (Path(__file__).resolve().parents[1] / "mcp_daemon.py").read_text(
         encoding="utf-8"
     )
-    body = source.split("def claim_singleton(", 1)[1].split("\ndef ", 1)[0]
-    reserve = source.split("def _reserve_slot_cli(", 1)[1].split("\ndef ", 1)[0]
+    body = source.split("def _claim_singleton_guarded(", 1)[1].split("\ndef ", 1)[0]
+    reserve = source.split("def _reserve_slot_guarded(", 1)[1].split("\ndef ", 1)[0]
     cli = source.split("def _reclaim_claim_cli(", 1)[1].split("\ndef ", 1)[0]
 
     # Only the RECLAIM and RELEASE paths are in scope. The two remaining plain
@@ -1171,7 +1176,7 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     # not yet published, which it holds exclusively; they remove nothing another
     # holder could own.
     for name, section in (
-        ("_reserve_slot_cli", reserve),
+        ("_reserve_slot_guarded", reserve),
         ("_reclaim_claim_cli", cli),
     ):
         assert (
@@ -1189,10 +1194,17 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     # The sidecar goes through _sidecar_cleared (which reclaims it by instance
     # and distinguishes absent from unreadable); the claim goes through the
     # helper directly. Both reclaim branches, plus the release callback's pair.
+    # The release callback moved out of claim_singleton into _release_guarded
+    # when every mutator was brought under the shared guard, so the pair it
+    # contributes is counted from there rather than from the claim body.
+    release = source.split("def _release_guarded(", 1)[1].split(chr(10) + "def ", 1)[0]
     assert (
         body.count("_sidecar_cleared(pid_path, observed_sidecar)") == 2
     ), "a reclaim branch clears the sidecar without binding it to the snapshot"
-    assert body.count("_reclaim_claim_if_unchanged(") == 4
+    assert (body + release).count("_reclaim_claim_if_unchanged(") == 4
+    assert release.index("_identity_path(pid_path), identity_seen") < release.index(
+        "_reclaim_claim_if_unchanged(pid_path, mine)"
+    ), "the release frees the slot before its sidecar"
 
 
 def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
@@ -1931,3 +1943,101 @@ def test_the_guard_is_reentrant_within_one_process(tmp_path):
             )
 
     assert not target.exists()
+
+
+def test_recording_refuses_a_winner_that_already_converted_to_a_pid(tmp_path):
+    """The token test only fired for RESERVATION records.
+
+    A launcher suspended past the stale window has its reservation reclaimed,
+    and the winner then records its own PID -- so by the time the loser
+    resumes, the slot holds a pid, not a reservation.
+    _reservation_token_of() returns None for that, the mismatch branch never
+    fired, and the loser deleted the winner's claim AND its sidecar and
+    recorded itself. Two servers, one record, pointing at the loser.
+    """
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    mine = _reservation_token(_reserve(pid_path))
+
+    # The winner reclaimed our reservation and recorded its own server.
+    pid_path.write_text("31337", encoding="utf-8")
+    sidecar = Path(f"{pid_path}.identity")
+    sidecar.write_text("winner-start-token", encoding="utf-8")
+
+    result = _record(pid_path, os.getpid(), mine)
+
+    assert result.stdout.strip().splitlines()[-1] == "STALE_RESERVATION"
+    assert result.returncode == 1
+    assert pid_path.read_text(encoding="utf-8") == "31337"
+    assert sidecar.read_text(encoding="utf-8") == "winner-start-token"
+
+
+def test_re_recording_the_same_pid_is_still_allowed(tmp_path):
+    """Fail-closed must not break the idempotent case the start script relies
+    on when it retries a recording."""
+    import os
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+
+    result = _record(pid_path, os.getpid())
+
+    assert result.stdout.strip().splitlines()[-1] == "RECORDED"
+    assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
+
+
+def test_every_creator_of_a_claim_joins_the_guard(tmp_path):
+    """A guard only half the writers take is not mutual exclusion.
+
+    The guard was added to the reclaimers, and the two exclusive creates they
+    race against -- --reserve-slot and claim_singleton -- stayed outside it.
+    A slow reclaimer could still have its inspected claim replaced by one of
+    those creates, move the LIVE replacement aside, and lose it to a rollback
+    that could not reacquire the pathname.
+    """
+    from packages.activity_log import filelock
+
+    pid_path = tmp_path / "omniroute.pid"
+
+    with filelock.guarded(pid_path):
+        blocked = _reserve(pid_path)
+
+    assert blocked.stdout.strip().splitlines()[-1] == "OCCUPIED"
+    assert not pid_path.exists(), "a reservation was created inside another transition"
+
+
+def test_claim_singleton_waits_for_a_transition_in_flight(tmp_path):
+    """Same property on the daemon's own creator, which had the same gap.
+
+    Driven in a SUBPROCESS. The guard is re-entrant within a process on
+    purpose -- the reclaim helper takes it and so does any caller sequencing
+    several helpers -- so holding it in the test process and calling
+    claim_singleton() there proves nothing: it simply re-enters. The exclusion
+    being asserted is cross-process, so the claimant has to be one.
+    """
+    import subprocess
+    import sys as _sys
+
+    from packages.activity_log import filelock
+
+    pid_path = tmp_path / "consensus.pid"
+    program = (
+        "import os, sys;"
+        "sys.path.insert(0, os.getcwd());"
+        "from packages import mcp_daemon;"
+        "mcp_daemon._CLAIM_GUARD_SECONDS = 0.2;"
+        "print(mcp_daemon.claim_singleton('consensus.pid'))"
+    )
+
+    with filelock.guarded(pid_path):
+        result = subprocess.run(
+            [_sys.executable, "-c", program],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+            env={**os.environ, "FLOSS_AGENT_DIR": str(tmp_path)},
+        )
+
+    assert result.stdout.strip().splitlines()[-1] == "False", result.stderr[-2000:]
+    assert not pid_path.exists(), "a claim was created inside another transition"

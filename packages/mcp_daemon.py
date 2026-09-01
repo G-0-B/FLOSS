@@ -29,6 +29,11 @@ from pathlib import Path
 # while reclaiming too late costs one more run.
 _RESERVATION_STALE_SECONDS = 60.0
 
+# How long any claim transition waits for another one to finish. Short: a
+# daemon that cannot claim its slot must fail fast rather than hang at
+# startup, and a shutdown must never block on it at all.
+_CLAIM_GUARD_SECONDS = 5.0
+
 
 # A reservation carries a unique token so two of them are never identical.
 #
@@ -373,6 +378,64 @@ def claim_singleton(pid_filename: str) -> bool:
     # atexit handler deleted the SURVIVOR's pid file, so duplicate prevention
     # was defeated for every later start too. O_EXCL makes exactly one creator
     # win at the filesystem level.
+    # UNDER THE SAME GUARD AS EVERY OTHER MUTATION OF THIS PATH.
+    #
+    # This creator sat outside the guard added for the reclaimers, which makes
+    # the guard not mutual exclusion but a convention half the writers follow.
+    # A reclaimer that inspected an old claim could have it replaced here, move
+    # the LIVE replacement aside, and lose it to a rollback that could not get
+    # the pathname back. Taken with a short budget because a daemon that cannot
+    # claim its slot must fail fast rather than hang at startup.
+    try:
+        with _claim_guard(pid_path, timeout_seconds=_CLAIM_GUARD_SECONDS):
+            claimed = _claim_singleton_guarded(pid_path, me)
+    except TimeoutError:
+        # Someone is mid-transition on this slot. Occupied is the conservative
+        # reading and the one that prevents a duplicate daemon.
+        return False
+    except (OSError, ImportError):
+        return False
+    if not claimed:
+        return False
+
+    def _release() -> None:
+        """Remove the pid file only while it still names this process.
+
+        Unconditional unlink is what let a losing racer delete the winner's
+        claim.
+        """
+        try:
+            with _claim_guard(pid_path, timeout_seconds=_CLAIM_GUARD_SECONDS):
+                _release_guarded(pid_path, me)
+        except (TimeoutError, OSError, ImportError, ValueError):
+            # Leaving the record is the conservative failure: it blocks the
+            # next start rather than freeing a slot we may not own. Never hang
+            # a shutdown on it.
+            pass
+
+    atexit.register(_release)
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda *_: (_release(), sys.exit(0)))
+    return True
+
+
+def _release_guarded(pid_path: Path, me: int) -> None:
+    # Identity captured with the contents, so the reclaims below prove
+    # they are removing the same files this ownership test read.
+    mine = _inspect_claim(pid_path)
+    identity_seen = _inspect_claim(_identity_path(pid_path))
+    if mine is None or mine.data.decode("utf-8", "replace").strip() != str(me):
+        return
+    # SIDECAR FIRST, exactly as the stale-reclaim path does. Unlinking the
+    # PID file first opens a window in which a replacement launcher claims
+    # the freed slot and writes ITS identity -- which this callback then
+    # deletes. The replacement stays alive but unverifiable, so the stop
+    # script refuses to terminate it and every later launch stays blocked.
+    _reclaim_claim_if_unchanged(_identity_path(pid_path), identity_seen)
+    _reclaim_claim_if_unchanged(pid_path, mine)
+
+
+def _claim_singleton_guarded(pid_path: Path, me: int) -> bool:
     claimed = False
     for _ in range(5):
         try:
@@ -503,44 +566,7 @@ def claim_singleton(pid_filename: str) -> bool:
                 return False
             claimed = True
             break
-    if not claimed:
-        return False
-
-    def _release() -> None:
-        """Remove the pid file only while it still names this process.
-
-        Unconditional unlink is what let a losing racer delete the winner's
-        claim.
-        """
-        try:
-            # Identity captured with the contents, so the reclaims below prove
-            # they are removing the same files this ownership test read.
-            mine = _inspect_claim(pid_path)
-            if mine is not None and mine.data.decode("utf-8", "replace").strip() == str(
-                me
-            ):
-                # SIDECAR FIRST, exactly as the stale-reclaim path does.
-                # Unlinking the PID file first opens a window in which a
-                # replacement launcher claims the freed slot and writes ITS
-                # identity -- which this callback then deletes. The replacement
-                # stays alive but unverifiable, so the stop script refuses to
-                # terminate it and every later launch stays blocked.
-                #
-                # And INSTANCE-CHECKED, like every other removal here. The
-                # ownership test above is a read; a slow shutdown can be judged
-                # stale and reclaimed between that read and these unlinks, and
-                # then this would delete the replacement's record by pathname.
-                # Same defect as the reclaim paths, on the way out instead of in.
-                identity_seen = _inspect_claim(_identity_path(pid_path))
-                _reclaim_claim_if_unchanged(_identity_path(pid_path), identity_seen)
-                _reclaim_claim_if_unchanged(pid_path, mine)
-        except (OSError, ValueError):
-            pass
-
-    atexit.register(_release)
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda *_: (_release(), sys.exit(0)))
-    return True
+    return claimed
 
 
 def audit_appender(sink: str):
@@ -724,9 +750,10 @@ def _record_identity_guarded(pid_path: Path, pid: int, presented: str) -> int:
     # Fail closed on a token mismatch, including a caller that presents none:
     # a marked reservation belongs to a specific launcher, and a recorder that
     # cannot name it is not that launcher. Absent, empty and PID-bearing claims
-    # are untouched -- an empty claim is a pre-marker reservation that cannot
-    # be attributed either way, and a PID-bearing one is a re-record, both of
-    # which were always allowed.
+    # Absent and empty claims are untouched: an empty claim is a pre-marker
+    # reservation that cannot be attributed either way. A PID-bearing claim is
+    # accepted only when it already names the PID being recorded, which is a
+    # genuine re-record; any other PID belongs to a launcher that beat us.
     #
     # BOTH HALVES SNAPSHOTTED HERE, TOGETHER. The sidecar used to be inspected
     # at the moment it was about to be deleted, which is after the token check
@@ -739,8 +766,26 @@ def _record_identity_guarded(pid_path: Path, pid: int, presented: str) -> int:
     existing_sidecar = _inspect_sidecar(pid_path)
 
     if existing is not None:
-        held = _reservation_token_of(existing.data.decode("utf-8", "replace").strip())
-        if held is not None and held != presented:
+        raw = existing.data.decode("utf-8", "replace").strip()
+        held = _reservation_token_of(raw)
+        if held is not None:
+            if held != presented:
+                print("STALE_RESERVATION")
+                return 1
+        elif raw and raw != str(pid):
+            # A PID-BEARING CLAIM IS NOT A FREE PASS.
+            #
+            # The token test only rejected when the record was still a
+            # RESERVATION, so a launcher whose reservation had been reclaimed
+            # AND already converted to a PID claim by the winner sailed
+            # through: _reservation_token_of returns None for a pid, the
+            # branch did not fire, and the code below deleted the winner's
+            # claim and sidecar and recorded the loser's PID. The comment here
+            # used to call that "a re-record, which was always allowed" -- true
+            # only when the pid is OURS, which is the case this now tests.
+            #
+            # Moving a slot to a different PID is a release followed by a
+            # record, and has to be asked for in those words.
             print("STALE_RESERVATION")
             return 1
 
@@ -814,6 +859,34 @@ def _reserve_slot_cli() -> int:
     pid_path = Path(sys.argv[2])
     try:
         pid_path.parent.mkdir(parents=True, exist_ok=True)
+        with _claim_guard(pid_path):
+            return _reserve_slot_guarded(pid_path)
+    except TimeoutError:
+        # Another mutation of this claim is in flight; it will either leave a
+        # live claim or a fresh reservation, and both mean OCCUPIED here.
+        print("OCCUPIED")
+        return 1
+    except (OSError, ImportError):
+        print("OCCUPIED")
+        return 1
+
+
+def _reserve_slot_guarded(pid_path: Path) -> int:
+    # THE CREATORS HAVE TO JOIN THE GUARD, NOT ONLY THE RECLAIMERS.
+    #
+    # The guard was added to reclaim_if_unchanged and to the two transitions
+    # that remove records, and this exclusive create -- the thing those
+    # reclaimers race against -- was left outside it. A guard only some
+    # mutators take is not mutual exclusion: a slow reclaimer that inspected an
+    # old claim could still have it replaced here before it entered the
+    # guarded helper, then move that LIVE reservation aside, and a second
+    # unguarded create could occupy the momentarily free pathname so the
+    # rollback discarded the displaced claim. Exactly the window the guard was
+    # added to close, still open through the door that was not fitted.
+    #
+    # This is the right lock around the wrong span, which is the shape this
+    # session has now produced more than any other.
+    try:
         fd = os.open(pid_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         # THE RECLAMATION HAS TO BE ON THIS PATH, NOT ONLY IN claim_singleton.
