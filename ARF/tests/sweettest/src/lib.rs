@@ -19,9 +19,36 @@ pub async fn setup_two_agent_app() -> TestApp {
         .join("../../dnas/rose_forest/workdir/rose_forest.dna");
     assert!(
         bundle_path.is_file(),
-        "DNA bundle missing: {}",
+        "DNA bundle missing: {} — build and pack via ./tests/sweettest/run.sh, not bare cargo test",
         bundle_path.display()
     );
+
+    // Verify the four release WASMs exist and are nonzero.  Without this
+    // check, a stale gitignored .dna bundle silently passes tests against
+    // outdated zome code.  The WASMs are built by run.sh before packing.
+    let wasm_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../target/wasm32-unknown-unknown/release");
+    let expected_wasms = [
+        "rose_forest_integrity.wasm",
+        "rose_forest.wasm",
+        "consent_integrity.wasm",
+        "consent.wasm",
+    ];
+    for wasm_name in &expected_wasms {
+        let wasm_path = wasm_dir.join(wasm_name);
+        let metadata = std::fs::metadata(&wasm_path).unwrap_or_else(|_| {
+            panic!(
+                "release WASM missing: {} — run ./tests/sweettest/run.sh to build+pack fresh DNA, not bare cargo test",
+                wasm_path.display()
+            )
+        });
+        assert!(
+            metadata.len() > 0,
+            "release WASM is empty: {} — rebuild via ./tests/sweettest/run.sh",
+            wasm_path.display()
+        );
+    }
+
     let dna: DnaFile = SweetDnaFile::from_bundle(&bundle_path)
         .await
         .expect("DNA bundle must load");
