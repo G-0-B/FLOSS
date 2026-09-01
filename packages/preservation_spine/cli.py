@@ -144,31 +144,40 @@ def _handle_capture(args: argparse.Namespace) -> int:
     state_dir = _state_directory(Path(args.output), repo=repo)
     capsule_root = state_dir / _CAPSULE_DIRNAME
 
-    records = capture_planes(
-        repo,
-        remote_main_sha,
-        pr_head_sha,
-        capsule_root,
-        SecretPolicy.default(),
-    )
-    _validated_state_id(state_dir.name)
-    capsule_root_hash = seal_capsule(capsule_root)
-    precomputed_manifest = inventory_change_universe(capsule_root)
-    state_id = _validated_state_id(str(precomputed_manifest["state_id"]))
-    _write_bytes(
-        state_dir / _CAPSULE_RECORD,
-        canonical_json_bytes(
-            CapsuleRecord(
-                schema_version="1.0.0",
-                state_id=state_id,
-                repository=repo.name,
-                captured_at=_utc_now(),
-                planes=tuple(records),
-                exclusions=_excluded_paths(capsule_root),
-                status=_capsule_status(records),
-            )
-        ),
-    )
+    try:
+        records = capture_planes(
+            repo,
+            remote_main_sha,
+            pr_head_sha,
+            capsule_root,
+            SecretPolicy.default(),
+        )
+        _validated_state_id(state_dir.name)
+        capsule_root_hash = seal_capsule(capsule_root)
+        precomputed_manifest = inventory_change_universe(capsule_root)
+        state_id = _validated_state_id(str(precomputed_manifest["state_id"]))
+        _write_bytes(
+            state_dir / _CAPSULE_RECORD,
+            canonical_json_bytes(
+                CapsuleRecord(
+                    schema_version="1.0.0",
+                    state_id=state_id,
+                    repository=repo.name,
+                    captured_at=_utc_now(),
+                    planes=tuple(records),
+                    exclusions=_excluded_paths(capsule_root),
+                    status=_capsule_status(records),
+                )
+            ),
+        )
+    except Exception:
+        # No genesis checkpoint has been written yet, so the output dir
+        # is untracked and safe to remove.  This prevents a partial
+        # capsule from blocking a re-run.
+        import shutil
+
+        shutil.rmtree(state_dir, ignore_errors=True)
+        raise
     checkpoint = Checkpoint(
         schema_version="1.0.0",
         sequence=0,
