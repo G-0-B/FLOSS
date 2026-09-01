@@ -11,4 +11,4 @@ publish = false
 holochain = { git = "https://github.com/holochain/holochain", rev = "b1d40b24ab19d81f7563b0cf66b933a138f556a0", features = ["sweettest"] }
 holochain_serialized_bytes = "=0.0.57"
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }

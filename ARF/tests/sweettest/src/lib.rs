@@ -138,9 +138,15 @@ pub struct TripleResult {
 }
 
 pub async fn await_two_agent_consistency(app: &TestApp) {
-    await_consistency([&app.alice, &app.bob])
-        .await
-        .expect("both DHT databases must integrate every published op");
+    tokio::time::timeout(
+        std::time::Duration::from_secs(300),
+        await_consistency([&app.alice, &app.bob]),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        panic!("DHT consistency not reached in 300s — run via ./tests/sweettest/run.sh, not bare cargo test")
+    })
+    .expect("both DHT databases must integrate every published op");
 }
 
 pub fn mutated_missing_hash(
