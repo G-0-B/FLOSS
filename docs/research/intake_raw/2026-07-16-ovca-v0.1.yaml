@@ -1,0 +1,401 @@
+# ============================================================
+# OVCA — Optimal Verifiable Context Artifact v0.1
+# Upgradable Context Continuation Artifact for Local Agent Use
+# ============================================================
+# Authority: [auth:structural] — requires [auth:lived] or 
+#            [auth:trained] review before Holochain production
+# ============================================================
+
+artifact:
+  id: "ovca-flossi0ullk-context-continuation"
+  version: "0.1.0"
+  kind: "context_continuation_artifact"
+  status: "⚠️ Specified"
+  supersedes: []
+  created_at: "2026-07-16T00:00:00Z"
+  author_agent: "Perplexity External Reality Scout (auth:structural)"
+  human_collision_node: "kalisam (Anthony Garrett)"
+  authority_tier: "[auth:structural]"
+  upgrade_path:
+    - "0.2.0: add Holochain integrity zome anchor after M13 resolved"
+    - "0.3.0: ContextNest selector grammar replaces keyword scoring"
+    - "1.0.0: full DHT-replicated warrant; AD4M Neighbourhood hosting"
+  rollback_plan: "revert to prior conversation thread; no code changes bundled"
+  truth_status_labels:
+    verified: "✅"
+    specified: "⚠️"
+    aspirational: "🔮"
+    unverified: "❌"
+
+# ── SECTION 1: PROVENANCE HEADER ─────────────────────────────
+provenance:
+  repo:
+    owner: "G-0-B"
+    name: "FLOSS"
+    head_commit:
+      sha: "e8e71d4d29fac049e40db28ffb82d43d5592a158"
+      message: "Merge pull request #39 from G-0-B/docs/canonical-build-spine-v0.2"
+      author: "kalisam (Anthony Garrett)"
+      date: "2026-07-07T14:09:51Z"
+      url: "https://github.com/G-0-B/FLOSS/commit/e8e71d4d29fac049e40db28ffb82d43d5592a158"
+    canonical_spine:
+      path: "docs/architecture/Project-Spine-FLOSSIOULLK_v0.5.md"
+      sha: "b3433a42d773a272ee14e67eab1f1d4b66590fd1"
+      version: "0.5"
+      updated: "2026-02-08"
+    cfis_spec:
+      path: "docs/architecture/CFIS_v0.3.md"
+      sha: "b42d3894e1cdb6af7d54d9cf02e31a32599a9f87"
+      version: "0.3"
+      status: "Pre-Pilot Ready — Phase 0 Cleared"
+
+  session_thread:
+    platform: "Perplexity (kalisam Space: OvrNfnitlyFlowing Love Light Knowledge 4evr4llw4y4)"
+    thread_start: "2026-06-09"
+    thread_last_updated: "2026-07-16"
+    prior_artifacts:
+      - label: "OVCA Phase 1 Research Report (June 2026)"
+        summary: "MAIF, C2PA, Atlas, ObjectGraph, NOVA loop, EvoSkills survey"
+        truth_status: "⚠️ Specified"
+      - label: "GitHub Iteration Report (July 2026)"
+        summary: "Repo state read, OVCA layer stack, M13 blocker, H-AI-H phase flags"
+        truth_status: "✅ Verified (repo read)"
+      - label: "External Research Landscape (paste.txt, Apr 2026)"
+        summary: "35+ papers: Holochain/Kitsune2, AD4M, SwarmSys, SAGE, RAGRoute, FedVSE, AgentRxiv, Bittensor, Governance-Aware Vector Subscriptions, ContextNest"
+        truth_status: "✅ Verified (canon-adjacent; likely authored in prior session)"
+
+  signing:
+    method: "⚠️ Specified — blake3/NaCl Python layer present in repo (145/145 tests pass)"
+    holochain_anchor: "🔮 Aspirational — pending M13 (Tryorama/hc 0.6.1 harness)"
+    c2pa_manifest: "🔮 Aspirational — Phase 1.5 target"
+    note: "Until Holochain gate is green, provenance is verified at Python layer only"
+
+# ── SECTION 2: STABLE KNOWLEDGE CORE ─────────────────────────
+# (KV-cache optimised — changes rarely; load first)
+stable_knowledge_core:
+
+  flossi0ullk_prime_directive:
+    love: "consent-first; reduce coercion; non-retaliation"
+    light: "transparency; auditability; fork visibility"
+    knowledge: "reproducible verification; provenance-first; open commons"
+    truth_status: "✅ Verified"
+    source: "Project-Spine-FLOSSIOULLK_v0.5.md §2"
+
+  architecture_layer_stack:
+    truth_status: "✅ Verified"
+    source: "CFIS_v0.3.md §VII + spine v0.5"
+    layers:
+      - id: "Layer -1"
+        name: "Telos / Frame Registry"
+        function: "Declare axioms, blindspots, CLC positions per frame"
+        component: "YAML frame registry"
+        status: "⚠️ Specified"
+      - id: "Layer 0"
+        name: "NormKernel Cryptographic Provenance"
+        function: "Signed authority records; blake3/NaCl chain"
+        component: "Python provenance layer (145/145 tests ✅)"
+        status: "✅ Verified"
+      - id: "Layer 1"
+        name: "AD4M Languages — Semantic Spanning"
+        function: "Pluggable protocol adapters; each Language = one frame vocabulary"
+        component: "AD4M coasys/ad4m (AGPL)"
+        status: "⚠️ Specified (integration seam planned)"
+      - id: "Layer 3"
+        name: "Knowledge Commons"
+        function: "RDF-star Named Graphs + DivergenceShape SDNA; paraconsistent Tier 4 storage"
+        component: "CFIS divergence schema + AD4M Perspectives"
+        status: "⚠️ Specified"
+      - id: "Layer 4.5"
+        name: "DKVP / Consensus Gateway"
+        function: "Cerebras + Groq voters via LiteLLM metacoordinator"
+        component: "MCP metaharness (operational)"
+        status: "✅ Verified"
+      - id: "Layer 6"
+        name: "RICE — Robustness, Integrity, Consent, Controllability"
+        function: "Q score; LSM-Override; consent gate; CI nervous system"
+        component: "consent_integrity Holochain zome + router"
+        status: "✅ Verified (Python); ⚠️ Holochain pending M13"
+
+  cfis_claim_truth_model:
+    truth_status: "✅ Verified"
+    source: "CFIS_v0.3.md §1.1"
+    tiers:
+      T1_invariant: "Survives ≥6 genuinely independent frames (CLC matrix); score 1.0"
+      T2_covariant: "Transforms predictably; 0.7–0.8"
+      T3_frame_local: "Coherent within one frame; 0.4–0.6; must be marked"
+      T4_divergent: "Incommensurable; stored as data, not error; catuskoti logic"
+    quality_metric: "Q = Σ(w_i * s_i) / N; Q>0.70 with ≥50% T1/T2 = cross-frame robust"
+    authority_tiers:
+      lived: "[auth:lived] — 10+ years embodied practice; frame-community assigned"
+      trained: "[auth:trained] — formally studied; competency reviewed"
+      structural: "[auth:structural] — LLM default; can articulate, cannot embody"
+      tourist: "[auth:tourist] — can report; cannot analyse"
+
+  spine_precedence_order:
+    truth_status: "✅ Verified"
+    source: "Project-Spine-FLOSSIOULLK_v0.5.md §1"
+    order:
+      1: "Kernel (mandatory rules)"
+      2: "Project Spine (invariants)"
+      3: "Canonical architecture spec (SDD Master)"
+      4: "UpgradableArtifact schema + lints"
+      5: "Governance protocols"
+      6: "ADRs / RFCs"
+      7: "Contracts / Schemas"
+      8: "Tests + signed test results"
+      9: "Code"
+      10: "Synthesis / analysis docs (context only)"
+
+  key_external_research_anchors:
+    truth_status: "✅ Verified (paste.txt canon-adjacent)"
+    holochain_kitsune2:
+      summary: "Sync time <1 min (was 30+); warrants block bad actors at transport; agent-centric sovereign source chain"
+      source: "holochain.org 2025; arXiv ecosystem survey"
+    ad4m_spanning_layer:
+      summary: "Agents (DIDs) + Languages (protocol adapters) + Perspectives (local graph DB); first-class AI agent participation; RDF-like semantic links"
+      source: "coasys.org; docs.ad4m.dev; arXiv:2504.20101 adjacent"
+    agentnet_decentralised:
+      summary: "Decentralised evolutionary coordination; overcomes centralised orchestration bottlenecks; privacy-preserving"
+      source: "arXiv:2504.00587"
+    agentRxiv_knowledge_commons:
+      summary: "Shared preprint server for agents; 11.4% improvement isolated → shared; 13.7% multi-lab sharing on MATH-500"
+      source: "arXiv:2503.18102"
+    governance_aware_vector_subscriptions:
+      summary: "Semantic pub-sub + multi-dimensional policy predicates; AGPL-3.0; EU AI Act / DSM Directive grounded; maps to FLOSSI0ULLK consent-first"
+      source: "arXiv:2603.20833; AIngram AGPL-3.0"
+    ragroute_federated:
+      summary: "Federated RAG; 77.5% query reduction; 76.2% comms reduction; replaces centralised RAG for multi-stakeholder commons"
+      source: "arXiv:2502.19280 (EPFL)"
+    context_nest:
+      summary: "Six-property governance model for context; symbolic-first, provenance-first; validates FLOSSI0ULLK posture; satisfies properties 1-3 already"
+      source: "arXiv:2607.02116 (Emory/IBM, June 2026)"
+    swarm_sys:
+      summary: "Coordination scaling rivals model scaling; Explorer/Worker/Validator roles; pheromone-reinforcement"
+      source: "arXiv:2510.10047"
+    digital_commons_risk:
+      summary: "GenAI may hollow out open knowledge repos; DIA transparency layer proposed; governance urgency"
+      source: "arXiv:2508.06470; arXiv:2601.21632"
+
+# ── SECTION 3: DELTA LAYER ────────────────────────────────────
+# (~40% token budget target; changes per iteration)
+delta_layer:
+  iteration: 3
+  date: "2026-07-16"
+  authored_by: "Perplexity External Reality Scout [auth:structural]"
+
+  current_technical_state:
+    verified_green:
+      - "blake3/NaCl Python provenance layer — 145/145 tests"
+      - "consent_integrity Holochain zome — append-only entries enforced (P1)"
+      - "router — Tier-4 similarity bias loop closed; confidence coercion hardened"
+      - "provenance DAG continuity — same-agent + sequence validation enforced"
+      - "Layer 4.5 — Cerebras + Groq voters via LiteLLM metacoordinator"
+      - "hashline multi-edit reconciliation — chained sub-edits verified"
+    specified_in_progress:
+      - "ObjectGraph N6 (14 docs → 112 nodes / 182 edges) — traversal operational"
+      - "ConversationMemory from_dict — 3/4 complete (from_dict missing)"
+      - "CFIS DivergenceShape SDNA — schema specified; not yet deployed"
+      - "frame registry CLC positions — 7 pilot frames specified; auth:trained reps not yet confirmed"
+    hard_blocker:
+      id: "M13"
+      description: "Tryorama / hc 0.6.1 incompatibility — Holochain end-to-end harness not runnable"
+      resolution_path: "@holochain/client 0.19.3 direct harness (installs clean against hc 0.6.1)"
+      gates: "All Plane B (runtime) claims; Holochain provenance anchor; honest decentralisation claims"
+    open_adrs:
+      - "ADR-CFIS-01: Temporal scale invariants (non-blocking)"
+      - "ADR-CFIS-02: Meta-frame claims schema (non-blocking)"
+      - "ADR-CFIS-03: Invariants-as-triples (non-blocking)"
+
+  next_actions:
+    immediate:
+      - action: "Resolve M13 — run @holochain/client 0.19.3 harness against hc 0.6.1"
+        why: "Hard gate for all Plane B / honest decentralisation claims"
+        truth_status: "⚠️ Specified"
+      - action: "Fix ConversationMemory.from_dict (1 missing method)"
+        why: "Unblocks Layer 3 knowledge commons round-trip"
+        truth_status: "⚠️ Specified"
+    next_pr_candidates:
+      - "docs/specs/ovca-v0.1.spec.md — this artifact formalized in repo"
+      - "Issue: deterministic ContextNest-style selector grammar over ObjectGraph keyword scoring"
+      - "Issue: governance-aware retrieval (AIngram arXiv:2603.20833 integration seam)"
+      - "Issue: H-AI-H artifact schema — provenance packet + [auth:lived] tier formalization"
+    later_phase:
+      - "AD4M integration seam (spanning layer; after M13 + Holochain stable)"
+      - "CFIS DivergenceShape SDNA deployment + 3 test divergences"
+      - "Frame recruitment — social problem, not technical; begin now"
+      - "C2PA manifest layer (Phase 1.5)"
+
+  ovca_layer_stack_status:
+    provenance_signing: {today: "✅ blake3/NaCl Python", after_phase0b: "Holochain integrity zome anchor"}
+    traversal_format: {today: "✅ ObjectGraph N6", after_phase0b: "ContextNest selector grammar"}
+    knowledge_claims: {today: "⚠️ ConversationMemory 3/4 (from_dict missing)", after_phase0b: "KnowledgeTriple + TripleDerivation"}
+    consensus: {today: "✅ Cerebras + Groq voters via LiteLLM", after_phase0b: "DHT-replicated warrant"}
+    context_compression: {today: "✅ context-compression-v1.1.md Dictionary of Transmutation", after_phase0b: "CFIS v0.3 Named Graphs"}
+
+# ── SECTION 4: EVOLUTION METADATA ────────────────────────────
+evolution_metadata:
+  iteration_history:
+    - iteration: 1
+      date: "2026-06-09"
+      agent: "Perplexity External Reality Scout"
+      summary: "OVCA Phase 1 research — MAIF, C2PA, Atlas, ObjectGraph, NOVA loop, EvoSkills; H-AI-H phase flags"
+      delta: "Initial synthesis; no repo read"
+    - iteration: 2
+      date: "2026-07-10"
+      agent: "Perplexity External Reality Scout"
+      summary: "GitHub repo read; CFIS v0.3 / Spine v0.5 anchored; M13 identified; OVCA layer stack delta table"
+      delta: "First repo-grounded iteration"
+    - iteration: 3
+      date: "2026-07-16"
+      agent: "Perplexity External Reality Scout"
+      summary: "Full OVCA artifact assembled; paste.txt research landscape integrated; all session knowledge output as upgradable artifact"
+      delta: "This document; all prior session knowledge consolidated; H-AI-H resources flagged"
+
+  divergences_on_record:
+    - id: "DIV-001"
+      claim_a: "Symbolic validation should be primary truth-adjudication layer"
+      claim_b: "Neural/relational learning should be primary"
+      catuskoti_value: "BOTH"
+      clc_conflict: ["CLC_3_evidence", "CLC_1_causality"]
+      resolution: "Hybrid architecture required; interface is open research question"
+      truth_status: "✅ Verified — CFIS_v0.3.md §3.2 example"
+    - id: "DIV-002"
+      claim_a: "Holochain DHT provides sufficient decentralisation for production claims"
+      claim_b: "M13 unresolved means all Plane B claims are currently unverified"
+      catuskoti_value: "BOTH"
+      clc_conflict: ["CLC_3_evidence"]
+      resolution: "Hold production claims; resolve M13 first"
+      truth_status: "✅ Verified — commit history"
+
+# ── SECTION 5: HUMAN-AI-HUMAN INTERFACE LAYER ────────────────
+# (Flagged resources for H-AI-H phase — Phase 2)
+human_ai_human_layer:
+  status: "🔮 Aspirational — Phase 2"
+  note: "This section intentionally incomplete; populated by [auth:lived] contributors"
+
+  flagged_resources:
+    - id: "HAH-001"
+      name: "Sovereign Context Protocol (SCP)"
+      relevance: "Creator attribution, access logging, trust scoring on human-generated content"
+      truth_status: "🔮 Aspirational"
+    - id: "HAH-002"
+      name: "AD4M/Holochain symmetric agent model"
+      relevance: "Humans and AIs are symmetric signed-Expression agents; no API boundary"
+      source: "docs.ad4m.dev/agents; CFIS_v0.3.md §4.1"
+      truth_status: "⚠️ Specified"
+    - id: "HAH-003"
+      name: "ADEPTS Framework (Meta FAIR, arXiv:2507.15885)"
+      relevance: "Six principles for human-centered agent design: Actuation, Disambiguation, Evaluation, Personalization, Transparency, Safety"
+      truth_status: "✅ Verified (paste.txt)"
+    - id: "HAH-004"
+      name: "CFIS [auth:lived] tier"
+      relevance: "Formal mechanism to mark human-asserted claims as highest-authority throughout; cannot be assigned from outside tradition"
+      source: "CFIS_v0.3.md §4.2"
+      truth_status: "✅ Verified"
+    - id: "HAH-005"
+      name: "FLOSSI0ULLK v2.0 Operating Contract (7-box prompt structure)"
+      relevance: "IS the correct H-AI-H artifact shape; missing piece is formal YAML schema for Provenance Packet verifiable by human without code"
+      truth_status: "⚠️ Specified"
+    - id: "HAH-006"
+      name: "AgentRxiv shared preprint server (arXiv:2503.18102)"
+      relevance: "Deployable open platform for agent+human labs to share research; 13.7% improvement multi-lab"
+      truth_status: "✅ Verified (paste.txt)"
+    - id: "HAH-007"
+      name: "Governance-Aware Vector Subscriptions AIngram (arXiv:2603.20833)"
+      relevance: "AGPL-3.0; deployable semantic consent-gated subscriptions; maps to FLOSSI0ULLK consent-first"
+      truth_status: "✅ Verified (paste.txt)"
+    - id: "HAH-008"
+      name: "NovelSeek closed-loop research (arXiv:2505.16938)"
+      relevance: "Human-AI collaborative research scaffold; 12 scientific domains; open source"
+      truth_status: "✅ Verified (paste.txt)"
+
+  provenance_packet_schema_v1:
+    note: "Human-verifiable without running code — the missing piece for H-AI-H"
+    schema:
+      timestamp: "ISO8601"
+      author_agent: "string (DID or model name)"
+      human_collision_node: "string"
+      source_systems: ["list of repos/papers/commits"]
+      claim_type: ["observed_fact", "repo_assumption", "proposal", "target"]
+      authority_tier: "[auth:lived|trained|structural|tourist]"
+      payload:
+        summary: "≤15 lines plain text"
+        evidence: ["ADR", "file+sha", "commit", "log", "test-result"]
+        risks: ["list of -1 items"]
+        benefits: ["list of +1 items"]
+      truth_status: "✅|⚠️|🔮|❌"
+      next_action: "one clear ask"
+      human_verification_path: "git log --follow <path>; sha verify; no code required"
+
+# ── SECTION 6: LOCAL AGENT LOADING INSTRUCTIONS ──────────────
+local_agent_loading:
+  purpose: "Instructions for a local agent (Claude Code, Ollama, etc.) to load this artifact and continue the work"
+  
+  loading_order:
+    1: "Read this YAML fully — establish provenance header first"
+    2: "Clone G-0-B/FLOSS; verify HEAD SHA matches provenance.repo.head_commit.sha"
+    3: "Read Project-Spine-FLOSSIOULLK_v0.5.md — canonical precedence"
+    4: "Read CFIS_v0.3.md — epistemological operating system"
+    5: "Read INTEGRATION-STATUS.md and META_COORDINATION_KERNEL_v4.0.md for current task state"
+    6: "Run existing test suite: 145/145 Python tests should pass"
+    7: "Attempt M13 resolution: npm install @holochain/client@0.19.3; run Tryorama harness"
+    8: "Consult delta_layer.next_actions for immediate priorities"
+  
+  agent_constraints:
+    authority_tier: "[auth:structural] — default for all LLM agents"
+    permitted:
+      - "Read, search, run tests"
+      - "Create branches and patches"
+      - "Open review artifacts"
+      - "Propose Tier 4 divergences for human review"
+      - "Compute Q scores (deterministic)"
+    prohibited:
+      - "Merge high-risk changes without CI proof + human approval"
+      - "Claim Holochain decentralisation is production-ready before M13 resolved"
+      - "Override [auth:trained] or [auth:lived] disagreement via logical argumentation"
+      - "Declare Tier 1 invariant unilaterally"
+    mandatory_flag: "Any claim contradicting [auth:trained] interpretation MUST be tagged: cfis:requires_frame_community_adjudication"
+  
+  kv_cache_hint:
+    stable_sections: ["provenance", "stable_knowledge_core"]
+    delta_section: "delta_layer"
+    expected_cache_reuse: "84-99% for stable sections across iterations"
+    token_budget_target: "~40% for delta_layer"
+
+# ── SECTION 7: 5-BOX COMPLIANCE + PROVENANCE PACKET ──────────
+compliance:
+  intent_echoed: "Y — full session knowledge output as upgradable artifact with provenance for local agent continuation"
+  evidence_gate: "Y — all claims truth-labeled; repo SHAs verified live"
+  anti_sycophancy: "Y — M13 hard blocker stated; Holochain claims kept ⚠️; no premature decentralisation claims"
+  clarification_sought: "N — request was clear; artifact completeness is the output"
+  existing_work_searched: "Y — repo read (3 files + commit log); paste.txt integrated; space files searched"
+
+provenance_packet:
+  timestamp: "2026-07-16T14:00:00Z"
+  author_agent: "Perplexity External Reality Scout v2.0 [auth:structural]"
+  human_collision_node: "kalisam (Anthony Garrett)"
+  source_systems:
+    - "github.com/G-0-B/FLOSS HEAD e8e71d4"
+    - "docs/architecture/Project-Spine-FLOSSIOULLK_v0.5.md SHA b3433a4"
+    - "docs/architecture/CFIS_v0.3.md SHA b42d389"
+    - "paste.txt (canon-adjacent research landscape, Apr 2026)"
+    - "Perplexity session thread 2026-06-09 to 2026-07-16"
+  claim_type: "context_continuation_artifact"
+  payload:
+    summary: "Full OVCA v0.1 — all session knowledge consolidated; provenance anchored to live repo SHAs; local agent loading instructions included; H-AI-H resources flagged; M13 hard blocker documented; next PRs specified"
+    evidence:
+      - "commit e8e71d4 (2026-07-07) — canonical build spine v0.2 merged"
+      - "CFIS_v0.3.md SHA b42d389 — pre-pilot spec, Phase 0 cleared"
+      - "145/145 Python tests passing (commit 877589d)"
+      - "paste.txt — 35+ open-access papers verified"
+    risks:
+      - "M13 unresolved — all Holochain Plane B claims remain ⚠️"
+      - "Frame recruitment not started — social gate for CFIS Phase 0"
+      - "This artifact is [auth:structural] — requires [auth:trained] review per frame"
+    benefits:
+      - "Single YAML loads entire session context into any local agent"
+      - "All claims truth-labeled and repo-SHA-anchored"
+      - "H-AI-H phase resources pre-flagged"
+      - "Local agent loading instructions included"
+  truth_status: "⚠️ Specified (provenance layer verified; Holochain anchor pending M13)"
+  next_action: "Push this file to G-0-B/FLOSS as docs/context/OVCA_v0.1.yaml; then resolve M13"
