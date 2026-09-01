@@ -599,6 +599,48 @@
     "FLOSS/hooks/hook_pre_write.py": {
       "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
     },
+    "FLOSS/hooks/grok_pretool_st.py": {
+      "spec": "Grok PreToolUse reminder to prefer Smart Tree and canonical memory surfaces",
+      "tier": 1,
+      "reuse": {
+        "capability": "Adapt existing workspace tool and memory guidance to Grok's native PreToolUse hook contract",
+        "search_date": "2026-08-30",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "existing shared hook surface and Grok native hooks",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "Grok hook files landed with the coordination-room branch; spec_gate reproduced only their missing registry entries.",
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Grok-specific hook envelope only; guidance is reused from existing workspace policy."
+      }
+    },
+    "FLOSS/hooks/grok_session_register.py": {
+      "spec": "Grok SessionStart adapter that registers sessions with the existing agentmemory REST service",
+      "tier": 1,
+      "reuse": {
+        "capability": "Adapt the existing agentmemory session-start flow to Grok's native SessionStart hook contract",
+        "search_date": "2026-08-30",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "FLOSS/hooks/agentmemory_client.py and existing session-start hook pattern",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "Grok hook files landed with the coordination-room branch; spec_gate reproduced only their missing registry entries.",
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Grok-specific SessionStart input adapter; persistence remains in the existing agentmemory service."
+      }
+    },
     "FLOSS/hooks/session_start_inject.py": {
       "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
@@ -736,9 +778,6 @@
     },
     "FLOSS/scripts/refresh_agent_surfaces.py": {
       "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
-    },
-    "FLOSS/scripts/research_log.py": {
-      "spec": "Appends dated research-log entries to the shared research register"
     },
     "FLOSS/scripts/review_independence.py": {
       "spec": "Kish n_eff over reviewer findings-overlap; measures panel redundancy without gold labels",
