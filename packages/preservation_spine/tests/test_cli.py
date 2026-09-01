@@ -559,3 +559,39 @@ def test_script_help_matches_main_surface(tmp_path: Path) -> None:
     assert "capture" in result.stdout
     assert "render-github" in result.stdout
     assert "post-comment" not in result.stdout
+
+
+def test_capture_drift_surfaces_real_exception_message(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CaptureDrift from capture_planes must reach the user with its real message, not 'local-only salvage command failed'."""
+    repo, main_sha, pr_sha = _build_repo(tmp_path)
+    output = tmp_path / "capsule-state-drift"
+
+    from packages.preservation_spine.git_capture import CaptureDrift
+
+    def _raise_drift(*args: object, **kwargs: object) -> object:
+        raise CaptureDrift("source state changed during capture")
+
+    monkeypatch.setattr("packages.preservation_spine.cli.capture_planes", _raise_drift)
+
+    assert (
+        main(
+            [
+                "capture",
+                "--repo",
+                str(repo),
+                "--remote-main-sha",
+                main_sha,
+                "--pr-head-sha",
+                pr_sha,
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+
+    captured = capsys.readouterr()
+    assert "source state changed during capture" in captured.err
+    assert "local-only salvage command failed" not in captured.err
