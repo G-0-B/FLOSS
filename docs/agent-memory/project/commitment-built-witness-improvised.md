@@ -1,3 +1,14 @@
+---
+id: project-commitment-built-witness-improvised
+type: project
+created: '2026-08-29'
+status: active
+applies_to:
+- any-agent
+source: cross_audit
+title: This project builds the commitment and improvises the witness
+---
+
 # This project builds the commitment and improvises the witness
 
 **Date:** 2026-08-29
