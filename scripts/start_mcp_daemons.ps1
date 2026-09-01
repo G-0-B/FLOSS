@@ -1,4 +1,4 @@
-# FLOSS/scripts/start_mcp_daemons.ps1 — start OmniRoute + both MCP daemons if not already up.
+# FLOSS/scripts/start_mcp_daemons.ps1 — start OmniRoute + MCP daemons if not already up.
 # Idempotent: PID guard in mcp_daemon.py makes re-runs safe (second launch self-exits).
 # Register as a Scheduled Task:
 #   schtasks /Create /TN "FLOSS-MCP-Daemons" /TR "powershell -WindowStyle Hidden -File C:\~shit\FLOSS\scripts\start_mcp_daemons.ps1" /SC ONLOGON /RU "MSI\kalis" /RL LIMITED /F
@@ -116,6 +116,20 @@ if (-not $consensusProc) { $skipped += "consensus gateway (:7331) - exited immed
 # Start reasoning ensemble daemon (port 7332)
 $ensembleProc = Start-Daemon $py "packages.reasoning_ensemble.mcp_server" "reasoning ensemble (:7332)" $workspace
 if (-not $ensembleProc) { $skipped += "reasoning ensemble (:7332) - exited immediately after launch" }
+
+# Start coordination room (port 7334) — file-claim bus. Same Start-Daemon /
+# claim_singleton path as 7331/7332. Do not start computer-use (:7333) here.
+# Pin the log at the workspace intake mouth so a worktree launch does not
+# create a second bus under FLOSS/.worktrees/.agent-surface.
+$intakeRoot = if ($workspace -match '\\.worktrees\\') {
+    Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $workspace))
+} else {
+    Split-Path -Parent $workspace
+}
+$env:COORDINATION_ROOM_LOG = Join-Path $intakeRoot '.agent-surface\rooms\default\events.jsonl'
+$env:COORDINATION_ROOM_ROOT = $workspace
+$roomProc = Start-Daemon $py "packages.coordination_room.server" "coordination room (:7334)" $workspace
+if (-not $roomProc) { $skipped += "coordination room (:7334) - exited immediately after launch" }
 
 # Start OmniRoute daemon (port 20128) — model routing + token compression
 # Match on the COMMAND LINE, not $_.Path. For an npm-installed OmniRoute the
@@ -328,4 +342,4 @@ if ($skipped.Count -gt 0) {
     exit 1
 }
 
-Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, omniroute :20128). PID guard prevents duplicates."
+Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, coordination room :7334, omniroute :20128). PID guard prevents duplicates."

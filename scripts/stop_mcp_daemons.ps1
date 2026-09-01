@@ -1,5 +1,5 @@
 # FLOSS/scripts/stop_mcp_daemons.ps1 — stop all FLOSS MCP daemons cleanly.
-# Kills: consensus (:7331), ensemble (:7332), OmniRoute (:20128).
+# Kills: consensus (:7331), ensemble (:7332), coordination room (:7334), OmniRoute (:20128).
 # Removes PID files so next start is clean.
 
 # Same resolution mcp_daemon.py uses when it WRITES these files
@@ -36,7 +36,7 @@ if ($env:FLOSS_PYTHON) {
 $unresolved = @()
 
 # Kill FLOSS MCP daemons via PID files
-$pidFiles = @("consensus.pid", "reasoning_ensemble.pid")
+$pidFiles = @("consensus.pid", "reasoning_ensemble.pid", "coordination_room.pid")
 foreach ($pidFile in $pidFiles) {
     $pidPath = Join-Path $flossAgent $pidFile
     if (Test-Path $pidPath) {
