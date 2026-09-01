@@ -107,6 +107,8 @@ None of these three matches either of the other two. The root `LICENSE` file —
 
 **Decision:** 0 HOLD — escalated to NOW backlog (§8) as a direct question, not resolved here.
 
+> **Resolution update — 2026-08-12 (append-only):** Anthony's license decision was executed. `LICENSE`, the Kernel header, `README.md`, and ADR-7 now agree on **AGPL-3.0-or-later**; the earlier instruction not to cite a project license is superseded. The separate placement of the Compassion Clause remains open and does not change the operative software license.
+
 ### C8 — Two documents both claim to be "the SDD Master Spec"
 
 **Conflict:** `ARF/docs/arf_sdd_master_spec.md` (v0.1, no date header, FR/AC/contract-heavy, defines Feature 000 "SDD Tooling" and Feature 001 "Identity & Membership" complete with JSON Schemas and a working Rust skeleton) and root `SDD-Master-Spec-0.22.md` (v0.2-rc1/"Synthesis," dated 2025-11-07, narrative prose describing a 7-layer architecture — RICE, NormKernel, MetaLoop, YumeiCHAIN — that does not appear anywhere in v0.1) are **structurally unrelated documents that happen to share a name and a rough version lineage**. `CLAUDE.md`'s directory map lists both but its "Key Entry Points" section names only the root one as *the* SDD spec.
