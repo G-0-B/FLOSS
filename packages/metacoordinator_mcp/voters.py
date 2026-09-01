@@ -1063,25 +1063,43 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
     # whether a poll counts as independent. The registry is the thing to fix,
     # so say so instead of picking.
     probed_by_lineage: dict[str, str] = {}
+    conflicted: set[str] = set()
     for known, meta in index.items():
         lineage = _unverified_family(known)
-        previous = probed_by_lineage.setdefault(lineage, meta["family"])
-        if previous != meta["family"]:
+        if lineage in conflicted:
+            continue
+        family = meta["family"]
+        previous = probed_by_lineage.setdefault(lineage, family)
+        if previous != family:
+            # DROPPED, NOT OVERWRITTEN, AND REPORTED ONCE.
+            #
+            # The first version wrote "" as a conflict marker, which is
+            # indistinguishable from a registry entry whose family really is
+            # empty, and it re-reported on every later route sharing the
+            # lineage: three conflicting routes printed twice. A `conflicted`
+            # set says the same thing without inventing a sentinel that
+            # collides with real data.
+            conflicted.add(lineage)
+            probed_by_lineage.pop(lineage, None)
             print(
                 f"[voters] registry conflict: routes sharing lineage "
                 f"{lineage!r} are probed with different families "
-                f"({previous!r} and {meta['family']!r}). Unprobed twins of this "
+                f"({previous!r} and {family!r}). Unprobed twins of this "
                 f"lineage are counted as unverified until "
                 f"{VOTER_REGISTRY_PATH.name} agrees with itself.",
                 file=sys.stderr,
             )
-            probed_by_lineage[lineage] = ""
 
     def _family_for_unclassified(model: str) -> str:
+        """The probed family for this lineage, or the unverified key.
+
+        `.get(lineage, lineage)` and not `.get(lineage) or lineage`: the second
+        form treats a legitimately empty family string as absent, which is the
+        same conflation the "" conflict marker had.
+        """
+
         lineage = _unverified_family(model)
-        # "" is the conflict marker written above: fall back to the unverified
-        # lineage rather than inheriting an arbitrary side of a disagreement.
-        return probed_by_lineage.get(lineage) or lineage
+        return probed_by_lineage.get(lineage, lineage)
 
     families = {index[model]["family"] for model in models if model in index}
     for model in unclassified:

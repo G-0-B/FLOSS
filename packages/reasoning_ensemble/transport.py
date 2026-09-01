@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -266,14 +267,12 @@ def resolve_voter_pool(
         # makes the failure silent if that ever stops being true.
         judged = {voter["voter_id"]: _independence_route(voter) for voter in combined}
         if len(judged) != len(combined):
-            seen: set[str] = set()
-            clashes = sorted(
-                {
-                    v["voter_id"]
-                    for v in combined
-                    if v["voter_id"] in seen or seen.add(v["voter_id"])
-                }
-            )
+            # Counter, not a set comprehension whose filter relies on
+            # `set.add` returning None. That version was correct and unreadable,
+            # which on this file's history means it is a defect waiting for the
+            # next edit.
+            counts = Counter(voter["voter_id"] for voter in combined)
+            clashes = sorted(vid for vid, n in counts.items() if n > 1)
             raise RuntimeError(
                 "mixed-mode pool has duplicate voter_id(s) "
                 f"{clashes}: the roster judged for independence would not be "

@@ -61,15 +61,39 @@ def test_deferral_is_not_mistaken_for_an_llm_failure(tmp_path):
     assert result.startswith(module.DEFERRED_PREFIX)
 
 
-def test_caller_skips_staging_before_it_can_stage_a_deferral():
-    """main() must test for the deferral sentinel *before* calling stage_draft."""
+def test_caller_classifies_before_it_can_stage():
+    """main() must classify the result *before* calling stage_draft.
+
+    This asserted on the name DEFERRED_PREFIX appearing in main(). That name
+    moved into the shared pending_marker()/record_pending() helpers when the
+    first-attempt and retry sites were unified, so the guard broke on a
+    refactor that did not change the invariant at all -- the fourth
+    source-splitting guard in this session to need repointing. Anchored on the
+    call that does the classifying now, which is the thing that must not move
+    below staging.
+    """
     module = load_module()
     source = inspect.getsource(module.main)
 
-    assert "DEFERRED_PREFIX" in source, "main() no longer checks for deferrals"
-    assert source.index("DEFERRED_PREFIX") < source.index("stage_draft(file_path"), (
-        "deferral check must precede staging, or deferred files get recorded as "
-        "completed distillations again"
+    assert "pending_marker(" in source, "main() no longer classifies results"
+    assert source.index("pending_marker(") < source.index("stage_draft(file_path"), (
+        "classification must precede staging, or deferred and unreadable files "
+        "get recorded as completed distillations again"
+    )
+    # Both sites, not one: the retry used to carry its own narrower check.
+    #
+    # Counted over CODE lines only. The first version of this assertion counted
+    # every occurrence in the source and got 3, because a comment in main()
+    # names the function -- matching prose instead of code, in the test written
+    # to replace a test that had matched prose instead of code.
+    calls = [
+        line
+        for line in source.splitlines()
+        if "pending_marker(" in line and not line.strip().startswith("#")
+    ]
+    assert len(calls) == 2, (
+        "the first attempt and the rate-limit retry must both classify, and "
+        f"through the same predicate; found {len(calls)}: {calls}"
     )
 
 
