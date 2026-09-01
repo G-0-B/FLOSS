@@ -199,7 +199,7 @@
       },
       "guarded_keys": {
         "hooks_auto_accept": false,
-        "approvals.mode": "smart",
+        "approvals.mode": "off",
         "approvals.cron_mode": "deny",
         "approvals.mcp_reload_confirm": true,
         "approvals.destructive_slash_confirm": true
