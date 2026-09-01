@@ -57,8 +57,10 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    # Once a month at 05:00 UTC on the 1st.
+    # Existing monthly held-job pulse at 05:00 UTC on the 1st.
     - cron: "0 5 1 * *"
+    # Sweettest evidence run: weekly on Monday at 05:00 UTC.
+    - cron: "0 5 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -168,10 +170,14 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Cargo fmt (check only)
+      - name: Cargo fmt (parent workspace, check only)
         if: needs.changes.outputs.rust == 'true'
         working-directory: ${{ env.CARGO_WORKSPACE }}
         run: cargo fmt --all -- --check
+
+      - name: Cargo fmt (Sweettest child workspace, check only)
+        if: needs.changes.outputs.rust == 'true'
+        run: cargo fmt --manifest-path ARF/tests/sweettest/Cargo.toml --all -- --check
 
       - name: No Rust changes
         if: needs.changes.outputs.rust != 'true'
@@ -230,6 +236,23 @@ jobs:
       - name: No Rust changes
         if: needs.changes.outputs.rust != 'true'
         run: echo "No Rust files changed; nothing to compile-check. Reporting success."
+
+  sweettest:
+    name: Sweettest (weekly/manual, advisory)
+    # The full two-conductor suite takes about 30 minutes. Keep it out of
+    # required checks and run only on explicit dispatch or the weekly cron.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * 1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31 tag target, resolved 2026-09-01
+
+      - name: Run freshly built four-zome Sweettest suite
+        working-directory: ARF
+        run: nix develop path:. --command ./tests/sweettest/run.sh
 
   clippy:
     name: Lint (cargo clippy) [HELD -- manual only]
