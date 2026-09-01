@@ -27,7 +27,7 @@ pub async fn setup_two_agent_app() -> TestApp {
     // check, a stale gitignored .dna bundle silently passes tests against
     // outdated zome code.  The WASMs are built by run.sh before packing.
     let wasm_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../target/wasm32-unknown-unknown/release");
+        .join("../../target/wasm32-unknown-unknown/release");
     let expected_wasms = [
         "rose_forest_integrity.wasm",
         "rose_forest.wasm",
