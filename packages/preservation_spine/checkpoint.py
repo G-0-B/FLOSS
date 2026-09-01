@@ -20,6 +20,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 from typing import BinaryIO, Iterator, Mapping, Sequence
 
 from .models import canonical_json_bytes
@@ -899,13 +900,36 @@ def _discard_unpublished_genesis(path: Path) -> None:
 
 
 def _remove_empty_checkpoint_file(path: Path) -> None:
-    if not path.exists():
+    """Remove an empty checkpoint file using fd-based fstat to close the TOCTOU
+    window between size-check and unlink.
+
+    Callers must hold _locked_directory(parent) to prevent concurrent
+    appenders from writing between the fstat and the unlink.  Both call
+    sites (append_checkpoint line 164, load_latest_checkpoint line 201)
+    are already inside _locked_directory(parent).
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+    except FileNotFoundError:
         return
-    metadata = _validated_file_state(path)
-    if metadata.st_size != 0:
-        raise CheckpointIntegrityError(
-            "checkpoint recovery refused to remove a non-empty file"
-        )
+    except OSError:
+        return
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            os.close(fd)
+            raise CheckpointIntegrityError(
+                "checkpoint recovery target is not a regular file"
+            )
+        if metadata.st_size != 0:
+            os.close(fd)
+            raise CheckpointIntegrityError(
+                "checkpoint recovery refused to remove a non-empty file"
+            )
+    except OSError:
+        os.close(fd)
+        return
+    os.close(fd)
     try:
         os.unlink(path)
     except OSError as exc:
