@@ -748,3 +748,28 @@ def test_template_is_proposed_noncanonical_and_has_no_remote_api_command() -> No
     assert "curl " not in lowered
     assert "invoke-webrequest" not in lowered
     assert "non-canonical" in lowered
+
+
+def test_unbound_verification_digest_is_its_own_blocker() -> None:
+    evidence = _evidence()
+    unbound = Evidence(
+        verification=evidence.verification,
+        checkpoint=_checkpoint(
+            evidence.verification,
+            evidence.manifest,
+            verification_digest=None,
+        ),
+        manifest=evidence.manifest,
+        absolute_core_status=ResultStatus.PASS,
+        regression_core_status=ResultStatus.PASS,
+        evidence_locations=evidence.evidence_locations,
+    )
+    summary = render_check_summary(unbound)
+    assert "verification-digest-unbound" in summary["blockers"]
+    assert "restore-check-blocked" in summary["blockers"]
+
+
+def test_unbound_verification_digest_is_not_masked_by_blocked_restore() -> None:
+    summary = render_check_summary(_evidence(verification_status=ResultStatus.BLOCKED))
+    assert "verification-digest-unbound" in summary["blockers"]
+    assert "restore-check-blocked" in summary["blockers"]

@@ -2,6 +2,12 @@
 
 Built for the PR38 salvage in 2026-07, but nothing here is PR-specific:
 the six-plane contract applies to any risky repository operation.
+
+Windows durability note: on NT, parent-directory fsync is a no-op because
+Windows does not expose FlushFileBuffers on directory handles. File-content
+durability (fsync on the file descriptor) is real on both platforms; directory-
+entry durability (create/unlink persistence after crash) is best-effort on
+Windows only.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 from typing import BinaryIO, Iterator, Mapping, Sequence
 
 from .models import canonical_json_bytes
@@ -157,6 +164,7 @@ def append_checkpoint(path: Path, checkpoint: Checkpoint) -> None:
     try:
         with _locked_directory(parent):
             _recover_pending_append(target)
+            _discard_unpublished_genesis(target)
             if target.exists():
                 with _open_checkpoint_stream(target, create=False) as stream:
                     existing = _read_stream_bytes(stream, target)
@@ -193,6 +201,7 @@ def load_latest_checkpoint(path: Path) -> Checkpoint:
     try:
         with _locked_directory(parent):
             _recover_pending_append(target)
+            _discard_unpublished_genesis(target)
             if not target.exists():
                 raise FileNotFoundError(target)
             with _open_checkpoint_stream(target, create=False) as stream:
@@ -210,6 +219,9 @@ def _append_with_intent(
 ) -> None:
     intent = _build_intent(path, committed_bytes, checkpoint)
     _write_pending_intent(path, intent)
+    if intent.committed_size == 0:
+        # Intent is durable first. Only then publish the empty target name.
+        _fsync_parent_directory(path)
     content = canonical_json_bytes(checkpoint)
     try:
         _append_bytes(
@@ -504,10 +516,18 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
             ) from ctypes.WinError()
         try:
             descriptor = msvcrt.open_osfhandle(handle, getattr(os, "O_BINARY", 0))
-        except OSError:
+        except OSError as exc:
             ctypes.windll.kernel32.CloseHandle(handle)
-            raise
-    stream = os.fdopen(descriptor, "r+b", closefd=True)
+            raise CheckpointIntegrityError(
+                "checkpoint file cannot be opened safely"
+            ) from exc
+    try:
+        stream = os.fdopen(descriptor, "r+b", closefd=True)
+    except OSError as exc:
+        os.close(descriptor)
+        raise CheckpointIntegrityError(
+            "checkpoint file cannot be opened safely"
+        ) from exc
     try:
         handle_state = os.fstat(stream.fileno())
         _assert_regular_metadata(handle_state)
@@ -517,6 +537,9 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
                 raise CheckpointIntegrityError(
                     "checkpoint file changed while acquiring append handle"
                 )
+            # Do not fsync the parent here. Publishing an empty genesis file
+            # before the append intent exists leaves a durable empty log that
+            # later load/append treat as irrecoverable.
         else:
             before = _validated_file_state(path)
             if _node_identity(before) != _node_identity(handle_state):
@@ -627,6 +650,33 @@ def _fsync_descriptor(fd: int) -> None:
     os.fsync(fd)
 
 
+def _fsync_parent_directory(path: Path) -> None:
+    """Make a create or unlink durable by fsyncing the parent directory.
+
+    POSIX requires a directory fsync after creating or unlinking a name;
+    Windows does not expose an equivalent, so this is a no-op there.
+    """
+
+    if os.name == "nt":
+        return
+    parent = _parent_directory(path)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(parent, flags)
+    except OSError as exc:
+        raise CheckpointIntegrityError(
+            "checkpoint parent directory fsync failed"
+        ) from exc
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise CheckpointIntegrityError(
+            "checkpoint parent directory fsync failed"
+        ) from exc
+    finally:
+        os.close(descriptor)
+
+
 def _intent_path(path: Path) -> Path:
     return path.with_name(_INTENT_NAME_TEMPLATE.format(name=path.name))
 
@@ -686,12 +736,17 @@ def _write_pending_intent(path: Path, intent: _PendingAppendIntent) -> None:
             raise CheckpointIntegrityError(
                 "checkpoint append intent verification failed"
             )
+        _fsync_parent_directory(pending)
     except BaseException:
         # Best-effort cleanup, including on KeyboardInterrupt: an interrupted
         # write is exactly the case that used to leave the wedging fragment.
         try:
             pending.unlink(missing_ok=True)
         except OSError:
+            pass
+        try:
+            _fsync_parent_directory(pending)
+        except Exception:
             pass
         raise
 
@@ -736,9 +791,11 @@ def _open_exclusive_output_descriptor(path: Path) -> int:
         ) from ctypes.WinError()
     try:
         return msvcrt.open_osfhandle(handle, getattr(os, "O_BINARY", 0))
-    except OSError:
+    except OSError as exc:
         ctypes.windll.kernel32.CloseHandle(handle)
-        raise
+        raise CheckpointIntegrityError(
+            "checkpoint append intent cannot be created safely"
+        ) from exc
 
 
 def _write_exact_descriptor(descriptor: int, content: bytes) -> None:
@@ -768,6 +825,7 @@ def _clear_pending_intent(path: Path) -> None:
         raise CheckpointIntegrityError(
             "checkpoint append intent could not be cleared"
         ) from exc
+    _fsync_parent_directory(pending)
 
 
 def _recover_pending_append(path: Path) -> None:
@@ -820,20 +878,65 @@ def _recover_pending_append(path: Path) -> None:
     _clear_pending_intent(path)
 
 
-def _remove_empty_checkpoint_file(path: Path) -> None:
+
+def _discard_unpublished_genesis(path: Path) -> None:
+    """Remove a leftover empty genesis file that has no recovery intent.
+
+    A crash after creating `checkpoints.jsonl` and before writing the append
+    intent used to leave a durable empty file. Load then failed with
+    `checkpoint file is empty`, and append took the existing-file path and
+    failed the same way. An empty file with no intent is unpublished, not a
+    committed chain.
+    """
+
     if not path.exists():
+        return
+    if _intent_path(path).exists():
         return
     metadata = _validated_file_state(path)
     if metadata.st_size != 0:
-        raise CheckpointIntegrityError(
-            "checkpoint recovery refused to remove a non-empty file"
-        )
+        return
+    _remove_empty_checkpoint_file(path)
+
+
+def _remove_empty_checkpoint_file(path: Path) -> None:
+    """Remove an empty checkpoint file using fd-based fstat to close the TOCTOU
+    window between size-check and unlink.
+
+    Callers must hold _locked_directory(parent) to prevent concurrent
+    appenders from writing between the fstat and the unlink.  Both call
+    sites (append_checkpoint line 164, load_latest_checkpoint line 201)
+    are already inside _locked_directory(parent).
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode):
+            os.close(fd)
+            raise CheckpointIntegrityError(
+                "checkpoint recovery target is not a regular file"
+            )
+        if metadata.st_size != 0:
+            os.close(fd)
+            raise CheckpointIntegrityError(
+                "checkpoint recovery refused to remove a non-empty file"
+            )
+    except OSError:
+        os.close(fd)
+        return
+    os.close(fd)
     try:
         os.unlink(path)
     except OSError as exc:
         raise CheckpointIntegrityError(
             "checkpoint recovery could not clear the empty target"
         ) from exc
+    _fsync_parent_directory(path)
 
 
 def _read_pending_intent(path: Path) -> _PendingAppendIntent | None:

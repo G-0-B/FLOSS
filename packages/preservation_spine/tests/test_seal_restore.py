@@ -13,6 +13,8 @@ import pytest
 from packages.preservation_spine.git_capture import SecretPolicy, capture_planes
 from packages.preservation_spine.models import PlaneId, ResultStatus, canonical_json_bytes
 from packages.preservation_spine.restore import restore_and_verify
+import packages.preservation_spine.restore as restore_module
+import packages.preservation_spine.seal as seal_module
 from packages.preservation_spine.seal import (
     CapsuleVerificationError,
     seal_capsule,
@@ -1248,3 +1250,61 @@ def test_verification_json_is_deterministic_and_contains_no_absolute_paths(
     )
     assert (capsule / "verification.json").read_bytes() == first
     assert second_result == result
+
+
+def test_list_bundle_heads_rejects_non_ascii_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = tmp_path / "history.bundle"
+    bundle.write_bytes(b"git bundle")
+
+    class _Result:
+        stdout = b"0123456789abcdef0123456789abcdef01234567 refs/heads/caf\xc3\xa9\n"
+
+    def fake_run(*args: object, **kwargs: object) -> _Result:
+        return _Result()
+
+    monkeypatch.setattr(restore_module.subprocess, "run", fake_run)
+
+    with pytest.raises(CapsuleVerificationError, match="malformed"):
+        restore_module._list_bundle_heads(bundle)
+
+
+def test_list_bundle_heads_still_rejects_malformed_ascii_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = tmp_path / "history.bundle"
+    bundle.write_bytes(b"git bundle")
+
+    class _Result:
+        stdout = b"not-a-head-line\n"
+
+    def fake_run(*args: object, **kwargs: object) -> _Result:
+        return _Result()
+
+    monkeypatch.setattr(restore_module.subprocess, "run", fake_run)
+
+    with pytest.raises(CapsuleVerificationError, match="malformed"):
+        restore_module._list_bundle_heads(bundle)
+
+
+def test_open_regular_nofollow_fdopen_failure_closes_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "payload.bin"
+    path.write_bytes(b"payload\n")
+    leaked: dict[str, int] = {}
+
+    def failing_fdopen(fd: int, mode: str = "r", *args: object, **kwargs: object):
+        leaked["fd"] = fd
+        raise OSError("injected fdopen failure")
+
+    monkeypatch.setattr(seal_module.os, "fdopen", failing_fdopen)
+
+    with pytest.raises(CapsuleVerificationError, match="opened safely"):
+        with seal_module._open_regular_nofollow(path):
+            pass
+
+    assert "fd" in leaked
+    with pytest.raises(OSError):
+        os.fstat(leaked["fd"])

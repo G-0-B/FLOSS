@@ -1209,3 +1209,35 @@ def test_secret_policy_path_component_match(
     Over-redaction is the intended fail-closed default."""
     policy = SecretPolicy.default()
     assert policy.is_secret(relative_path) is expected_secret
+
+
+def test_read_regular_file_maps_resolve_race_to_capture_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = initialized_repo(tmp_path)
+    original_resolve = Path.resolve
+
+    def racing_resolve(self: Path, *args: object, **kwargs: object) -> Path:
+        if self.name == "a.txt":
+            raise FileNotFoundError(self)
+        return original_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", racing_resolve)
+    with pytest.raises(CaptureDrift, match="source state changed during capture"):
+        git_capture_module._read_regular_file(repo, "a.txt")
+
+
+def test_read_regular_file_maps_read_race_to_capture_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = initialized_repo(tmp_path)
+    original_read = Path.read_bytes
+
+    def racing_read(self: Path) -> bytes:
+        if self.name == "a.txt":
+            raise FileNotFoundError(self)
+        return original_read(self)
+
+    monkeypatch.setattr(Path, "read_bytes", racing_read)
+    with pytest.raises(CaptureDrift, match="source state changed during capture"):
+        git_capture_module._read_regular_file(repo, "a.txt")

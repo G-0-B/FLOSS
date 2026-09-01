@@ -467,8 +467,11 @@ def _read_regular_file(
             "inclusion": "excluded",
             "reason": "symlink-parent-not-followed",
         }
-    resolved = path.resolve(strict=True)
-    source_root = repo.resolve(strict=True)
+    try:
+        resolved = path.resolve(strict=True)
+        source_root = repo.resolve(strict=True)
+    except FileNotFoundError:
+        raise CaptureDrift("source state changed during capture")
     if resolved == source_root or source_root not in resolved.parents:
         return None, {
             "kind": kind,
@@ -479,8 +482,11 @@ def _read_regular_file(
             "reason": "outside-source-not-followed",
         }
 
-    content = path.read_bytes()
-    after = path.lstat()
+    try:
+        content = path.read_bytes()
+        after = path.lstat()
+    except FileNotFoundError:
+        raise CaptureDrift("source state changed during capture")
     stable_fields = [
         "st_dev",
         "st_ino",

@@ -128,10 +128,18 @@ def _open_regular_nofollow(path: Path) -> Iterator[BinaryIO]:
             ) from ctypes.WinError()
         try:
             descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
-        except OSError:
+        except OSError as exc:
             ctypes.windll.kernel32.CloseHandle(handle)
-            raise
-    stream = os.fdopen(descriptor, "rb", closefd=True)
+            raise CapsuleVerificationError(
+                "capsule payload cannot be opened safely"
+            ) from exc
+    try:
+        stream = os.fdopen(descriptor, "rb", closefd=True)
+    except OSError as exc:
+        os.close(descriptor)
+        raise CapsuleVerificationError(
+            "capsule payload cannot be opened safely"
+        ) from exc
     try:
         yield stream
     finally:
@@ -388,7 +396,14 @@ def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
             raise CapsuleVerificationError(
                 "fixed output pending file cannot be created"
             ) from exc
-        with os.fdopen(descriptor, "wb", closefd=True) as stream:
+        try:
+            stream = os.fdopen(descriptor, "wb", closefd=True)
+        except OSError as exc:
+            os.close(descriptor)
+            raise CapsuleVerificationError(
+                "fixed output pending file cannot be created"
+            ) from exc
+        with stream:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())

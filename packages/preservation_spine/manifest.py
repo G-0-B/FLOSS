@@ -575,7 +575,12 @@ def _decode_git_path(value: bytes) -> str:
                         index += 1
                     else:
                         break
-                encoded.append(int(digits.decode("ascii"), 8))
+                parsed = int(digits.decode("ascii"), 8)
+                if parsed > 0o377:
+                    raise CapsuleVerificationError(
+                        "quoted diff path octal escape is malformed"
+                    )
+                encoded.append(parsed)
                 continue
             if escaped not in escapes:
                 raise CapsuleVerificationError("quoted diff path escape is malformed")

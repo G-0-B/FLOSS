@@ -9,6 +9,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from packages.preservation_spine.manifest import (
+    _decode_git_path,
     inventory_change_universe,
     manifest_digest,
     validate_manifest,
@@ -720,3 +721,17 @@ def test_inventory_rejects_index_and_history_disposition_drift(tmp_path: Path) -
     )
     with pytest.raises(CapsuleVerificationError):
         inventory_change_universe(history_capsule)
+
+
+def test_decode_git_path_rejects_octal_above_byte_range() -> None:
+    with pytest.raises(CapsuleVerificationError, match="octal escape|malformed"):
+        _decode_git_path(rb'"\400.txt"')
+    with pytest.raises(CapsuleVerificationError, match="octal escape|malformed"):
+        _decode_git_path(rb'"\777.txt"')
+
+
+def test_decode_git_path_still_accepts_max_byte_octal() -> None:
+    # 0o377 is a valid byte and must not raise the octal-range error; 0xFF is
+    # not valid UTF-8 so decoding fails in the existing UTF-8 check.
+    with pytest.raises(CapsuleVerificationError, match="UTF-8"):
+        _decode_git_path(rb'"\377.txt"')
