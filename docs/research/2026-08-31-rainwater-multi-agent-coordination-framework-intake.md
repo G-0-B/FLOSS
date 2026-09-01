@@ -1,8 +1,8 @@
 # Rainwater multi-agent coordination framework — intake delta
 
-**Date:** 2026-08-31  
-**Status:** Research intake; no framework adoption  
-**Truth status:** Mixed — source structure inspected locally; source case-study metrics are author-reported and not FLOSSI0ULLK measurements  
+**Date:** 2026-08-31
+**Status:** Research intake; no framework adoption
+**Truth status:** Mixed — source structure inspected locally; source case-study metrics are author-reported and not FLOSSI0ULLK measurements
 **Source:** `C:/~shit/timothyjrainwater-lab-multi-agent-coordination-framework-8a5edab282632443.md` (MIT-licensed gitingest snapshot)
 
 ## Why retain this delta
