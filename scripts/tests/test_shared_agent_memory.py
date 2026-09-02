@@ -181,3 +181,44 @@ def test_an_empty_body_produces_no_gist():
     module = load_memory_module()
     assert module.first_sentence("") == ""
     assert module.first_sentence("\n\n# only a heading\n") == ""
+
+
+def test_every_canonical_memory_note_parses():
+    """One note without frontmatter takes the whole agent surface down.
+
+    `commitment-built-witness-improvised.md` landed in 726d568 with a `#`
+    heading where its siblings carry a YAML block. split_frontmatter refuses a
+    file without one, and it raises inside the walk, so
+    `materialize_shared_agent_surface.py --check` failed before doing any work
+    at all -- from a docs-only commit, for four days, while the green set stayed
+    green. Nothing here read the real tree.
+
+    The glob mirrors the materializer's own `canonical_root.glob("*/*.md")`
+    exactly: top-level files such as MEMORY.md are indexes it never reads, and
+    a test with a wider glob would fail on files the tool does not care about.
+    """
+    memory = load_memory_module()
+    canonical_root = FLOSS_ROOT / "docs" / "agent-memory"
+    notes = sorted(canonical_root.glob("*/*.md"))
+    assert notes, "no canonical memory notes found -- the glob is wrong"
+
+    unparseable = []
+    for path in notes:
+        try:
+            metadata, _ = memory.split_frontmatter(
+                path.read_text(encoding="utf-8"), path
+            )
+        except Exception as exc:  # noqa: BLE001 -- the point is to name them all
+            unparseable.append(f"{path.relative_to(FLOSS_ROOT).as_posix()}: {exc}")
+            continue
+        if not metadata.get("id"):
+            unparseable.append(
+                f"{path.relative_to(FLOSS_ROOT).as_posix()}: frontmatter has no `id`"
+            )
+
+    newline = chr(10)
+    assert unparseable == [], (
+        "memory notes the materializer cannot read:"
+        + newline
+        + newline.join(unparseable)
+    )
