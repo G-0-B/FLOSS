@@ -410,6 +410,7 @@ def build_antigravity_payload(
     for name, raw_server in shared_mcp.items():
         transport, spec = classify_transport(name, raw_server)
         if transport == "http":
+            reject_unsupported_headers(name, "Antigravity", spec)
             servers[name] = {"serverUrl": spec["url"]}
         elif transport == "stdio":
             entry: dict[str, Any] = {
@@ -480,7 +481,40 @@ def build_opencode_payload(
 
 # Transport fields the propagator owns on a managed server. Everything else
 # on that server (tools tables, timeouts, approval modes) is preserved.
-MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url")
+# `http_headers` is MANAGED, not preserved: a target converted from http to
+# stdio, or to an http entry that no longer carries credentials, must not keep
+# the old header table. Same reasoning the `env` handling below already
+# documents, in the other direction.
+MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url", "http_headers")
+
+
+def reject_unsupported_headers(name: str, target: str, spec: dict[str, Any]) -> None:
+    """Refuse to project an authenticated HTTP server onto a target that
+    cannot carry its headers.
+
+    classify_transport() validates and returns `headers`, and three of the four
+    HTTP projections discarded it -- so an MCP authenticated by header was
+    written out as an unauthenticated server: a config that parses, installs,
+    and fails at connect time with nothing in the generated file to suggest
+    anything was removed. OpenCode and Codex have documented header fields and
+    now receive them. For the rest there is no verified field name, and
+    inventing one would be the same silent failure with extra steps.
+
+    Loud refusal is the honest option: it happens at materialization, names the
+    server and the target, and leaves the operator to remove the credentials
+    from the shared entry or drop the target. One definition, three callers --
+    a per-target copy of this is how the OpenCode fix came to be applied to one
+    projection out of four.
+    """
+
+    if spec.get("headers"):
+        raise SharedSurfaceError(
+            f"Shared MCP server {name!r} is an HTTP server with `headers`, and "
+            f"the {target} projection has no field to carry them. Writing it "
+            f"anyway would emit an unauthenticated server that fails at "
+            f"connect time. Remove the headers from the shared entry, or "
+            f"exclude {name!r} from the {target} target."
+        )
 
 
 def ensure_no_name_map_collisions(
@@ -603,6 +637,17 @@ def apply_codex_mcp(
                 entry["env"] = spec["env"]
             elif preserved_env is not None:
                 entry["env"] = preserved_env
+        elif spec.get("headers"):
+            # `http_headers`, per Codex's documented config reference: "Map of
+            # HTTP header names to static values." Written HERE and not with
+            # the managed scalars above because it is a table, and TOML
+            # re-parents every later scalar into a table that precedes them --
+            # the constraint this function's ordering already exists to honour.
+            #
+            # It is in MANAGED_TRANSPORT_FIELDS, so a stale header table from a
+            # previous configuration is dropped before this runs rather than
+            # surviving as a preserved table.
+            entry["http_headers"] = spec["headers"]
         for key, value in preserved_tables.items():
             entry[key] = value
 
@@ -849,6 +894,7 @@ def apply_hermes_mcp(
         entry = servers[target_name]
 
         if transport == "http":
+            reject_unsupported_headers(shared_name, "Hermes", spec)
             for key in ("command", "args", "env"):
                 entry.pop(key, None)
             entry["type"] = "http"

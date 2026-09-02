@@ -1160,3 +1160,88 @@ def test_opencode_remote_projection_omits_absent_headers():
     )
 
     assert projected == {"type": "remote", "url": "https://example.invalid/mcp"}
+
+
+HEADERED = {
+    "type": "http",
+    "url": "https://example.invalid/mcp",
+    "headers": {"Authorization": "Bearer token-value"},
+}
+
+
+def test_codex_projects_headers_to_http_headers():
+    """The Codex branch wrote only type and url, so an MCP authenticated by
+    header was emitted as an unauthenticated server -- the same defect fixed
+    for OpenCode one commit earlier, in the same file, three functions away."""
+    doc = tomlkit.parse("")
+    result = mas.apply_codex_mcp(doc, {"authed": HEADERED}, {}, {})
+
+    entry = result["mcp_servers"]["authed"]
+    assert entry["type"] == "streamable_http"
+    assert dict(entry["http_headers"]) == {"Authorization": "Bearer token-value"}
+
+
+def test_codex_drops_a_stale_header_table_when_the_transport_changes():
+    """http_headers is managed, not preserved: a server converted to stdio
+    must not keep credential-bearing headers from its previous configuration.
+    Same reasoning the `env` handling already documents, in reverse.
+
+    The stale table is seeded DIRECTLY rather than produced by a first
+    projection. Written that way, the test passed against the unfixed code for
+    a vacuous reason -- the old code never wrote http_headers at all, so
+    "not in entry" was true either way. It has to start from a config that
+    already carries the credentials.
+    """
+    doc = tomlkit.parse(
+        chr(10).join(
+            [
+                "[mcp_servers.srv]",
+                'type = "streamable_http"',
+                'url = "https://example.invalid/mcp"',
+                "",
+                "[mcp_servers.srv.http_headers]",
+                'Authorization = "Bearer stale-token"',
+            ]
+        )
+    )
+    assert "http_headers" in doc["mcp_servers"]["srv"], "fixture is not stale"
+
+    result = mas.apply_codex_mcp(
+        doc, {"srv": {"command": "run", "args": ["--x"]}}, {}, {}
+    )
+
+    entry = result["mcp_servers"]["srv"]
+    assert entry["type"] == "stdio"
+    assert "http_headers" not in entry, "a stale credential table survived"
+
+
+def test_codex_omits_http_headers_when_there_are_none():
+    doc = tomlkit.parse("")
+    result = mas.apply_codex_mcp(
+        doc, {"plain": {"type": "http", "url": "https://example.invalid/mcp"}}, {}, {}
+    )
+
+    assert "http_headers" not in result["mcp_servers"]["plain"]
+
+
+def test_a_target_with_no_header_field_refuses_rather_than_dropping_them():
+    """Antigravity and Hermes have no verified header field. Inventing one
+    would be the same silent failure with extra steps, and writing the server
+    without its credentials is the defect itself -- so it fails loudly at
+    materialization, naming the server and the target."""
+    with pytest.raises(mas.SharedSurfaceError, match="Antigravity"):
+        mas.build_antigravity_payload({}, {"authed": HEADERED})
+
+    with pytest.raises(mas.SharedSurfaceError, match="no field to carry"):
+        mas.build_antigravity_payload({}, {"authed": HEADERED})
+
+
+def test_an_unauthenticated_http_server_still_projects_everywhere():
+    """Fail-closed must not refuse the ordinary case."""
+    plain = {"type": "http", "url": "https://example.invalid/mcp"}
+
+    payload = mas.build_antigravity_payload({}, {"plain": plain})
+
+    assert payload["mcpServers"]["plain"] == {
+        "serverUrl": "https://example.invalid/mcp"
+    }
