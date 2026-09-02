@@ -67,6 +67,11 @@
           "emergency": {
             "type": "boolean",
             "description": "Downgrades a missing reuse block to a warning until promotion. Retrospective reuse audit required before the artifact is generalized."
+          },
+          "tier_exempt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Why this artifact carries no reuse tier. Required when `tier` and `grandfathered` are both absent (R2, 2026-09-02): before that date an omitted tier was a silent exemption, which held ADR-18's reuse gate to 9 of 109 registered artifacts. A reason, never a boolean -- a bare flag is an omitted tier wearing a hat."
           }
         },
         "additionalProperties": false

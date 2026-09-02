@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-17",
+  "updated": "2026-09-02",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
@@ -35,27 +35,34 @@
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
-      "spec": "ADR-13: Yumeichan Watch Architecture (Affective Edge Node)"
+      "spec": "ADR-13: Yumeichan Watch Architecture (Affective Edge Node)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-14-objectgraph-projection.md": {
-      "spec": "ADR-14: ObjectGraph Projection over Corpus"
+      "spec": "ADR-14: ObjectGraph Projection over Corpus",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-15-provenance-validation-enforcement.md": {
-      "spec": "ADR-15: Enforce Author-Provenance Binding in Integrity Zome"
+      "spec": "ADR-15: Enforce Author-Provenance Binding in Integrity Zome",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-16-omnigent-execution-surface.md": {
-      "spec": "ADR-16: Omnigent as Execution/Governance Surface"
+      "spec": "ADR-16: Omnigent as Execution/Governance Surface",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
-      "spec": "ADR-17: KnowledgeTriple contract reconciliation"
+      "spec": "ADR-17: KnowledgeTriple contract reconciliation",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
       "spec": "ADR-18: enforce adopt/extend/compose/build evidence via spec_gate + reuse-review voters",
-      "spec_ref": "docs/specs/reuse-gate.spec.md"
+      "spec_ref": "docs/specs/reuse-gate.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-19-omniroute-inference-plane.md": {
       "spec": "ADR-19: OmniRoute as the inference-routing plane",
-      "spec_ref": "docs/adr/ADR-19-omniroute-inference-plane.md"
+      "spec_ref": "docs/adr/ADR-19-omniroute-inference-plane.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
@@ -365,6 +372,59 @@
         ]
       }
     },
+    "FLOSS/docs/specs/file-locking.spec.md": {
+      "spec": "File locking capability: process-lifetime locks vs the daemon claim that must outlive its process",
+      "tier": 1,
+      "reuse": {
+        "capability": "File locking, in two lifetimes: (A) process-lifetime mutual exclusion for the provenance identity, sequence and anchor-scan locks; (B) a daemon slot claim that must OUTLIVE the process that took it.",
+        "search_date": "2026-09-02",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "py-filelock (filelock 3.18.0)",
+            "version": "3.18.0",
+            "license": "Unlicense",
+            "maintenance": "active (tox-dev)",
+            "platform_fit": "native — msvcrt on Windows, fcntl on POSIX",
+            "truth_status": "Verified",
+            "probe": "Already installed on the development machine at C:/Python313/Lib/site-packages/filelock/ and declared in no requirements file. Verified present and importable 2026-09-02 (python -c 'import filelock; print(filelock.__version__)' -> 3.18.0). Provides exactly Surface A's semantics including release-on-process-death. ADOPT for Surface A. Cannot express Surface B: an OS advisory lock is released by the kernel when the holder dies, which is precisely the property the daemon claim must not have."
+          },
+          {
+            "name": "hand-rolled _acquire_lock (packages/activity_log/provenance.py:159)",
+            "version": "repo at head",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "truth_status": "Verified",
+            "probe": "Read at head 2026-09-02; three call sites (.identity.lock, .sequence.lock, .anchor-scan.lock). ADR-20 attributes the holes and doubled origin in identity DkuYPguG98HM2nyR to its stale-reclamation defect. Superseded by py-filelock for Surface A."
+          },
+          {
+            "name": "pid file + .identity sidecar + compare-and-swap remove",
+            "version": "PR41 lineage",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "truth_status": "Specified",
+            "probe": "Not probed on this branch — packages/activity_log/filelock.py is absent here and lives on the PR41 lineage (commits 222d27b, 29feb91). Retained as the Surface B design: a claim whose lifetime is independent of any holding process, with stale reclamation as a CAS against the inspected (st_dev, st_ino) instance rather than inspect-then-unlink."
+          },
+          {
+            "name": "portalocker",
+            "version": "not probed",
+            "license": "BSD-3-Clause",
+            "maintenance": "active",
+            "platform_fit": "cross-platform",
+            "truth_status": "Specified",
+            "probe": "not_probed: same lifetime semantics as py-filelock, so it answers Surface A and not Surface B either. Not probed because py-filelock was already installed, making it the zero-cost adopt. Recorded as unprobed rather than dismissed."
+          }
+        ],
+        "verdict": "compose",
+        "irreducible_delta": "Surface A has NO irreducible delta — py-filelock already provides it, and building it was the error ADR-20 accepted correcting on 2026-08-25. Surface B's delta is irreducible and precisely stateable: a claim whose lifetime is independent of any holding process. No OS lock primitive offers that, because release-on-death is the defining property of an OS lock. The composed artifact is an adopted library for A plus a built claim protocol for B; the single verdict is `compose` because neither half describes the whole.",
+        "rejected_because": [
+          "portalocker: same process-lifetime semantics as the already-installed py-filelock; no advantage, and it does not answer Surface B either (Specified, not probed)"
+        ],
+        "expiry_or_retest_date": "2026-12-31"
+      }
+    },
     "FLOSS/docs/specs/harvest-protocol.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (HARVEST Protocol Specification)",
       "grandfathered": true
@@ -387,7 +447,8 @@
     },
     "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
       "spec": "Author-provenance binding enforcement in integrity zome",
-      "spec_ref": "docs/adr/ADR-15-provenance-validation-enforcement.md"
+      "spec_ref": "docs/adr/ADR-15-provenance-validation-enforcement.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/knowledge-edge.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (knowledge-edge.schema)",
@@ -406,7 +467,8 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
-      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)"
+      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
@@ -492,7 +554,8 @@
     },
     "FLOSS/docs/specs/reuse-gate.schema.json": {
       "spec": "JSON Schema for ADR-18 reuse blocks in spec-registry entries",
-      "spec_ref": "docs/specs/reuse-gate.spec.md"
+      "spec_ref": "docs/specs/reuse-gate.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/reuse-gate.spec.md": {
       "spec": "Prior-Art and Reuse Gate spec: tiers, review profile, guideline loop, risk register, PR38 retrospective audit",
@@ -558,15 +621,18 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/spec-gate.spec.md": {
-      "spec": "Spec for the -1-layer spec-gate check (D7, adopted 2026-06-12)"
+      "spec": "Spec for the -1-layer spec-gate check (D7, adopted 2026-06-12)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/spec-registry.json": {
       "spec": "Spec-gate registry: one-line spec stubs for gated artifacts (this file)",
-      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/spec-registry.schema.json": {
       "spec": "JSON Schema for the spec-gate registry",
-      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/thought-credential.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (thought-credential.schema)",
@@ -578,103 +644,134 @@
     },
     "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
       "spec": "Yumeichan affective edge-node watch architecture",
-      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/docs/specs/yumeichan-watch-capabilities.schema.json": {
       "spec": "Capability schema for Yumeichan watch node",
-      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/README.md": {
-      "spec": "Operator note describing what each hook fires on and how to disable one"
+      "spec": "Operator note describing what each hook fires on and how to disable one",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/agentmemory_client.py": {
-      "spec": "Thin REST client the hooks use to read/write the local agentmemory service"
+      "spec": "Thin REST client the hooks use to read/write the local agentmemory service",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/hook_bg_round.py": {
-      "spec": "Detached background consensus-round runner spawned by hook_post_write"
+      "spec": "Detached background consensus-round runner spawned by hook_post_write",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/hook_post_write.py": {
-      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
+      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/hook_pre_write.py": {
-      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/hooks/session_start_inject.py": {
-      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
+      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/artifact_actions.py": {
-      "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
+      "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/audit_provenance_packets.py": {
-      "spec": "Audit provenance packets: valid / superseded / invalid"
+      "spec": "Audit provenance packets: valid / superseded / invalid",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/autonomous_synthesis_loop.py": {
-      "spec": "Human-gated synthesis loop: staged drafts -> source-chain commit"
+      "spec": "Human-gated synthesis loop: staged drafts -> source-chain commit",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/backfill_kalisam_fork.py": {
-      "spec": "Backfill kalisam_fork URLs in harvest staging drafts"
+      "spec": "Backfill kalisam_fork URLs in harvest staging drafts",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/backfill_stabilization_provenance.py": {
-      "spec": "Backfill provenance packets for the 2026-05-25 stabilization commits"
+      "spec": "Backfill provenance packets for the 2026-05-25 stabilization commits",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/context_router.py": {
-      "spec": "Deterministic query -> corpus-roots routing (RAGRoute-style keyword scorer)"
+      "spec": "Deterministic query -> corpus-roots routing (RAGRoute-style keyword scorer)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/fork_ancestry_gather.py": {
-      "spec": "Gather upstream metadata + README excerpts for kalisam forks (ancestry sweep)"
+      "spec": "Gather upstream metadata + README excerpts for kalisam forks (ancestry sweep)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/harvest_batch.sh": {
-      "spec": "Batch driver for harvest_reuse_ledger runs"
+      "spec": "Batch driver for harvest_reuse_ledger runs",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/harvest_reuse_ledger.py": {
-      "spec": "Harvest reuse-ledger entry candidates from upstream repos into staging"
+      "spec": "Harvest reuse-ledger entry candidates from upstream repos into staging",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/heartbeat.py": {
       "spec": "Plane A heartbeat loop: budget-capped work-item rotation, STOP-file halt",
-      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
+      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/heartbeat_slate.py": {
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
-      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
+      "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/major_consolidation_sweep.py": {
-      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
+      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
-      "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
+      "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_agent_memory.py": {
-      "spec": "Agent-memory canonical markdown -> registry + per-client projections"
+      "spec": "Agent-memory canonical markdown -> registry + per-client projections",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_agent_surface.py": {
-      "spec": "Shared agent-surface manifest -> per-client projections"
+      "spec": "Shared agent-surface manifest -> per-client projections",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_ai_roster.py": {
-      "spec": "AI/harness roster manifest -> roster projections + update packet"
+      "spec": "AI/harness roster manifest -> roster projections + update packet",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_context_surface.py": {
-      "spec": "Context manifest -> CONTEXT_L0/L1 + context registries"
+      "spec": "Context manifest -> CONTEXT_L0/L1 + context registries",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_hook_surface.py": {
-      "spec": "Hook manifest -> per-client hook projections"
+      "spec": "Hook manifest -> per-client hook projections",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/materialize_shared_skill_surface.py": {
-      "spec": "Skill manifest -> per-client skill projections"
+      "spec": "Skill manifest -> per-client skill projections",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/objectgraph_spike.py": {
       "spec": "Typed node-level projection + read-only resolve over skill-corpus (N6 pilot, concept-not-import)",
-      "spec_ref": "FLOSS/docs/superpowers/specs/2026-06-12-objectgraph-spike.md"
+      "spec_ref": "FLOSS/docs/superpowers/specs/2026-06-12-objectgraph-spike.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/orient_probe.py": {
       "spec": "Deterministic orientation packet: presence/mtime/sha + router shortlist",
-      "spec_ref": "C:/~shit/.claude/skills/flossi0ullk-orient/SKILL.md"
+      "spec_ref": "C:/~shit/.claude/skills/flossi0ullk-orient/SKILL.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/poll_high_roi_actions.py": {
-      "spec": "Durable high-ROI action poll through the consensus gateway (default profile: diverse)"
+      "spec": "Durable high-ROI action poll through the consensus gateway (default profile: diverse)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/process_intake_events.py": {
       "spec": "Intake event consolidator over the claim-by-rename queue",
-      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/provenance_anchor.py": {
       "spec": "CLI to publish and verify the provenance Merkle anchor; prints publish commands, runs none",
@@ -735,10 +832,12 @@
       }
     },
     "FLOSS/scripts/refresh_agent_surfaces.py": {
-      "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
+      "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/research_log.py": {
-      "spec": "Appends dated research-log entries to the shared research register"
+      "spec": "Appends dated research-log entries to the shared research register",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/review_independence.py": {
       "spec": "Kish n_eff over reviewer findings-overlap; measures panel redundancy without gold labels",
@@ -768,39 +867,50 @@
       }
     },
     "FLOSS/scripts/review_queue.py": {
-      "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
+      "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/smoke_test_gateway.py": {
-      "spec": "Smoke test: consensus gateway end-to-end"
+      "spec": "Smoke test: consensus gateway end-to-end",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/smoke_test_inference.py": {
-      "spec": "Smoke test: inference provider reachability"
+      "spec": "Smoke test: inference provider reachability",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/smoke_test_voters.py": {
-      "spec": "Smoke test: voter roster resolution + credentials"
+      "spec": "Smoke test: voter roster resolution + credentials",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/spec_gate.py": {
       "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",
-      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+      "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/start_mcp_daemons.ps1": {
-      "spec": "Starts the local MCP daemon set (consensus gateway, agentmemory, reasoning ensemble)"
+      "spec": "Starts the local MCP daemon set (consensus gateway, agentmemory, reasoning ensemble)",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/stop_mcp_daemons.ps1": {
-      "spec": "Stops the local MCP daemon set started by start_mcp_daemons.ps1"
+      "spec": "Stops the local MCP daemon set started by start_mcp_daemons.ps1",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/sweep_mcp_orphans.ps1": {
-      "spec": "Reaps orphaned MCP daemon processes left by crashed or detached sessions"
+      "spec": "Reaps orphaned MCP daemon processes left by crashed or detached sessions",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/triage_review_queue.py": {
-      "spec": "DEPRECATED shim -> review_queue.py --triage"
+      "spec": "DEPRECATED shim -> review_queue.py --triage",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/watch_intake.py": {
       "spec": "Polling intake watcher: root drops -> IntakeEvents",
-      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
+      "spec_ref": "FLOSS/docs/specs/intake-event.schema.json",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
     "FLOSS/scripts/yumeichan_watch_capabilities.py": {
-      "spec": "Semantic validation for Yumeichan Watch capability-token bounds"
+      "spec": "Semantic validation for Yumeichan Watch capability-token bounds",
+      "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     }
   }
 }

@@ -78,7 +78,8 @@ delete clock with no backup. They are not yet copied into
 R1's effect, reproducible with `python FLOSS/scripts/spec_gate.py --check`:
 
 ```
-SPEC-GATE COVERAGE: reuse gate active on 9/109 registered artifact(s) (8%); 100 untiered, of which 57 not grandfathered
+SPEC-GATE COVERAGE: reuse gate active on 10/110 registered artifact(s) (9%); 57 exempt with a reason, 43 grandfathered, 0 undecided
+SPEC-GATE PROMISES: 6 ADR section(s) record accepted or deferred work that nothing gates -- ADR-0.1, ADR-14, ADR-17, ADR-20, ADR-6, FLOSSI0ULLK-ADR-Suite-v2.0
 ```
 
 `reuse_coverage()` in `scripts/spec_gate.py` derives that from the registry —
@@ -183,17 +184,37 @@ and the consent zomes. Report findings; do not edit.
   commit.
 - `docs/agent-memory/` files carry CRLF; git warns on every add. Cosmetic.
 
-## 7. Open, and waiting on the operator
+## 7. State of the remedies — all seven implemented 2026-09-02
 
-| Item | State |
+| Remedy | State |
 |---|---|
-| **R2** — untiered stops meaning exempt for new entries | Needs explicit consent; convention-establishing |
-| **R3** — materializers report all failures, not the first | Proposed |
-| **R4** — register the lock capability under ADR-18, per-surface verdicts, declare the dependency | Proposed |
-| **R6** — count accepted-but-not-implemented promises and print it | Proposed |
-| **R7** — fix the `st` directive (`--everything`, or drop "always") | Proposed |
-| Back up 25 transcripts / 124.5 MB into `FLOSS/ai-conversations/` | Undone |
-| ADR-20 open questions 1, 2, 4, 6 | Open; Q2's exit condition was never satisfied |
+| R1 reuse-coverage line | ✅ Implemented, TDD |
+| R2 untiered is no longer exempt | ✅ `tier_decision_problems()` fails closed; 57 entries swept to explicit `tier_exempt`; schema updated; `--add` already refused untiered entries |
+| R3 report all failures | ✅ For `materialize_shared_agent_memory.py`. ⚠️ **Three other corpus materializers not swept — left open deliberately** |
+| R4 lock capability under ADR-18 | ✅ `docs/specs/file-locking.spec.md`, tier 1, verdict `compose` |
+| R5 no new surface | ✅ Honoured |
+| R6 count ungated promises | ✅ Implemented, TDD; finds 6 ADRs |
+| R7 fix the `st` directive | ✅ `--everything` now required and the rule scoped |
+| Transcript retention + backup | ✅ `cleanupPeriodDays: 99999` + 218 MB / 121 transcripts mirrored |
+
+### Still open
+
+- **R3 for the other three materializers.** `skill_surface`, `hook_surface` and
+  `context_surface` show 4, 10 and 4 raise-in-loop candidates under a crude
+  regex. Each needs reading; mass-editing on a regex match would be the
+  opposite of the care the remedy is about.
+- **Surface A lock adoption.** `docs/specs/file-locking.spec.md` records
+  `adopt py-filelock` for the three process-lifetime lock sites. Not done: ADR-20
+  reclassified this area **Substrate** (0.85, override forbidden) and the
+  consensus gateway was unreachable. `filelock` is deliberately absent from
+  `requirements-ci.txt` until the first `import` lands in the same commit.
+- **`FLOSS/packages/` is not a gated surface.** The registry's `gated_surfaces`
+  are `scripts`, `hooks`, `docs/specs`, `docs/adr`. The product code — every
+  lock, the provenance validator, the source chain, the gateway — is invisible
+  to ADR-18 by configuration. Widening it is a policy decision, not a bug fix.
+- **ADR-20 open questions 1, 2, 4, 6.** Q2's exit condition was never satisfied.
+- **`spec_gate --check` still exits 1** on the two unregistered `grok_*` hooks
+  and one stale entry. Unrelated to this work.
 
 ## 8. What NOT to do
 

@@ -145,6 +145,36 @@ The audit's subject is gates that do not fire. This is the adjacent case: a
 directive that fires and returns a wrong answer quietly. Both produce the same
 end state -- a reader who believes they complied.
 
+SIXTH AND SEVENTH INSTANCES — FOUND 2026-09-02 WHILE IMPLEMENTING THE REMEDIES
+
+SIXTH: the gate cannot see the code.
+docs/specs/spec-registry.json declares gated_surfaces as FLOSS/scripts,
+FLOSS/hooks, FLOSS/docs/specs and FLOSS/docs/adr. FLOSS/packages/ -- the product
+code, where every lock, the provenance validator, the source chain and the
+consensus gateway live -- IS NOT A GATED SURFACE. ADR-18 could not have caught
+the hand-rolled lock even with a perfect tier discipline, because
+packages/activity_log/provenance.py:159 is invisible to the registry by
+configuration. The reuse gate governs specs and ADRs about code, never code.
+
+SEVENTH: a comment cited an authority that was never built.
+scripts/spec_gate.py's --add path carried the comment "see
+REUSE_TIER_GRANDFATHERED below". That constant does not exist anywhere in the
+file. A reader checking whether existing entries were safely grandfathered
+would have gone looking for a mechanism that was never written. This is the
+same drift the module's own test docstring catalogues four prior instances of
+-- a specification edited, a nearby name treated as its implementation. Fixed
+2026-09-02 to point at `grandfathered`, `tier_exempt` and
+`tier_decision_problems`, which are the things with actual force.
+
+WHAT THE REPO CAUGHT THAT THIS AUDIT DID NOT
+Worth recording as a positive: implementing R2 broke
+test_registry_schema_admits_every_key_the_registry_uses, because adding
+`tier_exempt` to 57 entries made the canonical registry invalid against its own
+declared schema. That test exists precisely because the same defect happened
+when `tier` and `reuse` were added. It fired, correctly, on the first run. The
+repo's drift discipline works where it has been applied; the finding of this
+audit is only ever about where it has not.
+
 THE GENERALISED DEFECT
 Name: gates are exempt by default, so adoption decays silently while the gate
 still reports green.

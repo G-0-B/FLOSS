@@ -128,20 +128,20 @@ Recorded at [`docs/agent-memory/project/gates-exempt-by-default.md`](../../agent
 
 | Remedy | State |
 |---|---|
-| **R1** — `spec_gate --check` prints coverage | ✅ **Implemented** this session, TDD, 4 new tests in `scripts/tests/test_spec_gate_reuse_contract.py` |
-| R2 — untiered stops meaning exempt for new entries | ⚠️ Proposed; convention-establishing, needs explicit operator consent |
-| R3 — aggregate materializers report all failures | ⚠️ Proposed |
-| R4 — register the lock capability under ADR-18 with per-surface verdicts | ⚠️ Proposed |
-| R5 — add no new surface | ✅ Honoured |
-| **R6** — count accepted-but-not-implemented promises | ⚠️ Proposed (ADR-20 carries six) |
-| **R7** — fix the `st` directive (`--everything`, or drop "always") | ⚠️ Proposed |
+| **R1** — `spec_gate --check` prints reuse coverage | ✅ Implemented `633c87a`, TDD |
+| **R2** — untiered stops meaning exempt | ✅ Implemented 2026-09-02. `tier_decision_problems()` fails closed; 57 undecided entries swept to an explicit `tier_exempt` reason; `tier_exempt` declared in `spec-registry.schema.json`; `--add` already refused an untiered entry |
+| **R3** — materializers report all failures | ✅ Implemented for the proven case (`materialize_shared_agent_memory.py`), TDD. ⚠️ The other three corpus materializers were **not** swept — see below |
+| **R4** — register the lock capability under ADR-18 | ✅ `docs/specs/file-locking.spec.md` + tier-1 reuse block, verdict `compose`. ⚠️ No lock code changed (Substrate); `filelock` deliberately not yet in requirements |
+| **R5** — add no new surface | ✅ Honoured. No skill, hook, agent or checklist created |
+| **R6** — count ungated accepted/deferred promises | ✅ Implemented, TDD. Finds 6 ADRs |
+| **R7** — fix the `st` directive | ✅ `FLOSS/CLAUDE.md` now requires `--everything` and scopes the rule |
+| Transcript retention + backup | ✅ `cleanupPeriodDays: 99999` (operator, verified) + 218 MB / 121 transcripts mirrored to gitignored `ai-conversations/claude-code-transcripts/` with a refresh README |
 
-Also closed this session, outside the remedy list: Claude Code transcript
-retention. `cleanupPeriodDays` was unset, so the default 30-day deletion was
-live against 25 transcripts / 124.5 MB with no backup, oldest dated 2026-08-20.
-Operator set it to `99999` on 2026-09-02; verified, with all 17 other settings
-keys preserved. The corpus is no longer on a delete clock. Backing it up into
-`FLOSS/ai-conversations/` remains undone.
+**Scope honesty on R3.** Only `materialize_shared_agent_memory.py` was converted.
+`materialize_shared_skill_surface.py`, `..._hook_surface.py` and
+`..._context_surface.py` show 4, 10 and 4 raise-in-loop candidates under a crude
+regex. Mass-editing ~18 sites on a regex match would be the opposite of the
+care this remedy is about; each needs reading. **Left open, deliberately.**
 
 R1's output on this branch at time of writing:
 

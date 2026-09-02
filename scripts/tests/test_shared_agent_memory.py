@@ -5,7 +5,6 @@ import json
 import sys
 from pathlib import Path
 
-
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -48,7 +47,14 @@ def test_imports_legacy_claude_memory_into_canonical_tree(tmp_path):
     )
 
     assert [entry.path.as_posix() for entry in imported] == [
-        (tmp_path / "FLOSS" / "docs" / "agent-memory" / "feedback" / "pressure-helps.md").as_posix()
+        (
+            tmp_path
+            / "FLOSS"
+            / "docs"
+            / "agent-memory"
+            / "feedback"
+            / "pressure-helps.md"
+        ).as_posix()
     ]
     text = imported[0].path.read_text(encoding="utf-8")
     assert "id: feedback-pressure-helps" in text
@@ -181,3 +187,102 @@ def test_an_empty_body_produces_no_gist():
     module = load_memory_module()
     assert module.first_sentence("") == ""
     assert module.first_sentence("\n\n# only a heading\n") == ""
+
+
+# --- R3: aggregate validators must not hide failures behind the first one ----
+#
+# 2026-08-29: commit 726d568 added one memory file with no frontmatter.
+# collect_memory_entries raised on it and the whole 62-memory projection
+# stopped. Nobody noticed for three days, because the error named one file and
+# therefore read as one file's problem rather than as a dead surface. Failing
+# closed is correct; failing closed on the FIRST problem while staying silent
+# about the rest is what cost the three days.
+
+
+def _valid_memory(name: str) -> str:
+    return "\n".join(
+        [
+            "---",
+            f"id: project-{name}",
+            "type: project",
+            "status: active",
+            f"title: {name}",
+            "---",
+            "",
+            f"# {name}",
+            "",
+            "Body sentence.",
+            "",
+        ]
+    )
+
+
+def _canonical_tree(tmp_path):
+    canonical = tmp_path / "agent-memory"
+    (canonical / "project").mkdir(parents=True)
+    return canonical
+
+
+def test_every_rejected_memory_file_is_named_not_just_the_first(tmp_path):
+    memory = load_memory_module()
+    canonical = _canonical_tree(tmp_path)
+    (canonical / "project" / "aaa-good.md").write_text(
+        _valid_memory("aaa-good"), encoding="utf-8"
+    )
+    (canonical / "project" / "bbb-no-frontmatter.md").write_text(
+        "# no frontmatter here\n", encoding="utf-8"
+    )
+    (canonical / "project" / "ccc-unclosed.md").write_text(
+        "---\nid: x\n", encoding="utf-8"
+    )
+
+    try:
+        memory.collect_memory_entries(tmp_path, canonical)
+    except memory.AgentMemoryError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("collect_memory_entries accepted invalid memory files")
+
+    assert "bbb-no-frontmatter.md" in message
+    # The load-bearing assertion: a failure AFTER the first one still reaches
+    # the reader. Sorted order puts bbb first, so ccc is only present if the
+    # walk continued past a raise.
+    assert "ccc-unclosed.md" in message
+
+
+def test_the_rejection_reports_how_much_it_examined(tmp_path):
+    """A validator that says what it rejected but not what it looked at leaves
+    the reader unable to tell one bad file from a dead surface."""
+    memory = load_memory_module()
+    canonical = _canonical_tree(tmp_path)
+    for name in ("aaa-good", "bbb-good"):
+        (canonical / "project" / f"{name}.md").write_text(
+            _valid_memory(name), encoding="utf-8"
+        )
+    (canonical / "project" / "ccc-bad.md").write_text(
+        "no frontmatter\n", encoding="utf-8"
+    )
+
+    try:
+        memory.collect_memory_entries(tmp_path, canonical)
+    except memory.AgentMemoryError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("collect_memory_entries accepted an invalid memory file")
+
+    assert "1 of 3" in message, message
+
+
+def test_a_clean_tree_still_returns_every_entry(tmp_path):
+    memory = load_memory_module()
+    canonical = _canonical_tree(tmp_path)
+    for name in ("aaa", "bbb", "ccc"):
+        (canonical / "project" / f"{name}.md").write_text(
+            _valid_memory(name), encoding="utf-8"
+        )
+    entries = memory.collect_memory_entries(tmp_path, canonical)
+    assert [entry.memory_id for entry in entries] == [
+        "project-aaa",
+        "project-bbb",
+        "project-ccc",
+    ]

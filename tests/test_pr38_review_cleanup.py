@@ -981,7 +981,11 @@ def test_spec_gate_normalizes_and_audits_named_and_linked_worktrees(
     assert spec_gate.run_check() == 1
 
     registry_path.write_text(
-        '{"version": "test", "entries": {"FLOSS/docs/specs/spec-registry.json": {"spec": "registry"}, "FLOSS/scripts/probe.py": {"spec": "probe"}}}\n',
+        # `tier_exempt` is required since the R2 sweep of 2026-09-02: an
+        # omitted tier is no longer a silent exemption. This test's subject
+        # is worktree path normalization, not tier policy, so the fixture
+        # records a decision rather than relying on absence meaning fine.
+        '{"version": "test", "entries": {"FLOSS/docs/specs/spec-registry.json": {"spec": "registry", "tier_exempt": "fixture"}, "FLOSS/scripts/probe.py": {"spec": "probe", "tier_exempt": "fixture"}}}\n',
         encoding="utf-8",
     )
     assert spec_gate.run_check() == 0

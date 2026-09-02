@@ -810,3 +810,108 @@ def test_check_reports_coverage_on_both_the_pass_and_fail_paths(gate, capsys):
     )
     assert verdict_index is not None, "run_check printed no verdict"
     assert out.splitlines().index(coverage_line) < verdict_index
+
+
+# --- R6: accepted-but-not-implemented is a third ungated class --------------
+#
+# spec_gate validates that evidence exists for artifacts that were BUILT.
+# Nothing validates that artifacts get built for decisions that were ACCEPTED.
+# ADR-20:589 lists six such promises, `filelock` adoption among them, accepted
+# 2026-08-25 after a four-auditor meta-audit and still undone eight days later
+# while the hand-rolled lock accrued review rounds. Invisible to every other
+# gate by construction, so the gate here is: count them and print the number.
+
+
+def test_deferred_promises_finds_accepted_but_not_implemented_headings(gate, tmp_path):
+    adr = tmp_path / "adr"
+    adr.mkdir()
+    (adr / "ADR-90-thing.md").write_text(
+        "# ADR-90\n\n### Accepted but not implemented here\n\nA, B, and C.\n",
+        encoding="utf-8",
+    )
+    (adr / "ADR-91-other.md").write_text(
+        "# ADR-91\n\n### Deferred (LATER)\n\nSomething.\n", encoding="utf-8"
+    )
+    (adr / "ADR-92-clean.md").write_text(
+        "# ADR-92\n\n## Decision\n\nDone and shipped.\n", encoding="utf-8"
+    )
+    found = dict(gate.deferred_promises(adr))
+    assert "ADR-90-thing.md" in found
+    assert "ADR-91-other.md" in found
+    assert "ADR-92-clean.md" not in found
+
+
+def test_deferred_promises_is_empty_safe(gate, tmp_path):
+    assert gate.deferred_promises(tmp_path / "nope") == []
+
+
+def test_deferred_promises_finds_the_real_adr_20_section(gate):
+    """The instance this gate exists for must be found by it."""
+    found = dict(gate.deferred_promises())
+    assert "ADR-20-provenance-validator-reconciliation.md" in found
+
+
+def test_check_reports_ungated_promises_alongside_coverage(gate, capsys):
+    gate.run_check()
+    out = capsys.readouterr().out
+    assert "SPEC-GATE PROMISES:" in out
+
+
+# --- R2: an omitted tier stops being an exemption ---------------------------
+#
+# Measured 2026-09-01: 109 registered artifacts, 9 tiered, 100 untiered, of
+# which 43 were explicitly grandfathered and 57 were simply never decided.
+# spec_gate's own message said the rule out loud -- "an omitted tier is an
+# exemption, not a default" -- so the reuse gate reached 8% of the registry
+# while reporting OK. Absence of a decision now IS the failure; the 57 carry an
+# explicit `tier_exempt` reason recording that they were never assessed, which
+# is the honest label rather than a claim that they are fine.
+
+
+def _entry(**kw):
+    base = {"spec": "x"}
+    base.update(kw)
+    return base
+
+
+def test_an_entry_with_no_tier_decision_at_all_is_a_problem(gate):
+    problems = gate.tier_decision_problems({"a.md": _entry()})
+    assert len(problems) == 1
+    assert "a.md" in problems[0]
+
+
+def test_a_tier_satisfies_the_decision(gate):
+    assert gate.tier_decision_problems({"a.md": _entry(tier=1)}) == []
+    assert gate.tier_decision_problems({"a.md": _entry(tier=2)}) == []
+
+
+def test_an_explicit_exemption_reason_satisfies_the_decision(gate):
+    entries = {"a.md": _entry(tier_exempt="not architecture-class; docs only")}
+    assert gate.tier_decision_problems(entries) == []
+
+
+def test_an_empty_exemption_reason_does_not_satisfy_it(gate):
+    """`tier_exempt: ""` is an omitted tier wearing a hat."""
+    assert len(gate.tier_decision_problems({"a.md": _entry(tier_exempt="")})) == 1
+    assert len(gate.tier_decision_problems({"a.md": _entry(tier_exempt=True)})) == 1
+
+
+def test_grandfathering_still_satisfies_the_decision(gate):
+    entries = {"a.md": _entry(grandfathered="deadbeef")}
+    assert gate.tier_decision_problems(entries) == []
+
+
+def test_the_real_registry_has_no_undecided_entries_left(gate):
+    """The 2026-09-02 sweep must have covered all 57, not most of them."""
+    entries = gate.load_registry().get("entries", {})
+    assert gate.tier_decision_problems(entries) == []
+
+
+def test_check_fails_closed_on_an_undecided_entry(gate, monkeypatch, capsys):
+    real = gate.load_registry()
+    poisoned = dict(real)
+    poisoned["entries"] = dict(real.get("entries", {}))
+    poisoned["entries"]["docs/specs/invented-undecided.md"] = {"spec": "x"}
+    monkeypatch.setattr(gate, "load_registry", lambda: poisoned)
+    assert gate.run_check() == 1
+    assert "invented-undecided.md" in capsys.readouterr().out

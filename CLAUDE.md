@@ -117,9 +117,25 @@ All active development assumes you are inside this `FLOSS/` directory. For the A
 
 ### Filesystem & Exploration (Smart Tree)
 ```bash
-st --mode ai                   # AI-optimized directory output
+st --mode ai --everything DIR  # AI-optimized directory output
 st --search "query"            # Search file contents globally
-# ⚠️ MANDATORY: The `st` (Smart Tree) CLI tool is the required and vastly superior replacement for ls, grep, and find. Always use it to gather context.
+
+# Prefer `st` (Smart Tree) over ls/find for exploring trees, and over grep for
+# broad content sweeps -- it is markedly cheaper in tokens for both.
+#
+# ⚠️ `--everything` is REQUIRED here. Without it, st reports DOTTED directories
+# as empty rather than as skipped. Verified 2026-09-02:
+#     st --mode ai .agent-surface               -> F:0 D:0 S:0 (0.0MB)
+#     st --mode ai --everything .agent-surface  -> 689.5 MB
+# Every surface that matters in this workspace is dotted (.agent-surface,
+# .toilet, .claude, .gemini). Silent-empty reads as "nothing is there", not as
+# "the tool did not look".
+#
+# Scoped so the rule is followable: st for trees and broad searches; ordinary
+# grep/sed for a substring in a file you have already located. The previous
+# wording ("MANDATORY ... always") was wrong in that common case and was
+# therefore ignored wholesale -- see the fifth instance in
+# docs/reviews/2026-09-01-polyglot-plugin-materializer-spec/GATE-ADOPTION-AUDIT.md
 ```
 
 ```bash
@@ -186,3 +202,16 @@ ruff check .
 ## Historical Reference
 
 The previous comprehensive `FLOSS/CLAUDE.md` (dated 2025-11-16, v2.0, 38 KB) is preserved at `archive/claude-md-versions/2025-11-16_v2.md`. It predates `packages/`, `docs/superpowers/`, the local agent node, the intake-mouth concept, the Kitsune2 Holochain reliability landing, and the spine v0.5 governance framework. It remains valuable as a snapshot of the v2.0 framing and the 13-section operating-instructions taxonomy. Consult it for historical context, not current state.
+
+## Session Start — Observation Capture
+
+At the start of any task-oriented session — any interaction where you will use
+tools and produce deliverables — invoke the `task-observer` skill before
+beginning work. This ensures skill improvement opportunities are captured
+throughout the session rather than reconstructed from memory afterwards.
+
+When loading any skill, check the observation log for OPEN observations tagged
+to that skill and apply their insights to the current work, even if the skill
+file has not been updated yet.
+
+Observation log: `C:\Users\kalis\.claude\projects\C---shit\skill-observations\log.md`

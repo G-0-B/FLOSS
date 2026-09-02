@@ -209,41 +209,64 @@ def split_frontmatter(text: str, path: Path) -> tuple[dict[str, Any], str]:
     return metadata, parts[2].lstrip("\n")
 
 
-def collect_memory_entries(workspace_root: Path, canonical_root: Path) -> list[MemoryEntry]:
+def collect_memory_entries(
+    workspace_root: Path, canonical_root: Path
+) -> list[MemoryEntry]:
+    """Validate every memory file, then fail on all of them at once.
+
+    Raising on the first bad file cost three days in 2026-08-29..09-01: one
+    file added without frontmatter stopped the whole 62-memory projection, and
+    the error named that one file, so it read as one file's problem rather than
+    as a dead surface. Failing closed is right; failing closed silently about
+    everything after the first problem is not.
+    """
     entries: list[MemoryEntry] = []
+    problems: list[str] = []
+    examined = 0
     if not canonical_root.exists():
         return entries
     for path in sorted(canonical_root.glob("*/*.md")):
         if path.parent.name not in MEMORY_TYPES:
             continue
-        metadata, body = split_frontmatter(path.read_text(encoding="utf-8"), path)
-        memory_type = str(metadata.get("type") or path.parent.name)
-        if memory_type not in MEMORY_TYPES:
-            raise AgentMemoryError(f"Invalid memory type {memory_type!r} in {path}")
-        memory_id = str(metadata.get("id") or f"{memory_type}-{path.stem}")
-        applies_to = metadata.get("applies_to", ["any-agent"])
-        if isinstance(applies_to, str):
-            applies_to = [applies_to]
-        if not isinstance(applies_to, list):
-            raise AgentMemoryError(f"`applies_to` must be a list in {path}")
-        metadata_title = metadata.get("title")
-        if isinstance(metadata_title, str) and metadata_title.strip():
-            title = metadata_title.strip()
-        else:
-            title = extract_title(body, path.stem)
-        entries.append(
-            MemoryEntry(
-                memory_id=memory_id,
-                memory_type=memory_type,
-                status=str(metadata.get("status", "active")),
-                title=title,
-                path=path,
-                relative_path=path.relative_to(workspace_root).as_posix(),
-                applies_to=[str(item) for item in applies_to],
-                body=body,
-            )
+        examined += 1
+        try:
+            entries.append(_memory_entry(workspace_root, path))
+        except AgentMemoryError as exc:
+            problems.append(str(exc))
+    if problems:
+        raise AgentMemoryError(
+            f"rejected {len(problems)} of {examined} memory file(s):\n"
+            + "\n".join(f"  - {problem}" for problem in problems)
         )
     return entries
+
+
+def _memory_entry(workspace_root: Path, path: Path) -> MemoryEntry:
+    metadata, body = split_frontmatter(path.read_text(encoding="utf-8"), path)
+    memory_type = str(metadata.get("type") or path.parent.name)
+    if memory_type not in MEMORY_TYPES:
+        raise AgentMemoryError(f"Invalid memory type {memory_type!r} in {path}")
+    memory_id = str(metadata.get("id") or f"{memory_type}-{path.stem}")
+    applies_to = metadata.get("applies_to", ["any-agent"])
+    if isinstance(applies_to, str):
+        applies_to = [applies_to]
+    if not isinstance(applies_to, list):
+        raise AgentMemoryError(f"`applies_to` must be a list in {path}")
+    metadata_title = metadata.get("title")
+    if isinstance(metadata_title, str) and metadata_title.strip():
+        title = metadata_title.strip()
+    else:
+        title = extract_title(body, path.stem)
+    return MemoryEntry(
+        memory_id=memory_id,
+        memory_type=memory_type,
+        status=str(metadata.get("status", "active")),
+        title=title,
+        path=path,
+        relative_path=path.relative_to(workspace_root).as_posix(),
+        applies_to=[str(item) for item in applies_to],
+        body=body,
+    )
 
 
 def build_registry(
@@ -289,7 +312,6 @@ def build_shared_index(entries: list[MemoryEntry]) -> str:
             lines.append(f"- `{entry.memory_id}`: {entry.title}{suffix}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
-
 
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s")

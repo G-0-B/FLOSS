@@ -725,18 +725,103 @@ def reuse_coverage(entries: dict) -> dict:
     total = len(entries)
     tiered = sum(1 for entry in entries.values() if entry.get("tier") in (1, 2))
     untiered = total - tiered
-    not_grandfathered = sum(
+    untiered_entries = [e for e in entries.values() if e.get("tier") not in (1, 2)]
+    not_grandfathered = sum(1 for e in untiered_entries if not e.get("grandfathered"))
+    grandfathered = sum(1 for e in untiered_entries if e.get("grandfathered"))
+    exempt = sum(
         1
-        for entry in entries.values()
-        if entry.get("tier") not in (1, 2) and not entry.get("grandfathered")
+        for e in untiered_entries
+        if not e.get("grandfathered")
+        and isinstance(e.get("tier_exempt"), str)
+        and e["tier_exempt"].strip()
     )
     return {
         "total": total,
         "tiered": tiered,
         "untiered": untiered,
         "untiered_not_grandfathered": not_grandfathered,
+        "grandfathered": grandfathered,
+        "exempt_with_reason": exempt,
+        "undecided": not_grandfathered - exempt,
         "percent": round(100 * tiered / total) if total else 0,
     }
+
+
+_PROMISE_HEADING = re.compile(
+    r"^#{2,4}\s+.*(accepted but not implemented|not implemented here"
+    r"|deferred|\(LATER)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _promise_label(filename: str) -> str:
+    """`ADR-20-provenance-validator-reconciliation.md` -> `ADR-20`."""
+    stem = filename[:-3] if filename.endswith(".md") else filename
+    match = re.match(r"(ADR-[0-9.]+)", stem)
+    return match.group(1) if match else stem
+
+
+def deferred_promises(adr_dir: Path | None = None) -> list[tuple[str, str]]:
+    """ADR sections recording work that was accepted or deferred, never done.
+
+    The third ungated class. `--check` verifies that evidence exists for
+    artifacts that were built; nothing verifies that artifacts get built for
+    decisions that were accepted. ADR-20's "Accepted but not implemented here"
+    listed `filelock` adoption on 2026-08-25; eight days later the hand-rolled
+    lock was still accruing review rounds while py-filelock sat installed.
+
+    Heuristic by construction -- it reads headings, so it under-reports a
+    promise buried in prose and over-reports a heading that was since
+    satisfied. Reported, never fatal: the point is that the number stops being
+    zero-by-invisibility.
+    """
+    adr_dir = adr_dir if adr_dir is not None else REPO_ROOT / "docs" / "adr"
+    if not adr_dir.exists():
+        return []
+    found: list[tuple[str, str]] = []
+    for path in sorted(adr_dir.glob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = _PROMISE_HEADING.search(text)
+        if match:
+            found.append((path.name, match.group(0).strip()))
+    return found
+
+
+def tier_decision_problems(entries: dict) -> list[str]:
+    """Every registry entry must record a tier decision, including "no tier".
+
+    Before 2026-09-02 an omitted `tier` was an exemption, which is why ADR-18's
+    reuse gate reached 9 of 109 registered artifacts while reporting OK -- and
+    why `ADR-18-prior-art-reuse-gate.md` was itself exempt from the prior-art
+    gate. Absence of a decision is now the failure. Three things satisfy it:
+
+      tier: 1 | 2          the entry is gated
+      tier_exempt: "why"   a non-empty reason it is not
+      grandfathered: hash  the pre-existing hash-pinned exemption
+
+    `tier_exempt` is deliberately a reason and not a boolean: a bare flag is an
+    omitted tier wearing a hat.
+    """
+    problems: list[str] = []
+    for rel, entry in sorted(entries.items()):
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("tier") in (1, 2):
+            continue
+        if entry.get("grandfathered"):
+            continue
+        exempt = entry.get("tier_exempt")
+        if isinstance(exempt, str) and exempt.strip():
+            continue
+        problems.append(
+            f"tier decision missing: `{rel}` records neither a tier nor a "
+            f"`tier_exempt` reason. An omitted tier is no longer an exemption "
+            f"(R2, 2026-09-02). Use --tier 1|2, or set tier_exempt to why not."
+        )
+    return problems
 
 
 def run_check() -> int:
@@ -772,10 +857,23 @@ def run_check() -> int:
     cov = reuse_coverage(entries)
     print(
         f"SPEC-GATE COVERAGE: reuse gate active on {cov['tiered']}/{cov['total']} "
-        f"registered artifact(s) ({cov['percent']}%); {cov['untiered']} untiered, "
-        f"of which {cov['untiered_not_grandfathered']} not grandfathered"
+        f"registered artifact(s) ({cov['percent']}%); {cov['exempt_with_reason']} "
+        f"exempt with a reason, {cov['grandfathered']} grandfathered, "
+        f"{cov['undecided']} undecided"
     )
-    if missing or reuse_fails:
+    undecided = tier_decision_problems(entries)
+    for msg in undecided:
+        print(f"SPEC-GATE TIER-UNDECIDED {msg}")
+    promises = deferred_promises()
+    if promises:
+        names = ", ".join(_promise_label(name) for name, _ in promises)
+        print(
+            f"SPEC-GATE PROMISES: {len(promises)} ADR section(s) record accepted or "
+            f"deferred work that nothing gates -- {names}"
+        )
+    else:
+        print("SPEC-GATE PROMISES: 0 ADR sections record ungated accepted work")
+    if missing or reuse_fails or undecided:
         parts = []
         if missing:
             parts.append(
@@ -784,6 +882,11 @@ def run_check() -> int:
                 f"--tier 2 for architecture-class work). Register with: "
                 f"python FLOSS/scripts/spec_gate.py --add <path> "
                 f'--spec "<one-liner>" --tier 1'
+            )
+        if undecided:
+            parts.append(
+                f"{len(undecided)} entry(ies) with no tier decision (R2) — an "
+                f"omitted tier is no longer an exemption"
             )
         if reuse_fails:
             parts.append(
@@ -821,9 +924,15 @@ def run_add(
         # 106 of the 107 entries already in the registry are untiered, which is
         # why `--check` reports 0 reuse violations across the whole surface.
         #
-        # Fail closed for anything NEW. The existing 106 are not retroactively
-        # broken -- see REUSE_TIER_GRANDFATHERED below -- but nothing else joins
-        # them.
+        # Fail closed for anything NEW. Pre-existing entries are not
+        # retroactively broken: they carry either `grandfathered` (hash-pinned)
+        # or, since the R2 sweep of 2026-09-02, an explicit `tier_exempt`
+        # reason. `tier_decision_problems` is the enforcement point.
+        #
+        # This comment previously cited `REUSE_TIER_GRANDFATHERED below`, which
+        # does not exist anywhere in this file -- a pointer to an authority that
+        # was never built, which is the same drift this module's tests were
+        # written to catch.
         print(
             f"spec-gate: {rel} needs an explicit --tier (1 = evidence record, "
             "2 = + independent reuse review). ADR-18 has no untiered category; "
