@@ -712,6 +712,33 @@ def _is_reviewer_grandfathered(rel: str) -> bool:
     return digest == expected
 
 
+def reuse_coverage(entries: dict) -> dict:
+    """How much of the registry ADR-18's reuse gate actually reaches.
+
+    The gate is fail-closed *inside an opt-in scope*: `_reuse_problems` only
+    fires on entries carrying `tier` 1 or 2, and an omitted tier is an
+    exemption rather than a default. So `SPEC-GATE OK` was compatible with the
+    gate examining 9 of 109 registered artifacts, and nothing said so. Derived
+    here rather than recorded anywhere, because a hand-maintained coverage
+    number is the next thing to drift.
+    """
+    total = len(entries)
+    tiered = sum(1 for entry in entries.values() if entry.get("tier") in (1, 2))
+    untiered = total - tiered
+    not_grandfathered = sum(
+        1
+        for entry in entries.values()
+        if entry.get("tier") not in (1, 2) and not entry.get("grandfathered")
+    )
+    return {
+        "total": total,
+        "tiered": tiered,
+        "untiered": untiered,
+        "untiered_not_grandfathered": not_grandfathered,
+        "percent": round(100 * tiered / total) if total else 0,
+    }
+
+
 def run_check() -> int:
     registry = load_registry()
     if "load_error" in registry:
@@ -740,6 +767,14 @@ def run_check() -> int:
         print(f"SPEC-GATE REUSE-WARN {msg}")
     for msg in reuse_fails:
         print(f"SPEC-GATE REUSE-FAIL {msg}")
+    # Printed before the verdict, and on the fail path too: a red gate is
+    # exactly when its blind spots matter most.
+    cov = reuse_coverage(entries)
+    print(
+        f"SPEC-GATE COVERAGE: reuse gate active on {cov['tiered']}/{cov['total']} "
+        f"registered artifact(s) ({cov['percent']}%); {cov['untiered']} untiered, "
+        f"of which {cov['untiered_not_grandfathered']} not grandfathered"
+    )
     if missing or reuse_fails:
         parts = []
         if missing:

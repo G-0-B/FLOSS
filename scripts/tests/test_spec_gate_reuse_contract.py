@@ -744,3 +744,69 @@ def test_an_unreadable_record_cannot_satisfy_a_pin(gate):
     }
     problems = gate._reviewer_problems("x.md", reviewer)
     assert any("could not be read" in p or "does not exist" in p for p in problems)
+
+
+# --- ADR-18 coverage reporting -------------------------------------------
+#
+# Defect #5, found 2026-09-01 and the reason these tests exist: the gate is
+# fail-closed *inside an opt-in scope*. An omitted tier is an exemption, so
+# `SPEC-GATE OK` was compatible with the reuse gate firing on 9 of 109
+# registered artifacts. Running the gate felt like compliance because nothing
+# reported how little it had examined. A gate that prints a verdict without a
+# coverage number is an unfalsifiable claim of compliance.
+
+
+def test_reuse_coverage_counts_tiers_and_grandfathering(gate):
+    entries = {
+        "a.md": {"spec": "x", "tier": 1},
+        "b.md": {"spec": "x", "tier": 2},
+        "c.md": {"spec": "x"},
+        "d.md": {"spec": "x", "grandfathered": "deadbeef"},
+    }
+    cov = gate.reuse_coverage(entries)
+    assert cov["total"] == 4
+    assert cov["tiered"] == 2
+    assert cov["untiered"] == 2
+    assert cov["untiered_not_grandfathered"] == 1
+    assert cov["percent"] == 50
+
+
+def test_reuse_coverage_is_empty_safe(gate):
+    cov = gate.reuse_coverage({})
+    assert cov["total"] == 0
+    assert cov["tiered"] == 0
+    assert cov["percent"] == 0
+
+
+def test_reuse_coverage_matches_the_real_registry(gate):
+    """The reported number must be derived, never a hand-maintained constant."""
+    entries = gate.load_registry().get("entries", {})
+    cov = gate.reuse_coverage(entries)
+    expected_tiered = sum(1 for e in entries.values() if e.get("tier") in (1, 2))
+    assert cov["tiered"] == expected_tiered
+    assert cov["total"] == len(entries)
+    assert cov["tiered"] + cov["untiered"] == cov["total"]
+
+
+def test_check_reports_coverage_on_both_the_pass_and_fail_paths(gate, capsys):
+    """A red gate still has to say how much it looked at.
+
+    The early `return 1` for unregistered artifacts must not skip the coverage
+    line -- a failing gate is exactly when its blind spots matter most.
+    """
+    gate.run_check()
+    out = capsys.readouterr().out
+    assert "SPEC-GATE COVERAGE:" in out
+    coverage_line = next(
+        line for line in out.splitlines() if line.startswith("SPEC-GATE COVERAGE:")
+    )
+    verdict_index = next(
+        (
+            i
+            for i, line in enumerate(out.splitlines())
+            if line.startswith("SPEC-GATE OK") or line.startswith("SPEC-GATE FAIL")
+        ),
+        None,
+    )
+    assert verdict_index is not None, "run_check printed no verdict"
+    assert out.splitlines().index(coverage_line) < verdict_index
