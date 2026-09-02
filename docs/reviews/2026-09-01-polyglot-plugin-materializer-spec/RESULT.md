@@ -77,6 +77,42 @@ block. Two independent sightings, one week apart, of the same failure shape.
 That the earlier one was written in this very directory and did not prevent the
 later one is itself evidence for the standing rule below.
 
+## Correction to Finding 6, 2026-09-02 — the decision was made, then lost
+
+Finding 6 and the audit both said ADR-18's gate "never fired" on the lock
+capability. True, and too kind. **The reuse decision was reached by another
+route and dropped.**
+
+[`ADR-20`](../../adr/ADR-20-provenance-validator-reconciliation.md):589, under
+*Accepted but not implemented here*, operator-accepted 2026-08-25 after a
+four-auditor external meta-audit, lists **`filelock` adoption** alongside
+external anchoring and the ADR-12 consent gate. Accepted — not proposed, not
+deferred, not rejected. Eight days later the hand-rolled lock was still being
+reviewed round after round while py-filelock 3.18.0 sat installed on the machine.
+
+Same ADR, same sweep: the chain defects at identity `DkuYPguG98HM2nyR` are
+attributed to "the `_acquire_lock` stale-reclamation bug and the daemon
+singleton races." The lock work and the provenance work were one sweep, the
+reuse verdict was produced there, and it did not travel.
+
+That makes **three** ungated classes, not one:
+
+| Class | Why the gate misses it |
+|---|---|
+| Unregistered artifacts | No registry entry; the gate cannot see them |
+| Untiered entries | Registered, but an omitted tier is an exemption — 100/109 |
+| **Accepted-but-not-implemented** | **A decision reached and recorded in canon, with nothing checking it was carried out** |
+
+The third is invisible to every gate by construction. `spec_gate` validates that
+evidence exists for artifacts that were *built*; nothing validates that
+artifacts get built for decisions that were *accepted*. ADR-20 carries six such
+promises with no gate behind them.
+
+**R6** (new): read accepted ADRs for their accepted-but-not-implemented lists
+and report the open count. Same shape as R1 — an existing unmeasured boundary
+turned into a number that prints. No new surface; the items are already
+enumerated in ADR text.
+
 ## Standing rule adopted
 
 **Measure gate coverage, not just gate verdict.** A gate that reports pass/fail

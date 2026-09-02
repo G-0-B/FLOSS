@@ -67,6 +67,50 @@ stale entry (scripts/research_log.py, registered but absent). The gate is red an
 work continued. A gate that is habitually red is a gate that has been demoted to
 a log line.
 
+FOURTH INSTANCE — ADDED 2026-09-02, AND IT MAKES THIS AUDIT'S ORIGINAL CLAIM TOO KIND
+The audit above said ADR-18's gate "never fired" on the lock capability, and
+attributed that to the capability never being registered with a tier. That is
+true and incomplete. The reuse decision WAS reached, by a different route, and
+then lost.
+
+ADR-20 line 589, "Accepted but not implemented here", operator-accepted
+2026-08-25 following a four-auditor external meta-audit:
+
+  "External anchoring (P0-strategic), closing the ADR-12 consent gate, replacing
+   the ensemble aggregation, `filelock` adoption, the KERI-versus-DSSE fork
+   decision, and identity rotation with a signed lineage statement."
+
+filelock adoption is on an ACCEPTED list in an ACCEPTED ADR. It was not
+proposed, not deferred, not rejected — accepted, and then not done. Eight days
+later the hand-rolled lock was still being reviewed round after round on the
+PR41 lineage while py-filelock 3.18.0 sat installed on the machine.
+
+The same ADR records the context that produced it: the chain defects at
+identity DkuYPguG98HM2nyR are attributed to "the concurrency defects fixed in
+the same sweep — the _acquire_lock stale-reclamation bug and the daemon
+singleton races" (ADR-20, "What this found in the live chain"). The lock
+problem and the provenance problem were the same sweep. The reuse verdict was
+produced there and did not travel.
+
+So there are three ungated classes, not one:
+
+  1. UNREGISTERED artifacts        — no registry entry, gate cannot see them
+  2. UNTIERED entries              — registered, but an omitted tier is an exemption (100/109)
+  3. ACCEPTED-BUT-NOT-IMPLEMENTED  — a decision was reached and recorded in canon,
+                                     and NOTHING checks that it was carried out
+
+Class 3 is the worst of the three, because it is invisible to every gate by
+construction. spec_gate validates that evidence EXISTS for artifacts that were
+built. Nothing anywhere validates that artifacts get built for decisions that
+were accepted. An "Accepted but not implemented here" list is a promise with no
+gate behind it, and ADR-20 carries six of them.
+
+Remedy R6: the accepted-but-not-implemented list is the highest-value gate
+target in the repo, and it needs no new surface — those items are already
+enumerated in ADR text. A check that reads accepted ADRs for such lists and
+reports the open count is the same shape as R1: turn an existing unmeasured
+boundary into a number that prints.
+
 THE GENERALISED DEFECT
 Name: gates are exempt by default, so adoption decays silently while the gate
 still reports green.
