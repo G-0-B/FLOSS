@@ -1232,8 +1232,13 @@ def test_a_target_with_no_header_field_refuses_rather_than_dropping_them():
     with pytest.raises(mas.SharedSurfaceError, match="Antigravity"):
         mas.build_antigravity_payload({}, {"authed": HEADERED})
 
-    with pytest.raises(mas.SharedSurfaceError, match="no field to carry"):
-        mas.build_antigravity_payload({}, {"authed": HEADERED})
+    # Hermes, not Antigravity twice. The second assertion here called the same
+    # function with the same argument and only varied the match pattern -- and
+    # both patterns appear in the one error message, so it asserted nothing the
+    # first had not. The point of the guard is that BOTH header-less targets
+    # refuse; testing one of them twice is how a sibling stays uncovered.
+    with pytest.raises(mas.SharedSurfaceError, match="Hermes"):
+        mas.apply_hermes_mcp({}, {"authed": HEADERED}, {}, {})
 
 
 def test_an_unauthenticated_http_server_still_projects_everywhere():
@@ -1245,3 +1250,49 @@ def test_an_unauthenticated_http_server_still_projects_everywhere():
     assert payload["mcpServers"]["plain"] == {
         "serverUrl": "https://example.invalid/mcp"
     }
+
+
+def test_an_override_that_flips_the_transport_strands_no_credentials():
+    """Overrides are applied last and can set `type` to anything, including
+    flipping an http entry to stdio after http_headers was written -- leaving
+    credentials on an entry that will never send them, in a file an operator
+    reads as current."""
+    doc = tomlkit.parse("")
+
+    result = mas.apply_codex_mcp(
+        doc, {"srv": HEADERED}, {}, {"srv": {"type": "stdio", "command": "run"}}
+    )
+
+    entry = result["mcp_servers"]["srv"]
+    assert entry["type"] == "stdio"
+    assert "http_headers" not in entry, "credentials outlived their transport"
+
+
+def test_a_scalar_override_renders_outside_the_header_table():
+    """Pins the RENDERED shape, and passes against the unfixed code by design.
+
+    Overrides used to be applied wholesale after the tables, which contradicts
+    the ordering rule this function exists to honour -- adding http_headers put
+    a table in front of the override loop for exactly the entries that carry
+    credentials. Splitting overrides into scalars and tables restores the rule.
+
+    This test cannot discriminate that change, and saying so is the point:
+    tomlkit at the pinned version re-orders on render, so the output is
+    identical either way. What it guards is the day that stops being true,
+    which is the same reason the ordering rule is written down at all -- the
+    function's own docstring calls it defense-in-depth, not load-bearing today.
+    """
+    doc = tomlkit.parse("")
+
+    result = mas.apply_codex_mcp(
+        doc, {"srv": HEADERED}, {}, {"srv": {"startup_timeout_sec": 45}}
+    )
+
+    rendered = tomlkit.dumps(result)
+    headers_at = rendered.index("[mcp_servers.srv.http_headers]")
+    scalar_at = rendered.index("startup_timeout_sec")
+    assert scalar_at < headers_at, (
+        "a scalar override was emitted after the header table, which is the "
+        f"re-parenting hazard the ordering rule exists for:\n{rendered}"
+    )
+    assert result["mcp_servers"]["srv"]["startup_timeout_sec"] == 45

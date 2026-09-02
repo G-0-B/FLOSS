@@ -626,8 +626,24 @@ def apply_codex_mcp(
         for key, value in preserved_scalars.items():
             entry[key] = value
 
-        # 3. tables, or TOML re-parents every later scalar into them (see
-        #    docstring above -- defense-in-depth, not load-bearing today).
+        # 2b. OVERRIDE SCALARS, BEFORE ANY TABLE.
+        #
+        # Overrides used to be applied wholesale at the very end, after the
+        # tables -- which contradicts the ordering rule this function exists to
+        # honour, because tomlkit can re-parent a scalar written after a table
+        # into it. That was harmless while the only table was `env` on stdio
+        # entries and overrides in practice set scalars; adding `http_headers`
+        # put a table in front of the override loop for http entries too, which
+        # is exactly the case that carries credentials. Split by shape instead:
+        # scalars here, tables after the managed and preserved ones, so
+        # overrides still beat everything of their own kind.
+        override_items = (overrides.get(shared_name) or {}).items()
+        override_scalars = {k: v for k, v in override_items if not isinstance(v, dict)}
+        override_tables = {k: v for k, v in override_items if isinstance(v, dict)}
+        for key, value in override_scalars.items():
+            entry[key] = value
+
+        # 3. tables, or TOML re-parents every later scalar into them.
         #    `env` is managed only when the shared entry defines one, and is
         #    only ever carried over for a stdio target: a target converted
         #    to http must not keep a stale (possibly credential-bearing)
@@ -639,22 +655,25 @@ def apply_codex_mcp(
                 entry["env"] = preserved_env
         elif spec.get("headers"):
             # `http_headers`, per Codex's documented config reference: "Map of
-            # HTTP header names to static values." Written HERE and not with
-            # the managed scalars above because it is a table, and TOML
-            # re-parents every later scalar into a table that precedes them --
-            # the constraint this function's ordering already exists to honour.
-            #
-            # It is in MANAGED_TRANSPORT_FIELDS, so a stale header table from a
-            # previous configuration is dropped before this runs rather than
-            # surviving as a preserved table.
+            # HTTP header names to static values." A table, so it belongs here
+            # and not with the managed scalars above. It is also in
+            # MANAGED_TRANSPORT_FIELDS, so a stale header table from a previous
+            # configuration is dropped before this runs.
             entry["http_headers"] = spec["headers"]
         for key, value in preserved_tables.items():
             entry[key] = value
-
-        # 4. manifest overrides go LAST -- overrides beat everything,
-        #    including pre-existing file content.
-        for key, value in (overrides.get(shared_name) or {}).items():
+        for key, value in override_tables.items():
             entry[key] = value
+
+        # 5. A CREDENTIAL TABLE MUST NOT OUTLIVE ITS TRANSPORT.
+        #
+        # An override can set `type` to anything, including flipping an http
+        # entry to stdio after http_headers was written -- leaving the headers
+        # stranded on an entry that will never send them, in a file an operator
+        # reads as current. Reconciled from the FINAL type rather than from
+        # `transport`, because the override is what decides it.
+        if entry.get("type") != "streamable_http" and "http_headers" in entry:
+            del entry["http_headers"]
 
         servers[target_name] = entry
 
@@ -895,12 +914,15 @@ def apply_hermes_mcp(
 
         if transport == "http":
             reject_unsupported_headers(shared_name, "Hermes", spec)
-            for key in ("command", "args", "env"):
+            # `http_headers` in both lists: Hermes never writes one, but a hand
+            # edit can, and a credential table that survives a transport change
+            # is the same stranded-secret shape the Codex path reconciles.
+            for key in ("command", "args", "env", "http_headers"):
                 entry.pop(key, None)
             entry["type"] = "http"
             entry["url"] = spec["url"]
         else:
-            for key in ("type", "url"):
+            for key in ("type", "url", "http_headers"):
                 entry.pop(key, None)
             entry["command"] = spec["command"]
             entry["args"] = spec["args"]
