@@ -111,6 +111,40 @@ enumerated in ADR text. A check that reads accepted ADRs for such lists and
 reports the open count is the same shape as R1: turn an existing unmeasured
 boundary into a number that prints.
 
+FIFTH INSTANCE — ADDED 2026-09-02 — A MANDATORY TOOL THAT SILENTLY RETURNS EMPTY
+FLOSS/CLAUDE.md carries a hard directive:
+
+  "MANDATORY: The `st` (Smart Tree) CLI tool is the required and vastly superior
+   replacement for ls, grep, and find. Always use it to gather context."
+
+st IS installed (Smart Tree v6.5.2). Measured 2026-09-02 against the workspace's
+most important cross-harness directory:
+
+  st --mode ai .agent-surface                -> F:0 D:0 S:0 (0.0MB)
+  st --mode ai --everything .agent-surface   -> 689.5 MB, full tree
+  ls .agent-surface                          -> 18 entries
+
+Without --everything, st reports a dotted directory as EMPTY rather than as
+skipped. Silent-empty is the worst available failure mode: it does not read as
+"the tool did not look", it reads as "there is nothing there". An agent
+following the mandate literally would conclude the entire agent-surface does
+not exist.
+
+Two things follow, and the second is the one that generalises.
+
+  a) The directive needs the flag. Any harness told to use st on this workspace
+     must be told --everything, because the surfaces that matter here
+     (.agent-surface, .toilet, .claude, .gemini) are all dotted.
+  b) A rule written as "always, no exceptions" that is wrong in a common case
+     does not get scoped by its readers -- it gets ignored wholesale. This
+     session's own author used grep, find and ls throughout while auditing why
+     stated conventions do not get adopted, and did not try st once. That is
+     first-person evidence for the mechanism, not an anecdote about one agent.
+
+The audit's subject is gates that do not fire. This is the adjacent case: a
+directive that fires and returns a wrong answer quietly. Both produce the same
+end state -- a reader who believes they complied.
+
 THE GENERALISED DEFECT
 Name: gates are exempt by default, so adoption decays silently while the gate
 still reports green.
@@ -157,6 +191,15 @@ R4. Register the lock capability under ADR-18 with a tier and record the
     per-surface verdict (adopt py-filelock for process-lifetime locks; build for
     the daemon claim, with the outlives-the-process reason stated as the
     irreducible delta). Declare the dependency.
+
+R6. Count the accepted-but-not-implemented promises and print the number.
+    ADR-20 alone carries six. They are already enumerated in ADR text, so this
+    reads existing canon rather than adding a surface -- the same move as R1.
+    Class 3 above is invisible to every current gate by construction.
+
+R7. Add --everything to the st directive in FLOSS/CLAUDE.md, or drop the
+    "always" and say when. A mandate that silently returns empty on the
+    workspace's own coordination directory trains readers to ignore it.
 
 R5. Do nothing else. Specifically: do not add a skill, a reminder hook, an
     overwatch agent, or a checklist doc for any of the above. Those are the

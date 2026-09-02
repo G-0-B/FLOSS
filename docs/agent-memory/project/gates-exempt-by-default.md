@@ -16,6 +16,7 @@ description: Accepted gates here are fail-closed inside an opt-in scope. ADR-18'
 **Status:** ✅ Verified — counts reproduced against `docs/specs/spec-registry.json` on `feat/coordination-room`
 **Related:** [`installation-not-adoption.md`](installation-not-adoption.md), [`doc-explosion-acknowledged.md`](doc-explosion-acknowledged.md), [`scale-mismatch-is-the-recurring-defect.md`](scale-mismatch-is-the-recurring-defect.md)
 **Packet:** `docs/reviews/2026-09-01-polyglot-plugin-materializer-spec/GATE-ADOPTION-AUDIT.md`
+**Cross-harness handoff (read this first in a new thread or harness):** [`docs/reviews/2026-09-01-polyglot-plugin-materializer-spec/HANDOFF.md`](../../reviews/2026-09-01-polyglot-plugin-materializer-spec/HANDOFF.md)
 
 ## The measurement
 

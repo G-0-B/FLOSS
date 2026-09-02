@@ -133,6 +133,15 @@ Recorded at [`docs/agent-memory/project/gates-exempt-by-default.md`](../../agent
 | R3 — aggregate materializers report all failures | ⚠️ Proposed |
 | R4 — register the lock capability under ADR-18 with per-surface verdicts | ⚠️ Proposed |
 | R5 — add no new surface | ✅ Honoured |
+| **R6** — count accepted-but-not-implemented promises | ⚠️ Proposed (ADR-20 carries six) |
+| **R7** — fix the `st` directive (`--everything`, or drop "always") | ⚠️ Proposed |
+
+Also closed this session, outside the remedy list: Claude Code transcript
+retention. `cleanupPeriodDays` was unset, so the default 30-day deletion was
+live against 25 transcripts / 124.5 MB with no backup, oldest dated 2026-08-20.
+Operator set it to `99999` on 2026-09-02; verified, with all 17 other settings
+keys preserved. The corpus is no longer on a delete clock. Backing it up into
+`FLOSS/ai-conversations/` remains undone.
 
 R1's output on this branch at time of writing:
 
