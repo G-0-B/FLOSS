@@ -26,6 +26,15 @@ The 2026-06-12 root-intake pass moved 17 files + the `mcps/` schema snapshot int
 - **N4:** review-queue triage merged → `review_queue.py --triage`; `triage_review_queue.py` is a shim.
 - **CONTEXT_L0/L1** are script-generated projections of `FLOSS/shared-context-surface.json` — regenerate with `python FLOSS/scripts/materialize_shared_context_surface.py`; never hand-edit them; a no-op run does not bump mtime (probe staleness is mtime-based, materializer drift-check is content-based — they can disagree).
 
+## Seam packets, 2026-09-02 (in-repo, not at root)
+
+Two thread-seam handoffs were written the same day from two different branches, by agents that could not see each other. They are complements, not versions -- read both, and read them together:
+
+- `docs/reviews/2026-09-01-polyglot-plugin-materializer-spec/HANDOFF.md` (from `feat/coordination-room`) -- repository topology, tooling traps, concurrency hazards for agents sharing one checkout, gate-coverage findings, and the open operator queue R2/R3/R4/R6/R7.
+- `docs/research/2026-09-02-pr41-lineage-seam-packet.md` (from `reconcile/pr38-salvage-20260817`) -- branch topology and what each branch uniquely holds, the measured duplicate-work hazard, the ruleset condition that makes every merge require the owner bypass, and the four review threads still live on PR41.
+
+The pair is itself the evidence: four fixes were written twice by different agents within 48 hours, one pair byte-identical. Before writing a fix for a review finding, check whether another branch already carries it -- `git log --all --oneline -S'<distinctive token>'` is the cheap check.
+
 **Why:** Multiple agents across harnesses (claude.ai web, Claude Code, Codex, Warp, Gemini) deposit continuation artifacts at root in different formats; without one map, each new session re-derives the lineage at T3 cost or — worse — re-evaluates already-rejected material.
 
 **How to apply:** On re-entry, run the orient probe, then read the working todo list §A.00 and the latest dated digestion map before touching anything at root. Treat root drops newer than 2026-06-12 as fresh intake; everything older has a recorded verdict.
