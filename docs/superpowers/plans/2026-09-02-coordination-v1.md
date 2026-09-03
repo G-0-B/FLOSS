@@ -11,7 +11,15 @@
 ## Global Constraints
 
 - Probe path is stdlib-only, no network, no mutation. `gh pr list` only behind `--online` (D7). That flag **does not exist yet** — Task 5 adds it; do not assume it.
-- Execute **all** implementation from an isolated worktree: `git worktree add .worktrees/coord-v1 -b feat/coord-v1 feat/coordination-room`. Do not implement in `C:/~shit/FLOSS` while it has ~55 foreign dirty files (B11). `scripts/orient_probe.py` is already dirty there.
+- Execute **all** implementation from an isolated worktree based on **`feat/coordination-room-rebased`** (N2), not `feat/coordination-room`:
+  ```bash
+  APPROVED_DOCS_COMMIT=$(git log -1 --format=%H -- docs/superpowers/specs/2026-09-02-coordination-v1-design.md docs/superpowers/plans/2026-09-02-coordination-v1.md docs/reviews/2026-09-02-coordination-v1-design)
+  git worktree add .worktrees/coord-v1 -b feat/coord-v1 feat/coordination-room-rebased
+  git -C .worktrees/coord-v1 checkout "$APPROVED_DOCS_COMMIT" -- docs/superpowers/specs/2026-09-02-coordination-v1-design.md docs/superpowers/plans/2026-09-02-coordination-v1.md docs/reviews/2026-09-02-coordination-v1-design
+  git -C .worktrees/coord-v1 commit -m "docs(coord): import approved coordination-v1 design and evidence" -- docs/superpowers/specs/2026-09-02-coordination-v1-design.md docs/superpowers/plans/2026-09-02-coordination-v1.md docs/reviews/2026-09-02-coordination-v1-design
+  ```
+  Rebased already has `_repo_relative` (resolved+lowercase) **and** `:7334` `Start-Daemon` wiring. `feat/coordination-room` has neither; Task 4 would edit a superseded hook. Importing the exact approved document snapshots closes the otherwise missing design/evidence lineage without merging primary's 11 unrelated unique commits.
+- Do not implement in `C:/~shit/FLOSS` while it has ~55 foreign dirty files (B11). `scripts/orient_probe.py` is dirty there (N7): resolve and reconcile it through the Pre-Task Gate; isolation alone only defers the conflict.
 - New-file commits: `git add -- <paths> && git commit -F- -- <paths>` (B10). Never `git commit -m` after a broad add. Never `commit --` an untracked path without `add` first.
 - `scripts/` is not a package (`__init__.py` absent). Load modules with `importlib.util.spec_from_file_location`. `FLOSS_ROOT = Path(__file__).resolve().parents[2]` from `scripts/tests/`.
 - `git -C C:/~shit/FLOSS` pathspecs have **no** `FLOSS/` prefix (B1).
@@ -24,51 +32,65 @@
 
 ---
 
-### Task 0: Consensus decision gate (S1 / B12)
+## Pre-Task Gate — Resolve Dirty Probe (N7)
 
-**Files:**
-- Create: `docs/reviews/2026-09-02-coordination-v1-design/consensus-decision.md` (record of claim_id / waiver)
+Before creating the implementation worktree, run:
 
-**Interfaces:**
-- Consumes: `packages.metacoordinator_mcp.server.submit_claim` **or** MCP tool `submit_claim`. There is **no** `packages.metacoordinator_mcp.client`.
-- Signature: `submit_claim(proposer, proposal_type, summary, body, blast_radius, evidence=None) -> str`
-- `evidence` items use `ref` (not `path`/`url`). Types: `spec | commit | adr | test | url | provenance_packet`.
-- System/SpecChange/AdrChange fail-closed without provenance (`E_GOVERNED_PROVENANCE_REQUIRED`).
-
-- [ ] **Step 1: Submit the claim (real API, no placeholders)**
-
-From FLOSS root, `FLOSS_MODEL_BACKEND=litellm` (do not route voters through OmniRoute):
-
-```python
-from packages.metacoordinator_mcp.server import submit_claim
-print(submit_claim(
-    proposer="hermes-coord-v1",
-    proposal_type="SpecChange",
-    summary="Coordination v1: derived status via orient_probe + git-REF claims",
-    body="Design docs/superpowers/specs/2026-09-02-coordination-v1-design.md. CAS proof in docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md.",
-    blast_radius="System",
-    evidence=[
-        {"type": "spec", "ref": "docs/superpowers/specs/2026-09-02-coordination-v1-design.md"},
-        {"type": "commit", "ref": "a43f59cdb7f3d2882bc889cf98a5f6c3036968f8"},
-        {"type": "test", "ref": "docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md"},
-    ],
-))
+```bash
+git status --short -- scripts/orient_probe.py
+git diff -- scripts/orient_probe.py
 ```
 
-If this returns `E_GOVERNED_PROVENANCE_REQUIRED`, attach a validated provenance packet with `consent_ref` (operator explicit go) and resubmit. Do not invent `client.py`.
+At review time the primary checkout has an uncommitted `scripts/orient_probe.py` modification. Identify its owner from the coordination room/session ledger. The owner/operator must choose:
 
-- [ ] **Step 2: Round + record**
+1. **Land + reconcile:** commit it on primary, then cherry-pick that exact commit into `feat/coord-v1`; or
+2. **Discard:** owner/operator explicitly discards it after reviewing the diff.
 
-Run `run_consensus_round` on the claim_id. Write `docs/reviews/2026-09-02-coordination-v1-design/consensus-decision.md` with claim_id, mean, decision.
+Deferral blocks Task 1 because Task 1 edits the same file. Do not silently copy or overwrite it. A pre-Task-3 claim is impossible because the primitive does not exist yet. After worktree creation, verify `git diff <primary-probe-commit> -- scripts/orient_probe.py` is empty for the land path, or record the discard decision.
 
-If operator waives: write the waiver in that same file (who, when, why) and **stop Task 0**. Do not treat absence of a round as APPROVED.
+---
 
-- [ ] **Step 3: Commit (B10)**
+## Task 0 — Consensus decision gate (S1) — ❌ BLOCKED on consent anchor
+
+**Files:**
+- Create only when state changes: `docs/reviews/2026-09-02-coordination-v1-design/consensus-decision.md`
+
+**Verified gate state (2026-09-03):**
+- `packages/metacoordinator_mcp/tools.py:772-776` requires valid `provenance_packet` evidence with `consent_ref` for this `System` + `SpecChange` claim.
+- `docs/adr/ADR-12-consent-gate-protocol.md:19` says the `decision_action_hash` anchor remains undefined/unresolved.
+- `docs/agent-memory/project/adr19-ratification-deferred-to-consent-gate.md:14-20` records the operative prohibition: do not substitute a git commit, session id, or placeholder merely because the current validator only checks non-empty text.
+
+**Interfaces (after unblock):**
+- `packages.metacoordinator_mcp.server.submit_claim(proposer, proposal_type, summary, body, blast_radius, evidence=None) -> str`; there is no `client.py`.
+- Evidence items use `ref`. A valid `provenance_packet` entry carrying a real `consent_ref.decision_action_hash` is mandatory in addition to spec/commit/test evidence.
+- Voter rounds use `FLOSS_MODEL_BACKEND=litellm`, never OmniRoute.
+
+- [ ] **Step 1: Resolve the consent anchor through ADR-12**
+
+Obtain a source-chain decision action hash under the ratified consent-gate protocol. Operator chat approval, a waiver note, a commit SHA, and a session ID are **not** substitutes. If this artifact does not exist, record `❌ BLOCKED — E_GOVERNED_PROVENANCE_REQUIRED / consent anchor undefined` and stop. Do not call `submit_claim`; its failure is deterministic.
+
+- [ ] **Step 2: Create and validate provenance packet**
+
+Using the repo's `packages.activity_log.provenance.create_packet` / `artifact_ref` workflow, create a packet for the exact approved design/plan commit with `consent_ref.decision_action_hash=<real source-chain action hash>`. Validate the packet and artifact paths from workspace root (`C:/~shit`, so refs begin `FLOSS/...`). Add it as:
+
+```python
+{"type": "provenance_packet", "ref": "<validated workspace-relative packet path>"}
+```
+
+Do not invent the packet path or anchor.
+
+- [ ] **Step 3: Submit, round, and record**
+
+Submit the `SpecChange` / `System` claim with spec, current design commit, CAS test report, and validated provenance packet evidence. The body must include TWO decisions: (1) the holder-identity contract (proposal: unique per-session `FLOSS_AGENT_ID`); (2) the force-drop actor policy (proposal: `force=True` allowed only to the current holder or an operator-named force list recorded in the decision; default deny otherwise). Run `run_consensus_round`; write claim id, evidence refs, mean/variance/outcome, and both accepted contracts to `consensus-decision.md`.
+
+No waiver path: the standing System consensus gate outranks execution convenience. Tasks 1–5 remain blocked until the decision is `APPROVED`. If identity is not resolved by the decision, M2/Task 4 remains blocked even if M1 is approved separately.
+
+- [ ] **Step 4: Scoped commit**
 
 ```bash
 git add -- docs/reviews/2026-09-02-coordination-v1-design/consensus-decision.md
 git commit -F- -- docs/reviews/2026-09-02-coordination-v1-design/consensus-decision.md <<'EOF'
-docs(coord): record coordination-v1 consensus decision or waiver
+docs(coord): record coordination-v1 governed consensus decision
 EOF
 ```
 
@@ -286,7 +308,7 @@ def render_sections_fixture(*, rev_list_count: str, active_n: int) -> str:
     return f"## Coordination                    {rev_list_count} commits/24h, {rev_list_count} on exactly 1 of {active_n} active branches\n"
 ```
 
-Live `divergence_rows()` must call the same `shared_files` / hotspot collapse. Mtime prefilter: read `<git-common-dir>/worktrees/<name>/index` mtime; only `git status --porcelain` worktrees that are recent or already flagged dirty. Do not assert wall-clock in tests.
+Live `divergence_rows()` must call the same `shared_files` / hotspot collapse. Mtime prefilter: read `<git-common-dir>/worktrees/<name>/index` mtime; only `git status --porcelain` worktrees that are recent or already flagged dirty. Do not assert wall-clock in tests. Do **not** implement `SHARED-INDEX`: pure Git has no “another agent active in this same checkout” signal, and the live motivating case has no duplicate branch worktree. Active claim holders appear in the separate claim section after M2.
 
 - [ ] **Step 4: Tests + green set**
 
@@ -308,152 +330,139 @@ EOF
 - Test: `scripts/tests/test_coord_claim_cas.py`
 
 **Interfaces:**
-- `claim(kind, id, holder, ttl=3600) -> tuple[bool, str]` — create with `old=ZERO`; steal fails
-- `release(kind, id, holder) -> bool` — holder only
-- `is_expired(kind, id) -> bool` — `age > ttl`
-- `force_drop(kind, id, holder, force=False) -> bool` — non-force only if `age >= 2*ttl`; `force=True` + audit
+- `repo_relative_path(path, repo_root=REPO_ROOT) -> str | None` — resolve, contain, POSIX, lowercase; outside repo returns `None`
+- `encode_claim_id(kind, raw_id, repo_root=REPO_ROOT) -> str` — canonicalize then injectively percent-encode unsafe UTF-8 bytes
+- `claim_ref(kind, raw_id, repo_root=REPO_ROOT) -> str` — build ref, run `git check-ref-format`, raise `ClaimIdError` on failure
+- `claim(kind, raw_id, holder=None, ttl=3600, repo_root=REPO_ROOT) -> tuple[bool, str]` — holder defaults from the Task-0-approved identity source (proposal: `FLOSS_AGENT_ID`); missing identity is `E_AGENT_ID_MISSING`; exclusive create; same-holder refresh; different-holder reclaim only after `2×ttl`
+- `release(kind, raw_id, holder, repo_root=REPO_ROOT) -> bool` — holder only
+- `is_expired(kind, raw_id, repo_root=REPO_ROOT) -> bool` — `age > ttl`
+- `force_drop(kind, raw_id, actor, force=False, expected_sha=None, repo_root=REPO_ROOT) -> bool` — `actor` is who performs the drop; blob supplies `old_holder`; non-force only if `age >= 2*ttl`; delete CAS uses `expected_sha` when supplied; every successful drop audited
 - `race_claim(...)` — capture `expected_old` **once**, launch all `Popen` before any wait
-- Audit log: `C:/~shit/.agent-surface/coord/claims.jsonl` (`REPO_ROOT.parent`, not FLOSS)
+- Audit log default: `C:/~shit/.agent-surface/coord/claims.jsonl` (`REPO_ROOT.parent`, not FLOSS); tests inject a temp path
 
 - [ ] **Step 1: Failing tests**
 
 ```python
 cc = load("coord_claim_under_test", "scripts/coord_claim.py")
 
-def test_create_and_release():
-    ok, _ = cc.claim("path", "test/claim-cas-1", holder="hermes-test", ttl=60)
-    assert ok
-    ok2, holder = cc.claim("path", "test/claim-cas-1", holder="other", ttl=60)
-    assert not ok2 and holder == "hermes-test"  # steal must fail (C5)
-    assert cc.release("path", "test/claim-cas-1", holder="hermes-test")
+def test_create_is_exclusive_and_release_is_holder_only(tmp_repo):
+    raw = "docs/specs/spec-registry.json"
+    assert cc.claim("path", raw, "alice", 60, tmp_repo)[0]
+    assert cc.claim("path", raw, "bob", 60, tmp_repo) == (False, "alice")
+    assert not cc.release("path", raw, "bob", tmp_repo)
+    assert cc.release("path", raw, "alice", tmp_repo)
 
-def test_8way_cas_same_expected_old():
-    results = cc.race_claim("branch", "race-8", ttl=60, racers=8)
-    wins = sum(1 for ok, _ in results if ok)
-    assert wins == 1
-    cc.force_drop("branch", "race-8", holder="any", force=True)
+@pytest.mark.parametrize("raw", [
+    "docs/specs/spec-registry.json", "scripts/foo.lock",
+    "docs/a b.md", "docs/x..y.md",
+])
+def test_encoded_path_refs_pass_git_authority(raw, tmp_repo):
+    ref = cc.claim_ref("path", raw, tmp_repo)
+    assert cc._run("check-ref-format", ref, repo_root=tmp_repo).returncode == 0
 
-def test_ttl_expired_and_2x_force_drop():
-    cc.claim("path", "test/ttl-1", holder="alice", ttl=1)
-    import time; time.sleep(1.2)
-    assert cc.is_expired("path", "test/ttl-1")
-    assert not cc.force_drop("path", "test/ttl-1", holder="bob", force=False)  # not yet 2×ttl
-    assert cc.force_drop("path", "test/ttl-1", holder="bob", force=True)
-    assert cc.audit_log_contains("test/ttl-1", "force_drop")
+def test_encoding_is_injective_and_encodes_dot_and_percent(tmp_repo):
+    raw = ["scripts/foo.lock", "scripts/foo%2Elock", "docs/x..y.md", "docs/x.y.md"]
+    encoded = [cc.encode_claim_id("path", p, tmp_repo) for p in raw]
+    assert len(encoded) == len(set(encoded))
+    assert "%2E" in encoded[0] and "%25" in encoded[1]
+
+def test_outside_repo_path_is_illegal_not_conflict(tmp_repo):
+    assert cc.claim("path", "C:/other/foo.py", "alice", 60, tmp_repo) == (False, "E_ILLEGAL_ID")
+
+def test_8way_cas_same_expected_old(tmp_repo):
+    results = cc.race_claim("branch", "race-8", 60, 8, tmp_repo)
+    assert sum(1 for ok, _ in results if ok) == 1
+
+def test_unauthorized_force_true_is_denied_and_audited(tmp_repo, audit_log):
+    assert cc.claim("path", "docs/live.md", "alice", 3600, tmp_repo)[0]
+    assert not cc.force_drop("path", "docs/live.md", actor="mallory", force=True, repo_root=tmp_repo)
+    assert cc.current_holder("path", "docs/live.md", tmp_repo) == "alice"
+    assert cc.audit_log_contains("docs/live.md", "force_drop_denied", audit_log)
+
+def test_stale_reclaimer_cannot_delete_concurrent_refresh(tmp_repo, monkeypatch):
+    now = [datetime(2026, 9, 3, tzinfo=timezone.utc)]
+    monkeypatch.setattr(cc, "_utc_now", lambda: now[0])
+    assert cc.claim("path", "docs/live.md", "alice", 10, tmp_repo)[0]
+    stale_sha = cc.current_sha("path", "docs/live.md", tmp_repo)
+    now[0] += timedelta(seconds=21)
+    assert cc.claim("path", "docs/live.md", "alice", 10, tmp_repo)[0]  # refresh changes SHA/time
+    assert not cc.force_drop("path", "docs/live.md", actor="bob", expected_sha=stale_sha, repo_root=tmp_repo)
+    assert cc.current_holder("path", "docs/live.md", tmp_repo) == "alice"
+
+def test_reclaim_only_after_2x_ttl_is_audited(tmp_repo, tmp_path, monkeypatch):
+    now = [datetime(2026, 9, 3, tzinfo=timezone.utc)]
+    audit_log = tmp_path / "claims.jsonl"
+    monkeypatch.setattr(cc, "_utc_now", lambda: now[0])
+    monkeypatch.setattr(cc, "AUDIT_LOG", audit_log)
+    assert cc.claim("path", "docs/stale.md", "alice", 10, tmp_repo)[0]
+    now[0] += timedelta(seconds=11)
+    assert cc.is_expired("path", "docs/stale.md", tmp_repo)
+    assert cc.claim("path", "docs/stale.md", "bob", 10, tmp_repo) == (False, "alice")
+    now[0] += timedelta(seconds=10)
+    assert cc.claim("path", "docs/stale.md", "bob", 10, tmp_repo)[0]
+    assert cc.audit_log_contains("docs/stale.md", "force_drop", audit_log)
 ```
+
+Each test module defines a local `tmp_repo` fixture: `git init -b main`, configure test name/email, make one empty commit, and create referenced parent directories. Import `datetime`, `timedelta`, and `timezone` in the test. Production code exposes one `_utc_now()` seam returning `datetime.now(timezone.utc)`; tests monkeypatch it. Do not sleep.
 
 - [ ] **Step 2: Run — expect fail**
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Implement these invariants**
 
 ```python
-from __future__ import annotations
-import json, subprocess, time
-from datetime import datetime, timezone
-from pathlib import Path
+_SAFE = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
 
-ZERO = "0" * 40
-REPO_ROOT = Path(__file__).resolve().parents[1]          # FLOSS/
-WORKSPACE_ROOT = REPO_ROOT.parent                        # C:/~shit
-AUDIT_LOG = WORKSPACE_ROOT / ".agent-surface" / "coord" / "claims.jsonl"
+def _encode_component(component: str) -> str:
+    # urllib.parse.quote(safe="") is NOT sufficient: it leaves '.' unescaped.
+    return "".join(chr(b) if b in _SAFE else f"%{b:02X}" for b in component.encode("utf-8")) or "%00"
 
-def _run(*a, cwd=None):
-    return subprocess.run(["git", *a], capture_output=True, text=True, cwd=cwd or REPO_ROOT)
-
-def claim_json(holder, kind, id, ttl=3600) -> str:
-    payload = json.dumps({
-        "holder": holder, "kind": kind, "id": id,
-        "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "ttl": ttl,
-    })
-    r = subprocess.run(["git", "hash-object", "-w", "--stdin"], input=payload, capture_output=True, text=True, cwd=REPO_ROOT)
-    return r.stdout.strip()
-
-def _blob(kind, id) -> dict | None:
-    ref = f"refs/agent-claims/{kind}/{id}"
-    r = _run("cat-file", "-p", ref)
-    if r.returncode != 0:
-        return None
+def repo_relative_path(path, repo_root=REPO_ROOT):
+    root = Path(repo_root).resolve()
+    p = Path(path)
+    if not p.is_absolute():
+        p = root / p
     try:
-        return json.loads(r.stdout)
-    except json.JSONDecodeError:
+        return p.resolve().relative_to(root).as_posix().lower()
+    except (OSError, ValueError):
         return None
 
-def claim(kind, id, holder, ttl=3600):
-    ref = f"refs/agent-claims/{kind}/{id}"
-    sha = claim_json(holder, kind, id, ttl)
-    r0 = _run("rev-parse", "--verify", ref)
-    if r0.returncode != 0:
-        r = _run("update-ref", ref, sha, ZERO)  # exclusive create
-        return (r.returncode == 0, holder if r.returncode == 0 else "conflict")
-    data = _blob(kind, id) or {}
-    existing = data.get("holder", "unknown")
-    if existing != holder:
-        return False, existing  # steal fails
-    r = _run("update-ref", ref, sha, r0.stdout.strip())  # same-holder refresh
-    return (r.returncode == 0, holder)
+def encode_claim_id(kind, raw_id, repo_root=REPO_ROOT):
+    if kind not in {"path", "branch", "worktree"}:
+        raise ClaimIdError(kind)
+    if kind == "path":
+        canonical = repo_relative_path(raw_id, repo_root)
+        if canonical is None:
+            raise ClaimIdError(raw_id)
+    elif kind == "worktree":
+        # Filesystem path on Windows (NTFS case-insensitive): lowercase.
+        canonical = str(raw_id).replace("\\", "/").lower()
+    else:  # branch: git refs are case-sensitive — preserve exact case.
+        # Do NOT lower() or casefold() branch names: Feature/X != feature/x,
+        # and casefold() would additionally collapse Straße -> strasse.
+        canonical = str(raw_id).replace("\\", "/")
+    return "/".join(_encode_component(part) for part in canonical.split("/"))
 
-def release(kind, id, holder):
-    data = _blob(kind, id)
-    if not data:
-        return True
-    if data.get("holder") != holder:
-        return False
-    ref = f"refs/agent-claims/{kind}/{id}"
-    cur = _run("rev-parse", ref).stdout.strip()
-    r = _run("update-ref", "-d", ref, cur)
-    return r.returncode == 0
-
-def _age_and_ttl(kind, id) -> tuple[float, int] | None:
-    data = _blob(kind, id)
-    if not data:
-        return None
-    created = datetime.strptime(data["created"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    age = (datetime.now(timezone.utc) - created).total_seconds()
-    return age, int(data.get("ttl", 3600))
-
-def is_expired(kind, id) -> bool:
-    at = _age_and_ttl(kind, id)
-    return bool(at and at[0] > at[1])
-
-def force_drop(kind, id, holder, force=False) -> bool:
-    at = _age_and_ttl(kind, id)
-    if not at:
-        return False
-    age, ttl = at
-    if not force and age < 2 * ttl:
-        return False
-    ref = f"refs/agent-claims/{kind}/{id}"
-    cur = _run("rev-parse", ref).stdout.strip()
-    r = _run("update-ref", "-d", ref, cur)
-    if r.returncode == 0:
-        AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-        AUDIT_LOG.open("a", encoding="utf-8").write(json.dumps({
-            "op": "force_drop", "ref": ref, "holder": holder,
-            "force": force, "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }) + "\n")
-    return r.returncode == 0
-
-def audit_log_contains(id, op) -> bool:
-    if not AUDIT_LOG.exists():
-        return False
-    return any(op in line and id in line for line in AUDIT_LOG.read_text(encoding="utf-8").splitlines())
-
-def race_claim(kind, base_id, ttl=60, racers=8):
-    ref = f"refs/agent-claims/{kind}/{base_id}"
-    r = _run("rev-parse", "--verify", ref)
-    expected = r.stdout.strip() if r.returncode == 0 else ZERO
-    shas = [claim_json(f"racer-{i}", kind, base_id, ttl) for i in range(racers)]
-    procs = [subprocess.Popen(["git", "-C", str(REPO_ROOT), "update-ref", ref, sha, expected],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for sha in shas]
-    out = []
-    for p in procs:
-        err = p.communicate()[1]
-        out.append((p.returncode == 0, err))
-    return out
+def claim_ref(kind, raw_id, repo_root=REPO_ROOT):
+    ref = f"refs/agent-claims/{kind}/{encode_claim_id(kind, raw_id, repo_root)}"
+    if _run("check-ref-format", ref, repo_root=repo_root).returncode != 0:
+        raise ClaimIdError(raw_id)
+    return ref
 ```
 
-Schema: `docs/specs/coordination-claims.schema.json` — required `holder, kind, id, created, ttl`; `kind` enum `worktree|branch|path`.
+All ref readers/writers (`claim`, `_blob`, `release`, `is_expired`, `force_drop`, `race_claim`, hook lookup) call `claim_ref`; none interpolate raw ids. Store both `raw_id` and `encoded_id` in the blob.
+
+`claim()` algorithm:
+1. Resolve holder under the Task-0-approved identity contract; missing/empty → `(False, "E_AGENT_ID_MISSING")`. Form/validate ref; on `ClaimIdError`, return `(False, "E_ILLEGAL_ID")`.
+2. Read current SHA **once**. Missing → `update-ref <ref> <new> ZERO`.
+3. Existing same holder → refresh with CAS against that SHA.
+4. Existing different holder and age `< 2×ttl` → `(False, existing_holder)`.
+5. Existing different holder and age `>= 2×ttl` → CAS-delete via `force_drop(..., actor=holder, expected_sha=current)` with audit, then exclusive-create with `ZERO`. If another writer wins the gap, return its holder/`conflict`; never overwrite.
+
+`force_drop()` validates the ref, reads one current SHA/blob, checks any supplied `expected_sha` against that current SHA, enforces `2×ttl` unless `force=True` **from an authorized actor**, then deletes with the current SHA as expected-old. Authorization: `force=True` requires `actor == old_holder` or `actor` in the Task-0-approved force list; any other actor with `force=True` returns False and audits the denial. On success it appends a JSONL audit record containing raw id, encoded ref, `old_holder` from the blob, separate `actor`, force flag, age, and UTC timestamp. Malformed blob/time/ref is an explicit error, never “not claimed.”
+
+`race_claim()` forms the encoded ref once, captures the same expected-old before spawning, creates all blobs, launches all `Popen` calls, then waits. Cleanup deletes the encoded ref.
+
+Schema: `docs/specs/coordination-claims.schema.json` — required `holder, kind, raw_id, encoded_id, created, ttl`; `kind` enum `worktree|branch|path`; UTC timestamp; positive TTL.
 
 - [ ] **Step 4: Tests + green set.** Cleanup leftover `refs/agent-claims/test/*` after.
 
@@ -468,111 +477,271 @@ EOF
 
 ---
 
-### Task 4: Enforcement — separate predicate + real deny (C9 H2)
+### Task 4: Enforcement — shared canonicalizer + fail-closed deny (N1/N3/N4/C9/H2)
 
-**Files:** Modify `hooks/hook_pre_write.py` (add functions + call from `main`; **do not change** `is_substantive` / `SUBSTANTIVE_PATH_SEGMENTS`); `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
+**Files:** Modify `hooks/hook_pre_write.py` (import `importlib.util` and **`subprocess`**; load `scripts/coord_claim.py`; delegate `_repo_relative`; preserve `is_substantive` behavior while adapting its local leading slash; add functions + call from `main`; **do not widen** `SUBSTANTIVE_PATH_SEGMENTS` or provenance scope); modify `docs/architecture/RUNTIME_SURFACES.md` to document the approved identity source/launch requirement; `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
 
 **Interfaces:**
-- `normalize_repo_rel(path: str, repo_root: Path) -> str` — posix, relative to repo
+- `resolve_floss_worktree(path) -> Path | None` — derive the target path's actual `git rev-parse --show-toplevel`; accept it only when its resolved `--git-common-dir` equals the hook script checkout's FLOSS common dir. This reaches sibling worktrees but excludes unrelated repositories.
+- `hook_pre_write._repo_relative(path, target_root)` resolves relative tool paths against `Path.cwd()`, then delegates the resulting absolute path to `coord_claim.repo_relative_path(path, target_root)` — no third case/containment normalizer; returned id has no leading slash
+- `is_substantive(path, target_root)` forms `norm = "/" + (_repo_relative(path, target_root) or "").lstrip("/")` before its existing segment checks, preserving the rebased N2 behavior
+- `extract_agent_id(payload) -> str | None` — implement the Task-0-approved contract; proposed default reads unique per-session `FLOSS_AGENT_ID`, never a static harness name
 - `is_claim_blocked(path: str, agent_id: str) -> tuple[bool, str]`
 - `is_write_allowed(path: str, agent_id: str) -> bool`
 - `deny_payload(holder: str) -> dict` for `--stdout-json`
-- `main()` calls claim-check **before** `is_substantive`. Deny: print payload, **return 2**. `finish()` stays allow/exit 0.
+- `main()` order: mutating-tool check → existing `_is_inside_repo` guard (**outside FLOSS returns allow; this is a user-scope hook**) → claim-check for every in-repo path → `is_substantive`. Deny or lookup/encoding error: print payload, **return 2**. `finish()` stays allow/exit 0.
 
-- [ ] **Step 1: Failing test** (same `normalize_repo_rel` as claim ids)
+- [ ] **Step 1: Failing tests**
 
 ```python
+import io
+
 hp = load("hook_pre_write_under_test", "hooks/hook_pre_write.py")
 cc = load("coord_claim_under_test2", "scripts/coord_claim.py")
 
-def test_hook_blocks_claimed_path():
-    rel = "docs/specs/spec-registry.json"
-    cc.claim("path", rel, holder="alice", ttl=3600)
-    abs_path = str(FLOSS_ROOT / rel)
-    assert not hp.is_write_allowed(abs_path, "bob")
-    blocked, holder = hp.is_claim_blocked(abs_path, "bob")
+def invoke(payload, monkeypatch):
+    monkeypatch.setattr(hp.sys, "stdin", io.StringIO(json.dumps(payload)))
+    return hp.main()
+
+def write_payload(path):
+    return {"tool_name": "write", "tool_input": {"file_path": str(path)}}
+
+def test_resolve_floss_worktree_reaches_sibling_not_unrelated(tmp_repo, tmp_path):
+    sibling = tmp_path / "sibling-wt"
+    git(tmp_repo, "worktree", "add", "-b", "test/sibling", str(sibling))
+    unrelated = init_repo(tmp_path / "unrelated")
+    assert hp.resolve_floss_worktree(sibling / "docs/x.md", tmp_repo) == sibling.resolve()
+    assert hp.resolve_floss_worktree(unrelated / "x.md", tmp_repo) is None
+
+def test_hook_resolves_sibling_worktree_scopes_not_hook_checkout(tmp_repo, tmp_path, monkeypatch):
+    # Hook checkout root != target worktree: scopes must come from the target.
+    sibling = tmp_path / "sibling-wt"
+    git(tmp_repo, "worktree", "add", "-b", "test/sibling-scope", str(sibling))
+    (sibling / "docs").mkdir(exist_ok=True)
+    target = sibling / "docs/x.md"
+    target.write_text("x")
+    assert cc.claim("branch", "test/sibling-scope", "alice", 3600, sibling)[0]
+    authenticity = hp.resolve_floss_worktree(str(target), tmp_repo)
+    assert authenticity == sibling.resolve()
+    blocked, holder = hp.is_claim_blocked(str(target), "bob", authenticity)
     assert blocked and holder == "alice"
-    cc.force_drop("path", rel, holder="alice", force=True)
+
+def test_hook_and_claim_use_same_canonical_id(tmp_repo):
+    mixed = str(tmp_repo / "Docs" / "X Y.lock")
+    lower = str(tmp_repo / "docs" / "x y.lock")
+    assert hp._repo_relative(mixed, tmp_repo) == cc.repo_relative_path(lower, tmp_repo)
+    assert cc.claim_ref("path", mixed, tmp_repo) == cc.claim_ref("path", lower, tmp_repo)
+
+def test_rebased_substantive_semantics_survive_shared_normalizer(tmp_repo, monkeypatch):
+    (tmp_repo / "nested").mkdir(exist_ok=True)
+    monkeypatch.chdir(tmp_repo / "nested")
+    assert hp._repo_relative("../packages/prod.py", tmp_repo) == "packages/prod.py"
+    assert hp.is_substantive(str(tmp_repo / "packages" / "prod.py"), tmp_repo)
+    assert hp.is_substantive(str(tmp_repo / "packages" / "tests" / ".." / "prod.py"), tmp_repo)
+    assert not hp.is_substantive(str(tmp_repo / "packages" / "tests" / "x.py"), tmp_repo)
+
+@pytest.mark.parametrize("kind,raw", [
+    ("worktree", "C:/Users/A B/repo.lock"),
+    ("branch", "feature/a b..lock"),
+])
+def test_non_path_claim_refs_are_legal_and_injective(kind, raw, tmp_repo):
+    first = cc.claim_ref(kind, raw, tmp_repo)
+    second = cc.claim_ref(kind, raw + "%", tmp_repo)
+    assert first != second
+    assert cc._run("check-ref-format", first, repo_root=tmp_repo).returncode == 0
+
+def test_lower_not_casefold_avoids_unicode_collision(tmp_repo):
+    assert cc.claim_ref("branch", "Straße", tmp_repo) != cc.claim_ref("branch", "Strasse", tmp_repo)
+    assert cc.claim_ref("branch", "Feature/X", tmp_repo) != cc.claim_ref("branch", "feature/x", tmp_repo)
+    # Path ids stay NTFS case-insensitive:
+    assert cc.claim_ref("path", "Docs/X.md", tmp_repo) == cc.claim_ref("path", "docs/x.md", tmp_repo)
+
+def test_hook_blocks_path_branch_and_worktree_claims(tmp_repo, monkeypatch):
+    monkeypatch.setattr(hp, "current_branch", lambda root: "main")
+    monkeypatch.setattr(hp, "current_worktree", lambda root: str(root.resolve()))
+    target = tmp_repo / "docs/specs/spec-registry.json"
+    for kind, raw in [("path", str(target)), ("branch", "main"), ("worktree", str(tmp_repo))]:
+        assert cc.claim(kind, raw, "alice", 3600, tmp_repo)[0]
+        blocked, holder = hp.is_claim_blocked(str(target), "bob", tmp_repo)
+        assert blocked and holder == "alice"
+        assert cc.release(kind, raw, "alice", tmp_repo)
+
+def test_hook_fails_closed_outside_repo_and_on_lookup_exception(tmp_repo, monkeypatch):
+    assert hp.is_claim_blocked("C:/other/foo.py", "bob", tmp_repo) == (True, "E_ILLEGAL_ID")
+    monkeypatch.setattr(hp.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("spawn failed")))
+    assert hp.is_claim_blocked(str(tmp_repo / "docs/x.md"), "bob", tmp_repo) == (True, "E_CLAIM_LOOKUP")
+
+def test_missing_agent_identity_fails_closed_for_in_repo_write(tmp_repo, monkeypatch):
+    monkeypatch.delenv("FLOSS_AGENT_ID", raising=False)
+    monkeypatch.setattr(hp, "REPO_ROOT", tmp_repo)
+    hp.EMIT_STDOUT_JSON = True
+    assert invoke(write_payload(tmp_repo / "docs/x.md"), monkeypatch) == 2
+
+def test_main_allows_unrelated_project_before_claim_lookup(monkeypatch):
+    monkeypatch.setattr(hp, "is_claim_blocked", lambda *a, **k: pytest.fail("lookup must not run"))
+    assert invoke(write_payload("C:/other-project/packages/x.py"), monkeypatch) == 0
+
+def test_main_claim_deny_is_exit_2_and_json(tmp_repo, monkeypatch, capsys):
+    monkeypatch.setenv("FLOSS_AGENT_ID", "bob")
+    monkeypatch.setattr(hp, "REPO_ROOT", tmp_repo)
+    hp.EMIT_STDOUT_JSON = True
+    target = tmp_repo / "docs/x.md"
+    assert cc.claim("path", str(target), "alice", 3600, tmp_repo)[0]
+    assert invoke(write_payload(target), monkeypatch) == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["permissionDecision"] == "deny"
 ```
 
-- [ ] **Step 2: Run — expect `AttributeError: is_write_allowed`**
+- [ ] **Step 2: Run — expect missing imports/functions**
 
 - [ ] **Step 3: Implement**
 
+At module import, explicitly load `scripts/coord_claim.py` by file location (the `scripts` directory is not a package). Add both imports:
+
 ```python
-def normalize_repo_rel(path: str, repo_root: Path | None = None) -> str:
-    root = (repo_root or REPO_ROOT).resolve()
-    p = Path(path).expanduser()
-    if not p.is_absolute():
-        p = root / p
-    try:
-        rel = p.resolve().relative_to(root)
-    except ValueError:
-        return Path(path).as_posix().lstrip("/")
-    return rel.as_posix()
+import importlib.util
+import subprocess  # N4: required by is_claim_blocked
 
-def is_claim_blocked(path: str, agent_id: str) -> tuple[bool, str]:
-    rel = normalize_repo_rel(path)
-    ref = f"refs/agent-claims/path/{rel}"
-    r = subprocess.run(["git", "-C", str(REPO_ROOT), "rev-parse", "--verify", ref], capture_output=True, text=True)
-    if r.returncode != 0:
-        return False, ""
-    blob = subprocess.run(["git", "-C", str(REPO_ROOT), "cat-file", "-p", ref], capture_output=True, text=True).stdout
-    try:
-        holder = json.loads(blob).get("holder", "unknown")
-    except json.JSONDecodeError:
-        holder = "unknown"
-    if holder != agent_id:
-        return True, holder
-    return False, ""
+_CC_PATH = Path(__file__).resolve().parents[1] / "scripts" / "coord_claim.py"
+_CC_SPEC = importlib.util.spec_from_file_location("coord_claim_for_hook", _CC_PATH)
+_CC = importlib.util.module_from_spec(_CC_SPEC)
+assert _CC_SPEC.loader is not None
+sys.modules[_CC_SPEC.name] = _CC
+_CC_SPEC.loader.exec_module(_CC)
 
-def is_write_allowed(path: str, agent_id: str) -> bool:
-    blocked, _ = is_claim_blocked(path, agent_id)
-    return not blocked
+def extract_agent_id(payload: dict) -> str | None:
+    # Replace only if Task 0 approves a different shared identity contract.
+    value = os.environ.get("FLOSS_AGENT_ID", "").strip()
+    return value or None
 
-def deny_payload(holder: str) -> dict:
-    reason = f"conflict: holder={holder}"
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
-        },
-        "decision": "block",
-        "reason": reason,
-    }
+def _repo_relative(path_str: str, repo_root: Path = REPO_ROOT) -> str | None:
+    candidate = Path(path_str).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate  # preserve existing hook input semantics
+    return _CC.repo_relative_path(candidate, repo_root)
 
-# in main(), after path extract, BEFORE is_substantive:
-#   blocked, holder = is_claim_blocked(target_path, agent_id)
-#   if blocked:
-#       if EMIT_STDOUT_JSON:
-#           sys.stdout.write(json.dumps(deny_payload(holder)) + "\n")
-#       else:
-#           sys.stderr.write(deny_payload(holder)["reason"] + "\n")
-#       return 2
+# In is_substantive(), preserve the leading slash expected by the existing
+# SUBSTANTIVE_PATH_SEGMENTS / CANON_PATH_SEGMENTS constants:
+#   rel = _repo_relative(path_str)
+#   if rel is None: return False
+#   norm = "/" + rel.lstrip("/")
 ```
 
-`is_substantive` / `SUBSTANTIVE_PATH_SEGMENTS` **unchanged**.
+Claim lookup checks scopes in deterministic broad-to-narrow order: current worktree, current branch (skip only a verified detached HEAD), then target path. Any claim held by another identity blocks the write; same-holder and absent refs continue to the next scope.
+
+```python
+class ClaimLookupError(RuntimeError):
+    pass
+
+def _git(*args, repo_root=REPO_ROOT):
+    try:
+        return subprocess.run(["git", "-C", str(repo_root), *args], capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ClaimLookupError(str(exc)) from exc
+
+def current_worktree(repo_root=REPO_ROOT) -> str:
+    # Resolve the ACTUAL top-level of the target checkout (sibling worktrees
+    # have their own top-level). Never assume the hook script's checkout.
+    r = _git("rev-parse", "--show-toplevel", repo_root=repo_root)
+    if r.returncode != 0:
+        raise ClaimLookupError(r.stderr)
+    return r.stdout.strip()
+
+def current_branch(repo_root=REPO_ROOT) -> str | None:
+    r = _git("symbolic-ref", "--quiet", "--short", "HEAD", repo_root=repo_root)
+    if r.returncode == 1:  # documented detached HEAD result
+        return None
+    if r.returncode != 0:
+        raise ClaimLookupError(r.stderr)
+    return r.stdout.strip()
+
+def _claim_holder(kind: str, raw_id: str, repo_root=REPO_ROOT) -> str | None:
+    ref = _CC.claim_ref(kind, raw_id, repo_root)  # may raise ClaimIdError
+    r = _git("show-ref", "--verify", "--quiet", ref, repo_root=repo_root)
+    if r.returncode == 1:
+        return None
+    if r.returncode != 0:
+        raise ClaimLookupError(r.stderr)
+    blob = _git("cat-file", "-p", ref, repo_root=repo_root)
+    if blob.returncode != 0:
+        raise ClaimLookupError(blob.stderr)
+    try:
+        return json.loads(blob.stdout)["holder"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ClaimLookupError("E_CLAIM_DATA") from exc
+
+def is_claim_blocked(path: str, agent_id: str, repo_root: Path = REPO_ROOT) -> tuple[bool, str]:
+    # repo_root MUST be the target file's resolved worktree root (from
+    # resolve_floss_worktree), never the hook script's checkout default, when
+    # the target lives in a sibling worktree. All scope readers below take it.
+    try:
+        scopes = [("worktree", current_worktree(repo_root))]
+        branch = current_branch(repo_root)
+        if branch is not None:
+            scopes.append(("branch", branch))
+        scopes.append(("path", path))
+        for kind, raw_id in scopes:
+            holder = _claim_holder(kind, raw_id, repo_root)
+            if holder is not None and holder != agent_id:
+                return True, holder
+        return False, ""
+    except _CC.ClaimIdError:
+        return True, "E_ILLEGAL_ID"
+    except (ClaimLookupError, OSError, subprocess.SubprocessError):
+        return True, "E_CLAIM_LOOKUP"
+```
+
+`is_write_allowed` negates the first tuple item. `deny_payload` retains both Claude/Hermes and Codex-compatible fields. In `main()`, after mutating-tool validation, preserve the existing user-scope containment boundary, resolve identity, and wrap claim enforcement so an unforeseen exception cannot fall through the live hook's outer catch/`finish()` allow path:
+
+```python
+if not _is_inside_repo(file_path):
+    return finish()  # user-scope hook: unrelated repositories remain out of scope
+agent_id = extract_agent_id(payload)
+if not agent_id:
+    payload = deny_payload("E_AGENT_ID_MISSING")
+    if EMIT_STDOUT_JSON:
+        sys.stdout.write(json.dumps(payload) + "\n")
+    else:
+        sys.stderr.write(payload["reason"] + "\n")
+    return 2
+try:
+    target_root = resolve_floss_worktree(file_path)
+    if target_root is None:
+        raise ClaimLookupError("E_CLAIM_LOOKUP")  # in-FLOSS per guard, but unresolvable
+    blocked, holder = is_claim_blocked(file_path, agent_id, target_root)
+except Exception:  # claim subsystem must fail closed
+    log(f"[hook-pre] claim lookup crashed:\n{traceback.format_exc()}")
+    blocked, holder = True, "E_CLAIM_INTERNAL"
+if blocked:
+    payload = deny_payload(holder)
+    if EMIT_STDOUT_JSON:
+        sys.stdout.write(json.dumps(payload) + "\n")
+    else:
+        sys.stderr.write(payload["reason"] + "\n")
+    return 2
+```
+
+`SUBSTANTIVE_PATH_SEGMENTS` and provenance scope remain unchanged. `is_substantive` changes only its local leading-slash adaptation to preserve prior semantics.
 
 - [ ] **Step 4: Tests + `materialize_shared_hook_surface.py --check` + green set**
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -- hooks/hook_pre_write.py scripts/tests/test_hook_claim_block.py
-git commit -F- -- hooks/hook_pre_write.py scripts/tests/test_hook_claim_block.py <<'EOF'
-feat(coord): claim-block predicate + deny exit 2; is_substantive unchanged
+git add -- hooks/hook_pre_write.py scripts/tests/test_hook_claim_block.py docs/architecture/RUNTIME_SURFACES.md
+git commit -F- -- hooks/hook_pre_write.py scripts/tests/test_hook_claim_block.py docs/architecture/RUNTIME_SURFACES.md <<'EOF'
+feat(coord): fail-closed claim enforcement with shared path identity
 EOF
 ```
 
 ---
 
-### Task 5: Probe `--online`, Grok wiring, partial board retirement (S2 D7)
+### Task 5: Probe `--online`, verify inherited Grok wiring, partial board retirement (S2/D7/N2)
 
 **Files:**
 - Modify: `scripts/orient_probe.py` — **add** `--online` (it does not exist today; argparse is `--query/--root/--limit/--json` only)
-- Modify: `scripts/start_mcp_daemons.ps1` / `stop_mcp_daemons.ps1` — merge Grok `:7334` `Start-Daemon` onto existing `$PSScriptRoot`/`$FLOSS_PYTHON` (today **0** `7334` hits). Show the actual diff hunk; do not “then merge” in prose.
-- Modify: `docs/architecture/RUNTIME_SURFACES.md` — `COORDINATION_ROOM_LOG` pin to workspace intake mouth
+- **Verify only:** `scripts/start_mcp_daemons.ps1` / `stop_mcp_daemons.ps1` — the `feat/coordination-room-rebased` base already carries Grok `:7334` `Start-Daemon`, PID, stop, and `COORDINATION_ROOM_LOG` wiring. Do not cherry-pick or duplicate it.
+- Modify `docs/architecture/RUNTIME_SURFACES.md` only if its coordination-room pin is absent/stale on the rebased base; show the exact diff.
 - Modify: `docs/research/2026-05-15-working-todo-list.md` — replace **branch/worktree half of §0 only**; **keep PR table** until `--online` is verified
 
 - [ ] **Step 1: Add `--online` to argparse; default off; `gh` only when set**
@@ -592,17 +761,25 @@ env -u PYTHONPATH C:/Python313/python.exe scripts/orient_probe.py --query "smoke
 
 Default: no PR section. `--online`: PR section present **or** explicit `[offline: gh failed]` — never silent.
 
-- [ ] **Step 3: Daemon wiring + 17 room tests + green set**
+- [ ] **Step 3: Verify inherited daemon wiring + 17 room tests + green set**
 
-`rg -n 7334 scripts/start_mcp_daemons.ps1` must hit after the merge.
+On `feat/coordination-room-rebased`:
+
+```bash
+rg -n "7334|coordination_room" scripts/start_mcp_daemons.ps1 scripts/stop_mcp_daemons.ps1
+```
+
+Must show start on `:7334`, `coordination_room.pid`, stop coverage, and the workspace `.agent-surface/rooms/default/events.jsonl` pin. If any is absent, stop and reconcile against the rebased branch evidence; do not blindly cherry-pick. Then:
+
 `env -u PYTHONPATH C:/Python313/python.exe -m pytest packages/coordination_room/tests -v` → 17 passed.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add -- scripts/orient_probe.py scripts/start_mcp_daemons.ps1 scripts/stop_mcp_daemons.ps1 docs/architecture/RUNTIME_SURFACES.md docs/research/2026-05-15-working-todo-list.md
-git commit -F- -- scripts/orient_probe.py scripts/start_mcp_daemons.ps1 scripts/stop_mcp_daemons.ps1 docs/architecture/RUNTIME_SURFACES.md docs/research/2026-05-15-working-todo-list.md <<'EOF'
-feat(coord): --online split, :7334 daemon pin, partial Work Board §0 retirement
+git add -- scripts/orient_probe.py docs/research/2026-05-15-working-todo-list.md
+git add -- docs/architecture/RUNTIME_SURFACES.md  # only if changed after exact stale-pin proof
+git commit -F- -- scripts/orient_probe.py docs/research/2026-05-15-working-todo-list.md docs/architecture/RUNTIME_SURFACES.md <<'EOF'
+feat(coord): --online split and partial Work Board §0 retirement
 EOF
 ```
 
@@ -610,20 +787,26 @@ EOF
 
 ## Self-Review
 
-- [ ] D1–D9 carried; DELTA-PLAN B1–B3/C1–C4/H1–H2/T1–T2/S1–S2 carried; DELTA-PLAN-2 B10–B12/C5–C10 carried in **this** text
+- [ ] D1–D9; DELTA-PLAN B1–B3/C1–C4/H1–H2/T1–T2/S1–S2; DELTA-PLAN-2 B10–B12/C5–C10; DELTA-3 N1–N7 carried in **this** text
+- [ ] Base is `feat/coordination-room-rebased`; inherited `_repo_relative` and `:7334` wiring verified; no duplicate cherry-pick
+- [ ] Dirty primary `scripts/orient_probe.py` resolved by owner/operator before Task 1
+- [ ] One canonical path function; lowercased; illegal ref bytes injectively encoded; `git check-ref-format` authoritative
+- [ ] Holder identity contract explicitly approved in Task 0; no undefined/static `agent_id`; missing identity fails closed for in-repo writes
+- [ ] `claim()` distinguishes `E_ILLEGAL_ID`, reclaims only after `2×ttl`, and audits; hook lookup failures deny/exit 2
+- [ ] `SHARED-INDEX` explicitly rejected as underivable from pure Git; no fake caller boolean; CAS test is `scripts/tests/test_coord_claim_cas.py`
 - [ ] No `import scripts.`; no `FLOSS/` prefix on `git -C FLOSS` pathspecs
 - [ ] New files: `add --` then `commit -F- --`; isolated worktree
 - [ ] `claim()` exclusive create `old=ZERO`; steal fails
 - [ ] `force_drop` 2×ttl; UTC parse; audit at workspace `.agent-surface`
 - [ ] `is_substantive` not widened; deny is exit 2 + JSON payload
 - [ ] Fixtures not live counts; green set each task
-- [ ] Task 0 uses `server.submit_claim` or written waiver — no `client.py`, no `...`
+- [ ] Task 0 includes a validated provenance packet with a real ADR-12 consent action hash; no waiver/placeholder; decision is `APPROVED` before M1
 - [ ] `--online` is added in Task 5, not assumed
 - [ ] Self-review boxes stay **unchecked** until an implementer verifies each against the worktree
 
 ## Execution Handoff
 
-Do **not** start Task 1 until operator LGTM **and** Task 0 is recorded.
+Do **not** start Task 1 until the dirty-probe gate is reconciled **and** Task 0 has a valid provenance-backed `APPROVED` decision. Operator chat LGTM or a waiver is insufficient while ADR-12's consent anchor is unresolved.
 
 **1. Subagent-Driven (recommended after LGTM)** — isolated worktree, one task per subagent
 **2. Inline Execution** — same isolation, checkpoints

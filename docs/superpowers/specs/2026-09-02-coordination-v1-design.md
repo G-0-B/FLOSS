@@ -1,6 +1,6 @@
 # Coordination v1 — Derived Status + Git-REF Claims — Design
 
-> Status: Draft — DELTA D1–D9 + DELTA-PLAN + DELTA-PLAN-2 applied; operator LGTM required before Task 0 / M1. Plan: `docs/superpowers/plans/2026-09-02-coordination-v1.md`.
+> Status: Draft — DELTA D1–D9 + DELTA-PLAN + DELTA-PLAN-2 applied; DELTA-3 adjudicated (N1–N5/N7 accepted, N6 CAS-path accepted, `SHARED-INDEX` rejected after live falsification). **❌ Implementation blocked:** ADR-12 has no ratified `consent_ref.decision_action_hash` anchor, so the required System claim cannot be validly submitted. Plan: `docs/superpowers/plans/2026-09-02-coordination-v1.md`.
 > Scope: Architectural. Restructures how agents coordinate; changes an interface others depend on.
 > Decision gate: `flossi0ullk-consensus` System claim required before implementation (blast radius: Module/System).
 > ADR-18: adopt → extend → compose → build checked — see §7.
@@ -10,7 +10,7 @@
 
 **CWD:** `C:/~shit/FLOSS` · **Probed:** `orient_probe.py` + 4 parallel verifications 2026-09-02
 **Facts [V]:**
-- Coordination room `packages/coordination_room/` — 17 tests pass 2026-08-30, binds `127.0.0.1:7334`, was `ConnectionRefused` whole window it existed. Not in `scripts/start_mcp_daemons.ps1` (grep 7334 = 0 hits).
+- Coordination room `packages/coordination_room/` — 17 tests pass 2026-08-30, binds `127.0.0.1:7334`, was `ConnectionRefused` the window it existed. On `feat/coordination-room` HEAD, `start_mcp_daemons.ps1` has **0** `7334` hits. On `feat/coordination-room-rebased` (implementation base, N2) Grok already wired `:7334`.
 - `git update-ref refs/agent-claims/<name> <new> <old>` CAS on Windows 11/NTFS/git 2.54.0 — 8-way Popen race → 1 win / 7 blocked, `rc=128 is at <winner> but expected <old>`, lock `*.lock` held only during write, no stale locks. Report: `docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md`.
 - Work Board §0 clean ladder falsified: `reconcile/pr38-salvage` ↔ `feat/preservation-spine` mutually non-ancestral (`merge-base 31bcad0`, exit 1 both ways), `coord-room` ↔ `coord-room-rebased` (`08619f0`, 16 vs 46 past base). Ladder intentionally broken §0.1c. Report: `docs/reviews/2026-09-02-coordination-v1-design/ancestor-matrix-report.md`.
 - Grok `coord-room-rebased@2460c55` vs `coord-room@45b3f26` — `packages/coordination_room/` diff 0 lines (identical v0). Grok added `hooks/grok_session_register.py`, `hooks/grok_pretool_st.py`, `:7334` wiring via `Start-Daemon` + `Resolve-ServerPid` + `COORDINATION_ROOM_LOG` pin. Divergence 53 files +7172/-2757 is parallel substrate evolution, not room conflict. Report: `docs/reviews/2026-09-02-coordination-v1-design/grok-coord-room-audit.md`.
@@ -60,7 +60,7 @@ Of 10 commits landed across all refs in last 24h, 10 exist on exactly 1 of 8 act
 
 **Sections and sources (all pure-git unless flagged `--online`):**
 
-1. **Worktree table — exceptions, not inventory (D4).** Source `git worktree list --porcelain` + `<common-dir>/worktrees/<name>/index` mtime pre-filter + `git status --porcelain` only for recent/dirty worktrees (D4 cost fix — status across 20 worktrees dominated runtime). Presentation: active + anomalous rows only; rest collapsed to `13 more — idle, clean`. Flags: `SHARED-INDEX` (dirty checkout another agent active in), `TEMP-DIR` (worktree under temp), `ABANDONED-DIRTY` (uncommitted, no activity 30d — see §6/D9), `ORPHAN` (detached, parent merged).
+1. **Worktree table — exceptions, not inventory (D4).** Source `git worktree list --porcelain` + `<common-dir>/worktrees/<name>/index` mtime pre-filter + `git status --porcelain` only for recent/dirty worktrees (D4 cost fix — status across 20 worktrees dominated runtime). Presentation: active + anomalous rows only; rest collapsed to `13 more — idle, clean`. Flags: `TEMP-DIR` (worktree under temp), `ABANDONED-DIRTY` (uncommitted, no activity 30d), `ORPHAN` (detached/merged). **DELTA-3's `SHARED-INDEX` request is rejected after live falsification:** pure Git shows dirty state but cannot identify “another agent active in this same checkout,” and Git normally prevents the same branch in two worktrees. Do not fabricate it from a caller-supplied boolean; surface active holders separately from claim refs once identity exists.
 2. **Branch containment matrix** — `git branch --contains HEAD` + `merge-base --is-ancestor`.
 3. **Divergence alerts — active + shared-file filter (D2) with hotspot collapse (D3).** Naive filter (any two branches with unique commits both ways) produced 45+ rows, truncated. Filter: (a) **active branches only** — commit in last 7 days (28 → 8), (b) **both sides must have modified the same file** — `git diff --name-only <merge-base> A` intersect `git diff --name-only <merge-base> B`; empty intersection = disjoint fork, no stranding risk. Result on 2026-09-02: 45+ → 4 rows. Verified rediscovery: `chore/digestion-actions` ↔ `reconcile/pr38-salvage-20260817`, shared files `scripts/start_mcp_daemons.ps1`, `scripts/stop_mcp_daemons.ps1`, `docs/agent-memory/project/commitment-built-witness-improvised.md`. Hotspot collapse (D3): when one file (e.g. `docs/specs/spec-registry.json` on 5 of 8 pairs) appears on both sides of ≥3 pairs, emit once as `HOTSPOT` row.
 4. **Claim refs** — `git for-each-ref refs/agent-claims/ --format='%(refname:short) %(objectname:short) %(committerdate:iso)'` + reflog parse for holder.
@@ -71,11 +71,16 @@ Of 10 commits landed across all refs in last 24h, 10 exist on exactly 1 of 8 act
 
 ### 4.2 Claim primitive — git refs as intent
 
-- **Namespace:** `refs/agent-claims/<kind>/<id>` where `kind ∈ {worktree, branch, path}` and `id` is normalized (posix path for path, `worktree/<sanitized>` for worktree, `branch/<sanitized>` for branch).
-- **Value:** blob SHA of JSON `{"holder": "<agent_id>", "kind": "...", "id": "...", "created": "iso", "ttl": 3600, "branch": "<current HEAD>", "worktree": "<path>"}` — written via `git hash-object -w`.
-- **CAS:** `git update-ref refs/agent-claims/<kind>/<id> <new_sha> <expected_old>` where `expected_old` is `000...0` for create, current `rev-parse` for update, or delete via `update-ref -d <ref> <old>`. Exactly 1/8 wins on NTFS — proven (§0).
-- **Release:** `git update-ref -d refs/agent-claims/<kind>/<id> <old>` only by holder (enforced in hook, not git ACL). `force_drop` requires `--force` + audit log entry.
-- **TTL/GC:** Claims carry `created + ttl`. Status flags `expired` (age > ttl). GC: `git for-each-ref` scan + `reflog` age check; expired claims auto-prunable by holder or by any agent after `2×ttl` with broadcast to `.agent-surface/coord/claims.jsonl` (append-only, not the room's bus). No packed-refs surprise — loose refs, no reflog file after delete is expected.
+- **Namespace:** `refs/agent-claims/<kind>/<encoded-id>` where `kind ∈ {worktree, branch, path}`. **`encoded-id` is not the raw path.** One implementation in `scripts/coord_claim.py`, imported by `hook_pre_write.py` (N1/N3):
+  - `repo_relative_path(path, root)` resolves repository paths (relative inputs are repo-root-relative for the claim CLI), returns lowercase POSIX relative path **without a leading slash**, and returns `None` outside that worktree. The user-scope hook first resolves the edited path's actual FLOSS worktree by comparing Git common-dir identity, resolves relative tool paths against `Path.cwd()`, then delegates with that target root; `is_substantive` prepends `/` locally for segment checks. This avoids anchoring every sibling-worktree edit to the hook script's primary checkout.
+  - `encode_claim_id(kind, raw_id, root)` percent-encodes every UTF-8 byte except ASCII alphanumeric, `_`, and `-`, component by component. Path and worktree ids are filesystem paths: lowercase on Windows (NTFS case-insensitive). Branch ids preserve exact case (git refs are case-sensitive: `Feature/X` != `feature/x`). **Do not use Unicode `casefold()`** on any kind: it collapses distinct names such as `Straße` and `Strasse`. **Do not use `urllib.parse.quote(..., safe="")`**: RFC-unreserved `.` remains unescaped, leaving `.lock` and `..` illegal. Encoding `.` as `%2E`, `%` as `%25`, spaces as `%20`, and `:` as `%3A` keeps the encoded map injective within each kind's canonicalization. Path claims require `repo_relative_path != None`; branch/worktree ids canonicalize then encode.
+  - Every operation validates the finished ref using `git check-ref-format`; it is the authority. Raw `scripts/foo.lock`, `docs/a b.md`, `docs/x..y.md`, `C:/other/foo.py` are illegal as ref names — verified 2026-09-03. Outside-repo path claim → no id (fail closed).
+- **Illegal id vs conflict:** `claim()` returns `(False, "E_ILLEGAL_ID")` when `check-ref-format` fails or `_repo_relative` is `None`. Never report that as `conflict`. `is_claim_blocked()` **fails closed** (treat as blocked / raise) if it cannot form a legal ref — never `(False, "")` meaning "not claimed".
+- **Holder identity (N8, decision required):** the hook payload and current manifest provide no stable `agent_id`; the prior plan referenced an undefined variable. Proposed contract: a unique, opaque `FLOSS_AGENT_ID` inherited by one harness process/session; `coord_claim.py` defaults `holder` from it, and the in-repo hook denies with `E_AGENT_ID_MISSING` when absent. Static harness labels (`hermes`, `codex`) and worktree-only identity are rejected as defaults because concurrent agents can share both. Task 0 must record approval or an alternative identity contract before M2/Task 4; do not infer identity from a generic session id without a claim-side way to obtain the same value.
+- **Value:** blob SHA of JSON `{"holder": "<agent_id>", "kind": "...", "raw_id": "...", "encoded_id": "...", "created": "iso", "ttl": 3600, "branch": "<current HEAD>", "worktree": "<path>"}` — written via `git hash-object -w`.
+- **CAS:** `git update-ref refs/agent-claims/<kind>/<encoded-id> <new_sha> <expected_old>` where `expected_old` is `000...0` for create, current `rev-parse` for same-holder refresh, or delete via `update-ref -d <ref> <old>`. Exactly 1/8 wins on NTFS — proven (§0).
+- **Release:** `git update-ref -d ...` only by holder (enforced in hook, not git ACL). `force_drop(kind, raw_id, actor, force=False, expected_sha=None)` distinguishes the acting identity from the blob's `old_holder`; it requires explicit `force=True` from an authorized actor (`actor == old_holder` or Task-0-approved force list; unauthorized `force=True` is denied and audited) or age ≥ `2×ttl`, and always deletes with the read/explicit expected SHA.
+- **TTL/GC:** Status flags `expired` (age > ttl). Silent auto-expiry before `2×ttl` is forbidden. **`claim()` reclaim flow (N5):** if a different holder exists and age ≥ `2×ttl`, `claim()` `force_drop`s (audit) then creates — do not require a four-step notice/expire/drop/reclaim. Before `2×ttl`, steal still fails. Status output next to `expired` still suggests `force_drop`.
 - **Lock:** `.git/refs/agent-claims/<name>.lock` — git handles. No hand-rolled lock. Single `update-ref` per claim, retry 3× 50ms jitter on `File exists` (AV/indexer).
 
 ### 4.3 Enforcement — reuse existing surfaces (D5 corrected)
@@ -93,14 +98,14 @@ Of 10 commits landed across all refs in last 24h, 10 exist on exactly 1 of 8 act
 
 The count is not the point — **Codex is uncovered**, and Codex is the most active agent in this repo (majority of PR41's 248 threads, four `codex/*` branches). Any enforcement routed through harness hooks misses the main contender. Materialization closes Claude, leaves Codex and OpenCode outside. This strengthens §9's M1-first sequencing: the derived view reaches every agent that can shell `git` (all six); enforcement reaches at best four. Reach, not liveness, is the constraint driving order.
 
-- **Primary fix:** materialize `shared-hook-surface.json` for Claude/Codex/Hermes `PreToolUse`. Add a **separate** `is_claim_blocked(path, agent_id)` predicate — do **not** widen `is_substantive()` / `SUBSTANTIVE_PATH_SEGMENTS` (those gate provenance-chain submission, not exclusivity). Claim-check an edit without making it claim-worthy provenance. Deny must be a real harness block (`permissionDecision: deny` + non-zero exit); `finish()` remains the allow path (exit 0).
+- **Primary fix:** materialize `shared-hook-surface.json` for Claude/Codex/Hermes `PreToolUse`. Add a **separate** `is_claim_blocked(path, agent_id)` predicate — do **not** widen `is_substantive()` / `SUBSTANTIVE_PATH_SEGMENTS` (those gate provenance-chain submission, not exclusivity). Preserve the existing user-scope containment boundary: `main()` checks mutating tool → outside-FLOSS allow → holder identity → worktree claim → branch claim (skip verified detached HEAD) → path claim → substantive/provenance gate. Any malformed ref, Git execution error, or unexpected claim exception denies; missing identity denies in-repo writes. Deny must be a real harness block (`permissionDecision: deny` + non-zero exit); `finish()` remains the allow path (exit 0).
 - **Secondary:** git hook `pre-commit`/`pre-push` checking `refs/agent-claims/*` for current HEAD worktree/branch — installed via `shared-hook-surface` (today `core.hooksPath` unset, hooks only `*.sample`).
 - **Out of scope:** OpenCode has no `PreToolUse` — advisory-only until wired.
 
 ### 4.4 What Grok built and how we keep it
 
 - Keep identical `packages/coordination_room/` (0-line diff) as v0 reference/routing option — not retired, but not required for liveness. Its 17 tests remain green.
-- Cherry-pick Grok's `:7334` wiring pattern onto primary's portable startup: merge `Start-Daemon`/`Resolve-ServerPid`/`$skipped`/`settle` onto existing `$PSScriptRoot`/`$FLOSS_PYTHON`/`venv` portability fixes — don't overwrite. Pin `COORDINATION_ROOM_LOG` to workspace intake mouth so worktree launches share one bus.
+- Inherit Grok's `:7334` wiring from the `feat/coordination-room-rebased` base (verify-only): carry `Start-Daemon`/`Resolve-ServerPid`/`$skipped`/`settle` with the existing `$PSScriptRoot`/`$FLOSS_PYTHON`/`venv` portability fixes — don't overwrite, do not cherry-pick a second copy. Pin `COORDINATION_ROOM_LOG` to workspace intake mouth so worktree launches share one bus.
 - Take Grok's `grok_pretool_st.py` (smart-tree reminder) as-is; `grok_session_register.py` is Grok-specific — keep behind Grok harness only.
 
 ## 5. Data flow and interfaces
@@ -114,7 +119,7 @@ gh pr list --online (D7, optional) ─────┘   claim: git hash-object +
 hook_pre_write.py ──→ check refs/agent-claims/* for target worktree/branch/path ─→ block with holder id
 ```
 
-Claim JSON schema: see `docs/specs/coordination-claims.schema.json` (to be added). Fields: `holder`, `kind`, `id`, `created`, `ttl`, `worktree`, `branch`, `reason`.
+Claim JSON schema: see `docs/specs/coordination-claims.schema.json` (to be added). Required fields: `holder`, `kind`, `raw_id`, `encoded_id`, `created`, `ttl`; optional context: `worktree`, `branch`, `reason`. There is no ambiguous standalone `id` field.
 
 ## 6. Error handling and failure modes
 
@@ -131,23 +136,24 @@ Adopt `git` refs + `update-ref` CAS and `git worktree list / merge-base / rev-li
 
 ## 8. Testing
 
-- **CAS proof:** committed as `docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md` — re-run in CI as `pytest packages/tests/test_agent_claim_cas.py` (8-way Popen, asserted 1 win).
+- **CAS proof:** committed as `docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md` — re-run in CI as `pytest scripts/tests/test_coord_claim_cas.py` (8-way Popen, asserted 1 win; green-set path). Also `git check-ref-format` over the N1 table (legal vs `.lock` / space / `..` / `:`).
 - **Derived view:** golden-output / fixture-driven tests (injected `worktree list --porcelain`, `for-each-ref`, `diff --name-only`). Assert filter *behaviour*: disjoint fork emits none; hotspot in ≥3 pairs emits one HOTSPOT row for that file and keeps other pairs; naive N pairs collapse to M. Do **not** assert live-repo row counts (45→4 is historical evidence in DELTA.md, not a CI assertion). One live smoke: sections render, not what they contain. No wall-clock budget asserts.
-- **Claims:** unit: create/delete/re-claim idempotent/force_drop; integration: two-process `update-ref` race (the CAS proof); hook: `hook_pre_write` blocks writes to claimed path/branch.
+- **Claims:** unit: create/delete/re-claim idempotent/force_drop, path/branch/worktree encoding legality and collision cases, stale-reclaimer vs same-holder refresh CAS; integration: two-process `update-ref` race; hook: real stdin fixtures prove worktree → branch → path enforcement, outside-repo allow, missing-identity deny, lookup-exception deny.
 - **Room v0 unchanged:** `pytest packages/coordination_room/tests -v` 17 pass.
 
 ## 9. Rollout (no code until approved)
 
 1. **M1 — Derived view only (Approach 3):** ship `scripts/coord_status.py` as `render_sections()` imported by `orient_probe.py`; wire `--online` separately. Replace Work Board §0 reads with probe output. Verify in one operator session. Reach (all six harnesses) drives this first, not liveness (D5).
-2. **M2 — Claims as refs:** add `coord_claim.py`, schema, separate `is_claim_blocked` (not `is_substantive` widen), `pre-commit` guard, status claim section, TTL/GC. Cherry-pick Grok's daemon wiring onto startup scripts in same PR or preceding.
+2. **M2 — Claims as refs:** add `coord_claim.py`, schema, `encode_claim_id` + fail-closed `is_claim_blocked` (not `is_substantive` widen), `pre-commit` guard, status claim section, TTL/GC with reclaim on `claim()` after `2×ttl`. Implementation worktree bases on `feat/coordination-room-rebased` (has `_repo_relative` and `:7334`); do not cherry-pick Grok daemon wiring in M3.
 3. **M3 — Retire Work Board §0 as manual surface:** keep file for history. Replace **branch/worktree half only** with `Generated from orient_probe.py + coord_status.render_sections() — do not hand-edit`. Keep the PR table until `--online` exists and is verified (D7/S2). No `hermes status` alias.
 
 ## 10. Open questions for operator
 
+- Claim-holder identity contract: approve unique per-session `FLOSS_AGENT_ID`, or specify an alternative that both `coord_claim.py` and the hook can derive identically? Static harness/worktree labels are insufficient for agents sharing a checkout. **This blocks M2/Task 4, not M1.**
 - Claim TTL default: 1h, 4h, or 24h? (proposal: 4h worktree/branch, 1h path).
 - Who may `force_drop` non-expired? (proposal: only holder + operator, others wait for expiry).
 - Keep room `:7334` as parallel bus or declare `refs/agent-claims` the canonical exclusive table? (proposal: refs canonical for exclusivity; room remains as broadcast/log, not source of truth).
 
 ---
 
-*Next step on approval: invoke `writing-plans` to cut `docs/superpowers/plans/2026-09-02-coordination-v1.md` with tasks M1→M3.*
+*Next step: resolve and ratify ADR-12's consent action-hash anchor, then create a validated provenance packet and run Task 0. No M1–M3 implementation before an APPROVED governed consensus decision.*
