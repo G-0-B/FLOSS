@@ -28,9 +28,9 @@ Heads audited against: PR43 `4daefa0`, PR59 `7edd1c8`, PR61 `c925ed1`
 
 | # | Thread | Evidence |
 |---|--------|----------|
-| F1 | PR43 `bACIb` P1 full-index @git_capture.py:326 | Both diff invocations carry `--full-index` (lines 325, 334 on `4daefa0`) [V, grep] |
-| F2 | PR43 `bjThG` P1 ext-diff @git_capture.py:326 | Both invocations carry `--no-ext-diff` (lines 323, 332; commit `89187d0`) [V, grep] |
-| F3 | PR43 `bjThH` P1 opaque-planes @restore.py:471 | 43-B (`b5722c4`) split authenticated/releasable; no `_verification_inventory_eligible` remnants in cli.py [V, grep]. Verify e2e still green before replying. |
+| F1 | PR43 `bACIb` P1 full-index @git_capture.py:326 | Both diff invocations carry `--full-index` (lines 325, 334 on `4daefa0`) [V, grep; auditor sa-0 CONFIRMED] |
+| F2 | PR43 `bjThG` P1 ext-diff @git_capture.py:326 | Both invocations carry `--no-ext-diff` (lines 323, 332; commit `89187d0`) [V, grep; auditor sa-0 CONFIRMED] |
+| F3 | PR43 `bjThH` P1 opaque-planes @restore.py:471 | 43-B (`b5722c4`) split authenticated/releasable; no `_verification_inventory_eligible` remnants in cli.py; inventory gate cli.py:332 + render gate cli.py:397 on `_verification_authenticated` [V, grep; auditor sa-0 CONFIRMED] |
 
 Rule: re-run the named test slice green on the fix worktree, then reply with
 SHA + mechanism, then resolve. Reply BEFORE resolve.
@@ -44,7 +44,7 @@ SHA + mechanism, then resolve. Reply BEFORE resolve.
 | A2 | `d-mPr` P1 noprefix | Add `--src-prefix=a/ --dst-prefix=b/` to both invocations | Set `diff.noprefix=true` + staged edit; assert inventory does not raise `diff header is malformed` |
 | A3 | `bb2dB` P1 split-index | Fail closed (`CaptureDrift`) when index has `link` extension without backing `sharedindex` file present | Synthetic split-index repo; assert capture raises instead of silently partial index |
 | A4 | `bcDRf` P1 ambient GIT_* | Strip `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` (and `GIT_WORK_TREE`) from capture subprocess env | Set `GIT_DIR` to another repo; assert capsule history matches `--repo`, not the intruder |
-| A5 | `d-oiD` Major separators | Normalize `-`/`_` in marker AND stem before comparison (`api-key.txt`, `id-rsa` must redact) [V valid: `_marker_in_stem` is bare `marker in stem`, `api_key` never matches `api-key`] | Parametric cases `api-key.txt`, `id-rsa`, `my-private-key.pem` → True; keep `docs/seed.md`-class dir-prefix cases False. Also update the now-stale `is_secret` docstring (still describes separator-bounded behavior) |
+| A5 | `d-oiD` Major separators | Normalize `-`/`_` in marker AND stem before comparison (`api-key.txt`, `id-rsa` must redact) [V valid: `_marker_in_stem` is bare `marker in stem`, `api_key` never matches `api-key`; auditor sa-0 CONFIRMED via live run, incl. `ID-RSA` bypass. Bonus: `_split_segments` (git_capture.py:38) is dead code — delete in the same commit] | Parametric cases `api-key.txt`, `id-rsa`, `my-private-key.pem` → True; keep `docs/seed.md`-class dir-prefix cases False. Also update the now-stale `is_secret` docstring (still describes separator-bounded behavior) |
 | A6 | `bdJsD` P1 non-UTF-8 paths | Reversible JSON-safe byte encoding for undecodable path bytes (no surrogates into `canonical_json_bytes`) | Repo with `\xff\xfe` filename; assert capture completes and inventory round-trips the name |
 | A7 | `bjThI` P1 non-NFC | Fail closed BEFORE state-dir creation when a valid non-NFC path is present (or encode per A6 if the same mechanism covers it — decide in implementation; prefer one mechanism) | Decomposed `e\u0301.txt` repo; assert clean error, no sealed-but-checkpointless state dir |
 
@@ -54,7 +54,7 @@ SHA + mechanism, then resolve. Reply BEFORE resolve.
 | B1 | `bcDRa` P1 idempotent verify | Re-run `verify_checksums` + provenance-root comparison before taking the idempotent shortcut | Mutate sealed payload after verify; re-run `verify`; assert nonzero exit / drift, not stale `verification-complete` |
 | B2 | `d-mPt` P1 + `d-oh_` minor unbound fields | Require raw `verification.json` bytes to equal canonical JSON of the bound schema before accept/copy | Add unknown field to `verification.json` post-verify; assert inventory rejects and render does not copy it |
 | B3 | `bAGPt` Major sanitize_command | Match `_UNSAFE_COMMAND_RE` against `normalized` as well as `value` | Parametric `%70ush` + every verb in `_UNSAFE_COMMAND_RE` |
-| B4 | `bdJsF` P2 + `bjTat` Major exclusions dir | Read `capsule_root / PlaneId.LOCAL_TRACKED.value / metadata.json` (one thread, one fix, reply to both) | Tracked-secret capsule; assert `exclusions` lists it |
+| B4 | `bdJsF` P2 + `bjTat` Major exclusions dir | Read `capsule_root / PlaneId.LOCAL_TRACKED.value / metadata.json` (one thread, one fix, reply to both) [auditor sa-0 CONFIRMED: `local-tracked-worktree` appears exactly once in the package — the stale read at cli.py:617; all writers use `PlaneId.LOCAL_TRACKED.value`] | Tracked-secret capsule; assert `exclusions` lists it |
 | B5 | `bAGPd` minor restore-verified dedupe | Strip-then-append in `_handle_restore_verified` like inventory/render handlers | Re-verify; assert single `restore-verified` + no stale `manifest-inventoried` |
 
 ### Batch C — error-contract hardening
@@ -89,8 +89,8 @@ SHA + mechanism, then resolve. Reply BEFORE resolve.
 
 | # | Thread | Fix | Failing test first |
 |---|--------|-----|--------------------|
-| S1 | `bjUQe` P1 racy unlink | Audit 59-A (`open`→`fstat`→unlink under dir lock): prove file identity is retained through removal (dev-fd / `st_ino`+`st_dev` recheck + link-count check before unlink) or extend it until proven. If already sufficient → move to §2 with proof. | Concurrent-writer simulation: writer appends genesis between size check and unlink; assert no record loss (or drift reported, never silent loss) |
-| S2 | `d-kra` P1 truncated log | Zero-length `checkpoints.jsonl` with no intent must NOT unlink-then-accept-genesis-0. Options: (a) durable creation marker written at first genesis, (b) fail closed (integrity error) whenever a previously-nonempty path reads empty. Lean: (b) fail closed — a marker is new format surface; truncation of a committed log is operator error deserving a loud error, matching pre-59-A behavior. Consensus to confirm. | Truncate committed log to 0; assert integrity error, and assert `append_checkpoint` refuses sequence-0 genesis |
+| S1 | `bjUQe` P1 racy unlink | 59-A does NOT retain identity [auditor sa-1, exact mechanism]: fd opened `:912`, fstat `:918`, size check `:924-928`, but **fd closed at `:932`, `os.unlink(path)` by name at `:934`** — no `st_nlink` check (contrast `seal.py:84`), no ino/dev capture. `_locked_directory` only guards directory identity, takes no exclusive lock — concurrent creator/writer inside the same dir is unblocked. Fix bar: hold fd through removal (flock + re-fstat) or ino/dev recheck + link-count before unlink; extend flock discipline to the write path if writers are non-cooperating. The same file does identity correctly at `_read_stream_bytes:559-569` / `_append_bytes:600-601` — follow that pattern. | Concurrent-writer simulation: writer appends genesis between fstat and unlink; assert no record loss (or drift reported, never silent loss) |
+| S2 | `d-kra` P1 truncated log | CONFIRMED on append path [auditor sa-1]: `_discard_unpublished_genesis:882-899` unlinks silently → `append_checkpoint:164-189` falls to genesis branch `:181-189`, sequence-0 accepted. Load path `:202-208` same discard then bare `FileNotFoundError` (wrong type, should be `CheckpointIntegrityError`); `_parse_chain:368` "file is empty" now unreachable for no-intent case. **Refined lean (auditor): pure fail-closed breaks 59-A's legitimate crash window** (create-then-crash-before-intent, `:478-479`): fail closed in the discard path UNLESS the current call created the file itself — thread a just-created flag from the `O_CREAT|O_EXCL` site (or write intent alongside creation so "no intent" positively means "never legitimately empty"). Fix the load-path error type in the same commit. | Truncate committed log to 0; assert integrity error + `append_checkpoint` refuses genesis-0; separate test: create-crash-no-intent window still recovers |
 
 Note: S2 is a follow-up critique OF 59-A itself — the fix introduced the hole.
 No defensiveness; fix it in the same file before pushing.
@@ -99,7 +99,7 @@ No defensiveness; fix it in the same file before pushing.
 
 | # | Thread | Fix | Failing test first |
 |---|--------|-----|--------------------|
-| R1 | `d-i9D` P2 DNA staleness | Fresh-DNA guard must also bind the packed `.dna` to the WASMs: assert `rose_forest.dna` mtime ≥ newest WASM mtime (fail with repack instruction), or compare embedded WASM hashes. Lean: mtime gate + message; hash comparison is stronger but needs DNA-bundle parsing in the guard. Consensus to confirm strength choice. | Touch WASM newer than DNA; assert guard fails with repack message |
+| R1 | `d-i9D` P2 DNA staleness | CONFIRMED [auditor sa-1]: guard (`lib.rs:17-50`) checks `.dna` existence + 4 WASMs existence/size; staleness comment at `:26-28` but no mtime/hash comparison anywhere. Two-stage [auditor]: **ship mtime gate now** (DNA mtime ≥ newest WASM mtime + repack message; near-zero code, right cost for P2 dev-time guard), **file WASM-bytes-vs-embedded-hash comparison as hardening follow-up** (`DnaFile` already loaded at `:52`; content-addressed, no clock dependence; same-second rebuilds can slip mtime). | Touch WASM newer than DNA; assert guard fails with repack message |
 
 ## 6. PR41 — no code action
 
