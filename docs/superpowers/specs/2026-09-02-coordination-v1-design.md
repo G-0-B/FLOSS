@@ -1,6 +1,6 @@
 # Coordination v1 — Derived Status + Git-REF Claims — Design
 
-> Status: Draft — delta-applied 2026-09-02, awaiting operator approval before `writing-plans` cuts tasks
+> Status: Draft — DELTA D1–D9 + DELTA-PLAN + DELTA-PLAN-2 applied; operator LGTM required before Task 0 / M1. Plan: `docs/superpowers/plans/2026-09-02-coordination-v1.md`.
 > Scope: Architectural. Restructures how agents coordinate; changes an interface others depend on.
 > Decision gate: `flossi0ullk-consensus` System claim required before implementation (blast radius: Module/System).
 > ADR-18: adopt → extend → compose → build checked — see §7.
@@ -93,7 +93,7 @@ Of 10 commits landed across all refs in last 24h, 10 exist on exactly 1 of 8 act
 
 The count is not the point — **Codex is uncovered**, and Codex is the most active agent in this repo (majority of PR41's 248 threads, four `codex/*` branches). Any enforcement routed through harness hooks misses the main contender. Materialization closes Claude, leaves Codex and OpenCode outside. This strengthens §9's M1-first sequencing: the derived view reaches every agent that can shell `git` (all six); enforcement reaches at best four. Reach, not liveness, is the constraint driving order.
 
-- **Primary fix:** materialize `shared-hook-surface.json` for Claude/Codex/Hermes `PreToolUse`; widen `SUBSTANTIVE_PATH_SEGMENTS = ("/packages/",)` + canon `"/docs/adr/"` to include claimed `kind` paths or claims on non-substantive files aren't enforced.
+- **Primary fix:** materialize `shared-hook-surface.json` for Claude/Codex/Hermes `PreToolUse`. Add a **separate** `is_claim_blocked(path, agent_id)` predicate — do **not** widen `is_substantive()` / `SUBSTANTIVE_PATH_SEGMENTS` (those gate provenance-chain submission, not exclusivity). Claim-check an edit without making it claim-worthy provenance. Deny must be a real harness block (`permissionDecision: deny` + non-zero exit); `finish()` remains the allow path (exit 0).
 - **Secondary:** git hook `pre-commit`/`pre-push` checking `refs/agent-claims/*` for current HEAD worktree/branch — installed via `shared-hook-surface` (today `core.hooksPath` unset, hooks only `*.sample`).
 - **Out of scope:** OpenCode has no `PreToolUse` — advisory-only until wired.
 
@@ -127,20 +127,20 @@ Claim JSON schema: see `docs/specs/coordination-claims.schema.json` (to be added
 
 ## 7. ADR-18 reuse check
 
-Adopt `git` refs + `update-ref` CAS and `git worktree list / merge-base / rev-list / for-each-ref / log -S` (all present, NTFS-verified). Extend `hook_pre_write.py` filter and `scripts/orient_probe.py` with `coord_status.render_sections()` (D1), compose with `shared-hook-surface.json` materializer. Build only `scripts/coord_status.py` + `scripts/coord_claim.py` wrappers and the JSON schema. No new daemon, no new lock impl, no CRDT. D1 moves the probe extension from build to extend — one rung, but the rung that decides adoption.
+Adopt `git` refs + `update-ref` CAS and `git worktree list / merge-base / rev-list / for-each-ref / log -S` (all present, NTFS-verified). Extend `scripts/orient_probe.py` with `coord_status.render_sections()` (D1). Add a separate claim predicate on `hook_pre_write.py` without widening `is_substantive`. Compose with `shared-hook-surface.json` materializer. Build only `scripts/coord_status.py` + `scripts/coord_claim.py` wrappers and the JSON schema. No new daemon, no new lock impl, no CRDT.
 
 ## 8. Testing
 
 - **CAS proof:** committed as `docs/reviews/2026-09-02-coordination-v1-design/cas-proof-report.md` — re-run in CI as `pytest packages/tests/test_agent_claim_cas.py` (8-way Popen, asserted 1 win).
-- **Derived view:** golden-output test against fixture `git worktree list --porcelain` sample; divergence math via `rev-list --left-right --count`; D2/D3 filters asserted against repo (45+ → 4 rows, hotspot collapsed); D4 mtime pre-filter cost asserted; D8 propagation metric asserted (10/10 on 1 of 8 active).
+- **Derived view:** golden-output / fixture-driven tests (injected `worktree list --porcelain`, `for-each-ref`, `diff --name-only`). Assert filter *behaviour*: disjoint fork emits none; hotspot in ≥3 pairs emits one HOTSPOT row for that file and keeps other pairs; naive N pairs collapse to M. Do **not** assert live-repo row counts (45→4 is historical evidence in DELTA.md, not a CI assertion). One live smoke: sections render, not what they contain. No wall-clock budget asserts.
 - **Claims:** unit: create/delete/re-claim idempotent/force_drop; integration: two-process `update-ref` race (the CAS proof); hook: `hook_pre_write` blocks writes to claimed path/branch.
 - **Room v0 unchanged:** `pytest packages/coordination_room/tests -v` 17 pass.
 
 ## 9. Rollout (no code until approved)
 
 1. **M1 — Derived view only (Approach 3):** ship `scripts/coord_status.py` as `render_sections()` imported by `orient_probe.py`; wire `--online` separately. Replace Work Board §0 reads with probe output. Verify in one operator session. Reach (all six harnesses) drives this first, not liveness (D5).
-2. **M2 — Claims as refs:** add `coord_claim.py`, schema, `hook_pre_write` widen, `pre-commit` guard, status claim section, GC. Cherry-pick Grok's daemon wiring onto startup scripts in same PR or preceding.
-3. **M3 — Retire Work Board §0 as manual surface:** keep file for history, but §0 becomes `Generated from hermes status — do not hand-edit` (now probe output).
+2. **M2 — Claims as refs:** add `coord_claim.py`, schema, separate `is_claim_blocked` (not `is_substantive` widen), `pre-commit` guard, status claim section, TTL/GC. Cherry-pick Grok's daemon wiring onto startup scripts in same PR or preceding.
+3. **M3 — Retire Work Board §0 as manual surface:** keep file for history. Replace **branch/worktree half only** with `Generated from orient_probe.py + coord_status.render_sections() — do not hand-edit`. Keep the PR table until `--online` exists and is verified (D7/S2). No `hermes status` alias.
 
 ## 10. Open questions for operator
 
