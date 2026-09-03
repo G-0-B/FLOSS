@@ -148,3 +148,12 @@ unilaterally — resolving others' threads is a review action.
   (sa-0) verify F1/F2/F3 + A5 + B4 verdicts on `_pr43_fresh`;
   (sa-1) verify S1/S2/R1 + opine on design leans on `_pr59_fresh` + PR61 tree.
   Results pending; they gate implementation alongside §7.1.
+- 2026-09-03: auditors returned — **all 8 verdicts CONFIRMED**. sa-1 refined
+  S2 (pure fail-closed breaks 59-A's crash window → creator-knows exception,
+  adopted) and R1 (mtime now + hash follow-up, adopted); sa-0 found
+  `_split_segments` dead (folded into A5). Ollama down (ensemble unavailable).
+  Fresh evidence: git_capture + cli + e2e = **96 passed** on `4daefa0`.
+  F1/F2/F3 replied (discussion_r3928735615/809/004) and resolved. PR43 live
+  count re-queried: **29 live-unresolved (was 32)**. Plan §2–§5 updated.
+  D-D1/D-D2 still lack external verdicts (consensus weak, OmniRoute blocked) —
+  operator-confirmable leans; flagged in handoff.
