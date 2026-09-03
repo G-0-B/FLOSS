@@ -127,5 +127,24 @@ unilaterally — resolving others' threads is a review action.
 
 ## 8. Progress log
 
-- 2026-09-03: plan written. Live-thread inventory complete (35 + PR41 note).
-  Design verdicts pending. Nothing implemented, nothing pushed.
+- 2026-09-03: plan written (commit `836caa4`). Live-thread inventory complete
+  (35 + PR41 note). Nothing implemented, nothing pushed.
+- 2026-09-03 ~21:05 UTC: consensus claim `01a06916` (Module/CodeChange,
+  evidence: commit + spec + 3 PR urls) → round outcome **DEFERRED**
+  (tally_mean 0.2875). Voter detail: groq-gpt-oss-120b +0.6 and
+  huggingface-deepseek-v4-flash +0.55 (both form-checklist approvals, no
+  substantive design review); mistral-devstral-small + nvidia-nemotron-super-49b
+  errored to 0.0 (OmniRoute 400: model IDs not in live catalog).
+  **Finding: consensus voter roster is stale** — two roster IDs no longer exist
+  upstream. Gateway maintenance item, not a plan verdict. No implementation
+  gate claimed from this round.
+- 2026-09-03: direct frontier review via OmniRoute **blocked**: gemini-3.1-pro
+  → 402 billing; pioneer/grok-4.5 → 404 sunset; nvidia/glm-5.2 → 400 not in
+  catalog; combo routing needs provider/model prefix shape (400). Memory model
+  IDs are stale; `best_combo_for_task(review)` recommends `floss-coding` but
+  invocation shape unresolved. **Do not retry blind** — resolve via
+  omniroute skills (`omniroute-gateway-ops`) or gateway roster refresh first.
+- 2026-09-03: two independent auditor subagents dispatched (read-only):
+  (sa-0) verify F1/F2/F3 + A5 + B4 verdicts on `_pr43_fresh`;
+  (sa-1) verify S1/S2/R1 + opine on design leans on `_pr59_fresh` + PR61 tree.
+  Results pending; they gate implementation alongside §7.1.
