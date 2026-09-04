@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/capability-descriptor.schema.json",
+  "title": "CapabilityDescriptor",
+  "description": "Draft signed soft-state capability advertisement. Signature algorithm and identity binding must reuse current project identity/provenance conventions before implementation.",
+  "type": "object",
+  "required": ["id", "agent_id", "capability_id", "schema_hash", "policy_tags", "created_at", "expires_at", "signature"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "agent_id": {"type": "string", "minLength": 1},
+    "capability_id": {"type": "string", "minLength": 1},
+    "schema_hash": {"type": "string", "minLength": 1},
+    "tool_surface_hash": {"type": ["string", "null"]},
+    "policy_tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "semantic_tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "embedding_ref": {"type": ["string", "null"]},
+    "availability": {"enum": ["available", "busy", "degraded", "unavailable"]},
+    "qos": {
+      "type": "object",
+      "properties": {
+        "latency_p50_ms": {"type": ["number", "null"], "minimum": 0},
+        "latency_p95_ms": {"type": ["number", "null"], "minimum": 0},
+        "cost_hint": {"type": ["number", "string", "null"]},
+        "success_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": true
+    },
+    "competence_evidence_refs": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}},
+    "evidence_commitments": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "revoked_at": {"type": ["string", "null"], "format": "date-time"},
+    "signature": {"type": "string", "minLength": 1},
+    "metadata": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}

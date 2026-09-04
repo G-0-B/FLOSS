@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/shared-gist.schema.json",
+  "title": "SharedGist",
+  "description": "Compact admitted collective task state with unfoldable evidence lineage.",
+  "type": "object",
+  "required": ["id", "task_id", "content", "claim_ids", "admission_decision_ids", "evidence_refs", "status", "created_at"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "content": {"type": ["string", "object", "array"]},
+    "claim_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+    "admission_decision_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+    "evidence_refs": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}, "minItems": 1},
+    "unfold_refs": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}},
+    "status": {"enum": ["active", "contested", "stale", "superseded"]},
+    "qualifiers": {"type": "array", "items": {"type": "string"}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "metadata": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}

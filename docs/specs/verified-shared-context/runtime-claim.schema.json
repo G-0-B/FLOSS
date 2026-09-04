@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/runtime-claim.schema.json",
+  "title": "RuntimeClaim",
+  "type": "object",
+  "required": [
+    "id",
+    "task_id",
+    "claim_type",
+    "content",
+    "producer_agent",
+    "evidence_refs",
+    "created_at",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_type": {
+      "enum": [
+        "observation",
+        "state",
+        "decision"
+      ]
+    },
+    "content": {
+      "type": [
+        "string",
+        "object",
+        "array",
+        "number",
+        "boolean"
+      ]
+    },
+    "producer_agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "evidence-ref.schema.json"
+      },
+      "minItems": 0
+    },
+    "ledger_entry_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "contested",
+        "admitted",
+        "rejected",
+        "superseded"
+      ]
+    },
+    "scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "A task-runtime epistemic assertion. Deliberately NOT named `Claim`: packages/orchestrator/claim_schema.Claim is a governance proposal to the consensus gate, a different concept with a different lifecycle. ",
+  "$comment": "Reconciled 2026-09-04 against repo canon; see docs/reviews/2026-09-04-v04-continuation-bundle/REUSE-MAP.md"
+}

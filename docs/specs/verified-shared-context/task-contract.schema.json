@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/task-contract.schema.json",
+  "title": "TaskContract",
+  "type": "object",
+  "required": [
+    "id",
+    "intent",
+    "scope",
+    "blast_radius",
+    "required_capabilities",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": [
+        "string",
+        "object"
+      ]
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_policy_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "deadline": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "privacy_constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_verification": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "blast_radius": {
+      "type": "string",
+      "enum": [
+        "Local",
+        "Module",
+        "System",
+        "Substrate"
+      ],
+      "description": "Scope of impact. Was `risk_tier` [R0..R3]; changed 2026-09-04 to reuse claim_schema.BlastRadius, which already drives QUORUM_MIN and override rules. Two four-level risk scales in one system is the drift defect. R0..R3 also collided visually with the R1/R2 rule numbering in docs/specs/integrity-provenance-validation.spec.md."
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Reconciled 2026-09-04 against repo canon; see docs/reviews/2026-09-04-v04-continuation-bundle/REUSE-MAP.md"
+}

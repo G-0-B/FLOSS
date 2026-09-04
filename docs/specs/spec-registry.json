@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-09-02",
+  "updated": "2026-09-04",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
@@ -641,6 +641,96 @@
     "FLOSS/docs/specs/thought-credential.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ThoughtCredential Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/verified-shared-context.spec.md": {
+      "spec": "Verified shared context: admission-gated shared state, evidence ledger, capability descriptors (v0.4 bundle, Proposed)",
+      "tier": 1,
+      "reuse": {
+        "capability": "Task-runtime verified shared context: an evidence-gated ledger, admitted shared gists, capability descriptors with freshness/TTL, and agent-local private memory -- proposed by the v0.4 continuation bundle.",
+        "search_date": "2026-09-04",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "packages/orchestrator/claim_schema (Claim, EvidenceRef, Vote, Decision, BlastRadius)",
+            "version": "repo at head",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "truth_status": "Verified",
+            "probe": "Read at head 2026-09-04. EvidenceRef and its ten-value EVIDENCE_TYPES are REUSED verbatim -- the bundle's evidence-ref was an unconstrained string and now carries the same enum. BlastRadius is REUSED in place of the bundle's parallel R0..R3 risk_tier. claim_schema.Claim is a governance proposal to the consensus gate, a DIFFERENT concept from the bundle's task-runtime assertion, so the bundle's was renamed RuntimeClaim rather than merged."
+          },
+          {
+            "name": "docs/specs/provenance-packet.spec.md v1.4",
+            "version": "v1.4 + v1.5 D2/D3",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "truth_status": "Verified",
+            "probe": "Read at head 2026-09-04. Remains the governed cross-agent handoff envelope. The bundle composes with it rather than replacing it, per its own README and C4. Confirmed: no proposed schema duplicates the packet envelope."
+          },
+          {
+            "name": "LedgerEntry / SharedGist / CapabilityDescriptor / AdmissionDecision / TaskContract / PrivateMemoryPiece",
+            "version": "n/a",
+            "license": "project",
+            "maintenance": "n/a",
+            "platform_fit": "native",
+            "truth_status": "Verified",
+            "probe": "Searched docs/specs/ and packages/ 2026-09-04: no existing counterpart for any of these. Genuinely new surface. Each carries evidence_refs, which MUST be the reused EvidenceRef, not a local variant."
+          },
+          {
+            "name": "in-toto / DSSE attestation envelopes as the runtime evidence carrier",
+            "version": "not probed",
+            "license": "Apache-2.0",
+            "maintenance": "active",
+            "platform_fit": "adds runtime deps",
+            "truth_status": "Specified",
+            "probe": "not_probed: the repo already has a signed JCS/BLAKE3/Ed25519 handoff contract in provenance-packet.spec.md, and ADR-20 recorded the same rejection for the same reason -- dependency weight disproportionate to the gap. Recorded as unprobed rather than dismissed."
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Admission-time verification of shared state -- a seam where a factual broadcast is rejected unless it carries admissible evidence -- has no counterpart in the repo. The consensus gate governs proposals about the repo; nothing governs task-runtime shared state. The four overlapping structures were reduced to reuse (EvidenceRef, BlastRadius) or rename (RuntimeClaim) rather than built, so the delta is the four genuinely new structures plus the admission seam.",
+        "rejected_because": [
+          "in-toto/DSSE: duplicates the existing signed provenance envelope; same rejection ADR-20 recorded (Specified, not probed)",
+          "A second EvidenceRef vocabulary: rejected outright. ADR-20 D-A1 made claim_schema.EVIDENCE_TYPES the single authority after four allow-lists drifted and produced a 100% claim-rejection rate."
+        ],
+        "expiry_or_retest_date": "2027-01-02"
+      }
+    },
+    "FLOSS/docs/specs/verified-shared-context/README.md": {
+      "spec": "Verified-shared-context contract: README",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/admission-decision.schema.json": {
+      "spec": "Verified-shared-context contract: admission-decision.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/capability-descriptor.schema.json": {
+      "spec": "Verified-shared-context contract: capability-descriptor.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/evidence-ref.schema.json": {
+      "spec": "Verified-shared-context contract: evidence-ref.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/ledger-entry.schema.json": {
+      "spec": "Verified-shared-context contract: ledger-entry.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/private-memory-piece.schema.json": {
+      "spec": "Verified-shared-context contract: private-memory-piece.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/runtime-claim.schema.json": {
+      "spec": "Verified-shared-context contract: runtime-claim.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/shared-gist.schema.json": {
+      "spec": "Verified-shared-context contract: shared-gist.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
+    },
+    "FLOSS/docs/specs/verified-shared-context/task-contract.schema.json": {
+      "spec": "Verified-shared-context contract: task-contract.schema",
+      "tier_exempt": "Schema set covered as a group by the reuse block on FLOSS/docs/specs/verified-shared-context.spec.md (tier 1, 2026-09-04). Not independently reviewed. Promote the parent spec to tier 2 before implementing."
     },
     "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
       "spec": "Yumeichan affective edge-node watch architecture",

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/admission-decision.schema.json",
+  "title": "AdmissionDecision",
+  "type": "object",
+  "required": [
+    "id",
+    "task_id",
+    "claim_id",
+    "decision",
+    "validator",
+    "reasons",
+    "created_at",
+    "policy_version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "admit",
+        "abstain",
+        "reject"
+      ],
+      "description": "Admission verdict. Was [-1, 0, 1]; changed 2026-09-04 because that notation is indistinguishable from the ternary vote model ADR-10 v2.0 formally superseded in favour of analog weights in [-0.999, +0.999]. An admission verdict is not a vote weight; the notation must not imply it is."
+    },
+    "validator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validator_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "evidence-ref.schema.json"
+      }
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Reconciled 2026-09-04 against repo canon; see docs/reviews/2026-09-04-v04-continuation-bundle/REUSE-MAP.md"
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/evidence-ref.schema.json",
+  "title": "EvidenceRef",
+  "description": "Draft adapter-level reference to evidence. This does not replace provenance-packet.spec.md evidence_refs or widen current repo allowlists by itself.",
+  "type": "object",
+  "required": [
+    "type",
+    "ref"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "spec",
+        "test",
+        "adr",
+        "url",
+        "commit",
+        "provenance_packet",
+        "file",
+        "log",
+        "activity",
+        "source_chain"
+      ],
+      "description": "Evidence class. This enum MUST stay identical to packages/orchestrator/claim_schema.EVIDENCE_TYPES, which ADR-20 D-A1 made the single authority after four competing allow-lists drifted and caused a 100% claim-rejection rate. Widen there first, never here."
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "source_system": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "claim_scope": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Reconciled 2026-09-04 against repo canon; see docs/reviews/2026-09-04-v04-continuation-bundle/REUSE-MAP.md"
+}

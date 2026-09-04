@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/ledger-entry.schema.json",
+  "title": "LedgerEntry",
+  "type": "object",
+  "required": ["id", "task_id", "kind", "fact", "source", "status", "created_at", "content_hash"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["perception", "retrieval", "tool_result", "derivation"]},
+    "fact": {"type": ["string", "object", "array", "number", "boolean", "null"]},
+    "source": {
+      "type": "object",
+      "required": ["type", "ref"],
+      "properties": {
+        "type": {"type": "string"},
+        "ref": {"type": "string"},
+        "tool": {"type": ["string", "null"]},
+        "producer_agent": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "status": {"enum": ["active", "stale", "conflicted", "dropped"]},
+    "dependencies": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "evidence_refs": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "content_hash": {"type": "string", "minLength": 1},
+    "metadata": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/schemas/private-memory-piece.schema.json",
+  "title": "PrivateMemoryPiece",
+  "description": "LATER experiment schema. Agent-local persistent strategy/experience; not shared context and not authoritative collective truth.",
+  "type": "object",
+  "required": ["id", "agent_id", "context_prototype", "strategy", "outcome", "created_at", "sharing_policy"],
+  "properties": {
+    "id": {"type": "string"},
+    "agent_id": {"type": "string"},
+    "pool": {"enum": ["exploit", "explore"]},
+    "context_prototype": {"type": ["string", "object", "array"]},
+    "strategy": {"type": ["string", "object", "array"]},
+    "coordination_trajectory_ref": {"type": ["string", "null"]},
+    "outcome": {"type": ["string", "object", "number", "boolean"]},
+    "evaluation_refs": {"type": "array", "items": {"$ref": "evidence-ref.schema.json"}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "sharing_policy": {"enum": ["private", "selective", "publishable"]},
+    "metadata": {"type": "object", "additionalProperties": true}
+  },
+  "additionalProperties": false
+}
