@@ -129,6 +129,56 @@ def test_every_managed_registration_declares_its_surface():
     assert not undeclared, f"registrations with no declared surface: {undeclared}"
 
 
+def test_every_declared_surface_is_one_the_hook_recognises():
+    """Catch a typo where it is INTRODUCED, not where it is consumed.
+
+    `--surface` was accepted verbatim, so `--surface codexx` in the manifest
+    would have been stamped into the Claim summary and the signed packet's
+    `source_systems` with nothing to notice it. The runtime now refuses an
+    unknown label and falls back to inference; this is the half that stops the
+    typo reaching a config at all.
+    """
+    import json
+    import re
+
+    hook = load_hook()
+    manifest = json.loads(
+        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
+    )
+    seen = []
+    for target, cfg in manifest["targets"].items():
+        for event, entries in (cfg.get("hooks") or {}).items():
+            for entry in entries:
+                for h in entry.get("hooks") or [entry]:
+                    command = (h or {}).get("command", "")
+                    if "hook_post_write.py" not in command:
+                        continue
+                    found = re.search(r"--surface[= ]([^\s\"]+)", command)
+                    assert found, f"{target}.{event} declares no surface"
+                    seen.append((f"{target}.{event}", found.group(1)))
+
+    unknown = [
+        (where, value) for where, value in seen if value not in hook.KNOWN_SURFACES
+    ]
+    assert not unknown, (
+        f"surfaces the hook does not recognise: {unknown}; "
+        f"known: {sorted(hook.KNOWN_SURFACES)}"
+    )
+
+
+def test_an_unrecognised_surface_is_refused_rather_than_stamped(monkeypatch, capsys):
+    """A value nothing downstream can interpret must not reach a signed
+    record. Inference may be imprecise; an unknown label is uninterpretable."""
+    hook = load_hook()
+
+    assert hook.declared_surface(["--surface", "codexx"]) == ""
+    assert "unrecognised --surface" in capsys.readouterr().err
+
+    monkeypatch.setattr(sys, "argv", ["hook_post_write.py", "--surface", "codexx"])
+    monkeypatch.delenv(hook.DECLARED_SURFACE_ENV, raising=False)
+    assert hook.infer_surface("Write", "PostToolUse") == "claude-code"
+
+
 def test_inference_still_covers_an_unmanaged_install(monkeypatch):
     """A hand-written Claude Code settings.json predating this surface passes
     no flag, and is exactly the case the tool-name branch was written for."""

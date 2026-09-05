@@ -1324,3 +1324,34 @@ def test_a_scalar_override_renders_outside_the_header_table():
         f"re-parenting hazard the ordering rule exists for:\n{rendered}"
     )
     assert result["mcp_servers"]["srv"]["startup_timeout_sec"] == 45
+
+
+def test_a_corrupt_pid_file_is_reported_not_raised_through_materialize(tmp_path):
+    """A refusal is a result, not a traceback.
+
+    hermes_gateway_alive raising is right -- the caller writes on its answer --
+    but letting it escape breaks the rule the surrounding block states in its
+    own comment: an unusable file must become one actionable line naming the
+    path, not a traceback that discards every result gathered so far and skips
+    the downstream sub-materializers. It also crashed `--check`, which has to
+    be read-only and has to survive whatever it finds on disk.
+    """
+    home = tmp_path / "hermes"
+    home.mkdir()
+    (home / "gateway.pid").write_text("not json{", encoding="utf-8")
+    (home / "config.yaml").write_text("mcp_servers: {}\n", encoding="utf-8")
+
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "materialize_shared_agent_surface.py"
+    ).read_text(encoding="utf-8")
+
+    call = source.split("live_pid = hermes_gateway_alive(", 1)[0]
+    assert call.rstrip().endswith("try:"), (
+        "hermes_gateway_alive is called outside a try; a corrupt gateway.pid "
+        "would abort materialize() instead of being reported"
+    )
+    tail = source.split("live_pid = hermes_gateway_alive(", 1)[1]
+    assert "except SharedSurfaceError as exc:" in tail.split("if live_pid", 1)[0]
+    assert "REFUSED" in tail.split("if live_pid", 1)[0]

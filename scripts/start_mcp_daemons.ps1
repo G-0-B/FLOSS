@@ -209,10 +209,17 @@ $omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
 # added nothing to $skipped the closing summary still reported every daemon
 # started. A message is a message; it must not consume the dispatch.
 #
+# Two lines now print for this case, and that is deliberate: this one is
+# the DIAGNOSIS (what was found on disk) and the slot claim below emits the
+# OUTCOME (what was done about it). A fresh reservation still ends in
+# "already claimed by another launcher", which is true -- a launcher is
+# mid-flight -- and now also lands in $skipped, which is the half that was
+# missing. A stale one is reclaimed and OmniRoute starts.
+#
 # A RESERVATION is a claim whose launcher never came back, not an unverifiable
 # holder, and --reserve-slot below knows how to reclaim one past its window.
 if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
-    Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - letting the slot claim decide"
+    Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - handing it to the slot claim, which reclaims it only past its stale window"
 }
 if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not $omniIsReservation) {
     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."

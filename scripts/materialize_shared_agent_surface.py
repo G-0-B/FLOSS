@@ -1961,7 +1961,22 @@ def materialize(
         if not hermes_path.exists():
             results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
             continue
-        live_pid = hermes_gateway_alive(hermes_path.parent)
+        # A REFUSAL IS A RESULT, NOT A TRACEBACK.
+        #
+        # hermes_gateway_alive now raises rather than reporting an unreadable
+        # gateway.pid as "no gateway" -- correct, because the caller writes on
+        # that answer. But letting it escape here breaks the rule the block
+        # below states in its own comment: an unusable file must become one
+        # actionable line naming the path, not a raw traceback that discards
+        # every result gathered so far and skips the downstream
+        # sub-materializers. It also crashed `--check`, which must be
+        # read-only and must survive anything it finds on disk.
+        try:
+            live_pid = hermes_gateway_alive(hermes_path.parent)
+        except SharedSurfaceError as exc:
+            results.append(f"REFUSED {hermes_key}: {exc}")
+            drift_found = True
+            continue
         if live_pid is not None:
             results.append(
                 f"REFUSED {hermes_key}: gateway PID {live_pid} is live; "

@@ -295,6 +295,15 @@ def is_mutating_tool(tool_name: str) -> bool:
 DECLARED_SURFACE_ENV = "FLOSS_HOOK_SURFACE"
 DECLARED_SURFACE_FLAG = "--surface"
 
+# The labels this hook may stamp on a Claim. Closed on purpose: the value ends
+# up in the Claim summary and in the signed packet's `source_systems`, so a
+# manifest typo would write `--surface codexx` into permanent provenance with
+# nothing to notice it. Adding a harness already means editing infer_surface's
+# fallback branches, so an enum costs nothing that was free before.
+KNOWN_SURFACES = frozenset(
+    {"claude-code", "codex", "gemini-cli", "hermes", "agent-tool"}
+)
+
 
 def declared_surface(argv: list[str] | None = None) -> str:
     """The surface this invocation was registered as, or "".
@@ -309,12 +318,31 @@ def declared_surface(argv: list[str] | None = None) -> str:
     """
 
     args = list(sys.argv[1:] if argv is None else argv)
+    declared = ""
     for index, token in enumerate(args):
         if token == DECLARED_SURFACE_FLAG and index + 1 < len(args):
-            return args[index + 1].strip()
+            declared = args[index + 1].strip()
+            break
         if token.startswith(DECLARED_SURFACE_FLAG + "="):
-            return token.split("=", 1)[1].strip()
-    return (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
+            declared = token.split("=", 1)[1].strip()
+            break
+    else:
+        declared = (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
+
+    if declared and declared not in KNOWN_SURFACES:
+        # Loud, and NOT honoured. Falling back to inference is the lesser
+        # wrong: an inferred label may be imprecise, but an unrecognised one
+        # is a value nothing downstream can interpret, written into a signed
+        # record. The manifest guard in the tests is the real fix -- this is
+        # the runtime half, for a hand-edited target config.
+        print(
+            f"[hook_post_write] unrecognised --surface {declared!r}; "
+            f"expected one of {sorted(KNOWN_SURFACES)}. Falling back to "
+            "inference so provenance is not stamped with an unknown label.",
+            file=sys.stderr,
+        )
+        return ""
+    return declared
 
 
 def infer_surface(tool_name: str, hook_event_name: str) -> str:
