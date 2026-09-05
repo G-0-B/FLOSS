@@ -26,12 +26,17 @@ class SwarmRuntime:
 
     async def connect(self):
         """Connects to the Holochain conductor."""
-        # Start the conductor using the helper script
-        self.conductor_process = await asyncio.create_subprocess_exec(
-            "node",
-            "ARF/tests/tryorama/start_conductor.js",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        # The conductor launcher lived in the JS Tryorama suite, retired
+        # 2026-09-05 (tag archive/tryorama-suite-2026-09-05). It had already
+        # stopped working when the substrate moved to hc 0.6.1 -- no tryorama
+        # version pairs with that line. Fail loudly rather than on a missing
+        # file, until the Sweettest harness (task M13) provides a replacement.
+        raise RuntimeError(
+            "No Holochain conductor launcher available: the Tryorama "
+            "start_conductor.js helper was retired 2026-09-05 and the "
+            "Sweettest replacement (MVP_PLAN task M13) is not yet written. "
+            "Recover the old helper from tag archive/tryorama-suite-2026-09-05 "
+            "if you need it for reference."
         )
 
         # Read the conductor URL from stdout

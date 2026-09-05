@@ -28,7 +28,7 @@ FLOSS/
 │   ├── conversation_memory.py                       # Persistent memory across sessions
 │   ├── dnas/                                        # Holochain DNA (integrity + coordinator zomes)
 │   ├── docs/arf_sdd_master_spec.md
-│   ├── tests/                                       # Tryorama tests
+│   ├── tests/                                       # Python tests (JS Tryorama suite retired 2026-09-05)
 │   └── in.finite-nrg/                               # Hardware abstraction layer
 │
 ├── packages/                                        # Local agent node (landed in 096b058)
@@ -162,9 +162,12 @@ cargo test
 cargo fmt && cargo clippy
 hc dna pack workdir/dna
 
-# Holochain integration tests (TypeScript / Tryorama)
-npm install                                          # installs @holochain/tryorama
-npx ts-mocha ARF/tests/tryorama/*.test.ts
+# Holochain integration tests: the JS Tryorama suite was retired 2026-09-05
+# (deprecated per operator directive 2026-07-03; no tryorama version pairs with
+# hc 0.6.1). Rust Sweettest supersedes it: harness lives in ARF/tests/sweettest/
+# on PR #61 (branch codex/sweettest-substrate-bridge), open and not yet merged.
+# Until that lands, trunk has no executable Holochain integration coverage.
+# Recover the retired suite from tag archive/tryorama-suite-2026-09-05.
 
 # Python linting/formatting
 black .
