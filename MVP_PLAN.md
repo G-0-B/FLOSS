@@ -121,9 +121,30 @@ hc app pack workdir/
 
 **Requires**: `dna.yaml` and `happ.yaml` manifest files in workdir directories.
 
-### Step 0.3: Tryorama integration tests — ALREADY WRITTEN ✅
+### Step 0.3: Tryorama integration tests — ❌ RETIRED 2026-09-05
 
-`tests/tryorama/rose_forest.test.ts` already contains **363 lines** covering:
+**The JS Tryorama suite was removed from the tree on 2026-09-05.** It never ran
+against the current substrate (see the hc 0.6.1 incompatibility recorded above),
+and its live npm manifests were the sole source of three open Dependabot PRs
+(#45, #54, #63). Recover any of the eight test files from tag
+`archive/tryorama-suite-2026-09-05`, e.g.
+`git show archive/tryorama-suite-2026-09-05:ARF/tests/tryorama/substrate_bridge.test.ts`.
+
+Rust Sweettest supersedes it per the 2026-07-03 operator directive. The
+replacement harness **is written** and open as PR #61
+(`codex/sweettest-substrate-bridge`, `ARF/tests/sweettest/`): 334-line
+`substrate_bridge_test.rs` porting the six substrate-bridge criteria plus a
+missing-hash negative, 244-line `consent_zome_test.rs`, 291-line `src/lib.rs`,
+building the four zome WASMs from source against the pinned Holochain 0.6.1
+line. It is not yet merged to trunk, so between this commit and that merge
+trunk carries no executable Holochain integration coverage.
+
+Per PR #61's own description the harness does **not** close the orchestration
+substrate-bridge gate: `docs/specs/phase0-substrate-bridge.spec.md`
+Definition-of-Done stays open. So the gate remains ⚠️ Specified either way —
+retiring `substrate_bridge.test.ts` (488 lines) does not change its status.
+
+The retired `tests/tryorama/rose_forest.test.ts` contained **363 lines** covering:
 - RoseNode: create, vector_search (multi-agent with DHT sync), reject invalid license, reject missing model_card
 - KnowledgeEdge: link_edge between nodes, reject invalid relationship type
 - BudgetEntry: initial 100 RU, consumption tracking (33 RU per node), budget exhaustion at 4th node
@@ -132,9 +153,9 @@ hc app pack workdir/
 No new tests needed for Phase 0 — just make the existing ones pass.
 
 ### Step 0.4: Run integration tests
-```bash
-cd tests/tryorama && npm install && npm test
-```
+
+Blocked on M13 (Sweettest harness). The former command
+(`cd tests/tryorama && npm install && npm test`) no longer resolves.
 
 **Phase 0 exit criteria**: All 6+ integration tests pass. DNA compiles, installs, validates, and returns correct results.
 
