@@ -507,7 +507,18 @@ def _survivor_independence_problem(
 
     if not embedded:
         return None
-    if resolved_mode in {"local", "mixed"}:
+    # LOCAL ONLY. `mixed` was exempted here alongside `local`, and that stopped
+    # being defensible the moment resolve_voter_pool() started applying
+    # assert_roster_is_independent() to the COMBINED mixed pool: the run is now
+    # admitted precisely because online and local voters together clear the
+    # bar, so an outage that kills the online half leaves a correlated subset
+    # that this exemption would report as a normal consensus tier. Two views of
+    # one roster disagreeing about whether it counts as independent is the
+    # exact defect the combined-pool check was added to remove.
+    #
+    # `local` stays exempt because it is deliberately narrow by construction --
+    # one surface, chosen on purpose -- not degraded by circumstance.
+    if resolved_mode == "local":
         return None
     try:
         from packages.metacoordinator_mcp.voters import roster_independence_problem

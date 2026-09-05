@@ -292,8 +292,53 @@ def is_mutating_tool(tool_name: str) -> bool:
     return (tool_name or "").strip().lower() in MUTATING_TOOL_NAMES
 
 
+DECLARED_SURFACE_ENV = "FLOSS_HOOK_SURFACE"
+DECLARED_SURFACE_FLAG = "--surface"
+
+
+def declared_surface(argv: list[str] | None = None) -> str:
+    """The surface this invocation was registered as, or "".
+
+    Read from the command line first because that is how the manifest declares
+    it -- `hook_post_write.py --surface codex`. The environment variable is the
+    fallback for a launcher that cannot add arguments.
+
+    Both, and not one: the first version of this read only the environment
+    while the manifest was writing only the flag, so the declaration was
+    plumbed at one end and read at the other and nothing was declared at all.
+    """
+
+    args = list(sys.argv[1:] if argv is None else argv)
+    for index, token in enumerate(args):
+        if token == DECLARED_SURFACE_FLAG and index + 1 < len(args):
+            return args[index + 1].strip()
+        if token.startswith(DECLARED_SURFACE_FLAG + "="):
+            return token.split("=", 1)[1].strip()
+    return (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
+
+
 def infer_surface(tool_name: str, hook_event_name: str) -> str:
-    """Best-effort origin label for the claim proposer."""
+    """Origin label for the claim proposer: declared if possible, else inferred.
+
+    DECLARED BEATS INFERRED, because two harnesses register this hook
+    identically. `shared-hook-surface.json` gives Codex and Claude the SAME
+    matcher (`Write|Edit|MultiEdit`) and the SAME command, so the payload
+    carries nothing that separates them -- and the tool-name branch below
+    labelled every Codex edit `claude-code`. That label is persisted in the
+    Claim summary and in the signed packet's `source_systems`, so the
+    provenance record named the wrong harness for a whole managed surface.
+    No heuristic can fix that; the two events are identical by construction.
+
+    So each registration declares itself via FLOSS_HOOK_SURFACE, and the
+    inference below is what remains for an UNMANAGED install -- a hand-written
+    Claude Code settings.json predating this surface, which is exactly the case
+    the tool-name branch was originally written for.
+    """
+
+    declared = declared_surface()
+    if declared:
+        return declared
+
     tn = (tool_name or "").strip().lower()
     event_name = (hook_event_name or "").strip()
     if tn in {"write", "edit", "multiedit"}:

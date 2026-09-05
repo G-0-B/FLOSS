@@ -483,8 +483,36 @@ def test_hermes_gateway_alive_detects_own_process(tmp_path):
     assert mas.hermes_gateway_alive(tmp_path) == os.getpid()
 
 
-def test_hermes_gateway_alive_tolerates_corrupt_pid_file(tmp_path):
+def test_a_corrupt_hermes_pid_file_refuses_the_write(tmp_path):
+    """This asserted the opposite, deliberately -- "tolerates" a corrupt file by
+    returning None. That reading is what makes it dangerous: every caller reads
+    None as "no live gateway" and rewrites config.yaml, which a gateway that IS
+    running then overwrites from memory on shutdown. A half-written pid file is
+    likeliest during the gateway's own startup, so the old behaviour failed
+    open exactly when a gateway was most likely to be alive.
+
+    `_pid_alive` in this same module already fails closed for this reason,
+    returning True when liveness cannot be determined. The reader was the half
+    that did not, so the guard had a hole on its input side.
+    """
     (tmp_path / "gateway.pid").write_text("not json{", encoding="utf-8")
+
+    with pytest.raises(mas.SharedSurfaceError, match="not valid JSON"):
+        mas.hermes_gateway_alive(tmp_path)
+
+
+def test_a_pid_file_with_no_integer_pid_refuses_the_write(tmp_path):
+    """Same hole, different shape: valid JSON carrying no usable pid."""
+    (tmp_path / "gateway.pid").write_text('{"pid": "not-an-int"}', encoding="utf-8")
+
+    with pytest.raises(mas.SharedSurfaceError, match="no integer"):
+        mas.hermes_gateway_alive(tmp_path)
+
+
+def test_an_absent_hermes_pid_file_is_still_no_gateway(tmp_path):
+    """Absent is genuinely absent, and must stay cheap -- failing closed on a
+    missing file would block every materialization on a machine that has never
+    run Hermes."""
     assert mas.hermes_gateway_alive(tmp_path) is None
 
 

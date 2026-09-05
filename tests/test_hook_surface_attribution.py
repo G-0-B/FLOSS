@@ -76,3 +76,120 @@ def test_the_hermes_events_match_the_manifest_event_map():
 
     for hermes_event in event_map.values():
         assert hook.infer_surface("write_file", hermes_event) == "hermes", hermes_event
+
+
+def test_a_declared_surface_beats_inference(monkeypatch):
+    """Codex and Claude register this hook with the SAME matcher and the SAME
+    command, so the payload carries nothing that separates them and the
+    tool-name branch labelled every Codex edit `claude-code`. That label is
+    persisted in the Claim summary and the signed packet's `source_systems`.
+    No heuristic can fix identical events; the registration has to say."""
+    hook = load_hook()
+
+    monkeypatch.setattr(sys, "argv", ["hook_post_write.py", "--surface", "codex"])
+    assert hook.infer_surface("Write", "PostToolUse") == "codex"
+    assert hook.infer_surface("Edit", "PostToolUse") == "codex"
+    assert hook.infer_surface("MultiEdit", "PostToolUse") == "codex"
+
+
+def test_the_declaration_is_read_from_the_flag_the_manifest_writes(monkeypatch):
+    """Plumbed at one end and read at the other is the failure this guards.
+
+    The first version read only FLOSS_HOOK_SURFACE while the manifest wrote
+    only `--surface`, so nothing was declared and the misattribution survived
+    the fix for it.
+    """
+    hook = load_hook()
+
+    assert hook.declared_surface(["--surface", "codex"]) == "codex"
+    assert hook.declared_surface(["--surface=hermes"]) == "hermes"
+    assert hook.declared_surface([]) == ""
+
+    monkeypatch.setenv(hook.DECLARED_SURFACE_ENV, "gemini-cli")
+    assert hook.declared_surface([]) == "gemini-cli", "the env fallback is gone"
+
+
+def test_every_managed_registration_declares_its_surface():
+    """The join between the manifest and the hook. A target that registers
+    this hook without declaring itself falls back to inference, which is what
+    misattributed Codex in the first place."""
+    import json
+
+    manifest = json.loads(
+        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
+    )
+    undeclared = []
+    for target, cfg in manifest["targets"].items():
+        for event, entries in (cfg.get("hooks") or {}).items():
+            for entry in entries:
+                for hook in entry.get("hooks") or [entry]:
+                    command = (hook or {}).get("command", "")
+                    if "hook_post_write.py" in command and "--surface" not in command:
+                        undeclared.append(f"{target}.{event}")
+    assert not undeclared, f"registrations with no declared surface: {undeclared}"
+
+
+def test_inference_still_covers_an_unmanaged_install(monkeypatch):
+    """A hand-written Claude Code settings.json predating this surface passes
+    no flag, and is exactly the case the tool-name branch was written for."""
+    hook = load_hook()
+
+    monkeypatch.setattr(sys, "argv", ["hook_post_write.py"])
+    monkeypatch.delenv(hook.DECLARED_SURFACE_ENV, raising=False)
+
+    assert hook.infer_surface("Write", "PostToolUse") == "claude-code"
+    assert hook.infer_surface("write_file", "AfterTool") == "gemini-cli"
+
+
+def test_the_declaration_survives_materialization_for_every_target():
+    """The join I could not otherwise check: the manifest carries the flag and
+    the hook parses it, but the command string is REWRITTEN by the materializer
+    into each target's own config format before anything runs it. A quoting or
+    variable-expansion bug there would drop the declaration silently and hand
+    every surface back to inference, which is the misattribution this fixes.
+    """
+    import importlib.util
+    import json
+    import os
+
+    import pytest
+
+    spec = importlib.util.spec_from_file_location(
+        "materialize_shared_hook_surface",
+        REPO_ROOT / "scripts" / "materialize_shared_hook_surface.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    manifest = json.loads(
+        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
+    )
+    os.environ.setdefault("FLOSS_HOOKS_DIR", str(REPO_ROOT / "hooks"))
+    try:
+        variables = module.resolve_variables(manifest, REPO_ROOT)
+    except Exception as exc:  # noqa: BLE001 -- environment, not the contract
+        pytest.skip(f"hook variables unresolvable here: {type(exc).__name__}: {exc}")
+
+    expected = {
+        target: label
+        for target, label in (
+            ("codex", "codex"),
+            ("claude_user", "claude-code"),
+            ("hermes_user", "hermes"),
+            ("gemini", "gemini-cli"),
+        )
+        if target in manifest["targets"]
+    }
+    assert expected, "no known hook targets in the manifest; update this guard"
+
+    for target, label in expected.items():
+        cfg = manifest["targets"][target]
+        try:
+            rendered = json.dumps(module.build_target_payload({}, cfg, variables))
+        except Exception as exc:  # noqa: BLE001
+            pytest.skip(f"{target} not renderable here: {type(exc).__name__}")
+        assert f"--surface {label}" in rendered, (
+            f"{target}: the declared surface did not survive materialization; "
+            "every edit on this surface would be attributed by inference"
+        )

@@ -50,6 +50,19 @@ _CLAIM_GUARD_SECONDS = 5.0
 _RESERVATION_MARKER = "RESERVED"
 
 
+class ClaimUnavailable(RuntimeError):
+    """The slot could not be judged, as distinct from being occupied.
+
+    claim_singleton returns False for "someone else holds this", and the
+    OSError/ImportError paths returned the same False -- so a missing shared
+    helper or an unwritable agent directory was indistinguishable from a
+    healthy running daemon. run_http_daemon then printed "already running" and
+    exited 0, and the PowerShell launcher reads a clean exit as a live daemon,
+    so the startup summary reported success with the port unserved. An
+    infrastructure failure has to be able to say so.
+    """
+
+
 def _reservation_token() -> str:
     """A value no other reservation will carry."""
 
@@ -391,10 +404,19 @@ def claim_singleton(pid_filename: str) -> bool:
             claimed = _claim_singleton_guarded(pid_path, me)
     except TimeoutError:
         # Someone is mid-transition on this slot. Occupied is the conservative
-        # reading and the one that prevents a duplicate daemon.
+        # reading and the one that prevents a duplicate daemon, and it is a
+        # genuine occupancy answer rather than a failure to produce one.
         return False
-    except (OSError, ImportError):
-        return False
+    except ImportError as exc:
+        raise ClaimUnavailable(
+            f"the shared file-lock helper is unavailable ({exc}); the slot for "
+            f"{pid_path} cannot be claimed or judged"
+        ) from exc
+    except OSError as exc:
+        raise ClaimUnavailable(
+            f"the slot for {pid_path} could not be claimed "
+            f"({type(exc).__name__}: {exc})"
+        ) from exc
     if not claimed:
         return False
 
@@ -677,7 +699,15 @@ def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
     port must be set on the FastMCP instance's settings before calling run().
     This function patches ``mcp.settings.port`` in-place before serving.
     """
-    if not claim_singleton(pid_filename):
+    try:
+        claimed = claim_singleton(pid_filename)
+    except ClaimUnavailable as exc:
+        # NONZERO, and on stderr. Exiting 0 here told Start-Daemon that a
+        # healthy daemon already held the port, so a machine that simply could
+        # not write its agent directory reported a successful startup.
+        print(f"[FLOSS MCP] cannot claim :{port}: {exc}", file=sys.stderr)
+        sys.exit(2)
+    if not claimed:
         print(f"[FLOSS MCP] already running on :{port}; exiting.", file=sys.stderr)
         sys.exit(0)
     # FastMCP stores host/port in settings; run() reads them from there.

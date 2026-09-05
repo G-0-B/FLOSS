@@ -199,13 +199,22 @@ if ($null -ne $omniRaw) { $omniRaw = $omniRaw.Trim() }
 # that once inodes are recycled -- so testing emptiness alone would send every
 # new reservation down the UNVERIFIABLE path and never start OmniRoute again.
 $omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
+# NOT A BRANCH. This was the first arm of the if/elseif/else below, which is the
+# opposite of what its own comment claimed: saying "fall through and let the
+# slot claim decide" while structurally guaranteeing that the else block --
+# where --reserve-slot lives -- could never run. So a launcher that died
+# between reserving and recording left a reservation that was recognised,
+# announced, and then never reclaimed even past its stale window; OmniRoute
+# stayed disabled until someone deleted the file by hand, and because this arm
+# added nothing to $skipped the closing summary still reported every daemon
+# started. A message is a message; it must not consume the dispatch.
+#
+# A RESERVATION is a claim whose launcher never came back, not an unverifiable
+# holder, and --reserve-slot below knows how to reclaim one past its window.
 if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
-    # A RESERVATION is a claim whose launcher never came back, not an
-    # unverifiable holder. --reserve-slot below reclaims one past its stale
-    # window, so fall through and let it decide instead of rejecting here: this
-    # branch is what kept OmniRoute disabled until someone deleted the file.
     Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - letting the slot claim decide"
-} elseif ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
+}
+if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not $omniIsReservation) {
     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."
     $skipped += "OmniRoute (:20128) - not started; existing record is unverifiable"
 } elseif ($omniVerdict -eq 'OURS') {

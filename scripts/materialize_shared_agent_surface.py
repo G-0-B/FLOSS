@@ -728,13 +728,44 @@ def hermes_gateway_alive(home: Path) -> int | None:
     pid_file = home / "gateway.pid"
     if not pid_file.exists():
         return None
+
+    # INDETERMINATE IS NOT ABSENT.
+    #
+    # An unreadable or malformed gateway.pid returned None, and every caller
+    # reads None as "no live gateway" and rewrites config.yaml -- which a
+    # gateway that IS running then overwrites from memory on shutdown, losing
+    # exactly the MCP and hook changes this guard exists to protect. A
+    # PermissionError or a half-written file is the likeliest state during a
+    # gateway's own startup, so the failure mode is worst when it matters most.
+    #
+    # `_pid_alive` already fails closed the same way for the same reason: it
+    # returns True when liveness cannot be determined. The reader was the half
+    # that did not.
     try:
-        payload = json.loads(pid_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+        raw = pid_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} exists but could not be read "
+            f"({type(exc).__name__}); refusing to write under a gateway whose "
+            "state is unknown. Stop the gateway, or remove the file if you "
+            "know it is stale."
+        ) from exc
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+            "to write under a gateway whose state is unknown. Stop the "
+            "gateway, or remove the file if you know it is stale."
+        ) from exc
     pid = payload.get("pid")
     if not isinstance(pid, int):
-        return None
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} carries no integer `pid` (got "
+            f"{type(pid).__name__}); refusing to write under a gateway whose "
+            "state is unknown. Stop the gateway, or remove the file if you "
+            "know it is stale."
+        )
     return pid if _pid_alive(pid) else None
 
 

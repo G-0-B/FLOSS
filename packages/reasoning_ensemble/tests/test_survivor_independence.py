@@ -53,11 +53,38 @@ def test_three_survivors_cannot_satisfy_a_four_family_bar(monkeypatch):
 
 
 def test_the_check_is_skipped_where_the_pool_side_check_skips_it(monkeypatch):
-    """local and mixed are exempt through the same DEGRADED_OK_PROFILES list."""
+    """The invariant in this test's name, applied to what the pool side does NOW.
+
+    `mixed` was exempt here because the pool side exempted it too. That stopped
+    being true when resolve_voter_pool() began applying
+    assert_roster_is_independent() to the combined mixed pool: a mixed run is
+    admitted precisely BECAUSE online and local voters together clear the bar,
+    so an outage that kills the online half leaves a correlated subset that
+    this exemption would have reported as a normal consensus tier. The rule the
+    name states is unchanged; only the list it resolves to moved.
+    """
     survivors = [_r("a", "phi4-mini:latest", "phi")]
 
     assert synthesizer._survivor_independence_problem(survivors, "local") is None
-    assert synthesizer._survivor_independence_problem(survivors, "mixed") is None
+
+
+def test_mixed_survivors_are_rechecked_because_the_pool_side_checks_them(
+    monkeypatch,
+):
+    """The other half of the same rule. A mixed pool is judged as a whole at
+    dispatch, so its survivors have to be judged too -- otherwise a provider
+    outage silently converts an independent mixed ensemble into a correlated
+    subset, and nothing downstream can tell."""
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    survivors = [
+        _r("a", "groq/llama-3.1-8b-instant", "llama"),
+        _r("b", "groq/gemma2-9b-it", "gemma"),
+        _r("c", "groq/qwen-2.5-32b", "qwen"),
+    ]
+
+    problem = synthesizer._survivor_independence_problem(survivors, "mixed")
+
+    assert problem is not None, "a one-surface mixed survivor set was accepted"
 
 
 def test_an_empty_survivor_set_is_left_to_the_count_check(monkeypatch):

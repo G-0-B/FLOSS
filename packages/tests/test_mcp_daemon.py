@@ -2041,3 +2041,112 @@ def test_claim_singleton_waits_for_a_transition_in_flight(tmp_path):
 
     assert result.stdout.strip().splitlines()[-1] == "False", result.stderr[-2000:]
     assert not pid_path.exists(), "a claim was created inside another transition"
+
+
+# ---------------------------------------------------------------------------
+# A failure to judge the slot is not a report that the slot is taken.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unavailable_lock_helper_is_not_reported_as_occupancy(tmp_path, monkeypatch):
+    """claim_singleton returned False for OSError and ImportError, the same
+    False that means "someone else holds this". run_http_daemon then printed
+    "already running" and exited 0, and Start-Daemon reads a clean exit as a
+    healthy daemon -- so a machine that simply could not load the shared lock
+    helper reported a successful startup with the port unserved."""
+    import pytest
+
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+
+    def _no_helper(*a, **k):
+        raise ImportError("no filelock here")
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", _no_helper)
+
+    with pytest.raises(mcp_daemon.ClaimUnavailable, match="shared file-lock"):
+        mcp_daemon.claim_singleton("unavailable.pid")
+
+
+def test_an_unwritable_agent_directory_is_not_reported_as_occupancy(
+    tmp_path, monkeypatch
+):
+    """Same distinction, the other exception class."""
+    import pytest
+
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+
+    def _blows_up(*a, **k):
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", _blows_up)
+
+    with pytest.raises(mcp_daemon.ClaimUnavailable, match="could not be claimed"):
+        mcp_daemon.claim_singleton("unwritable.pid")
+
+
+def test_genuine_contention_is_still_a_plain_false(tmp_path, monkeypatch):
+    """Fail-loud must not swallow the case the return value exists for: a live
+    holder is an ANSWER about occupancy, not a failure to produce one."""
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    assert mcp_daemon.claim_singleton("contended.pid") is True
+    assert mcp_daemon.claim_singleton("contended.pid") is False
+
+
+def test_the_daemon_exits_nonzero_when_it_cannot_claim(tmp_path, monkeypatch):
+    """The whole point: the exit code is what the launcher reads."""
+    import pytest
+
+    from packages import mcp_daemon
+
+    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        mcp_daemon,
+        "claim_singleton",
+        lambda *_: (_ for _ in ()).throw(mcp_daemon.ClaimUnavailable("nope")),
+    )
+
+    class _Mcp:
+        settings = type("S", (), {"port": 0, "host": ""})()
+
+        def run(self, **_):  # pragma: no cover - must never be reached
+            raise AssertionError("served despite an unclaimable slot")
+
+    with pytest.raises(SystemExit) as excinfo:
+        mcp_daemon.run_http_daemon(_Mcp(), pid_filename="x.pid", port=20125)
+
+    assert excinfo.value.code == 2, "a clean exit reads as a healthy daemon"
+
+
+def test_an_incomplete_reservation_reaches_the_slot_claim(tmp_path):
+    """The reservation arm was the FIRST of an if/elseif/else chain, so it
+    structurally guaranteed the else block -- where --reserve-slot lives --
+    could never run, while its own comment said "fall through and let the slot
+    claim decide". A launcher that died between reserving and recording left a
+    reservation that was recognised, announced, and never reclaimed even past
+    its stale window; OmniRoute stayed disabled until someone deleted the file,
+    and because that arm added nothing to $skipped the summary still reported
+    every daemon started.
+    """
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "start_mcp_daemons.ps1"
+    ).read_text(encoding="utf-8")
+
+    code = _code_lines(script)
+    announce = next(
+        i for i, line in enumerate(code) if "incomplete reservation" in line
+    )
+    # The announcement must not be an arm of the dispatch chain: the arm that
+    # follows it has to re-test the condition rather than chain off it.
+    tail = code[announce:]
+    assert not any(
+        line.strip().startswith("} elseif") for line in tail[:3]
+    ), "the reservation message is still consuming the dispatch"
+    assert any(
+        "-not $omniIsReservation" in line for line in tail
+    ), "the UNVERIFIABLE arm must exclude reservations, or they never reclaim"
