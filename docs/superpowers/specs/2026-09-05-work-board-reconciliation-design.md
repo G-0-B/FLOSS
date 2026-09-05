@@ -2,7 +2,7 @@
 
 ```yaml
 id: flossi0ullk-work-board-reconciliation
-version: 0.1.0
+version: 0.1.1
 date: 2026-09-05
 status: Proposed written design; operator review required before execution planning
 truth_status: Specified
@@ -10,6 +10,7 @@ canonical_promotion: false
 implementation_performed: false
 operator_scope: "Documentation-only first"
 base_commit: 08b377e86293a16ae6b71a2917384c920bbdeb72
+revision_base_commit: 3f9e1aba7ec2c3d33a59720525e1c3dcd7338a1e
 branch_observed: feat/coordination-room
 board_sha256: 6d187e55aed71547e5916dc54730791dc4a7ebee59d3d1ec23e1d3b052316edb
 ```
@@ -18,8 +19,9 @@ This is a bounded documentation design, not a new work board, runtime contract,
 canonical promotion, or authorization to implement the source documents.
 The operator selected the documentation-only approach after reviewing the
 six-part reconciliation outline in the current conversation. The five additional
-coordination/plugin/reminder files are evidence to reconcile, not instructions
-to execute. No source document gains authority by being cited here.
+coordination/plugin/reminder files and the two later-supplied historical atlases
+are evidence to reconcile, not instructions to execute. No source document gains
+authority by being cited here.
 
 ## 1. Purpose and boundaries
 
@@ -78,6 +80,8 @@ a read-only inventory: module initialization constructs runtime objects.
 | Source | Role in reconciliation; limits |
 | --- | --- |
 | [Existing board](../../research/2026-05-15-working-todo-list.md) | Primary obligation inventory; preserve original identifiers and historical corrections |
+| [August 23 atlas](../../../../.toilet/2026-08-23-flossi0ullk-repo-atlas/START_HERE.md) | PR41 snapshot at `db80571ddd29f8a5e76dd5121e667d1dd322db67`; domain/share-set routing and historical file identities, not current status |
+| [August 11 atlas](../../../../.toilet/2026-08-11-flossi0ullk-repo-atlas/START_HERE.md) | PR38 snapshot at `4657bdaa40e1288c3ebbf830596e49eacd9d4d28`; historical comparison, retained unchanged |
 | [Room v0 design](2026-08-30-coordination-room-design.md) and [package](../../../packages/coordination_room/README.md) | Existing prototype, path claims, broadcast/read log; not consensus or semantic truth admission |
 | [Coordination-v1 design](2026-09-02-coordination-v1-design.md) and [plan](../plans/2026-09-02-coordination-v1.md) | Proposed derived status and Git-ref ownership; preserve milestone-specific gates |
 | [M1 decision record](../../reviews/2026-09-02-coordination-v1-design/consensus-decision.md) | Records DEFERRED for one exact submission, and blocked M2/M3; not a live source-chain read or approval of later revisions |
@@ -95,12 +99,45 @@ The execution evidence set starts with these sources. Add another only to resolv
 a named item or conflict; record the reason. Do not recursively ingest the
 research library or treat memory-search ranking as coverage.
 
+### Historical atlas reuse, without refreshing by default
+
+✅ Verified in the v0.1.1 authoring pass: all seven checksum-listed files in the
+August 11 packet and all nine in the August 23 packet match their respective
+`SHA256SUMS.txt`. This checks byte consistency against colocated manifests, not
+authorship, truth, or an independently authenticated seal. The August 23 TSV
+contains 1,319 rows and zero `packages/coordination_room/` paths, while the
+current checkout contains `packages/coordination_room/server.py`. Therefore
+absence from that inventory cannot establish absence from current work.
+
+⚠️ Specified reuse procedure:
+
+1. Use August 23 `DOMAINS.md` and `context-domains.json` share sets for the
+   smallest relevant L0/L1 source request. Consult August 11 and the existing
+   `PATH_DELTA.tsv` / `DELTA_FROM_2026-08-11.md` only for a named historical
+   discrepancy. Do not reload the entire atlas for each obligation.
+2. Label every atlas-derived reference with its snapshot commit. The atlas
+   inventories describe tracked paths inside `FLOSS/`, not the outer workspace,
+   local untracked intake, running services, or all obligations.
+3. Before relying on a selected path, check current existence, active manifest
+   membership where relevant, and content/commit identity. Record unchanged,
+   changed, renamed, absent, or unverified; resolve rename candidates by evidence,
+   not name resemblance. Do not infer completion or deletion from atlas absence.
+4. Add the post-snapshot sources already supplied by the operator and targeted
+   current Git/path discovery. The atlas's physical primary-domain ownership is
+   not a human/agent assignment, and its file count is not task coverage.
+5. Preserve both atlas directories and their manifests unchanged. A complete
+   atlas refresh is not a prerequisite for board reconciliation. Record a
+   separate refresh candidate only if a demonstrated navigation gap warrants it;
+   a future refresh must use a new dated packet and an explicit immutable target,
+   never silently overwrite historical snapshots with dirty-checkout content.
+
 ## 4. Relationships that must not disappear
 
 ⚠️ Specified reconciliation constraints:
 
 | Thread | Preserve as distinct | Relationship / outstanding evidence question |
 | --- | --- | --- |
+| Historical repository atlases | Noncanonical navigation and bounded share sets | Guide where to look; cannot supply current task status, assigned ownership, or approval |
 | Shared MCP room v0 | Implemented prototype with separately measured runtime state | Keep broadcast/log role; proposed Git-ref exclusivity does not itself retire the room |
 | Coordination-v1 M1/M2/M3 | Three milestones with different gates | M1 observed-status work is not M2 enforcement or M3 retirement of manual views |
 | Verified shared context / room admission | Proposed evidence admission, SharedGist, capability freshness | A room broadcast is not admitted evidence; map the integration seam, do not claim it exists |
@@ -170,6 +207,9 @@ none is executed by writing this design.
 ### A. Capture and account
 
 - Freeze board bytes/hash, local HEAD and worktree/index state without mutation.
+- Use the atlas reuse procedure in §3 to route bounded reads, then fill its
+  post-snapshot blind spots from current evidence. Never use tracked-file
+  inventory coverage as a substitute for obligation accounting.
 - Inventory every obligation in Sections 0 and A–I, including prose-only items,
   retrospective entries that still contain follow-ups, and accepted/deferred
   decisions in the bounded source set.
@@ -277,6 +317,8 @@ Review against these concrete counterexamples:
 | Two descriptions share words but have different consent or execution scope | Retain separately; semantic resemblance is not task identity |
 | Old hook-documentation blocker superseded; live probe absent | Close only the documentation subclaim |
 | Room has code/tests but endpoint was once unreachable | Track implementation, dated tests and runtime health separately |
+| Old atlas omits a now-present prototype or uses an obsolete path | Check current Git/worktree sources; do not reopen, retire, or declare missing from atlas data alone |
+| Atlas checksum matches but source snapshot is old | Integrity passes; freshness remains separately unverified |
 | Provider errors in a DEFERRED vote record | Preserve DEFERRED; expose missing participation, no outcome reinterpretation |
 | A changed spec cites an older approval | Bind approval to its revision; later changes are not automatically covered |
 | Board changes during editing | Stop and reconcile; never overwrite the concurrent update |
@@ -300,7 +342,20 @@ and whitespace checks establish only document hygiene, not architecture validity
 still required under brainstorming. The documentation-only scope is selected;
 the detailed execution plan, board edit and runtime work have not been performed.
 
-### Source hash anchors recorded 2026-09-05
+### v0.1.1 delta and concurrent-work observation
+
+✅ Verified: while the atlas addition was being prepared, current branch HEAD
+was `3f9e1ab`, a coordination-v1 design/plan review-correction commit after this
+design's initial commit `34ba0a1`. The reconciliation design was clean before
+this patch and the board hash remained unchanged. Preserve that other work;
+re-read the latest coordination design/plan at execution time. Do not mistake
+the initial source hashes below for promises that those inputs stayed current.
+
+This revision adds atlas discovery, snapshot/freshness boundaries, and related
+counterexamples only. It does not refresh an atlas, edit the board, resolve the
+coordination review, or broaden the documentation-only scope.
+
+### Initial source hash anchors recorded 2026-09-05
 
 SHA-256 below binds raw file bytes, not normalized text or an approval signature.
 
@@ -312,3 +367,10 @@ SHA-256 below binds raw file bytes, not normalized text or an approval signature
 | `docs/superpowers/specs/2026-09-01-polyglot-evolving-plugin-materializer-design.md` | `1c21998f2182e416760d567cdc4efdaadbeab798ac1afe8c1fb473f1163ba468` |
 | `docs/superpowers/specs/2026-08-30-task-time-skill-reminder-design.md` | `ef08fc3bcbebcff074678509ea3ee756b6b24d10f3da57a960bf4c32b04ae6ef` |
 | `docs/superpowers/specs/2026-08-30-coordination-room-design.md` | `2c16ac8acf9e847dade872e2fa875cb86e7f4e7bde2756f716bd72174235a364` |
+
+Atlas entrypoint hashes recorded for v0.1.1; paths relative to the outer workspace:
+
+| Path | SHA-256 |
+| --- | --- |
+| `.toilet/2026-08-23-flossi0ullk-repo-atlas/START_HERE.md` | `4dca54f0a3e30e5b941c1daa5caddaf8f726bba264ddcfa8ad1ebd78b16c2334` |
+| `.toilet/2026-08-11-flossi0ullk-repo-atlas/START_HERE.md` | `d191ace265896f1b84aa0d76ac74a8cb43a89013c33ef175a858302bb112f210` |
