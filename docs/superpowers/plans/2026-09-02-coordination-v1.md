@@ -81,7 +81,7 @@ Do not invent the packet path or anchor.
 
 - [ ] **Step 3: Submit, round, and record**
 
-Submit the `SpecChange` / `System` claim with spec, current design commit, CAS test report, and validated provenance packet evidence. The body must include TWO decisions: (1) the holder-identity contract (proposal: unique per-session `FLOSS_AGENT_ID`); (2) the force-drop actor policy (proposal: `force=True` allowed only to the current holder or an operator-named force list recorded in the decision; default deny otherwise). Run `run_consensus_round`; write claim id, evidence refs, mean/variance/outcome, and both accepted contracts to `consensus-decision.md`.
+Submit the `SpecChange` / `System` claim with spec, current design commit, CAS test report, and validated provenance packet evidence. The body must include TWO decisions: (1) the holder-identity contract (proposal: unique per-session `FLOSS_AGENT_ID`); (2) the force-drop actor policy (proposal: `force=True` allowed only to the current holder or an operator-named force list; default deny otherwise). Record the list verbatim in the decision; the launcher publishes it via `FLOSS_CLAIM_FORCE_LIST` (Task 4 documents the variable in `RUNTIME_SURFACES.md`). Run `run_consensus_round`; write claim id, evidence refs, mean/variance/outcome, and both accepted contracts to `consensus-decision.md`.
 
 No waiver path: the standing System consensus gate outranks execution convenience. Tasks 1–5 remain blocked until the decision is `APPROVED`. If identity is not resolved by the decision, M2/Task 4 remains blocked even if M1 is approved separately.
 
@@ -336,9 +336,11 @@ EOF
 - `claim(kind, raw_id, holder=None, ttl=3600, repo_root=REPO_ROOT) -> tuple[bool, str]` — holder defaults from the Task-0-approved identity source (proposal: `FLOSS_AGENT_ID`); missing identity is `E_AGENT_ID_MISSING`; exclusive create; same-holder refresh; different-holder reclaim only after `2×ttl`
 - `release(kind, raw_id, holder, repo_root=REPO_ROOT) -> bool` — holder only
 - `is_expired(kind, raw_id, repo_root=REPO_ROOT) -> bool` — `age > ttl`
-- `force_drop(kind, raw_id, actor, force=False, expected_sha=None, repo_root=REPO_ROOT) -> bool` — `actor` is who performs the drop; blob supplies `old_holder`; non-force only if `age >= 2*ttl`; delete CAS uses `expected_sha` when supplied; every successful drop audited
-- `race_claim(...)` — capture `expected_old` **once**, launch all `Popen` before any wait
+- `force_drop(kind, raw_id, actor, force=False, expected_sha=None, repo_root=REPO_ROOT) -> bool` — `actor` is who performs the drop; blob supplies `old_holder`; non-force only if `age >= 2*ttl`; delete CAS uses `expected_sha` when supplied; every successful drop audited. `force=True` authorization reads `force_list()` (below); any other actor with `force=True` returns False and audits the denial
+- `force_list() -> list[str]` — reads `FLOSS_CLAIM_FORCE_LIST` env (comma-separated holder ids), default `[]`. The launcher populates it from the Task-0 decision doc; Task 4 documents the variable in `RUNTIME_SURFACES.md`. No env → only the current holder may force
+- `race_claim(kind, base_id, holder, ttl=60, racers=8, repo_root=REPO_ROOT)` — holder owns all race blobs (same TTL); capture `expected_old` **once**, launch all `Popen` before any wait
 - Audit log default: `C:/~shit/.agent-surface/coord/claims.jsonl` (`REPO_ROOT.parent`, not FLOSS); tests inject a temp path
+- Test-support seams (exact names; signatures pinned by the tests below, implement exactly): `ZERO = "0"*40`; `_run(*git_args, repo_root=REPO_ROOT, input=None) -> CompletedProcess` (text mode, `input` passed as stdin); `current_sha(kind, raw_id, repo_root) -> str | None`; `current_holder(kind, raw_id, repo_root) -> str | None`; `is_expired(...)` (above); `AUDIT_LOG` module path; `_utc_now() -> datetime` (UTC); `audit_log_contains(raw_id, event, log_path) -> bool`; `ClaimIdError`
 
 - [ ] **Step 1: Failing tests**
 
@@ -369,8 +371,14 @@ def test_encoding_is_injective_and_encodes_dot_and_percent(tmp_repo):
 def test_outside_repo_path_is_illegal_not_conflict(tmp_repo):
     assert cc.claim("path", "C:/other/foo.py", "alice", 60, tmp_repo) == (False, "E_ILLEGAL_ID")
 
+def test_malformed_blob_is_data_error_not_absent(tmp_repo):
+    ref = cc.claim_ref("path", "docs/corrupt.md", tmp_repo)
+    bad = cc._run("hash-object", "-w", "--stdin", repo_root=tmp_repo, input="{nope")
+    cc._run("update-ref", ref, bad.stdout.strip(), cc.ZERO, repo_root=tmp_repo)
+    assert cc.claim("path", "docs/corrupt.md", "bob", 60, tmp_repo) == (False, "E_CLAIM_DATA")
+
 def test_8way_cas_same_expected_old(tmp_repo):
-    results = cc.race_claim("branch", "race-8", 60, 8, tmp_repo)
+    results = cc.race_claim("branch", "race-8", "racer", 60, 8, tmp_repo)
     assert sum(1 for ok, _ in results if ok) == 1
 
 def test_unauthorized_force_true_is_denied_and_audited(tmp_repo, audit_log):
@@ -434,8 +442,11 @@ def encode_claim_id(kind, raw_id, repo_root=REPO_ROOT):
         if canonical is None:
             raise ClaimIdError(raw_id)
     elif kind == "worktree":
-        # Filesystem path on Windows (NTFS case-insensitive): lowercase.
-        canonical = str(raw_id).replace("\\", "/").lower()
+        # Filesystem path on Windows (NTFS case-insensitive): lowercase, no
+        # trailing separator (C:/wt/ is the same checkout as C:/wt).
+        canonical = str(raw_id).replace("\\", "/").lower().rstrip("/")
+        if not canonical:
+            raise ClaimIdError(raw_id)
     else:  # branch: git refs are case-sensitive — preserve exact case.
         # Do NOT lower() or casefold() branch names: Feature/X != feature/x,
         # and casefold() would additionally collapse Straße -> strasse.
@@ -454,9 +465,10 @@ All ref readers/writers (`claim`, `_blob`, `release`, `is_expired`, `force_drop`
 `claim()` algorithm:
 1. Resolve holder under the Task-0-approved identity contract; missing/empty → `(False, "E_AGENT_ID_MISSING")`. Form/validate ref; on `ClaimIdError`, return `(False, "E_ILLEGAL_ID")`.
 2. Read current SHA **once**. Missing → `update-ref <ref> <new> ZERO`.
-3. Existing same holder → refresh with CAS against that SHA.
-4. Existing different holder and age `< 2×ttl` → `(False, existing_holder)`.
-5. Existing different holder and age `>= 2×ttl` → CAS-delete via `force_drop(..., actor=holder, expected_sha=current)` with audit, then exclusive-create with `ZERO`. If another writer wins the gap, return its holder/`conflict`; never overwrite.
+3. Existing blob unparseable (holder/created/ttl) → `(False, "E_CLAIM_DATA")` — fail closed, never treat corruption as absent.
+4. Existing same holder → refresh with CAS against that SHA.
+5. Existing different holder and age `< 2×ttl` → `(False, existing_holder)`.
+6. Existing different holder and age `>= 2×ttl` → CAS-delete via `force_drop(..., actor=holder, expected_sha=current)` with audit, then exclusive-create with `ZERO`. If another writer wins the gap, return its holder/`conflict`; never overwrite.
 
 `force_drop()` validates the ref, reads one current SHA/blob, checks any supplied `expected_sha` against that current SHA, enforces `2×ttl` unless `force=True` **from an authorized actor**, then deletes with the current SHA as expected-old. Authorization: `force=True` requires `actor == old_holder` or `actor` in the Task-0-approved force list; any other actor with `force=True` returns False and audits the denial. On success it appends a JSONL audit record containing raw id, encoded ref, `old_holder` from the blob, separate `actor`, force flag, age, and UTC timestamp. Malformed blob/time/ref is an explicit error, never “not claimed.”
 
@@ -482,14 +494,14 @@ EOF
 **Files:** Modify `hooks/hook_pre_write.py` (import `importlib.util` and **`subprocess`**; load `scripts/coord_claim.py`; delegate `_repo_relative`; preserve `is_substantive` behavior while adapting its local leading slash; add functions + call from `main`; **do not widen** `SUBSTANTIVE_PATH_SEGMENTS` or provenance scope); modify `docs/architecture/RUNTIME_SURFACES.md` to document the approved identity source/launch requirement; `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
 
 **Interfaces:**
-- `resolve_floss_worktree(path) -> Path | None` — derive the target path's actual `git rev-parse --show-toplevel`; accept it only when its resolved `--git-common-dir` equals the hook script checkout's FLOSS common dir. This reaches sibling worktrees but excludes unrelated repositories.
+- `resolve_floss_worktree(path, hook_root) -> Path | None` — BOTH args required (no defaults): derive the target path's actual `git rev-parse --show-toplevel`; accept it only when its resolved `--git-common-dir` equals the hook script checkout's FLOSS common dir. Returns `None` outside every FLOSS checkout. This reaches sibling worktrees but excludes unrelated repositories. Callers must never substitute the hook checkout's root for the result
 - `hook_pre_write._repo_relative(path, target_root)` resolves relative tool paths against `Path.cwd()`, then delegates the resulting absolute path to `coord_claim.repo_relative_path(path, target_root)` — no third case/containment normalizer; returned id has no leading slash
 - `is_substantive(path, target_root)` forms `norm = "/" + (_repo_relative(path, target_root) or "").lstrip("/")` before its existing segment checks, preserving the rebased N2 behavior
 - `extract_agent_id(payload) -> str | None` — implement the Task-0-approved contract; proposed default reads unique per-session `FLOSS_AGENT_ID`, never a static harness name
-- `is_claim_blocked(path: str, agent_id: str) -> tuple[bool, str]`
-- `is_write_allowed(path: str, agent_id: str) -> bool`
+- `is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, str]` — `repo_root` is REQUIRED (no default): it must be the `resolve_floss_worktree` result for this target. A defaulted hook-checkout root would silently check the wrong worktree
+- `is_write_allowed(path: str, agent_id: str) -> bool` — resolves the target root internally via `resolve_floss_worktree(path, REPO_ROOT)` (None → True, allow) then negates `is_claim_blocked`
 - `deny_payload(holder: str) -> dict` for `--stdout-json`
-- `main()` order: mutating-tool check → existing `_is_inside_repo` guard (**outside FLOSS returns allow; this is a user-scope hook**) → claim-check for every in-repo path → `is_substantive`. Deny or lookup/encoding error: print payload, **return 2**. `finish()` stays allow/exit 0.
+- `main()` order: mutating-tool check → resolve target worktree (None → allow; crash → deny 2) → identity (missing → deny 2) → claim-check with target root → `is_substantive`. Deny or lookup/encoding error: print payload, **return 2**. `finish()` stays allow/exit 0. `_is_inside_repo` is NOT on the claim path
 
 - [ ] **Step 1: Failing tests**
 
@@ -550,6 +562,9 @@ def test_non_path_claim_refs_are_legal_and_injective(kind, raw, tmp_repo):
     assert first != second
     assert cc._run("check-ref-format", first, repo_root=tmp_repo).returncode == 0
 
+def test_worktree_trailing_separator_is_same_checkout(tmp_repo):
+    assert cc.claim_ref("worktree", "C:/wt/", tmp_repo) == cc.claim_ref("worktree", "C:/wt", tmp_repo)
+
 def test_lower_not_casefold_avoids_unicode_collision(tmp_repo):
     assert cc.claim_ref("branch", "Straße", tmp_repo) != cc.claim_ref("branch", "Strasse", tmp_repo)
     assert cc.claim_ref("branch", "Feature/X", tmp_repo) != cc.claim_ref("branch", "feature/x", tmp_repo)
@@ -577,9 +592,24 @@ def test_missing_agent_identity_fails_closed_for_in_repo_write(tmp_repo, monkeyp
     hp.EMIT_STDOUT_JSON = True
     assert invoke(write_payload(tmp_repo / "docs/x.md"), monkeypatch) == 2
 
-def test_main_allows_unrelated_project_before_claim_lookup(monkeypatch):
-    monkeypatch.setattr(hp, "is_claim_blocked", lambda *a, **k: pytest.fail("lookup must not run"))
+def test_main_allows_unrelated_project_without_ref_lookup(tmp_repo, monkeypatch):
+    # Resolution runs (returns None outside FLOSS); ref lookup must not.
+    monkeypatch.setattr(hp, "resolve_floss_worktree", lambda *a, **k: None)
+    monkeypatch.setattr(hp, "_claim_holder", lambda *a, **k: pytest.fail("ref lookup must not run"))
     assert invoke(write_payload("C:/other-project/packages/x.py"), monkeypatch) == 0
+
+def test_main_sibling_worktree_bypass_closed(tmp_repo, tmp_path, monkeypatch):
+    # External sibling worktree: old _is_inside_repo guard would allow; resolve-first must enforce.
+    sibling = tmp_path / "sibling-main"
+    git(tmp_repo, "worktree", "add", "-b", "test/sibling-main", str(sibling))
+    (sibling / "docs").mkdir(exist_ok=True)
+    target = sibling / "docs/y.md"
+    target.write_text("y")
+    monkeypatch.setenv("FLOSS_AGENT_ID", "bob")
+    monkeypatch.setattr(hp, "REPO_ROOT", tmp_repo)
+    hp.EMIT_STDOUT_JSON = True
+    assert cc.claim("path", str(target), "alice", 3600, sibling)[0]
+    assert invoke(write_payload(target), monkeypatch) == 2
 
 def test_main_claim_deny_is_exit_2_and_json(tmp_repo, monkeypatch, capsys):
     monkeypatch.setenv("FLOSS_AGENT_ID", "bob")
@@ -603,11 +633,15 @@ import importlib.util
 import subprocess  # N4: required by is_claim_blocked
 
 _CC_PATH = Path(__file__).resolve().parents[1] / "scripts" / "coord_claim.py"
-_CC_SPEC = importlib.util.spec_from_file_location("coord_claim_for_hook", _CC_PATH)
-_CC = importlib.util.module_from_spec(_CC_SPEC)
-assert _CC_SPEC.loader is not None
-sys.modules[_CC_SPEC.name] = _CC
-_CC_SPEC.loader.exec_module(_CC)
+try:
+    _CC_SPEC = importlib.util.spec_from_file_location("coord_claim_for_hook", _CC_PATH)
+    _CC = importlib.util.module_from_spec(_CC_SPEC)
+    assert _CC_SPEC.loader is not None
+    sys.modules[_CC_SPEC.name] = _CC
+    _CC_SPEC.loader.exec_module(_CC)
+except Exception as _cc_exc:  # F8: missing/broken coord_claim must not crash the hook import
+    log(f"[hook-pre] coord_claim load failed ({_cc_exc}); claim checks fail closed")
+    _CC = None
 
 def extract_agent_id(payload: dict) -> str | None:
     # Replace only if Task 0 approves a different shared identity contract.
@@ -670,10 +704,12 @@ def _claim_holder(kind: str, raw_id: str, repo_root=REPO_ROOT) -> str | None:
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise ClaimLookupError("E_CLAIM_DATA") from exc
 
-def is_claim_blocked(path: str, agent_id: str, repo_root: Path = REPO_ROOT) -> tuple[bool, str]:
-    # repo_root MUST be the target file's resolved worktree root (from
-    # resolve_floss_worktree), never the hook script's checkout default, when
-    # the target lives in a sibling worktree. All scope readers below take it.
+def is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, str]:
+    # repo_root is REQUIRED (no default) and must be the resolve_floss_worktree
+    # result for this target. A defaulted hook-checkout root would silently
+    # check the wrong worktree.
+    if _CC is None:  # F8: coord_claim failed to load — fail closed
+        return True, "E_CLAIM_LOOKUP"
     try:
         scopes = [("worktree", current_worktree(repo_root))]
         branch = current_branch(repo_root)
@@ -691,11 +727,17 @@ def is_claim_blocked(path: str, agent_id: str, repo_root: Path = REPO_ROOT) -> t
         return True, "E_CLAIM_LOOKUP"
 ```
 
-`is_write_allowed` negates the first tuple item. `deny_payload` retains both Claude/Hermes and Codex-compatible fields. In `main()`, after mutating-tool validation, preserve the existing user-scope containment boundary, resolve identity, and wrap claim enforcement so an unforeseen exception cannot fall through the live hook's outer catch/`finish()` allow path:
+`is_write_allowed` negates the first tuple item. `deny_payload` retains both Claude/Hermes and Codex-compatible fields. In `main()`, resolve the target's FLOSS worktree FIRST — the old `_is_inside_repo` path-containment guard must not run before it, because sibling worktrees outside the hook checkout fail containment and would bypass enforcement (fail-open). `_is_inside_repo` stays untouched for the checkpoint path; the claim path uses common-dir identity instead:
 
 ```python
-if not _is_inside_repo(file_path):
-    return finish()  # user-scope hook: unrelated repositories remain out of scope
+try:
+    target_root = resolve_floss_worktree(file_path, REPO_ROOT)
+except Exception:
+    log(f"[hook-pre] worktree resolve crashed:\n{traceback.format_exc()}")
+    sys.stderr.write("claim worktree resolution failed\n")
+    return 2  # fail closed: resolution failure must never allow
+if target_root is None:
+    return finish()  # outside every FLOSS checkout: unrelated repositories stay out of scope
 agent_id = extract_agent_id(payload)
 if not agent_id:
     payload = deny_payload("E_AGENT_ID_MISSING")
@@ -705,9 +747,6 @@ if not agent_id:
         sys.stderr.write(payload["reason"] + "\n")
     return 2
 try:
-    target_root = resolve_floss_worktree(file_path)
-    if target_root is None:
-        raise ClaimLookupError("E_CLAIM_LOOKUP")  # in-FLOSS per guard, but unresolvable
     blocked, holder = is_claim_blocked(file_path, agent_id, target_root)
 except Exception:  # claim subsystem must fail closed
     log(f"[hook-pre] claim lookup crashed:\n{traceback.format_exc()}")
