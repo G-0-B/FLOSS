@@ -333,14 +333,14 @@ EOF
 - `repo_relative_path(path, repo_root=REPO_ROOT) -> str | None` — resolve, contain, POSIX, lowercase; outside repo returns `None`
 - `encode_claim_id(kind, raw_id, repo_root=REPO_ROOT) -> str` — canonicalize then injectively percent-encode unsafe UTF-8 bytes
 - `claim_ref(kind, raw_id, repo_root=REPO_ROOT) -> str` — build ref, run `git check-ref-format`, raise `ClaimIdError` on failure
-- `claim(kind, raw_id, holder=None, ttl=3600, repo_root=REPO_ROOT) -> tuple[bool, str]` — holder defaults from the Task-0-approved identity source (proposal: `FLOSS_AGENT_ID`); missing identity is `E_AGENT_ID_MISSING`; exclusive create; same-holder refresh; different-holder reclaim only after `2×ttl`
+- `claim(kind, raw_id, holder=None, ttl=3600, repo_root=REPO_ROOT) -> tuple[bool, str]` — holder defaults from the Task-0-approved identity source (proposal: `FLOSS_AGENT_ID`); missing identity is `E_AGENT_ID_MISSING`; exclusive create; same-holder refresh; different-holder reclaim only after `2×ttl`. `ttl=3600` is a PROPOSAL — Task 0 confirms the default (design open question: 1h/4h/24h); change the default to the decided value before M2
 - `release(kind, raw_id, holder, repo_root=REPO_ROOT) -> bool` — holder only
 - `is_expired(kind, raw_id, repo_root=REPO_ROOT) -> bool` — `age > ttl`
 - `force_drop(kind, raw_id, actor, force=False, expected_sha=None, repo_root=REPO_ROOT) -> bool` — `actor` is who performs the drop; blob supplies `old_holder`; non-force only if `age >= 2*ttl`; delete CAS uses `expected_sha` when supplied; every successful drop audited. `force=True` authorization reads `force_list()` (below); any other actor with `force=True` returns False and audits the denial
-- `force_list() -> list[str]` — reads `FLOSS_CLAIM_FORCE_LIST` env (comma-separated holder ids), default `[]`. The launcher populates it from the Task-0 decision doc; Task 4 documents the variable in `RUNTIME_SURFACES.md`. No env → only the current holder may force
+- `force_list() -> list[str]` — reads `FLOSS_CLAIM_FORCE_LIST` env (comma-separated holder ids), default `[]`. Split on ",", strip each, drop empties. The launcher populates it from the Task-0 decision doc; Task 4 documents the variable in `RUNTIME_SURFACES.md`. No env → only the current holder may force
 - `race_claim(kind, base_id, holder, ttl=60, racers=8, repo_root=REPO_ROOT)` — holder owns all race blobs (same TTL); capture `expected_old` **once**, launch all `Popen` before any wait
 - Audit log default: `C:/~shit/.agent-surface/coord/claims.jsonl` (`REPO_ROOT.parent`, not FLOSS); tests inject a temp path
-- Test-support seams (exact names; signatures pinned by the tests below, implement exactly): `ZERO = "0"*40`; `_run(*git_args, repo_root=REPO_ROOT, input=None) -> CompletedProcess` (text mode, `input` passed as stdin); `current_sha(kind, raw_id, repo_root) -> str | None`; `current_holder(kind, raw_id, repo_root) -> str | None`; `is_expired(...)` (above); `AUDIT_LOG` module path; `_utc_now() -> datetime` (UTC); `audit_log_contains(raw_id, event, log_path) -> bool`; `ClaimIdError`
+- Test-support seams (exact names; signatures pinned by the tests below, implement exactly): `ZERO = "0"*40`; `_run(*git_args, repo_root=REPO_ROOT, input=None) -> CompletedProcess` (text mode, `input` passed as stdin); `_update_ref(ref, new_sha, expected_old, repo_root) -> CompletedProcess` — routes ALL `update-ref` writes; on stderr matching `File exists|Another git process` retries up to 3× with ~50ms jitter, then returns the last result; `current_sha(kind, raw_id, repo_root) -> str | None`; `current_holder(kind, raw_id, repo_root) -> str | None`; `is_expired(...)` (above); `AUDIT_LOG` module path; `_utc_now() -> datetime` (UTC); `audit_log_contains(raw_id, event, log_path) -> bool`; `ClaimIdError`
 
 - [ ] **Step 1: Failing tests**
 
@@ -450,6 +450,19 @@ def test_force_drop_corrupt_blob_denied_and_audited(tmp_repo, tmp_path, monkeypa
     assert cc.force_drop("path", "docs/corrupt.md", actor="bob", force=True, repo_root=tmp_repo) is False
     assert cc.audit_log_contains("docs/corrupt.md", "E_CLAIM_DATA", audit_log)
 
+def test_lock_contention_retries_update_ref(tmp_repo, monkeypatch):
+    real = cc._run
+    n = {"update": 0}
+    def scripted(*a, **k):
+        if a and a[0] == "update-ref":
+            n["update"] += 1
+            if n["update"] <= 2:
+                return subprocess.CompletedProcess(a, 128, "", "fatal: Unable to create '.git/refs.lock': File exists")
+        return real(*a, **k)
+    monkeypatch.setattr(cc, "_run", scripted)
+    assert cc.claim("path", "docs/retry.md", "alice", 60, tmp_repo)[0]
+    assert n["update"] == 3
+
 def test_8way_cas_same_expected_old(tmp_repo):
     results = cc.race_claim("branch", "race-8", "racer", 60, 8, tmp_repo)
     assert sum(1 for ok, _ in results if ok) == 1
@@ -457,10 +470,20 @@ def test_8way_cas_same_expected_old(tmp_repo):
 def test_unauthorized_force_true_is_denied_and_audited(tmp_repo, tmp_path, monkeypatch):
     audit_log = tmp_path / "claims.jsonl"
     monkeypatch.setattr(cc, "AUDIT_LOG", audit_log)
+    monkeypatch.delenv("FLOSS_CLAIM_FORCE_LIST", raising=False)
     assert cc.claim("path", "docs/live.md", "alice", 3600, tmp_repo)[0]
     assert not cc.force_drop("path", "docs/live.md", actor="mallory", force=True, repo_root=tmp_repo)
     assert cc.current_holder("path", "docs/live.md", tmp_repo) == "alice"
     assert cc.audit_log_contains("docs/live.md", "force_drop_denied", audit_log)
+
+def test_authorized_force_list_allows_non_holder_before_2x_ttl(tmp_repo, tmp_path, monkeypatch):
+    audit_log = tmp_path / "claims.jsonl"
+    monkeypatch.setattr(cc, "AUDIT_LOG", audit_log)
+    monkeypatch.setenv("FLOSS_CLAIM_FORCE_LIST", " op ,,root ")
+    assert cc.force_list() == ["op", "root"]
+    assert cc.claim("path", "docs/live.md", "alice", 3600, tmp_repo)[0]
+    assert cc.force_drop("path", "docs/live.md", actor="op", force=True, repo_root=tmp_repo)
+    assert cc.current_holder("path", "docs/live.md", tmp_repo) is None
 
 def test_stale_reclaimer_cannot_delete_concurrent_refresh(tmp_repo, monkeypatch):
     now = [datetime(2026, 9, 3, tzinfo=timezone.utc)]
@@ -525,11 +548,19 @@ def encode_claim_id(kind, raw_id, repo_root=REPO_ROOT):
             raise ClaimIdError(raw_id)
     elif kind == "worktree":
         # Filesystem path on Windows (NTFS case-insensitive): lowercase,
-        # lexically normalized (C:/wt/./x is the same checkout as C:/wt/x;
-        # hook lookup always compares git-canonical toplevels, so filing
-        # must canonicalize too). normpath also strips trailing separators.
+        # git-canonical when the path lives in a repo (so symlinked spellings
+        # of one checkout file one id — hook lookup always uses toplevel),
+        # else lexical normpath (also strips trailing separators).
         import posixpath
-        canonical = posixpath.normpath(str(raw_id).replace("\\", "/")).lower()
+        candidate = Path(str(raw_id).replace("\\", "/"))
+        if candidate.exists():
+            r = _run("rev-parse", "--show-toplevel", repo_root=str(candidate if candidate.is_dir() else candidate.parent))
+            if r.returncode == 0:
+                canonical = r.stdout.strip().replace("\\", "/").lower()
+            else:
+                canonical = posixpath.normpath(str(raw_id).replace("\\", "/")).lower()
+        else:
+            canonical = posixpath.normpath(str(raw_id).replace("\\", "/")).lower()
         if not canonical or canonical == ".":
             raise ClaimIdError(raw_id)
     else:  # branch: git refs are case-sensitive — preserve exact case.
@@ -557,7 +588,7 @@ All ref readers/writers (`claim`, `_blob`, `release`, `is_expired`, `force_drop`
 
 `claim()` algorithm:
 1. Resolve holder under the Task-0-approved identity contract; missing/empty → `(False, "E_AGENT_ID_MISSING")`. Form/validate ref; on `ClaimIdError`, return `(False, "E_ILLEGAL_ID")`.
-2. Read current SHA **once**. Missing → `update-ref <ref> <new> ZERO`.
+2. Read current SHA **once**. Missing → `_update_ref(<ref>, <new>, ZERO)`. All `update-ref` writes in `claim()` go through `_update_ref` (lock retry).
 3. Existing blob unparseable (holder/created/ttl) → `(False, "E_CLAIM_DATA")` — fail closed, never treat corruption as absent.
 4. Existing same holder → refresh with CAS against that SHA.
 5. Existing different holder and age `< 2×ttl` → `(False, existing_holder)`.
@@ -584,7 +615,7 @@ EOF
 
 ### Task 4: Enforcement — shared canonicalizer + fail-closed deny (N1/N3/N4/C9/H2)
 
-**Files:** Modify `hooks/hook_pre_write.py` (import `importlib.util` and **`subprocess`**; load `scripts/coord_claim.py`; delegate `_repo_relative`; preserve `is_substantive` behavior while adapting its local leading slash; add functions + call from `main`; **do not widen** `SUBSTANTIVE_PATH_SEGMENTS` or provenance scope); modify `docs/architecture/RUNTIME_SURFACES.md` to document the approved identity source/launch requirement; `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
+**Files:** Modify `hooks/hook_pre_write.py` (import `importlib.util` and **`subprocess`**; load `scripts/coord_claim.py`; delegate `_repo_relative`; preserve `is_substantive` behavior while adapting its local leading slash; add functions + call from `main`; **do not widen** `SUBSTANTIVE_PATH_SEGMENTS` or provenance scope); modify `docs/architecture/RUNTIME_SURFACES.md` to document the approved identity source/launch requirement **and** the `FLOSS_CLAIM_FORCE_LIST` variable (launcher-populated from the Task-0 decision; no env → holder-only force); `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
 
 **Interfaces:**
 - `resolve_floss_worktree(path, hook_root) -> Path | None` — BOTH args required (no defaults). `git -C <file>` fails (rc=128) for file paths, so parent-walk: start at the path (or its parent if not a dir), ascend until `git -C <dir> rev-parse --show-toplevel` succeeds. Accept only when that repo's ABSOLUTE `--git-common-dir` (`rev-parse --path-format=absolute --git-common-dir`, resolved) equals the hook checkout's absolute common dir — raw `.git` == `.git` across unrelated repos, so relative compare is forbidden. First enclosing repo not FLOSS → `None`; no repo found → `None`. Returns the target's actual toplevel (sibling worktrees resolve to themselves). Callers must never substitute the hook checkout's root for the result
@@ -593,7 +624,7 @@ EOF
 - `extract_agent_id(payload) -> str | None` — implement the Task-0-approved contract; proposed default reads unique per-session `FLOSS_AGENT_ID`, never a static harness name
 - `is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, str]` — `repo_root` is REQUIRED (no default): it must be the `resolve_floss_worktree` result for this target. A defaulted hook-checkout root would silently check the wrong worktree
 - `is_write_allowed(path: str, agent_id: str) -> bool` — resolves the target root internally via `resolve_floss_worktree(path, REPO_ROOT)` (None → True, allow) then negates `is_claim_blocked`
-- `deny_payload(holder: str) -> dict` for `--stdout-json`
+- `deny_payload(holder: str) -> dict` — REQUIRED shape: `{"reason": str, "holder": str, "hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}}`. Extra harness-compatible keys are additive, never substitutes for `permissionDecision: deny`
 - `main()` order: mutating-tool check → resolve target worktree (None → allow; crash → deny 2) → identity (missing → deny 2) → claim-check with target root → `is_substantive`. Deny or lookup/encoding error: print payload, **return 2**. `finish()` stays allow/exit 0. `_is_inside_repo` is NOT on the claim path
 
 - [ ] **Step 1: Failing tests**
@@ -860,6 +891,7 @@ def _claim_holder(kind: str, raw_id: str, repo_root=REPO_ROOT) -> str | None:
     if not isinstance(holder, str) or not holder:
         # Missing key, JSON null, empty, or non-string: corrupt, never absent.
         raise ClaimLookupError("E_CLAIM_DATA")
+    return holder
 
 def is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, str]:
     # repo_root is REQUIRED (no default) and must be the resolve_floss_worktree
