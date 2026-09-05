@@ -345,12 +345,24 @@ EOF
 - [ ] **Step 1: Failing tests**
 
 ```python
+import importlib.util
 import json
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+
+FLOSS_ROOT = Path(__file__).resolve().parents[2]
+
+def load(name: str, rel: str):
+    spec = importlib.util.spec_from_file_location(name, FLOSS_ROOT / rel)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 cc = load("coord_claim_under_test", "scripts/coord_claim.py")
 
@@ -417,11 +429,26 @@ def test_encoding_is_injective_and_encodes_dot_and_percent(tmp_repo):
 def test_outside_repo_path_is_illegal_not_conflict(tmp_repo):
     assert cc.claim("path", "C:/other/foo.py", "alice", 60, tmp_repo) == (False, "E_ILLEGAL_ID")
 
+def test_windows_reserved_names_are_illegal_not_conflict(tmp_repo):
+    assert cc.claim("branch", "aux", "alice", 60, tmp_repo) == (False, "E_ILLEGAL_ID")
+    assert cc.claim("path", "docs/con", "alice", 60, tmp_repo) == (False, "E_ILLEGAL_ID")
+    assert cc.claim("path", "docs/con.md", "alice", 60, tmp_repo)[0]  # con%2Emd is legal
+    assert cc.claim("path", "docs/console.md", "alice", 60, tmp_repo)[0]
+
 def test_malformed_blob_is_data_error_not_absent(tmp_repo):
     ref = cc.claim_ref("path", "docs/corrupt.md", tmp_repo)
     bad = cc._run("hash-object", "-w", "--stdin", repo_root=tmp_repo, input="{nope")
     cc._run("update-ref", ref, bad.stdout.strip(), cc.ZERO, repo_root=tmp_repo)
     assert cc.claim("path", "docs/corrupt.md", "bob", 60, tmp_repo) == (False, "E_CLAIM_DATA")
+
+def test_force_drop_corrupt_blob_denied_and_audited(tmp_repo, tmp_path, monkeypatch):
+    audit_log = tmp_path / "claims.jsonl"
+    monkeypatch.setattr(cc, "AUDIT_LOG", audit_log)
+    ref = cc.claim_ref("path", "docs/corrupt.md", tmp_repo)
+    bad = cc._run("hash-object", "-w", "--stdin", repo_root=tmp_repo, input="{nope")
+    cc._run("update-ref", ref, bad.stdout.strip(), cc.ZERO, repo_root=tmp_repo)
+    assert cc.force_drop("path", "docs/corrupt.md", actor="bob", force=True, repo_root=tmp_repo) is False
+    assert cc.audit_log_contains("docs/corrupt.md", "E_CLAIM_DATA", audit_log)
 
 def test_8way_cas_same_expected_old(tmp_repo):
     results = cc.race_claim("branch", "race-8", "racer", 60, 8, tmp_repo)
@@ -468,6 +495,13 @@ Each test module defines a local `tmp_repo` fixture: `git init -b main`, configu
 ```python
 _SAFE = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
 
+# M1: Windows reserved device basenames (case-insensitive, with or without
+# extension) pass check-ref-format but fail update-ref — reject explicitly.
+_RESERVED = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"COM{i}" for i in range(1, 10)] + [f"LPT{i}" for i in range(1, 10)]
+)
+
 def _encode_component(component: str) -> str:
     # urllib.parse.quote(safe="") is NOT sufficient: it leaves '.' unescaped.
     return "".join(chr(b) if b in _SAFE else f"%{b:02X}" for b in component.encode("utf-8")) or "%00"
@@ -508,6 +542,14 @@ def claim_ref(kind, raw_id, repo_root=REPO_ROOT):
     ref = f"refs/agent-claims/{kind}/{encode_claim_id(kind, raw_id, repo_root)}"
     if _run("check-ref-format", ref, repo_root=repo_root).returncode != 0:
         raise ClaimIdError(raw_id)
+    # M1: check-ref-format is necessary but NOT sufficient on Windows —
+    # reserved device names as *exact* path components pass it yet fail
+    # update-ref with Invalid argument. `con.md` encodes to `con%2Emd` and
+    # is legal; a component that is exactly CON/PRN/AUX/NUL/COM1-9/LPT1-9
+    # (e.g. branch `aux`, path `docs/con`) is not.
+    for part in ref.split("/")[3:]:
+        if part.upper() in _RESERVED:
+            raise ClaimIdError(raw_id)
     return ref
 ```
 
@@ -521,7 +563,7 @@ All ref readers/writers (`claim`, `_blob`, `release`, `is_expired`, `force_drop`
 5. Existing different holder and age `< 2×ttl` → `(False, existing_holder)`.
 6. Existing different holder and age `>= 2×ttl` → CAS-delete via `force_drop(..., actor=holder, expected_sha=current)` with audit, then exclusive-create with `ZERO`. If another writer wins the gap, return its holder/`conflict`; never overwrite.
 
-`force_drop()` validates the ref, reads one current SHA/blob, checks any supplied `expected_sha` against that current SHA, enforces `2×ttl` unless `force=True` **from an authorized actor**, then deletes with the current SHA as expected-old. Authorization: `force=True` requires `actor == old_holder` or `actor` in the Task-0-approved force list; any other actor with `force=True` returns False and audits the denial. On success it appends a JSONL audit record containing raw id, encoded ref, `old_holder` from the blob, separate `actor`, force flag, age, and UTC timestamp. Malformed blob/time/ref is an explicit error, never “not claimed.”
+`force_drop()` validates the ref, reads one current SHA/blob, checks any supplied `expected_sha` against that current SHA, enforces `2×ttl` unless `force=True` **from an authorized actor**, then deletes with the current SHA as expected-old. Authorization: `force=True` requires `actor == old_holder` or `actor` in the Task-0-approved force list; any other actor with `force=True` returns False and audits the denial. On success it appends a JSONL audit record containing raw id, encoded ref, `old_holder` from the blob, separate `actor`, force flag, age, and UTC timestamp. Malformed blob/time/ref returns `False` and audits the denial with the `E_CLAIM_DATA` code — explicit error, never "not claimed", never steal-able.
 
 `race_claim()` forms the encoded ref once, captures the same expected-old before spawning, creates all blobs, launches all `Popen` calls, then waits. Cleanup deletes the encoded ref.
 
@@ -545,7 +587,7 @@ EOF
 **Files:** Modify `hooks/hook_pre_write.py` (import `importlib.util` and **`subprocess`**; load `scripts/coord_claim.py`; delegate `_repo_relative`; preserve `is_substantive` behavior while adapting its local leading slash; add functions + call from `main`; **do not widen** `SUBSTANTIVE_PATH_SEGMENTS` or provenance scope); modify `docs/architecture/RUNTIME_SURFACES.md` to document the approved identity source/launch requirement; `shared-hook-surface.json` only if a specific JSON key is missing — show the exact snippet, do not “ensure flat” in prose.
 
 **Interfaces:**
-- `resolve_floss_worktree(path, hook_root) -> Path | None` — BOTH args required (no defaults): derive the target path's actual `git rev-parse --show-toplevel`; accept it only when its resolved `--git-common-dir` equals the hook script checkout's FLOSS common dir. Returns `None` outside every FLOSS checkout. This reaches sibling worktrees but excludes unrelated repositories. Callers must never substitute the hook checkout's root for the result
+- `resolve_floss_worktree(path, hook_root) -> Path | None` — BOTH args required (no defaults). `git -C <file>` fails (rc=128) for file paths, so parent-walk: start at the path (or its parent if not a dir), ascend until `git -C <dir> rev-parse --show-toplevel` succeeds. Accept only when that repo's ABSOLUTE `--git-common-dir` (`rev-parse --path-format=absolute --git-common-dir`, resolved) equals the hook checkout's absolute common dir — raw `.git` == `.git` across unrelated repos, so relative compare is forbidden. First enclosing repo not FLOSS → `None`; no repo found → `None`. Returns the target's actual toplevel (sibling worktrees resolve to themselves). Callers must never substitute the hook checkout's root for the result
 - `hook_pre_write._repo_relative(path, target_root)` resolves relative tool paths against `Path.cwd()`, then delegates the resulting absolute path to `coord_claim.repo_relative_path(path, target_root)` — no third case/containment normalizer; returned id has no leading slash
 - `is_substantive(path, target_root)` forms `norm = "/" + (_repo_relative(path, target_root) or "").lstrip("/")` before its existing segment checks, preserving the rebased N2 behavior
 - `extract_agent_id(payload) -> str | None` — implement the Task-0-approved contract; proposed default reads unique per-session `FLOSS_AGENT_ID`, never a static harness name
@@ -565,8 +607,9 @@ import pytest
 hp = load("hook_pre_write_under_test", "hooks/hook_pre_write.py")
 cc = load("coord_claim_under_test2", "scripts/coord_claim.py")
 
-# Shared fixtures/helpers: tmp_repo, git(repo, *args), init_repo(path) —
-# defined once in Task 3 Step 1 above; copy that preamble here verbatim.
+# Shared fixtures/helpers: imports, load(), FLOSS_ROOT, tmp_repo,
+# git(repo, *args), init_repo(path) — defined once in Task 3 Step 1 above;
+# copy that preamble here verbatim.
 
 def invoke(payload, monkeypatch):
     monkeypatch.setattr(hp.sys, "stdin", io.StringIO(json.dumps(payload)))
@@ -716,7 +759,7 @@ def extract_agent_id(payload: dict) -> str | None:
     value = os.environ.get("FLOSS_AGENT_ID", "").strip()
     return value or None
 
-def _repo_relative(path_str: str, repo_root: Path = REPO_ROOT) -> str | None:
+def _repo_relative(path_str: str, repo_root: Path) -> str | None:
     candidate = Path(path_str).expanduser()
     if not candidate.is_absolute():
         candidate = Path.cwd() / candidate  # preserve existing hook input semantics
@@ -724,7 +767,7 @@ def _repo_relative(path_str: str, repo_root: Path = REPO_ROOT) -> str | None:
 
 # In is_substantive(), preserve the leading slash expected by the existing
 # SUBSTANTIVE_PATH_SEGMENTS / CANON_PATH_SEGMENTS constants:
-#   rel = _repo_relative(path_str)
+#   rel = _repo_relative(path_str, target_root)
 #   if rel is None: return False
 #   norm = "/" + rel.lstrip("/")
 ```
@@ -740,6 +783,31 @@ def _git(*args, repo_root=REPO_ROOT):
         return subprocess.run(["git", "-C", str(repo_root), *args], capture_output=True, text=True)
     except (OSError, subprocess.SubprocessError) as exc:
         raise ClaimLookupError(str(exc)) from exc
+
+def resolve_floss_worktree(path_str: str, hook_root: Path) -> Path | None:
+    # B1: git -C <file> fails for file paths — parent-walk from the path.
+    # Defined AFTER _git / ClaimLookupError so a sequential copy does not NameError.
+    candidate = Path(path_str).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    start = candidate if candidate.is_dir() else candidate.parent
+    hook_common = _git("rev-parse", "--path-format=absolute", "--git-common-dir",
+                       repo_root=hook_root)
+    if hook_common.returncode != 0:
+        raise ClaimLookupError(hook_common.stderr)
+    hook_common_p = Path(hook_common.stdout.strip()).resolve()
+    for d in [start, *start.parents]:
+        top = _git("rev-parse", "--show-toplevel", repo_root=d)
+        if top.returncode != 0:
+            continue
+        common = _git("rev-parse", "--path-format=absolute", "--git-common-dir",
+                      repo_root=d)
+        if common.returncode != 0:
+            continue
+        if Path(common.stdout.strip()).resolve() == hook_common_p:
+            return Path(top.stdout.strip())
+        return None  # first enclosing repo is not a FLOSS checkout
+    return None
 
 def current_worktree(repo_root=REPO_ROOT) -> str:
     # Resolve the ACTUAL top-level of the target checkout (sibling worktrees
