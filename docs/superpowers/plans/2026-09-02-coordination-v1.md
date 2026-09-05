@@ -604,12 +604,13 @@ import json
 
 import pytest
 
+# Preamble FIRST (copy from Task 3 Step 1 verbatim before anything below):
+# importlib, subprocess, sys, datetime/timedelta/timezone, Path,
+# FLOSS_ROOT, load(), git(), tmp_repo, init_repo. The load() calls that
+# follow need it; a contiguous copy must collect.
+
 hp = load("hook_pre_write_under_test", "hooks/hook_pre_write.py")
 cc = load("coord_claim_under_test2", "scripts/coord_claim.py")
-
-# Shared fixtures/helpers: imports, load(), FLOSS_ROOT, tmp_repo,
-# git(repo, *args), init_repo(path) — defined once in Task 3 Step 1 above;
-# copy that preamble here verbatim.
 
 def invoke(payload, monkeypatch):
     monkeypatch.setattr(hp.sys, "stdin", io.StringIO(json.dumps(payload)))
@@ -647,6 +648,22 @@ def test_is_write_allowed_negates_blocked(tmp_repo, monkeypatch):
     assert cc.claim("path", str(target), "alice", 3600, tmp_repo)[0]
     assert hp.is_write_allowed(str(target), "alice") is True
     assert hp.is_write_allowed(str(target), "bob") is False
+
+def test_relative_tool_path_resolves_against_cwd_not_root(tmp_repo, monkeypatch):
+    pkg = tmp_repo / "packages"
+    pkg.mkdir(exist_ok=True)
+    target = pkg / "prod.py"
+    target.write_text("x")
+    assert cc.claim("path", str(target), "alice", 3600, tmp_repo)[0]
+    monkeypatch.chdir(pkg)
+    blocked, holder = hp.is_claim_blocked("prod.py", "bob", tmp_repo)
+    assert blocked and holder == "alice"
+
+def test_null_holder_blob_is_data_error_not_absent(tmp_repo):
+    ref = cc.claim_ref("path", "docs/null.md", tmp_repo)
+    bad = cc._run("hash-object", "-w", "--stdin", repo_root=tmp_repo, input='{"holder": null}')
+    cc._run("update-ref", ref, bad.stdout.strip(), cc.ZERO, repo_root=tmp_repo)
+    assert hp.is_claim_blocked(str(tmp_repo / "docs/null.md"), "bob", tmp_repo) == (True, "E_CLAIM_DATA")
 
 def test_hook_and_claim_use_same_canonical_id(tmp_repo):
     mixed = str(tmp_repo / "Docs" / "X Y.lock")
@@ -836,9 +853,13 @@ def _claim_holder(kind: str, raw_id: str, repo_root=REPO_ROOT) -> str | None:
     if blob.returncode != 0:
         raise ClaimLookupError(blob.stderr)
     try:
-        return json.loads(blob.stdout)["holder"]
-    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        data = json.loads(blob.stdout)
+    except json.JSONDecodeError as exc:
         raise ClaimLookupError("E_CLAIM_DATA") from exc
+    holder = data.get("holder") if isinstance(data, dict) else None
+    if not isinstance(holder, str) or not holder:
+        # Missing key, JSON null, empty, or non-string: corrupt, never absent.
+        raise ClaimLookupError("E_CLAIM_DATA")
 
 def is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, str]:
     # repo_root is REQUIRED (no default) and must be the resolve_floss_worktree
@@ -846,6 +867,14 @@ def is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, s
     # check the wrong worktree.
     if _CC is None:  # F8: coord_claim failed to load — fail closed
         return True, "E_CLAIM_LOOKUP"
+    # Blocking-1: tool paths may be relative to the hook's cwd, NOT the repo
+    # root. repo_relative_path joins repo_root, so a bare "prod.py" would file
+    # as <root>/prod.py while the agent meant <cwd>/prod.py. Resolve against
+    # cwd first (same rule as _repo_relative), then file the absolute path.
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    path = str(candidate)
     try:
         scopes = [("worktree", current_worktree(repo_root))]
         branch = current_branch(repo_root)
