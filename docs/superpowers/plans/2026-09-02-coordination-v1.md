@@ -345,7 +345,53 @@ EOF
 - [ ] **Step 1: Failing tests**
 
 ```python
+import json
+import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import pytest
+
 cc = load("coord_claim_under_test", "scripts/coord_claim.py")
+
+def git(repo, *args, **kwargs):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True,
+                       text=True, **kwargs)
+    assert r.returncode == 0, r.stderr
+    return r
+
+@pytest.fixture
+def tmp_repo(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir(exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main", str(repo)], check=True,
+                   capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "--allow-empty", "-m", "init"],
+                   check=True, capture_output=True)
+    return repo
+
+def init_repo(path):
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main", str(path)], check=True,
+                   capture_output=True)
+    return path
+
+def test_claim_default_holder_missing_env_fails_closed(tmp_repo, monkeypatch):
+    monkeypatch.delenv("FLOSS_AGENT_ID", raising=False)
+    assert cc.claim("path", "docs/x.md", None, 60, tmp_repo) == (False, "E_AGENT_ID_MISSING")
+
+def test_release_and_is_expired_on_missing_or_corrupt_are_false_not_stealable(tmp_repo):
+    assert cc.release("path", "docs/absent.md", "alice", tmp_repo) is False
+    assert cc.is_expired("path", "docs/absent.md", tmp_repo) is False
+    ref = cc.claim_ref("path", "docs/corrupt.md", tmp_repo)
+    bad = cc._run("hash-object", "-w", "--stdin", repo_root=tmp_repo, input="{nope")
+    cc._run("update-ref", ref, bad.stdout.strip(), cc.ZERO, repo_root=tmp_repo)
+    assert cc.release("path", "docs/corrupt.md", "alice", tmp_repo) is False
+    assert cc.is_expired("path", "docs/corrupt.md", tmp_repo) is False
 
 def test_create_is_exclusive_and_release_is_holder_only(tmp_repo):
     raw = "docs/specs/spec-registry.json"
@@ -381,7 +427,9 @@ def test_8way_cas_same_expected_old(tmp_repo):
     results = cc.race_claim("branch", "race-8", "racer", 60, 8, tmp_repo)
     assert sum(1 for ok, _ in results if ok) == 1
 
-def test_unauthorized_force_true_is_denied_and_audited(tmp_repo, audit_log):
+def test_unauthorized_force_true_is_denied_and_audited(tmp_repo, tmp_path, monkeypatch):
+    audit_log = tmp_path / "claims.jsonl"
+    monkeypatch.setattr(cc, "AUDIT_LOG", audit_log)
     assert cc.claim("path", "docs/live.md", "alice", 3600, tmp_repo)[0]
     assert not cc.force_drop("path", "docs/live.md", actor="mallory", force=True, repo_root=tmp_repo)
     assert cc.current_holder("path", "docs/live.md", tmp_repo) == "alice"
@@ -442,10 +490,13 @@ def encode_claim_id(kind, raw_id, repo_root=REPO_ROOT):
         if canonical is None:
             raise ClaimIdError(raw_id)
     elif kind == "worktree":
-        # Filesystem path on Windows (NTFS case-insensitive): lowercase, no
-        # trailing separator (C:/wt/ is the same checkout as C:/wt).
-        canonical = str(raw_id).replace("\\", "/").lower().rstrip("/")
-        if not canonical:
+        # Filesystem path on Windows (NTFS case-insensitive): lowercase,
+        # lexically normalized (C:/wt/./x is the same checkout as C:/wt/x;
+        # hook lookup always compares git-canonical toplevels, so filing
+        # must canonicalize too). normpath also strips trailing separators.
+        import posixpath
+        canonical = posixpath.normpath(str(raw_id).replace("\\", "/")).lower()
+        if not canonical or canonical == ".":
             raise ClaimIdError(raw_id)
     else:  # branch: git refs are case-sensitive — preserve exact case.
         # Do NOT lower() or casefold() branch names: Feature/X != feature/x,
@@ -507,9 +558,15 @@ EOF
 
 ```python
 import io
+import json
+
+import pytest
 
 hp = load("hook_pre_write_under_test", "hooks/hook_pre_write.py")
 cc = load("coord_claim_under_test2", "scripts/coord_claim.py")
+
+# Shared fixtures/helpers: tmp_repo, git(repo, *args), init_repo(path) —
+# defined once in Task 3 Step 1 above; copy that preamble here verbatim.
 
 def invoke(payload, monkeypatch):
     monkeypatch.setattr(hp.sys, "stdin", io.StringIO(json.dumps(payload)))
@@ -538,6 +595,16 @@ def test_hook_resolves_sibling_worktree_scopes_not_hook_checkout(tmp_repo, tmp_p
     blocked, holder = hp.is_claim_blocked(str(target), "bob", authenticity)
     assert blocked and holder == "alice"
 
+def test_is_write_allowed_negates_blocked(tmp_repo, monkeypatch):
+    target = tmp_repo / "docs/z.md"
+    target.parent.mkdir(exist_ok=True)
+    target.write_text("z")
+    monkeypatch.setattr(hp, "resolve_floss_worktree", lambda *a, **k: tmp_repo)
+    assert hp.is_write_allowed(str(target), "alice") is True
+    assert cc.claim("path", str(target), "alice", 3600, tmp_repo)[0]
+    assert hp.is_write_allowed(str(target), "alice") is True
+    assert hp.is_write_allowed(str(target), "bob") is False
+
 def test_hook_and_claim_use_same_canonical_id(tmp_repo):
     mixed = str(tmp_repo / "Docs" / "X Y.lock")
     lower = str(tmp_repo / "docs" / "x y.lock")
@@ -564,6 +631,7 @@ def test_non_path_claim_refs_are_legal_and_injective(kind, raw, tmp_repo):
 
 def test_worktree_trailing_separator_is_same_checkout(tmp_repo):
     assert cc.claim_ref("worktree", "C:/wt/", tmp_repo) == cc.claim_ref("worktree", "C:/wt", tmp_repo)
+    assert cc.claim_ref("worktree", "C:/wt/./x", tmp_repo) == cc.claim_ref("worktree", "C:/wt/x", tmp_repo)
 
 def test_lower_not_casefold_avoids_unicode_collision(tmp_repo):
     assert cc.claim_ref("branch", "Straße", tmp_repo) != cc.claim_ref("branch", "Strasse", tmp_repo)
@@ -723,7 +791,12 @@ def is_claim_blocked(path: str, agent_id: str, repo_root: Path) -> tuple[bool, s
         return False, ""
     except _CC.ClaimIdError:
         return True, "E_ILLEGAL_ID"
-    except (ClaimLookupError, OSError, subprocess.SubprocessError):
+    except ClaimLookupError as exc:
+        # F4: preserve explicit E_ codes (notably E_CLAIM_DATA from corrupt
+        # blobs); anything else collapses to E_CLAIM_LOOKUP. Deny either way.
+        code = str(exc) or "E_CLAIM_LOOKUP"
+        return True, code if code.startswith("E_") else "E_CLAIM_LOOKUP"
+    except (OSError, subprocess.SubprocessError):
         return True, "E_CLAIM_LOOKUP"
 ```
 
@@ -758,9 +831,14 @@ if blocked:
     else:
         sys.stderr.write(payload["reason"] + "\n")
     return 2
+# F1: the existing 1-arg call below MUST be updated — after the signature change
+# a bare is_substantive(file_path) raises TypeError on every unclaimed write.
+if not is_substantive(file_path, target_root):
+    return finish()  # claim check passed; not provenance-worthy
+# ... existing provenance/substantive handling continues unchanged
 ```
 
-`SUBSTANTIVE_PATH_SEGMENTS` and provenance scope remain unchanged. `is_substantive` changes only its local leading-slash adaptation to preserve prior semantics.
+`SUBSTANTIVE_PATH_SEGMENTS` and provenance scope remain unchanged. `is_substantive` changes only its local leading-slash adaptation to preserve prior semantics. **Call-site update is mandatory, not optional:** the existing `if not is_substantive(file_path):` in `main()` (live hook ~L194, rebased base ~L211) must become `is_substantive(file_path, target_root)` — the new signature has no default, so the old call raises `TypeError` on every unclaimed write (crash, exit 1, no deny payload).
 
 - [ ] **Step 4: Tests + `materialize_shared_hook_surface.py --check` + green set**
 
