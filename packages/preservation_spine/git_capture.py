@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 import shutil
 import stat
 import subprocess
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from pathlib import PurePosixPath
@@ -35,19 +35,6 @@ class CaptureUnverifiable(CaptureEvidenceError):
     """Raised when redaction makes requested byte equality unprovable."""
 
 
-def _split_segments(component: str) -> list[str]:
-    """Split a path component on dash and underscore boundaries.
-
-    Dots are NOT separators — extensions are checked via suffix matching
-    in is_secret.
-
-    e.g. 'my-token' → ['my', 'token']
-    e.g. 'api_key' → ['api', 'key']
-    e.g. 'wallet-seed' → ['wallet', 'seed']
-    """
-    return [s for s in re.split(r"[-_]", component) if s]
-
-
 def _marker_in_stem(marker: str, stem: str) -> bool:
     """Check if marker appears in the filename stem as a substring.
 
@@ -59,11 +46,16 @@ def _marker_in_stem(marker: str, stem: str) -> bool:
     matches because the stem 'seed' contains the marker, not because
     'seed' appears somewhere in the path string.
 
+    Dashes and underscores normalize to the same separator before
+    comparison, so markers written with underscores ('api_key', 'id_rsa')
+    also match dash-written filenames ('api-key.txt', 'id-rsa').
+
     e.g. 'seed' in 'seed' → True          'secret' in 'secrets' → True
          'token' in 'my-token' → True      'seed' in 'seedling' → True
          'seed' in 'wallet-seed' → True    'credential' in 'credentials' → True
+         'api_key' in 'api-key' → True     'id_rsa' in 'id-rsa' → True
     """
-    return marker in stem
+    return marker.replace("-", "_") in stem.replace("-", "_")
 
 
 @dataclass(frozen=True)
@@ -102,7 +94,8 @@ class SecretPolicy:
         - exact path component equality (e.g. '.env' == '.env')
         - dotfile prefix (e.g. '.env' matches '.env.local')
         - suffix/extension (e.g. '.key' matches 'private.key')
-        - substring of the filename stem (e.g. 'token' in stem 'my-token')
+        - substring of the filename stem (e.g. 'token' in stem 'my-token';
+          dashes/underscores normalize, so 'api_key' matches 'api-key')
 
         The key change from the old policy: directory components and the
         extension no longer contribute.  'docs/seed.md' matches because the
@@ -127,11 +120,9 @@ class SecretPolicy:
                 # dot-prefix of the component.
                 if mf.startswith(".") and folded.startswith(mf + "."):
                     return True
-                # Marker as a separator-bounded token in the stem.
-                # e.g. 'api_key' matches stem 'api_key' (exact stem),
-                #      'token' matches stem 'my-token' (dash-bounded),
-                #      'seed' matches stem 'wallet-seed' (dash-bounded).
-                # Does NOT match 'seedling' (seed not separator-bounded).
+                # Marker as a substring of the stem (dashes/underscores
+                # normalize inside _marker_in_stem).  Fail-closed: 'seed'
+                # matches 'seedling', 'api_key' matches 'api-key'.
                 stem = PurePosixPath(part).stem.casefold()
                 if _marker_in_stem(mf, stem):
                     return True
@@ -251,6 +242,29 @@ def _optional_stash(repo: Path) -> bytes | None:
     return completed.stdout
 
 
+def _require_preservable_paths(paths: tuple[str, ...]) -> None:
+    """Fail closed when a repository path cannot live in the capsule format.
+
+    The manifest contract requires strict-UTF-8 NFC names
+    (_is_safe_manifest_path).  A surrogateescape residue (undecodable bytes
+    on Unix) would die later as an unclassified UnicodeEncodeError inside
+    canonical_json_bytes; a valid non-NFC name would seal planes the
+    inventory must then reject.  Both are source-side conditions, so both
+    raise CaptureDrift — before the state directory exists.
+    """
+    for path in paths:
+        try:
+            path.encode("utf-8")
+        except UnicodeEncodeError:
+            raise CaptureDrift(
+                "repository path is not valid UTF-8 and cannot be preserved"
+            ) from None
+        if unicodedata.normalize("NFC", path) != path:
+            raise CaptureDrift(
+                f"repository path is not NFC-normalized and cannot be preserved: {path!r}"
+            )
+
+
 def _shared_index_files(repo: Path) -> list[Path]:
     """Backing files an index may depend on under `core.splitIndex`.
 
@@ -262,16 +276,27 @@ def _shared_index_files(repo: Path) -> list[Path]:
     conflict-stage entries or index extensions.
 
     Returned so they can be copied beside index.raw and restored together.
+
+    Fail closed: any sharedindex.* entry that is not a plain file (symlink
+    to elsewhere, directory swap, or a name git no longer resolves) means
+    the stub index.raw cannot be faithfully bundled.  Callers run this as
+    a pre-flight before any git index read, so a dangling backing raises
+    CaptureDrift instead of dying later as an unclassified git error.
     """
     raw = run_git(repo, "rev-parse", "--path-format=absolute", "--git-dir")
     git_dir = Path(raw.rstrip(b"\r\n").decode("utf-8", errors="surrogateescape"))
-    # Use lstat to avoid following symlinks — a sharedindex.* symlink
-    # in a compromised .git would silently redirect the capsule elsewhere.
-    return sorted(
-        path
-        for path in git_dir.glob("sharedindex.*")
-        if path.is_symlink() is False and path.exists()
-    )
+    backing: list[Path] = []
+    for path in sorted(git_dir.glob("sharedindex.*")):
+        # Use lstat semantics — a sharedindex.* symlink in a compromised
+        # .git would silently redirect the capsule elsewhere, and a
+        # non-file entry means the stub index has no preservable backing.
+        if path.is_symlink() or not path.is_file():
+            raise CaptureDrift(
+                "split-index backing file cannot be faithfully preserved: "
+                f"{path.name}"
+            )
+        backing.append(path)
+    return backing
 
 
 def _index_path(repo: Path) -> Path:
@@ -321,6 +346,9 @@ def snapshot_subject(
             repo,
             "diff",
             "--no-ext-diff",
+            "--no-textconv",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
             "--binary",
             "--full-index",
             "--cached",
@@ -330,6 +358,9 @@ def snapshot_subject(
             repo,
             "diff-files",
             "--no-ext-diff",
+            "--no-textconv",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
             "--binary",
             "--full-index",
             exclude_paths=exclude_paths,
@@ -845,7 +876,18 @@ def capture_planes(
 
     repo = _repository_root(repo)
     _validate_destination(repo, destination)
+    # Pre-flight before any git index read: a split index whose backing
+    # file cannot be faithfully bundled must fail closed here, not die
+    # later as an unclassified git error from deep inside the snapshot.
+    shared_index_files = _shared_index_files(repo)
     inventory_before = _inventory_state(repo, secret_policy)
+    _require_preservable_paths(
+        (
+            *inventory_before.tracked_paths,
+            *inventory_before.untracked_paths,
+            *inventory_before.ignored_paths,
+        )
+    )
     tracked_paths = inventory_before.tracked_paths
     untracked_paths = inventory_before.untracked_paths
     ignored_paths = inventory_before.ignored_paths
@@ -863,7 +905,6 @@ def capture_planes(
     local_history_id = _resolved_commit(repo, "HEAD")
     object_format = _storage_object_format(repo)
     index_bytes = _index_path(repo).read_bytes()
-    shared_index_files = _shared_index_files(repo)
     tracked_manifest = _tracked_manifest(repo, tracked_paths, secret_policy)
 
     destination.mkdir(parents=True, exist_ok=False)

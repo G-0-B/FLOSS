@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -14,6 +15,7 @@ from packages.preservation_spine.git_capture import (
     CaptureUnverifiable,
     SecretPolicy,
     _decode_paths,
+    _require_preservable_paths,
     assert_unchanged,
     capture_planes,
     run_git,
@@ -1174,6 +1176,140 @@ def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
     assert b"diff --git" in snapshot.unstaged_diff
 
 
+def test_capture_ignores_ambient_git_routing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ambient GIT_DIR/GIT_INDEX_FILE/GIT_OBJECT_DIRECTORY must not redirect
+    capture queries.  Under a Git hook these point at another repository;
+    _git_environment strips every GIT_* variable so `git -C --repo` wins."""
+    repo = initialized_repo(tmp_path)
+    intruder = tmp_path / "intruder"
+    git(tmp_path, "init", str(intruder))
+    git(intruder, "config", "user.email", "test@example.invalid")
+    git(intruder, "config", "user.name", "Test")
+    (intruder / "evil.txt").write_text("evil\n", encoding="utf-8")
+    git(intruder, "add", "evil.txt")
+    git(intruder, "commit", "-m", "intruder")
+
+    monkeypatch.setenv("GIT_DIR", str(intruder / ".git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(intruder / ".git" / "index"))
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", str(intruder / ".git" / "objects"))
+
+    # The snapshot runs under the poisoned environment (the behavior under
+    # test).  Witness heads are read after undo() because the test helper
+    # inherits os.environ and would otherwise resolve through GIT_DIR too.
+    snapshot = snapshot_subject(repo)
+
+    monkeypatch.undo()
+    expected_head = git(repo, "rev-parse", "HEAD").stdout
+    intruder_head = git(intruder, "rev-parse", "HEAD").stdout
+    assert snapshot.head == expected_head
+    assert snapshot.head != intruder_head
+
+
+def test_staged_diff_ignores_textconv_helpers(tmp_path: Path) -> None:
+    """A configured diff.<driver>.textconv helper must not rewrite captured
+    diff bytes.  --no-ext-diff does NOT disable textconv: without
+    --no-textconv a helper returning identical text for both blobs makes
+    staged.diff empty while snapshots still compare equal."""
+    repo = initialized_repo(tmp_path)
+    (repo / "doc.txt").write_text("real content\n", encoding="utf-8")
+    git(repo, "add", "doc.txt")
+    (repo / ".gitattributes").write_text("*.txt diff=constdriver\n", encoding="utf-8")
+    git(repo, "config", "diff.constdriver.textconv", "echo constant")
+    (repo / "doc.txt").write_text("changed content\n", encoding="utf-8")
+    git(repo, "add", "doc.txt")
+
+    snapshot = snapshot_subject(repo)
+
+    assert b"constant" not in snapshot.staged_diff
+    assert b"changed content" in snapshot.staged_diff
+
+
+def test_staged_diff_uses_stable_prefixes(tmp_path: Path) -> None:
+    """diff.noprefix / diff.mnemonicPrefix must not break header parsing.
+    _split_diff_header requires a/ b/ prefixes; explicit --src-prefix/--dst-prefix
+    keeps capture deterministic regardless of repo config."""
+    repo = initialized_repo(tmp_path)
+    (repo / "f.txt").write_text("one\n", encoding="utf-8")
+    git(repo, "add", "f.txt")
+    git(repo, "commit", "-m", "add f")
+    (repo / "f.txt").write_text("two\n", encoding="utf-8")
+    git(repo, "add", "f.txt")
+    git(repo, "config", "diff.noprefix", "true")
+
+    snapshot = snapshot_subject(repo)
+
+    assert b"diff --git a/f.txt b/f.txt" in snapshot.staged_diff
+
+
+def test_split_index_backing_file_is_bundled(tmp_path: Path) -> None:
+    """Under core.splitIndex the index is a stub pointing at
+    $GIT_DIR/sharedindex.<oid>.  The capsule must bundle that backing
+    file beside index.raw (with its sha256 in metadata), not a dangling
+    pointer."""
+    repo = initialized_repo(tmp_path)
+    git(repo, "update-index", "--split-index")
+    backing = sorted((repo / ".git").glob("sharedindex.*"))
+    assert backing, "test setup: expected git to split the index"
+
+    capture_planes(repo, "HEAD", "HEAD", tmp_path / "capsule", SecretPolicy.default())
+
+    import json
+
+    plane = tmp_path / "capsule" / "local-index"
+    metadata = json.loads((plane / "metadata.json").read_text(encoding="utf-8"))
+    assert (plane / "index.raw").exists()
+    recorded = {entry["name"]: entry["sha256"] for entry in metadata["shared_index_files"]}
+    assert [shared.name for shared in backing] == sorted(recorded)
+    for shared in backing:
+        copied = plane / shared.name
+        assert copied.exists()
+        assert recorded[shared.name] == hashlib.sha256(shared.read_bytes()).hexdigest()
+
+
+def test_split_index_with_unpreservable_backing_file_fails_closed(
+    tmp_path: Path,
+) -> None:
+    """A sharedindex.* entry that is not a plain file (here: swapped for a
+    directory; a symlink to elsewhere is the same branch) cannot be
+    faithfully bundled — capture must fail closed, not record a stub
+    index.raw with no backing."""
+    repo = initialized_repo(tmp_path)
+    git(repo, "update-index", "--split-index")
+    backing = sorted((repo / ".git").glob("sharedindex.*"))
+    assert backing, "test setup: expected git to split the index"
+    victim = backing[0]
+    victim.unlink()
+    victim.mkdir()
+
+    with pytest.raises(CaptureDrift):
+        capture_planes(repo, "HEAD", "HEAD", tmp_path / "capsule", SecretPolicy.default())
+
+
+def test_surrogate_path_is_unpreservable() -> None:
+    """A path with undecodable bytes (surrogateescape residue) cannot be
+    represented in the UTF-8 JSON capsule — it must fail closed, not reach
+    canonical_json_bytes as an unclassified UnicodeEncodeError."""
+    with pytest.raises(CaptureDrift):
+        _require_preservable_paths(("a\udcff.txt",))
+
+
+def test_non_nfc_path_fails_closed_before_state_dir(tmp_path: Path) -> None:
+    """A valid non-NFC name passes capture validation but the manifest
+    contract requires NFC — capture must fail closed with a typed error
+    BEFORE creating the state directory, not seal planes it can never
+    inventory."""
+    repo = initialized_repo(tmp_path)
+    # Decomposed e + combining acute (explicit escapes: a literal é here
+    # would be the NFC form and would not exercise the branch).
+    (repo / "é.txt").write_text("decomposed\n", encoding="utf-8")
+
+    with pytest.raises(CaptureDrift):
+        capture_planes(repo, "HEAD", "HEAD", tmp_path / "capsule", SecretPolicy.default())
+    assert not (tmp_path / "capsule").exists()
+
+
 @pytest.mark.parametrize(
     ("relative_path", "expected_secret"),
     [
@@ -1190,6 +1326,10 @@ def test_diff_ignores_external_diff_tool(tmp_path: Path) -> None:
         ("seed.txt", True),
         ("private.key", True),
         ("id_rsa", True),
+        # Separator variants: markers use underscores, filenames use dashes.
+        ("api-key.txt", True),
+        ("id-rsa", True),
+        ("my-private-key.pem", True),
         # Directory components do not redact: marker must be in the stem.
         ("config/env/settings.py", False),
         ("docs/patterns-guide.md", False),  # stem has no marker substring
