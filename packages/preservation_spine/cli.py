@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from dataclasses import fields as _dataclass_fields
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -299,7 +300,12 @@ def _handle_verify(args: argparse.Namespace) -> int:
         manifest_digest=latest.manifest_digest,
         verification_digest=verification_digest,
         completed_actions=(
-            *latest.completed_actions,
+            *_without_action(
+                _without_action(latest.completed_actions, "restore-verified"),
+                # A fresh verification digest invalidates any earlier
+                # inventory binding, so the stale entry must not survive.
+                "manifest-inventoried",
+            ),
             "restore-verified",
         ),
         blockers=blockers,
@@ -612,13 +618,22 @@ def _capsule_status(records: Sequence[PlaneRecord]) -> ResultStatus:
 
 def _excluded_paths(capsule_root: Path) -> tuple[str, ...]:
     excluded: set[str] = set()
-    for metadata_path in (
-        capsule_root / "local-index" / "metadata.json",
-        capsule_root / "local-tracked-worktree" / "metadata.json",
-        capsule_root / "local-untracked-ignored" / "metadata.json",
+    # Plane directories derive from PlaneId — a hardcoded literal here once
+    # pointed at the nonexistent 'local-tracked-worktree' and silently
+    # dropped every tracked secret from the capsule exclusions.
+    for plane_id in (
+        PlaneId.LOCAL_INDEX,
+        PlaneId.LOCAL_TRACKED,
+        PlaneId.LOCAL_UNTRACKED,
     ):
+        metadata_path = capsule_root / plane_id.value / "metadata.json"
+        # capture_planes always writes all three metadata files, so a
+        # missing one means a corrupt or foreign capsule — fail loud
+        # instead of silently under-reporting exclusions.
         if not metadata_path.is_file():
-            continue
+            raise ValueError(
+                f"required plane metadata is missing: {plane_id.value}/metadata.json"
+            )
         payload = _load_json_object(metadata_path)
         value = payload.get("secret_path_exclusions", [])
         if isinstance(value, list):
@@ -650,6 +665,16 @@ def _load_verification(state_dir: Path) -> VerificationRecord:
     if not path.is_file():
         raise ValueError("verification record is missing")
     data = _load_json_object(path)
+    # Reject unbound fields: anything not in the dataclass schema was not
+    # present when verification_digest was computed, so accepting it would
+    # let inventory attest to a record render-github copies verbatim —
+    # including attacker- or producer-added absolute paths and diagnostics.
+    known = frozenset(field.name for field in _dataclass_fields(VerificationRecord))
+    unknown = set(data) - known
+    if unknown:
+        raise ValueError(
+            "verification record carries unbound fields: " + ",".join(sorted(unknown))
+        )
     try:
         return VerificationRecord(
             schema_version=str(data["schema_version"]),
@@ -670,6 +695,13 @@ def _load_verification(state_dir: Path) -> VerificationRecord:
 def _plane_restore_result(value: object) -> PlaneRestoreResult:
     if not isinstance(value, dict):
         raise ValueError("verification plane record is malformed")
+    known = frozenset(field.name for field in _dataclass_fields(PlaneRestoreResult))
+    unknown = set(value) - known
+    if unknown:
+        raise ValueError(
+            "verification plane record carries unbound fields: "
+            + ",".join(sorted(str(item) for item in unknown))
+        )
     return PlaneRestoreResult(
         plane_id=PlaneId(str(value["plane_id"])),
         subject_id=str(value["subject_id"]),

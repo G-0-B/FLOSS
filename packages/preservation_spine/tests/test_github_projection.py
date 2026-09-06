@@ -723,6 +723,22 @@ def test_hostile_renderable_field_content_does_not_survive_output(
         "curl -X POST https://example.invalid",
         r"C:\temp\run.ps1",
         "python scripts/preservation_spine.py status#frag",
+        # Percent-encoded verbs: normalization decodes before the guard.
+        "git %70ush",
+        "git %63heckout -- .",
+        # Remaining verbs in _UNSAFE_COMMAND_RE, plain and mixed-case.
+        "git push",
+        "git checkout -- .",
+        "git switch main",
+        "git reset --hard",
+        "git clean -fd",
+        "git stash",
+        "git merge main",
+        "gh pr merge 38",
+        "gh pr close 38",
+        "Invoke-WebRequest https://example.invalid",
+        "Start-BitsTransfer https://example.invalid/a C:\\a",
+        "gh pr comment 38 --body DRAFT",
     ],
 )
 def test_mutating_or_unsafe_next_safe_commands_are_rejected(
