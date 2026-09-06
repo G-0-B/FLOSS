@@ -789,7 +789,7 @@ def test_script_help_matches_main_surface(tmp_path: Path) -> None:
 def test_capture_drift_surfaces_real_exception_message(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """CaptureDrift from capture_planes must reach the user with its real message, not 'local-only salvage command failed'."""
+    """CaptureDrift from capture_planes must reach the user with its real message, not 'local-only preservation command failed'."""
     repo, main_sha, pr_sha = _build_repo(tmp_path)
     output = tmp_path / "capsule-state-drift"
 
@@ -819,7 +819,7 @@ def test_capture_drift_surfaces_real_exception_message(
 
     captured = capsys.readouterr()
     assert "source state changed during capture" in captured.err
-    assert "local-only salvage command failed" not in captured.err
+    assert "local-only preservation command failed" not in captured.err
 
 
 def test_capture_cleans_up_output_dir_on_failure(
