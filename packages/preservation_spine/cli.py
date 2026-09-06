@@ -134,7 +134,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit_error(str(exc))
         return 1
     except Exception:
-        _emit_error("local-only salvage command failed")
+        _emit_error("local-only preservation command failed")
         return 1
 
 
@@ -834,5 +834,5 @@ def _emit_error(message: str) -> None:
 def _sanitized_message(message: str) -> str:
     rendered = str(message).replace("\\", "/")
     if ":/" in rendered or rendered.startswith("//"):
-        return "local-only salvage command failed"
+        return "local-only preservation command failed"
     return rendered

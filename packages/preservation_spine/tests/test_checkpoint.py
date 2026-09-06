@@ -195,6 +195,33 @@ def _inject_faulty_fdopen(
     monkeypatch.setattr(checkpoint_module.os, "fdopen", wrapped_fdopen)
 
 
+def test_fdopen_failure_releases_the_raw_descriptor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If os.fdopen raises after the exclusive lock is taken, the raw
+    descriptor must be closed so a later append in the same process is
+    not blocked by a leaked LOCK_EX."""
+    path = tmp_path / "checkpoints.jsonl"
+    first = _checkpoint()
+    original_fdopen = checkpoint_module.os.fdopen
+    calls = {"n": 0}
+
+    def boom(fd: int, mode: str = "r", *args: object, **kwargs: object):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("injected fdopen failure")
+        return original_fdopen(fd, mode, *args, **kwargs)
+
+    monkeypatch.setattr(checkpoint_module.os, "fdopen", boom)
+    with pytest.raises((OSError, CheckpointIntegrityError)):
+        append_checkpoint(path, first)
+    monkeypatch.setattr(checkpoint_module.os, "fdopen", original_fdopen)
+    if path.exists():
+        path.unlink()
+    append_checkpoint(path, first)
+    assert load_latest_checkpoint(path) == first
+
+
 def test_checkpoint_chain_detects_rewrite(tmp_path: Path) -> None:
     path = tmp_path / "checkpoints.jsonl"
     first = _checkpoint()
@@ -286,6 +313,17 @@ def test_load_rejects_malformed_blank_truncated_and_noncanonical_bytes(
     path.write_bytes(payload)
 
     with pytest.raises(CheckpointIntegrityError):
+        load_latest_checkpoint(path)
+
+
+def test_load_rejects_blank_line_after_valid_genesis(tmp_path: Path) -> None:
+    """A valid genesis followed by an empty line must hit the blank-line
+    branch, not die earlier on a contract-fields mismatch."""
+    path = tmp_path / "blank-after-genesis.jsonl"
+    first = _checkpoint()
+    append_checkpoint(path, first)
+    path.write_bytes(path.read_bytes() + b"\n")
+    with pytest.raises(CheckpointIntegrityError, match="blank line"):
         load_latest_checkpoint(path)
 
 
@@ -569,7 +607,10 @@ def test_append_rolls_back_when_fsync_fails(
 
     def failing_fsync(fd: int) -> None:
         calls["count"] += 1
-        if calls["count"] >= 2:
+        # Call 1: intent fsync. Call 2: append fsync. Later calls are
+        # rollback — those must succeed so this test proves the boundary
+        # is restored, not that rollback itself failed.
+        if calls["count"] == 2:
             raise OSError("injected fsync failure")
         original_fsync(fd)
 
@@ -731,3 +772,20 @@ def test_verification_digest_cannot_regress_or_change_once_bound(
 
     with pytest.raises(CheckpointIntegrityError, match=match):
         load_latest_checkpoint(path)
+
+
+def test_input_shas_cannot_be_mutated_after_construction() -> None:
+    """input_shas must be immutable after Checkpoint construction so a
+    caller cannot invalidate digest.  MappingProxyType is unhashable and
+    breaks dataclasses.asdict; a tuple-of-pairs round-trips through asdict
+    and canonical_json_bytes."""
+    checkpoint = _checkpoint()
+    original = dict(checkpoint.input_shas)
+    digest = checkpoint.digest
+    with pytest.raises((TypeError, AttributeError)):
+        checkpoint.input_shas["remote_main"] = "0" * 40  # type: ignore[index]
+    assert dict(checkpoint.input_shas) == original
+    assert checkpoint.digest == digest
+    payload = asdict(checkpoint)
+    serialized = payload["input_shas"]
+    assert dict(serialized) == original or serialized == original
