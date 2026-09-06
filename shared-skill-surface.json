@@ -67,6 +67,20 @@
    "mode": "materialized-copy",
    "install_path": "%LOCALAPPDATA%/hermes/skills",
    "scope": "user"
+  },
+  "grok": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": ".grok/skills",
+   "scope": "repo",
+   "note": "Grok CLI discovers repo skills at <workspace>/.grok/skills/ (priority above ~/.grok/skills). Materialized from FLOSS/skill-corpus."
+  },
+  "grok_user": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": "~/.grok/skills",
+   "scope": "user",
+   "note": "User-scope Grok CLI skills home. Requires --include-user-scope. Same SKILL.md layout as hermes/codex projections."
   }
  },
  "skills": [

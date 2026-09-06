@@ -1,6 +1,6 @@
 ---
 name: flossi0ullk-shared-surface
-description: "Use when changing or extending the shared FLOSSI0ULLK agent surface: MCP servers, context manifests, skill manifests, materializers, or agent-native projections for Codex, Gemini, Claude-adjacent tooling, or OpenCode."
+description: "Use when changing or extending the shared FLOSSI0ULLK agent surface: MCP servers, context manifests, skill manifests, materializers, or agent-native projections for Codex, Gemini, Claude-adjacent tooling, OpenCode, Hermes, or Grok."
 ---
 
 # FLOSSI0ULLK Shared Surface
@@ -19,7 +19,31 @@ The shared surface is generated, not hand-curated per client.
    - `FLOSS/docs/agent-memory/*`
 2. Regenerate native views with the single runner:
    - `python FLOSS/scripts/refresh_agent_surfaces.py`
-   - Add `--include-user-scope` to also write `~/.codex/config.toml` and the
+   - Add `--include-user-scope` to also write `~/.codex/config.toml`, `~/.grok/*`, and the
+     AppData Hermes home. A live Hermes gateway is refused, not clobbered.
+   - `--only <step>` runs one step; `--list` names them. The six individual
+  ---
+name: flossi0ullk-shared-surface
+description: "Use when changing or extending the shared FLOSSI0ULLK agent surface: MCP servers, context manifests, skill manifests, materializers, or agent-native projections for Codex, Gemini, Claude-adjacent tooling, OpenCode, Hermes, or Grok."
+---
+
+# FLOSSI0ULLK Shared Surface
+
+The shared surface is generated, not hand-curated per client.
+
+## Core workflow
+
+1. Edit canonical sources only:
+   - `.mcp.json`
+   - `FLOSS/shared-agent-surface.json`
+   - `FLOSS/shared-context-surface.json`
+   - `FLOSS/shared-skill-surface.json`
+   - `FLOSS/shared-agent-memory-surface.json`
+   - `FLOSS/skill-corpus/*`
+   - `FLOSS/docs/agent-memory/*`
+2. Regenerate native views with the single runner:
+   - `python FLOSS/scripts/refresh_agent_surfaces.py`
+   - Add `--include-user-scope` to also write `~/.codex/config.toml`, `~/.grok/*`, and the
      AppData Hermes home. A live Hermes gateway is refused, not clobbered.
    - `--only <step>` runs one step; `--list` names them. The six individual
      materializers still work standalone.

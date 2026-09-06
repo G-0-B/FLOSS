@@ -204,6 +204,29 @@
         "approvals.mcp_reload_confirm": true,
         "approvals.destructive_slash_confirm": true
       }
+    },
+    "grok": {
+      "scope": "repo",
+      "config_path": ".grok/config.toml",
+      "name_map": {},
+      "overrides": {},
+      "note": "Project-scoped Grok MCP via .grok/config.toml [mcp_servers.*]. Same TOML shape as Codex; reuses apply_codex_mcp."
+    },
+    "grok_user": {
+      "scope": "user",
+      "config_path": "~/.grok/config.toml",
+      "name_map": {},
+      "overrides": {
+        "flossiullk-consensus": {
+          "enabled": true,
+          "startup_timeout_sec": 120
+        },
+        "flossiullk-reasoning-ensemble": {
+          "enabled": true,
+          "startup_timeout_sec": 240
+        }
+      },
+      "note": "User-scope Grok CLI home. Reuses apply_codex_mcp because Grok's [mcp_servers.*] tables match Codex. Requires --include-user-scope."
     }
   }
 }

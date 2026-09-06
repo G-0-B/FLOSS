@@ -243,6 +243,8 @@ KNOWN_TARGET_KEYS = frozenset(
         "codex_user",
         "hermes_workspace",
         "hermes_user",
+        "grok",
+        "grok_user",
     }
 )
 
@@ -1747,7 +1749,7 @@ def materialize(
             results.append(message)
             drift_found = drift_found or changed
 
-    for codex_key in ("codex", "codex_user"):
+    for codex_key in ("codex", "codex_user", "grok", "grok_user"):
         codex_cfg = targets.get(codex_key)
         if not (isinstance(codex_cfg, dict) and codex_cfg.get("config_path")):
             continue
@@ -1775,7 +1777,7 @@ def materialize(
             raise
         except Exception as exc:
             raise SharedSurfaceError(
-                f"Could not read/parse Codex config at {codex_path}: {exc}"
+                f"Could not read/parse Codex config ({codex_key}) at {codex_path}: {exc}"
             ) from exc
         apply_codex_mcp(
             doc,

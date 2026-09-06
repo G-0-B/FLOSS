@@ -767,6 +767,95 @@ def apply_yaml_target(
     )
 
 
+def apply_toml_target(
+    target_path: Path,
+    target_cfg: dict[str, Any],
+    *,
+    check: bool,
+    dry_run: bool,
+    variables: dict[str, str] | None = None,
+) -> tuple[str, bool]:
+    """Materialize a `format: "toml"` hook target (Grok `~/.grok/config.toml`).
+
+    Merges managed hook events into an existing TOML config under the top-level
+    `hooks` key, preserving unrelated tables (`mcp_servers`, `skills`, `models`,
+    ...). A missing file is SKIPPED rather than fabricated -- same stance as
+    the YAML Hermes path: we do not invent a full Grok home config.
+
+    Nested entry shape matches Grok's documented `[[hooks.<Event>]]` /
+    `[[hooks.<Event>.hooks]]` tables (Claude-compat nested schema).
+    """
+    if not target_path.exists():
+        return (f"SKIP  {target_path} (no config at {target_path})", False)
+
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import require_module
+
+    tomlkit = require_module("tomlkit", str(target_path))
+    try:
+        existing_text = target_path.read_text(encoding="utf-8")
+        doc = tomlkit.parse(existing_text)
+    except Exception as exc:  # noqa: BLE001 - surfaced as one actionable error
+        raise HookSurfaceError(
+            f"Could not read/parse TOML hook target at {target_path}: {exc}"
+        ) from exc
+
+    mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = expand_hook_commands(mapped_hooks, variables or {})
+    mapped_hooks = apply_entry_shape(
+        mapped_hooks, target_cfg.get("entry_shape", "nested")
+    )
+
+    # Replace only managed events under doc["hooks"]; leave other top-level
+    # tables untouched. Grok combines hook layers additively across files, but
+    # within one config.toml the materializer owns the named events it emits.
+    hooks_table = doc.get("hooks")
+    if hooks_table is None:
+        hooks_table = tomlkit.table(is_super_table=True)
+        doc["hooks"] = hooks_table
+    elif not hasattr(hooks_table, "items"):
+        raise HookSurfaceError(
+            f"TOML hook target at {target_path} has non-table `hooks` value"
+        )
+
+    for event_name, entries in mapped_hooks.items():
+        arr = tomlkit.aot()
+        if not isinstance(entries, list):
+            raise HookSurfaceError(
+                f"Hook event {event_name!r} must be a list after entry_shape"
+            )
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} entries must be objects"
+                )
+            item = tomlkit.table()
+            if "matcher" in entry and entry["matcher"] is not None:
+                item["matcher"] = entry["matcher"]
+            inner = entry.get("hooks")
+            if isinstance(inner, list):
+                inner_aot = tomlkit.aot()
+                for hook in inner:
+                    if not isinstance(hook, dict):
+                        raise HookSurfaceError(
+                            f"Inner hooks for {event_name!r} must be objects"
+                        )
+                    ht = tomlkit.table()
+                    for key, value in hook.items():
+                        ht[key] = value
+                    inner_aot.append(ht)
+                item["hooks"] = inner_aot
+            arr.append(item)
+        hooks_table[event_name] = arr
+
+    return check_or_write_text(
+        target_path, tomlkit.dumps(doc), check=check, dry_run=dry_run
+    )
+
+
+
 def assert_repo_scope_stays_inside(
     target_name: str,
     target_cfg: dict[str, Any],
@@ -1023,14 +1112,26 @@ def materialize(
         assert_repo_scope_stays_inside(target_name, target_cfg, target_path, workspace_root)
 
         target_format = target_cfg.get("format", "json")
-        if target_format not in ("json", "yaml"):
+        if target_format not in ("json", "yaml", "toml"):
             raise HookSurfaceError(
                 f"Target {target_name!r} has unsupported `format` "
-                f"{target_format!r} (expected 'json' or 'yaml')"
+                f"{target_format!r} (expected 'json', 'yaml', or 'toml')"
             )
 
         if target_format == "yaml":
             message, changed = apply_yaml_target(
+                target_path,
+                target_cfg,
+                check=check,
+                dry_run=dry_run,
+                variables=variables,
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+            continue
+
+        if target_format == "toml":
+            message, changed = apply_toml_target(
                 target_path,
                 target_cfg,
                 check=check,
@@ -1068,7 +1169,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-user-scope",
         action="store_true",
-        help="Also write targets outside the repository (~/.claude, Hermes AppData)",
+        help="Also write targets outside the repository (~/.claude, ~/.grok, Hermes AppData)",
     )
     return parser.parse_args()
 

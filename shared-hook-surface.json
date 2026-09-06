@@ -404,6 +404,71 @@
       "scope": "repo",
       "status": "pending",
       "reason": "No stable first-class hook configuration surface has been identified for OpenCode here yet."
+    },
+    "grok": {
+      "enabled": true,
+      "scope": "repo",
+      "settings_path": ".grok/hooks/flossi0ullk.json",
+      "format": "json",
+      "payload_shape": "hooks_only",
+      "entry_shape": "nested",
+      "reason": "Grok discovers project hooks under .grok/hooks/. File is hooks_only (same pattern as Codex .codex/hooks.json) so the materializer owns the whole file. Matcher uses Write|Edit|MultiEdit|Bash per Grok README Claude-compat vocabulary. FLOSS write hooks only in v1 \u2014 agentmemory node hooks stay on claude_user until a Grok-native event map is verified.",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit|Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\""
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit|Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "grok_user": {
+      "enabled": true,
+      "scope": "user",
+      "settings_path": "~/.grok/config.toml",
+      "format": "toml",
+      "entry_shape": "nested",
+      "reason": "User-scope Grok CLI config. Hooks live as [[hooks.<Event>]] tables in config.toml (Grok README). format=toml merges managed hook events into the existing file without clobbering mcp_servers/skills/models. Requires --include-user-scope. FLOSS write hooks only in v1.",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit|Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_pre_write.py\""
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Write|Edit|MultiEdit|Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
+              }
+            ]
+          }
+        ]
+      }
     }
   }
 }
