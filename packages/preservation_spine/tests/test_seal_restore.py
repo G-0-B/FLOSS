@@ -12,7 +12,10 @@ import pytest
 
 from packages.preservation_spine.git_capture import SecretPolicy, capture_planes
 from packages.preservation_spine.models import PlaneId, ResultStatus, canonical_json_bytes
-from packages.preservation_spine.restore import restore_and_verify
+from packages.preservation_spine.restore import (
+    _list_bundle_heads,
+    restore_and_verify,
+)
 from packages.preservation_spine.seal import (
     CapsuleVerificationError,
     seal_capsule,
@@ -185,6 +188,48 @@ def test_seal_is_deterministic_idempotent_and_local_unanchored(tmp_path: Path) -
         "schema_version": "1",
     }
     verify_checksums(capsule)
+
+
+def test_bundle_head_with_non_ascii_ref_maps_to_capsule_error(
+    tmp_path: Path,
+) -> None:
+    """A bundle containing a non-ASCII ref name must raise
+    CapsuleVerificationError like every other failure in the helper —
+    not a bare UnicodeDecodeError callers do not catch."""
+    repo = tmp_path / "repo"
+    git(tmp_path, "init", str(repo))
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "Test")
+    _write_and_commit(repo, "a.txt", b"one\n", "seed")
+    git(repo, "branch", "tête")
+    bundle = tmp_path / "heads.bundle"
+    git(repo, "bundle", "create", str(bundle), "--all")
+
+    with pytest.raises(CapsuleVerificationError):
+        _list_bundle_heads(bundle)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path/handle mode regression")
+def test_windows_open_failure_maps_to_capsule_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An OSError from the Windows handle→descriptor conversion must surface
+    as CapsuleVerificationError like every other failure in the helper —
+    callers catch only the capsule type, so a raw OSError would escape
+    unclassified."""
+    import msvcrt
+
+    seal_module = importlib.import_module("packages.preservation_spine.seal")
+    payload = tmp_path / "payload.bin"
+    payload.write_bytes(b"evidence\n")
+
+    def boom(*args: object, **kwargs: object) -> int:
+        raise OSError("simulated open_osfhandle failure")
+
+    monkeypatch.setattr(msvcrt, "open_osfhandle", boom)
+    with pytest.raises(CapsuleVerificationError):
+        with seal_module._open_regular_nofollow(payload):
+            pass
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows path/handle mode regression")

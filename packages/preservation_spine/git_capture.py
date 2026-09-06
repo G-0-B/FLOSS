@@ -498,8 +498,14 @@ def _read_regular_file(
             "inclusion": "excluded",
             "reason": "symlink-parent-not-followed",
         }
-    resolved = path.resolve(strict=True)
-    source_root = repo.resolve(strict=True)
+    try:
+        resolved = path.resolve(strict=True)
+        source_root = repo.resolve(strict=True)
+    except OSError as exc:
+        # A parent removed between the lstat above and this call means the
+        # source mutated mid-capture: drift, not a bare OSError callers
+        # catching CaptureEvidenceError would miss.
+        raise CaptureDrift("source state changed during capture") from exc
     if resolved == source_root or source_root not in resolved.parents:
         return None, {
             "kind": kind,
@@ -510,8 +516,11 @@ def _read_regular_file(
             "reason": "outside-source-not-followed",
         }
 
-    content = path.read_bytes()
-    after = path.lstat()
+    try:
+        content = path.read_bytes()
+        after = path.lstat()
+    except OSError as exc:
+        raise CaptureDrift("source state changed during capture") from exc
     stable_fields = [
         "st_dev",
         "st_ino",

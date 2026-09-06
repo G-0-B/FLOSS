@@ -128,9 +128,11 @@ def _open_regular_nofollow(path: Path) -> Iterator[BinaryIO]:
             ) from ctypes.WinError()
         try:
             descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
-        except OSError:
+        except OSError as exc:
             ctypes.windll.kernel32.CloseHandle(handle)
-            raise
+            raise CapsuleVerificationError(
+                "capsule payload cannot be opened safely"
+            ) from exc
     stream = os.fdopen(descriptor, "rb", closefd=True)
     try:
         yield stream
