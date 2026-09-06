@@ -15,6 +15,7 @@ from packages.preservation_spine.git_capture import (
     CaptureUnverifiable,
     SecretPolicy,
     _decode_paths,
+    _inventory_state,
     _read_regular_file,
     _require_preservable_paths,
     assert_unchanged,
@@ -1294,6 +1295,32 @@ def test_surrogate_path_is_unpreservable() -> None:
     canonical_json_bytes as an unclassified UnicodeEncodeError."""
     with pytest.raises(CaptureDrift):
         _require_preservable_paths(("a\udcff.txt",))
+
+
+def test_inventory_with_undecodable_names_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The preservable-paths gate must sit INSIDE _inventory_state, before
+    the fingerprints are canonicalized: otherwise a surrogate-bearing
+    name dies as an unclassified UnicodeEncodeError at digest time.
+    (The git boundary is stubbed because Windows cannot host undecodable
+    filenames; only ls-files output is faked, everything else is real.)"""
+    repo = initialized_repo(tmp_path)
+    real_run_git = git_capture_module.run_git
+
+    def fake_run_git(repo_arg: Path, *args: str) -> bytes:
+        # Only the tracked inventory (`ls-files -z`, no --others) carries
+        # the undecodable name. Other ls-files variants stay empty so we
+        # don't trip the duplicate-across-categories guard first.
+        if args[:2] == ("ls-files", "-z"):
+            return b"\xff\xfe\x00"
+        if args and args[0] == "ls-files":
+            return b""
+        return real_run_git(repo_arg, *args)
+
+    monkeypatch.setattr(git_capture_module, "run_git", fake_run_git)
+    with pytest.raises(CaptureDrift):
+        _inventory_state(repo, SecretPolicy.default())
 
 
 def test_resolve_race_during_file_read_maps_to_drift(

@@ -570,6 +570,7 @@ def _inventory_state(repo: Path, secret_policy: SecretPolicy) -> _InventoryState
                     "duplicate repository path across inventory categories"
                 )
             categories[path] = category
+    _require_preservable_paths((*tracked_paths, *untracked_paths, *ignored_paths))
     fingerprints: list[dict[str, object]] = []
     for relative_path in sorted(categories):
         path = _worktree_path(repo, relative_path)
