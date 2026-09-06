@@ -247,7 +247,12 @@ def _list_bundle_heads(bundle: Path) -> tuple[tuple[str, str], ...]:
         raise CapsuleVerificationError("history bundle is unreadable") from exc
     heads: list[tuple[str, str]] = []
     for line in output.splitlines():
-        fields = line.decode("ascii", errors="strict").split(" ", 1)
+        try:
+            fields = line.decode("ascii", errors="strict").split(" ", 1)
+        except UnicodeDecodeError as exc:
+            raise CapsuleVerificationError(
+                "history bundle head is not ASCII"
+            ) from exc
         if len(fields) != 2:
             raise CapsuleVerificationError("history bundle head is malformed")
         heads.append((fields[0], fields[1]))
@@ -510,8 +515,10 @@ def _manifest_facts(
         relative = _safe_relative(raw_entry.get("path"))
         relative_name = relative.as_posix()
         if relative_name in entries:
+            # Plane-neutral wording: this helper serves both the tracked
+            # plane (via _validate_artifact_plane) and the untracked plane.
             raise CapsuleVerificationError(
-                "untracked inventory contains duplicate paths"
+                "manifest contains duplicate paths"
             )
         inclusion = raw_entry.get("inclusion")
         if not isinstance(inclusion, str) or inclusion not in allowed_inclusions:
