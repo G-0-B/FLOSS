@@ -15,6 +15,7 @@ from packages.preservation_spine.git_capture import (
     CaptureUnverifiable,
     SecretPolicy,
     _decode_paths,
+    _read_regular_file,
     _require_preservable_paths,
     assert_unchanged,
     capture_planes,
@@ -1293,6 +1294,25 @@ def test_surrogate_path_is_unpreservable() -> None:
     canonical_json_bytes as an unclassified UnicodeEncodeError."""
     with pytest.raises(CaptureDrift):
         _require_preservable_paths(("a\udcff.txt",))
+
+
+def test_resolve_race_during_file_read_maps_to_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A worktree path vanishing between lstat and resolve (concurrent
+    source mutation) must surface as CaptureDrift — not a bare OSError
+    that callers catching CaptureEvidenceError would miss."""
+    from pathlib import Path as _Path
+
+    repo = initialized_repo(tmp_path)
+    (repo / "victim.txt").write_text("here\n", encoding="utf-8")
+
+    def vanishing(self: Path, *args: object, **kwargs: object) -> Path:
+        raise FileNotFoundError("simulated concurrent deletion")
+
+    monkeypatch.setattr(_Path, "resolve", vanishing)
+    with pytest.raises(CaptureDrift):
+        _read_regular_file(repo, "victim.txt")
 
 
 def test_non_nfc_path_fails_closed_before_state_dir(tmp_path: Path) -> None:

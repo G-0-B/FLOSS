@@ -437,6 +437,19 @@ def test_inventory_rejects_quoted_git_control_and_format_paths(
         inventory_change_universe(_sealed_capsule(tmp_path, staged_diff=diff))
 
 
+def test_inventory_rejects_out_of_range_octal_escape(tmp_path: Path) -> None:
+    """Git escapes single bytes (\\000–\\377).  A tampered capsule with
+    \\400 or higher must raise CapsuleVerificationError — not the bare
+    ValueError from bytearray.append, which escapes the capsule error
+    contract callers rely on."""
+    diff = (
+        b'diff --git "a/\\400.txt" "b/\\400.txt"\n'
+        + b'new file mode 100644\n--- /dev/null\n+++ "b/\\400.txt"\n@@ -0,0 +1 @@\n+x\n'
+    )
+    with pytest.raises(CapsuleVerificationError):
+        inventory_change_universe(_sealed_capsule(tmp_path, staged_diff=diff))
+
+
 def test_inventory_rejects_tamper_and_unsafe_manifest_path(tmp_path: Path) -> None:
     capsule = _sealed_capsule(tmp_path)
     (capsule / PlaneId.LOCAL_INDEX.value / "index.raw").write_bytes(b"tampered")

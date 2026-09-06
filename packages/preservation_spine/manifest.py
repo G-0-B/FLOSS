@@ -575,7 +575,15 @@ def _decode_git_path(value: bytes) -> str:
                         index += 1
                     else:
                         break
-                encoded.append(int(digits.decode("ascii"), 8))
+                code = int(digits.decode("ascii"), 8)
+                # Git escapes single bytes (\\000–\\377).  Anything wider
+                # is a tampered capsule, not a path — fail with the capsule
+                # error type instead of bytearray's bare ValueError.
+                if code > 255:
+                    raise CapsuleVerificationError(
+                        "quoted diff path escape is out of range"
+                    )
+                encoded.append(code)
                 continue
             if escaped not in escapes:
                 raise CapsuleVerificationError("quoted diff path escape is malformed")
