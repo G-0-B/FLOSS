@@ -62,6 +62,45 @@ _INTENT_FIELDS = frozenset(
 )
 
 
+class _FrozenStrMap(dict[str, str]):
+    """Immutable string-to-digest map that still serializes as a JSON object.
+
+    MappingProxyType cannot be pickled by dataclasses.asdict; a tuple of
+    pairs serializes as a JSON array and breaks the on-disk contract.
+    This subclass raises on mutation but deepcopy/asdict see a plain dict.
+    """
+
+    def __init__(self, mapping: Mapping[str, str] | None = None) -> None:
+        super().__init__(dict(mapping) if mapping is not None else {})
+
+    def __setitem__(self, key: str, value: str) -> None:
+        raise TypeError("input_shas is immutable")
+
+    def __delitem__(self, key: str) -> None:
+        raise TypeError("input_shas is immutable")
+
+    def clear(self) -> None:
+        raise TypeError("input_shas is immutable")
+
+    def pop(self, *args: object, **kwargs: object) -> str:
+        raise TypeError("input_shas is immutable")
+
+    def popitem(self) -> tuple[str, str]:
+        raise TypeError("input_shas is immutable")
+
+    def setdefault(self, *args: object, **kwargs: object) -> str:
+        raise TypeError("input_shas is immutable")
+
+    def update(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("input_shas is immutable")
+
+    def __copy__(self) -> dict[str, str]:
+        return dict(self)
+
+    def __deepcopy__(self, memo: dict[int, object]) -> dict[str, str]:
+        return dict(self)
+
+
 class CheckpointIntegrityError(RuntimeError):
     """The checkpoint chain is missing, unsafe, or internally inconsistent."""
 
@@ -262,7 +301,7 @@ def _require_operator_string(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must not contain control characters")
 
 
-def _normalize_input_shas(value: object) -> dict[str, str]:
+def _normalize_input_shas(value: object) -> Mapping[str, str]:
     if not isinstance(value, Mapping):
         raise ValueError("input_shas must be an object")
     normalized: dict[str, str] = {}
@@ -274,7 +313,7 @@ def _normalize_input_shas(value: object) -> dict[str, str]:
                 "input_shas values must be lowercase git or SHA-256 digests"
             )
         normalized[key] = digest
-    return normalized
+    return _FrozenStrMap(normalized)
 
 
 def _normalize_string_sequence(field_name: str, value: object) -> tuple[str, ...]:
@@ -507,7 +546,11 @@ def _open_checkpoint_stream(path: Path, *, create: bool) -> Iterator[BinaryIO]:
         except OSError:
             ctypes.windll.kernel32.CloseHandle(handle)
             raise
-    stream = os.fdopen(descriptor, "r+b", closefd=True)
+    try:
+        stream = os.fdopen(descriptor, "r+b", closefd=True)
+    except Exception:
+        os.close(descriptor)
+        raise
     try:
         handle_state = os.fstat(stream.fileno())
         _assert_regular_metadata(handle_state)

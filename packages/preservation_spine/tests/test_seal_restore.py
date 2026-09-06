@@ -452,7 +452,7 @@ def test_seal_fails_closed_when_payload_path_is_substituted_before_hash(
 
     monkeypatch.setattr(seal_module, "_hash_regular_file", substitute_before_hash)
 
-    with pytest.raises(CapsuleVerificationError, match="hardlink|changed"):
+    with pytest.raises(CapsuleVerificationError, match=r"hardlink|changed"):
         seal_capsule(capsule)
 
     assert substituted is True
