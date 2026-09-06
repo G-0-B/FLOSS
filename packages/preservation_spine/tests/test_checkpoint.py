@@ -775,17 +775,22 @@ def test_verification_digest_cannot_regress_or_change_once_bound(
 
 
 def test_input_shas_cannot_be_mutated_after_construction() -> None:
-    """input_shas must be immutable after Checkpoint construction so a
-    caller cannot invalidate digest.  MappingProxyType is unhashable and
-    breaks dataclasses.asdict; a tuple-of-pairs round-trips through asdict
-    and canonical_json_bytes."""
+    """input_shas must reject in-place mutation so a caller cannot
+    invalidate digest.  On-disk JSON remains an object (not an array of
+    pairs).  MappingProxyType is not used: dataclasses.asdict cannot
+    pickle it."""
     checkpoint = _checkpoint()
     original = dict(checkpoint.input_shas)
     digest = checkpoint.digest
-    with pytest.raises((TypeError, AttributeError)):
+    with pytest.raises(TypeError):
         checkpoint.input_shas["remote_main"] = "0" * 40  # type: ignore[index]
+    with pytest.raises(TypeError):
+        checkpoint.input_shas.update({"remote_main": "0" * 40})  # type: ignore[union-attr]
+    with pytest.raises(TypeError):
+        checkpoint.input_shas |= {"extra": "0" * 40}  # type: ignore[operator]
     assert dict(checkpoint.input_shas) == original
     assert checkpoint.digest == digest
-    payload = asdict(checkpoint)
-    serialized = payload["input_shas"]
-    assert dict(serialized) == original or serialized == original
+    encoded = canonical_json_bytes(checkpoint)
+    decoded = json.loads(encoded)
+    assert isinstance(decoded["input_shas"], dict)
+    assert decoded["input_shas"] == original

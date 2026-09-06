@@ -94,6 +94,14 @@ class _FrozenStrMap(dict[str, str]):
     def update(self, *args: object, **kwargs: object) -> None:
         raise TypeError("input_shas is immutable")
 
+    def __ior__(self, other: object) -> _FrozenStrMap:
+        raise TypeError("input_shas is immutable")
+
+    def __or__(self, other: object) -> dict[str, str]:
+        merged = dict(self)
+        merged.update(dict(other) if not isinstance(other, dict) else other)
+        return merged
+
     def __copy__(self) -> dict[str, str]:
         return dict(self)
 
