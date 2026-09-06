@@ -891,13 +891,6 @@ def capture_planes(
     # later as an unclassified git error from deep inside the snapshot.
     shared_index_files = _shared_index_files(repo)
     inventory_before = _inventory_state(repo, secret_policy)
-    _require_preservable_paths(
-        (
-            *inventory_before.tracked_paths,
-            *inventory_before.untracked_paths,
-            *inventory_before.ignored_paths,
-        )
-    )
     tracked_paths = inventory_before.tracked_paths
     untracked_paths = inventory_before.untracked_paths
     ignored_paths = inventory_before.ignored_paths
