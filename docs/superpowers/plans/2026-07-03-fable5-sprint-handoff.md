@@ -11,7 +11,7 @@ supersedes: []
 truth_status: "Specified"   # plan, not results
 evidence_sources:
   - "Fable 5 research report: model-improves-model survey (claude.ai session, 2026-07)"
-  - "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md"
+  - "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md"
   - "Anthropic Usage Policy non-compete carve-out (verified in research report)"
 upgrade_path: "Claude Code amends via PR; bump minor per WS completed"
 rollback_plan: "git revert; all outputs are additive files"
@@ -52,7 +52,7 @@ next_action: "Claude Code: execute WS0, report findings, then proceed WS1→WS5 
 ## 1. Ground Rules (pointers, not duplication)
 
 1. **Orient first.** Follow `flossi0ullk-orient` skill: run `python FLOSS/scripts/orient_probe.py --query "fable5 sprint <WS>"` before reading anything. Respect token tiers.
-2. **Kernel governs.** `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — evidence gate, claim truth model, ternary decisions, precedence (Section 11).
+2. **Kernel governs.** `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — evidence gate, claim truth model, ternary decisions, precedence (Section 11).
 3. **Source authority:** repo branch > CURRENT_STATE > repo docs > project uploads > conversation > memory. **This packet is conversation-tier.** Where WS0 findings contradict this packet, the repo wins — flag, don't blend.
 4. **Compose, don't greenfield.** Before creating any file, check INDEX.md / context router for an existing home. Several subsystems have silent predecessors.
 5. **Doc budget (hard cap):** ≤ 6 new markdown docs across the entire sprint. Eval/seed *data* files (JSONL etc.) are exempt but must each live under a single directory. Exceeding the cap = stop and ask.

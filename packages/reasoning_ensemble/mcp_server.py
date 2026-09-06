@@ -49,7 +49,7 @@ SPECS, ADRS, AND RELATED RESEARCH
   `docs/research/2026-05-18-metaharness-unification.md` (single Action
   schema, single activity log, shared invocation convention)
 - Decision-grade peer:
-  `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 — consensus gateway is
+  `docs/adr/ADR-10-local-agent-node.md` (ADR-10 — consensus gateway is
   decision-grade routing; this is reasoning-grade routing)
 - Consent: `docs/adr/ADR-12-consent-gate-protocol.md` (the MCP tool
   surface is itself a governed pattern at the integrate level)
@@ -109,8 +109,42 @@ from pathlib import Path
 # Allow running both as a module and as a CLI script
 _THIS_DIR = Path(__file__).resolve().parent
 _WORKSPACE_ROOT = _THIS_DIR.parents[2]
+_REPO_ROOT = _THIS_DIR.parent.parent
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
+
+
+def _load_repo_env() -> None:
+    """Load repo-local `.env` so MCP-launched servers see provider credentials.
+
+    The consensus server has done this since it was written; this one did not,
+    and the asymmetry was invisible until it mattered. `start_mcp_daemons.ps1`
+    sets only PYTHONPATH, so when this server is launched that way the provider
+    keys that live in `.env` are simply absent from its environment. Every
+    online voter then looks unavailable, `resolve_default_voter_specs(...,
+    include_unavailable=False)` filters them out, and the ensemble silently
+    deliberates with a smaller pool than the profile asked for -- the exact
+    "degraded roster votes anyway" failure the voter registry's independence
+    rule exists to prevent.
+
+    Deliberately `override=False`: a variable already set in the real
+    environment wins over the file, so an operator can still pin a backend or
+    key for one run without editing `.env`.
+    """
+    env_path = Path(os.environ.get("FLOSS_ENV_PATH", _REPO_ROOT / ".env")).expanduser()
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ImportError as exc:
+        raise RuntimeError(
+            "python-dotenv is required to load repo credentials from "
+            f"{env_path}. Install python-dotenv or remove the env file override."
+        ) from exc
+    load_dotenv(env_path, override=False)
+
+
+_load_repo_env()
 
 try:
     from FLOSS.packages.reasoning_ensemble.router import classify as router_classify
@@ -292,6 +326,49 @@ def get_ensemble_drafts(limit: int = 5) -> str:
 # ---------------------------------------------------------------------------
 
 
+_SERVER_INSTRUCTIONS = """\
+FLOSSI0ULLK Reasoning Ensemble — reasoning aid, not authority.
+
+Invariants you MUST honor when using these tools:
+- Router output is a routing hint: pass_through, single_strong, or ensemble.
+- Synthesizer output is Plane A draft reasoning. It never promotes canon.
+- Decision-grade claims still go through the separate flossiullk-consensus MCP.
+- Prefer this MCP for architectural, multi-file, ADR-class, or rollback-costly
+  reasoning where preserved disagreement has value.
+- Do not use this as a heartbeat health pulse. It is on-demand.
+- If the MCP is unavailable, fall back to normal single-strong reasoning and
+  record that the ensemble surface was unavailable if the decision mattered.
+"""
+
+_WORKSPACE_ROOT = _REPO_ROOT.parent
+
+
+def _audit_sink_path(filename: str) -> str:
+    """Resolve the audit sink against the workspace, not a hardcoded absolute.
+
+    This was the literal string "C:/~shit/.agent-surface/heartbeat/...". From
+    any other checkout the audited calls landed outside that checkout's own
+    advertised `.agent-surface` trail; on POSIX the Windows-looking value is not
+    absolute at all, so it created a literal `C:/~shit/...` subtree under
+    whatever the process working directory happened to be.
+
+    An audit trail that writes somewhere other than where the operator is told
+    to look is worse than none -- it reads as present.
+
+    Override with FLOSS_AUDIT_DIR when the trail belongs elsewhere.
+    """
+    override = os.environ.get("FLOSS_AUDIT_DIR")
+    base = (
+        Path(override).expanduser()
+        if override
+        else _WORKSPACE_ROOT / ".agent-surface" / "heartbeat"
+    )
+    return str(base / filename)
+
+
+_AUDIT_SINK = _audit_sink_path("janus-reasoning-ensemble-audit.jsonl")
+
+
 def _create_mcp():
     """Build the FastMCP app when the optional MCP SDK is available."""
     try:
@@ -299,14 +376,25 @@ def _create_mcp():
     except ImportError:
         return None
 
-    app = FastMCP("FLOSSI0ULLK Reasoning Ensemble (Inline CFIS Router + Synthesizer)")
-    for tool in (
-        route_prompt,
-        deliberate,
-        get_recent_decisions,
-        get_ensemble_drafts,
-    ):
-        app.tool()(tool)
+    app = FastMCP(
+        "FLOSSI0ULLK Reasoning Ensemble (Inline CFIS Router + Synthesizer)",
+        instructions=_SERVER_INSTRUCTIONS,
+    )
+    # See the matching note in metacoordinator_mcp/server.py: registering the
+    # bare functions left _AUDIT_SINK dead config, so no ensemble tool call
+    # reached the JSONL audit trail.
+    from packages.mcp_daemon import register_audited_tools
+
+    register_audited_tools(
+        app,
+        (
+            route_prompt,
+            deliberate,
+            get_recent_decisions,
+            get_ensemble_drafts,
+        ),
+        _AUDIT_SINK,
+    )
     return app
 
 
@@ -316,4 +404,6 @@ mcp = _create_mcp()
 if __name__ == "__main__":
     if mcp is None:
         raise ImportError("MCP SDK not installed. Run: pip install mcp")
-    mcp.run()
+    from packages.mcp_daemon import run_http_daemon
+
+    run_http_daemon(mcp, pid_filename="reasoning_ensemble.pid", port=7332)

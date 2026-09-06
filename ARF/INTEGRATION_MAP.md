@@ -274,7 +274,9 @@ if AutoConstitution.verify(proposal):
 | **VVS Architecture** | ✅ v1.0-1.2 | ⚠️ Partial | ⏳ | ⏳ |
 | **Autonomy Kernel** | ✅ v1.1 | ❌ | ❌ | ⏳ |
 | **Proof-Carrying Code** | ✅ v1.2 | ❌ | ❌ | ⏳ |
-| **Commons Protocol** | ✅ | ⚠️ Partial | ⏳ | ⏳ |
+| **Commons Protocol (KERI)** | ⚠️ Specified | ❌ | ⏳ | ⏳ |
+| **Value Flows (hREA)** | ⚠️ Specified | ❌ | ⏳ | ⏳ |
+| **Semantic Web (AD4M)** | ⚠️ Specified | ❌ | ⏳ | ⏳ |
 | **Fractal Embeddings** | ✅ | ✅ | ✅ | ⏳ |
 | **ConversationMemory** | ✅ ADR-0 | ✅ | ✅ | 🟢 Active |
 | **Multi-Agent Compose** | ✅ ADR-0 | ✅ | ✅ | 🟢 Active |

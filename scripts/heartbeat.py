@@ -490,7 +490,7 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
                 "richer summaries for the same wall-clock budget. "
                 f"Budget gate: {synthesis_reason}."
             ),
-            timeout_seconds=900,  # 3 files × 5 min budget per file
+            timeout_seconds=1800,  # 3 files × 10 min budget per file (raised 2026-07-08 from 900s — pathologically large files like Holistic_Vision.md need ~78 chunks)
         ))
     else:
         log_tick_line(f"[skip] autonomous_synthesis — {synthesis_reason}")
@@ -709,6 +709,10 @@ def run_one_tick() -> TickResult:
 
     daily_state = load_daily_state()
     daily_state["ticks_today"] = int(daily_state.get("ticks_today", 0)) + 1
+    # Persist immediately so a mid-tick kill (SIGKILL/OOM/crash) doesn't
+    # lose the tick count. load_daily_state() already reset the date/rounds
+    # on rollover, so this is safe to write now. (2026-07-08 persistence gap fix)
+    save_daily_state(daily_state)
 
     rotation = get_work_rotation(daily_state)
     rounds_dispatched_this_tick = 0
@@ -737,6 +741,10 @@ def run_one_tick() -> TickResult:
         daily_state["rounds_today"] = (
             int(daily_state.get("rounds_today", 0)) + rounds_used
         )
+        # Persist rounds accumulation after each item so partial-tick
+        # progress survives a hard kill before the end-of-tick save.
+        # (2026-07-08 persistence gap fix)
+        save_daily_state(daily_state)
 
         if result.get("returncode") == 0:
             tick.completed.append(result)

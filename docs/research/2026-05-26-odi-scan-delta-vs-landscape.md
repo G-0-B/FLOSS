@@ -30,12 +30,12 @@
 ### Validates (no change needed; cite for legitimacy)
 
 - **Arkology P2P Data Commons on Holochain** — third-party production proof that the Layer 0 choice (Holochain agent-centric DHT) is the right shape for "syntropic information networks." Cite in `HOLISTIC_ARCHITECTURE.md` as external validation rather than as a fork-target.
-- **Co-improvement framing (Weston + Foerster, Chaffer Incentivized Symbiosis)** — direct external citation for the prime directive ([`Master Metaprompt v1.3.1 §0`](../../FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md)) "Logic validates, neural assists." Worth adding to ADR-Suite v2.0 evidence sources on the next ADR-3 amendment.
+- **Co-improvement framing (Weston + Foerster, Chaffer Incentivized Symbiosis)** — direct external citation for the prime directive ([`Master Metaprompt v1.3.1 §0`](../../FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md)) "Logic validates, neural assists." Worth adding to ADR-Suite v2.0 evidence sources on the next ADR-3 amendment.
 - **Shiiku hybrid-network creativity result** — empirical support for the multi-AI consensus gateway design (mixed human+AI teams empirically outperform pure-AI OR pure-human on creative diversity). Pair with the Levin Corpus MT1 (Universal Convergence) — both say "diversity of substrate matters at low capability, less at high."
 
 ### Forces a comparison
 
-- **ISEK 6-stage protocol (Publish → Discover → Recruit → Execute → Settle → Feedback)** vs **FLOSSI0ULLK Claim/Vote/Source-Chain protocol** ([`ADR-10`](../adr/ADR-MCP-ORCHESTRATOR.md)). Both are coordination-fabric designs for billions-of-agents scale. ISEK has Web3 tokenomics ($ISEK); FLOSSI0ULLK explicitly rejects tokens per [`project-omo-momus-voter`](../agent-memory/project/omo-momus-voter.md) lineage. The comparison is structural — worth a research note before next ADR-10 amendment.
+- **ISEK 6-stage protocol (Publish → Discover → Recruit → Execute → Settle → Feedback)** vs **FLOSSI0ULLK Claim/Vote/Source-Chain protocol** ([`ADR-10`](../adr/ADR-10-local-agent-node.md)). Both are coordination-fabric designs for billions-of-agents scale. ISEK has Web3 tokenomics ($ISEK); FLOSSI0ULLK explicitly rejects tokens per [`project-omo-momus-voter`](../agent-memory/project/omo-momus-voter.md) lineage. The comparison is structural — worth a research note before next ADR-10 amendment.
 - **Hu + Rong "Sovereign Body" (DePIN + TEE)** vs **FLOSSI0ULLK Layer 0 + Layer 4.5**. They put cryptographic autonomy at the substrate via DePIN; we put it at the source chain via Holochain + the consensus gateway. Same goal (cryptographic independence from corporate/state override), different substrate. Spot-check before adopting DePIN ideas wholesale.
 
 ### Surfaces a gap → new lane
@@ -51,7 +51,7 @@
 ## What this distillation does NOT do
 
 - Does NOT promote any framework to canon. ISEK, TRiSM, ZK-ML, DePIN are external research; FLOSSI0ULLK adoption requires the harvest-ledger gate sequence per [`reuse-ledger-seed.yaml`](reuse-ledger-seed.yaml).
-- Does NOT add new ADRs. Two ADR candidates surfaced (TRiSM-style adversarial robustness; ZK-ML verifiable inference); both are watchlist-only until a Now/Later/Never evidence-gate pass per [Master Metaprompt §2](../../FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md).
+- Does NOT add new ADRs. Two ADR candidates surfaced (TRiSM-style adversarial robustness; ZK-ML verifiable inference); both are watchlist-only until a Now/Later/Never evidence-gate pass per [Master Metaprompt §2](../../FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md).
 - Does NOT replace the 2026-05-22 digestion. That pass's 5-lane framing remains valid for the substrate/coordination/retrieval/compute/interop layers; this delta adds §5/§6/§7 on top.
 
 ## Provenance + cross-refs

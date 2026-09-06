@@ -13,7 +13,11 @@ Generated artifacts:
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
+import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +29,26 @@ DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / ".agent-surface" / "hooks"
 
 class HookSurfaceError(Exception):
     """Raised for manifest, target, or projection errors."""
+
+
+def require_module(module_name: str, target: str) -> Any:
+    """Import a round-trip serializer, failing loudly for one target only.
+
+    Never fall back to a non-round-trip writer -- that would silently strip
+    comments and reorder keys in large hand-maintained configs. Imported
+    lazily (only when a `format: "yaml"` target is actually processed) so a
+    missing package fails just that target, not every target -- mirrors
+    `require_module` in `materialize_shared_agent_surface.py`.
+    """
+    import importlib
+
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise HookSurfaceError(
+            f"Target {target!r} requires the {module_name!r} package "
+            f"(pip install {module_name.split('.')[0]})"
+        ) from exc
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -166,14 +190,186 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return manifest
 
 
+TEMPLATE_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def resolve_variables(
+    manifest: dict[str, Any], workspace_root: Path | None = None
+) -> dict[str, str]:
+    """Resolve the manifest's `variables` block into concrete strings.
+
+    Hook commands are plain strings handed to a shell, so before this existed
+    every command had to spell out a machine-specific absolute path
+    (`C:/Python313/python.exe`, the npm-global `@agentmemory` plugin root,
+    ...). That made the manifest non-portable and, worse, made an upgrade or a
+    relocated install a *silent* breakage: the generated settings still parse,
+    the hook still "runs", and the harness just gets a nonzero exit nobody
+    reads.
+
+    Each entry is either a bare default string::
+
+        "PYTHON": "C:/Python313/python.exe"
+
+    or an object naming an environment variable that overrides that default::
+
+        "AGENTMEMORY_PLUGIN_ROOT": {
+            "env": "AGENTMEMORY_PLUGIN_ROOT",
+            "default": "%APPDATA%/npm/node_modules/@agentmemory/agentmemory/plugin"
+        }
+
+    The resolved value additionally goes through `os.path.expandvars` +
+    `~` expansion, so a default may itself reference `%APPDATA%`/`$HOME`.
+    An undefined `%VAR%`/`$VAR` inside a resolved value is a loud error for
+    exactly the reason `resolve_manifest_path` documents in the sibling
+    agent-surface module: `expandvars` leaves an unknown variable as a literal
+    rather than raising, which would bake a bogus path into every generated
+    harness config.
+    """
+    # Defaults may be written relative to the workspace so the manifest does
+    # not bake one machine's absolute path into every checkout. A default of
+    # "${WORKSPACE_ROOT}/FLOSS/hooks" resolves against the tree actually being
+    # materialized; without this a second clone silently generated hook
+    # commands pointing back at the first one, which still "run" and just
+    # exit nonzero where nobody looks.
+    workspace_token = str(workspace_root) if workspace_root is not None else None
+    raw = manifest.get("variables", {})
+    if not isinstance(raw, dict):
+        raise HookSurfaceError("Manifest `variables` field must be an object if present")
+
+    resolved: dict[str, str] = {}
+    for name, spec in raw.items():
+        if isinstance(spec, str):
+            value = spec
+        elif isinstance(spec, dict):
+            env_name = spec.get("env")
+            default = spec.get("default")
+            by_platform = spec.get("default_by_platform")
+            value = None
+            if isinstance(env_name, str) and env_name.strip():
+                value = os.environ.get(env_name)
+            # Platform-specific default beats the generic one, so a manifest
+            # written on Windows does not hard-break a Linux/macOS checkout.
+            # `sys.platform` keys: "win32", "linux", "darwin". Falls through to
+            # `default` when the running platform is not listed, and `env`
+            # still overrides everything above.
+            if (value is None or not str(value).strip()) and isinstance(
+                by_platform, dict
+            ):
+                candidate = by_platform.get(sys.platform)
+                if isinstance(candidate, str) and candidate.strip():
+                    value = candidate
+            if value is None or not str(value).strip():
+                value = default
+            if not isinstance(value, str) or not value.strip():
+                raise HookSurfaceError(
+                    f"Variable {name!r} resolved to no value on platform "
+                    f"{sys.platform!r} (env {env_name!r} unset, no matching "
+                    "`default_by_platform` entry, and no usable `default`)"
+                )
+        else:
+            raise HookSurfaceError(
+                f"Variable {name!r} must be a string or an object with "
+                "`env`/`default`"
+            )
+
+        if workspace_token is not None:
+            value = value.replace("${WORKSPACE_ROOT}", workspace_token)
+        expanded = os.path.expandvars(value)
+        leftover = re.search(r"%[^%]+%|\$[A-Za-z_][A-Za-z0-9_]*", expanded)
+        if leftover is not None:
+            raise HookSurfaceError(
+                f"Variable {name!r} references undefined environment variable "
+                f"{leftover.group()!r} (expands to {expanded!r}); set it or fix "
+                "the manifest"
+            )
+        resolved[name] = str(Path(expanded).expanduser().as_posix())
+    return resolved
+
+
+def expand_template(value: str, variables: dict[str, str], context: str) -> str:
+    """Substitute `${NAME}` references in one string, failing loudly on unknowns.
+
+    An unresolved `${NAME}` is never passed through: a command string carrying a
+    literal `${AGENTMEMORY_PLUGIN_ROOT}` would be written into a real harness
+    config and fail at hook-fire time, far from the edit that caused it.
+    """
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in variables:
+            raise HookSurfaceError(
+                f"{context} references undefined manifest variable "
+                f"${{{name}}}; declare it under `variables` in the manifest"
+            )
+        return variables[name]
+
+    return TEMPLATE_RE.sub(replace, value)
+
+
+def expand_hook_commands(
+    mapped_hooks: dict[str, Any], variables: dict[str, str]
+) -> dict[str, Any]:
+    """Return `mapped_hooks` with `${NAME}` expanded in every command string.
+
+    Walks the nested Claude-Code-shaped structure
+    (`{event: [{matcher, hooks: [{type, command}]}]}`) and rewrites only the
+    `command` fields, leaving matchers, timeouts, descriptions, and any
+    harness-specific keys untouched. Runs BEFORE `apply_entry_shape` so both
+    the nested and flat writers see already-resolved commands.
+    """
+    if not variables:
+        return mapped_hooks
+
+    expanded: dict[str, Any] = {}
+    for event_name, definitions in mapped_hooks.items():
+        if not isinstance(definitions, list):
+            expanded[event_name] = definitions
+            continue
+        new_definitions: list[Any] = []
+        for definition in definitions:
+            if not isinstance(definition, dict):
+                new_definitions.append(definition)
+                continue
+            new_definition = dict(definition)
+            inner_hooks = new_definition.get("hooks")
+            if isinstance(inner_hooks, list):
+                new_inner: list[Any] = []
+                for inner in inner_hooks:
+                    if isinstance(inner, dict) and isinstance(inner.get("command"), str):
+                        inner = dict(inner)
+                        inner["command"] = expand_template(
+                            inner["command"],
+                            variables,
+                            f"Hook event {event_name!r} command",
+                        )
+                    new_inner.append(inner)
+                new_definition["hooks"] = new_inner
+            new_definitions.append(new_definition)
+        expanded[event_name] = new_definitions
+    return expanded
+
+
 def validate_hook_scripts(
-    manifest: dict[str, Any], workspace_root: Path
+    manifest: dict[str, Any], workspace_root: Path, variables: dict[str, str]
 ) -> list[dict[str, str]]:
+    """Resolve and existence-check every declared hook script.
+
+    Entries may use `${NAME}` templates and may be absolute (an out-of-tree
+    script such as the npm-global agentmemory plugin) or workspace-relative.
+    A missing script is a hard error: this is the check that turns "an upgrade
+    silently removed a hook script" from a runtime mystery into a failed
+    `--check`.
+    """
     scripts: list[dict[str, str]] = []
     for raw_path in manifest.get("hook_scripts", []):
         if not isinstance(raw_path, str) or not raw_path.strip():
             raise HookSurfaceError("Each hook script path must be a non-empty string")
-        resolved = (workspace_root / raw_path).resolve()
+        expanded = expand_template(raw_path, variables, "Hook script path")
+        candidate = Path(expanded).expanduser()
+        resolved = (
+            candidate.resolve()
+            if candidate.is_absolute()
+            else (workspace_root / candidate).resolve()
+        )
         if not resolved.exists():
             raise HookSurfaceError(f"Hook script missing: {resolved}")
         scripts.append(
@@ -185,8 +381,129 @@ def validate_hook_scripts(
     return scripts
 
 
+def resolve_target_hooks(target_cfg: dict[str, Any]) -> dict[str, Any]:
+    """Return a target's hook block after applying its `event_map`, if any.
+
+    A target may declare `event_map: {"PreToolUse": "pre_tool_call", ...}`
+    to rename manifest event names into its own native vocabulary (e.g.
+    Hermes's snake_case events vs. Claude/Codex's PascalCase). Events
+    present in the manifest but ABSENT from a target's `event_map` are
+    OMITTED for that target rather than passed through raw -- emitting an
+    event name a harness doesn't understand is a silently broken hook, and
+    omission is the honest behavior. When no `event_map` is declared,
+    events pass through unchanged (existing behavior, preserved for every
+    target that predates this capability).
+    """
+    target_hooks = target_cfg.get("hooks", {})
+    if not isinstance(target_hooks, dict):
+        raise HookSurfaceError("Target `hooks` field must be an object if present")
+    for event_name, definitions in target_hooks.items():
+        if not isinstance(definitions, list):
+            raise HookSurfaceError(
+                f"Hook event {event_name!r} must contain a list of definitions"
+            )
+
+    event_map = target_cfg.get("event_map")
+    if event_map is None:
+        return dict(target_hooks)
+    if not isinstance(event_map, dict):
+        raise HookSurfaceError("Target `event_map` field must be an object if present")
+
+    mapped: dict[str, Any] = {}
+    for event_name, definitions in target_hooks.items():
+        mapped_name = event_map.get(event_name)
+        if mapped_name is None:
+            continue
+        mapped[mapped_name] = definitions
+    return mapped
+
+
+VALID_ENTRY_SHAPES = ("nested", "flat")
+
+
+def apply_entry_shape(mapped_hooks: dict[str, Any], entry_shape: str) -> dict[str, Any]:
+    """Convert manifest hook definitions into a target's on-disk entry shape.
+
+    The manifest always authors each event's hook list in the
+    Claude-Code-nested shape::
+
+        [{"matcher": ..., "hooks": [{"type": "command", "command": ...}]}]
+
+    Claude, Gemini, and Codex all consume that shape directly --
+    `entry_shape: "nested"` (the default, so every target that predates this
+    field and never sets it gets byte-identical output). Hermes's own
+    `agent/shell_hooks.py::_parse_single_entry` reads a flat mapping per
+    hook instead -- `{"command": <str>, "matcher"?: <regex str>, "timeout"?:
+    <int seconds>}` -- and warns-and-skips (`"is missing a non-empty
+    'command' field"`) on anything nested, which is exactly the bug this
+    function exists to fix: the nested shape was being written into a
+    target whose parser only understands the flat one, so every entry
+    silently failed to parse and zero hooks ever fired.
+
+    `entry_shape: "flat"` performs that flattening: each inner `hooks: [...]`
+    command is lifted to a sibling of `matcher` on the outer definition, and
+    a `matcher` of `None` or the nested convention's `"*"` (meaning "match
+    everything") is omitted entirely -- Hermes already treats an absent
+    `matcher` as match-everything (`ShellHookSpec.matches_tool` returns
+    `True` when `self.matcher` is falsy), so `"*"` would otherwise be
+    compiled as a literal (and invalid) regex.
+
+    Driven entirely by the manifest's `entry_shape` field -- this function
+    never special-cases a target name.
+    """
+    if entry_shape == "nested":
+        return mapped_hooks
+    if entry_shape != "flat":
+        raise HookSurfaceError(
+            f"Unsupported entry_shape {entry_shape!r} "
+            f"(expected one of {VALID_ENTRY_SHAPES!r})"
+        )
+
+    flattened: dict[str, Any] = {}
+    for event_name, definitions in mapped_hooks.items():
+        if not isinstance(definitions, list):
+            raise HookSurfaceError(
+                f"Hook event {event_name!r} must contain a list of definitions"
+            )
+        flat_entries: list[dict[str, Any]] = []
+        for definition in definitions:
+            if not isinstance(definition, dict):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} definitions must be objects "
+                    "when entry_shape is 'flat'"
+                )
+            matcher = definition.get("matcher")
+            inner_hooks = definition.get("hooks")
+            if not isinstance(inner_hooks, list):
+                raise HookSurfaceError(
+                    f"Hook event {event_name!r} definition is missing a "
+                    "`hooks` list required to flatten entry_shape 'flat'"
+                )
+            for inner in inner_hooks:
+                if not isinstance(inner, dict):
+                    raise HookSurfaceError(
+                        f"Hook event {event_name!r} inner hook entries must "
+                        "be objects when entry_shape is 'flat'"
+                    )
+                command = inner.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    raise HookSurfaceError(
+                        f"Hook event {event_name!r} inner hook entry is "
+                        "missing a non-empty `command`"
+                    )
+                flat_entry: dict[str, Any] = {}
+                if isinstance(matcher, str) and matcher.strip() and matcher != "*":
+                    flat_entry["matcher"] = matcher
+                flat_entry["command"] = command
+                flat_entries.append(flat_entry)
+        flattened[event_name] = flat_entries
+    return flattened
+
+
 def merge_hook_payload(
-    existing: dict[str, Any], target_cfg: dict[str, Any]
+    existing: dict[str, Any],
+    target_cfg: dict[str, Any],
+    mapped_hooks: dict[str, Any],
 ) -> dict[str, Any]:
     payload = dict(existing)
 
@@ -197,14 +514,7 @@ def merge_hook_payload(
         raise HookSurfaceError("Existing `hooks` field must be an object if present")
     merged_hooks = dict(existing_hooks)
 
-    target_hooks = target_cfg.get("hooks", {})
-    if not isinstance(target_hooks, dict):
-        raise HookSurfaceError("Target `hooks` field must be an object if present")
-    for event_name, definitions in target_hooks.items():
-        if not isinstance(definitions, list):
-            raise HookSurfaceError(
-                f"Hook event {event_name!r} must contain a list of definitions"
-            )
+    for event_name, definitions in mapped_hooks.items():
         merged_hooks[event_name] = definitions
     payload["hooks"] = merged_hooks
 
@@ -228,7 +538,328 @@ def merge_hook_payload(
     return payload
 
 
-def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, Any]:
+def build_target_payload(
+    existing: dict[str, Any],
+    target_cfg: dict[str, Any],
+    variables: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Build the on-disk payload for a hook target.
+
+    Most targets (`claude`, `gemini`) live in a settings file shared with
+    unrelated agent-native keys, so their payload is produced by merging
+    managed hook events into whatever already exists on disk.
+
+    Targets marked `payload_shape: "hooks_only"` own a settings file whose
+    *entire* content is the hook definitions (e.g. Codex's `.codex/hooks.json`,
+    which Codex pins by content hash). For those, the payload is built fresh
+    from the manifest only -- `existing` is intentionally ignored so no
+    incidental keys ever get carried forward into a file Codex re-hashes.
+    """
+    mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = expand_hook_commands(mapped_hooks, variables or {})
+    mapped_hooks = apply_entry_shape(
+        mapped_hooks, target_cfg.get("entry_shape", "nested")
+    )
+    if target_cfg.get("payload_shape") == "hooks_only":
+        return {"hooks": mapped_hooks}
+    return merge_hook_payload(existing, target_cfg, mapped_hooks)
+
+
+def resolve_target_path(workspace_root: Path, raw_path: str) -> Path:
+    """Resolve a hook target's `settings_path`, expanding `~` and env vars.
+
+    Delegates to `resolve_manifest_path` in the sibling
+    `materialize_shared_agent_surface` module rather than reimplementing
+    `~`/`%VAR%`/`$VAR` expansion a second time -- imported lazily via the
+    same `sys.path` manipulation `hermes_gateway_alive_for` below already
+    uses, for the same reason: `materialize_shared_agent_surface` imports
+    *this* module at module load time (`from materialize_shared_hook_surface
+    import materialize as materialize_hook_surface`), so a module-level
+    `from materialize_shared_agent_surface import ...` here would be
+    circular. A lazy, function-scoped import breaks that cycle while still
+    giving every hook target (not just Hermes) exactly one place that knows
+    how to expand a manifest path -- without this, a target whose
+    `settings_path` is `%LOCALAPPDATA%/hermes/config.yaml` would resolve to
+    a bogus path nested inside the workspace tree (`<workspace_root>/
+    %LOCALAPPDATA%/hermes/config.yaml`), since `Path.__truediv__` does not
+    expand environment variables.
+
+    Raises `materialize_shared_agent_surface.SharedSurfaceError` (not
+    `HookSurfaceError`) on an unresolved `%VAR%`/`$VAR` -- that exception
+    type is already what `resolve_manifest_path` raises, and re-wrapping it
+    here would just lose the underlying message for no benefit; callers in
+    this module already let unexpected exceptions propagate as fatal errors
+    (see `materialize()`, which raises loudly rather than swallowing).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    # Deliberate lazy import -- flagged as a cyclic import by static analysis and
+    # correct as written. materialize_shared_agent_surface imports THIS module at
+    # load time, so a module-level import here is a genuine cycle; deferring it
+    # into the function breaks that while keeping one shared path resolver. Do
+    # not "fix" this by hoisting it.
+    from materialize_shared_agent_surface import resolve_manifest_path
+
+    return resolve_manifest_path(workspace_root, raw_path)
+
+
+def hermes_gateway_alive_for(target_path: Path) -> int | None:
+    """Return the PID of a live Hermes gateway guarding `target_path`, else None.
+
+    Delegates to `hermes_gateway_alive` in the sibling
+    `materialize_shared_agent_surface` module rather than reimplementing the
+    liveness check -- a running Hermes gateway rewrites its own config.yaml
+    on shutdown, which would clobber a write made underneath it, and both
+    the MCP surface and this hook surface write into the same file for the
+    `hermes_user` target (the real AppData Hermes home). Imported lazily,
+    and only via `sys.path` manipulation (both scripts live in the same
+    `scripts/` directory but this module is not part of a package), so a
+    plain claude/gemini/codex JSON-only run never pays for importing the
+    much larger agent-surface module.
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    # Same deliberate cycle-break as resolve_target_path above; additionally
+    # keeps a JSON-only run from importing the much larger agent-surface module.
+    from materialize_shared_agent_surface import hermes_gateway_alive
+
+    return hermes_gateway_alive(target_path.parent)
+
+
+def merge_hook_payload_into_yaml_doc(
+    doc: Any, target_cfg: dict[str, Any], mapped_hooks: dict[str, Any]
+) -> None:
+    """Mutate a parsed YAML document in place, merging managed hook events.
+
+    Same merge semantics as `merge_hook_payload` (managed events overwrite
+    same-named existing events; unrelated keys are left untouched), but
+    mutates the already-parsed ruamel node in place instead of returning a
+    fresh dict. Mirrors `apply_hermes_mcp` in
+    `materialize_shared_agent_surface.py`: YAML mappings have no
+    positional/header hazard, so there is no need to rebuild the node, and
+    mutating in place is what lets ruamel preserve comments, key order, and
+    unrelated top-level content.
+
+    An event (or `hooksConfig` key) whose incoming value already compares
+    equal to what is on disk is left untouched rather than unconditionally
+    reassigned. `CommentedSeq`/`CommentedMap` subclass `list`/`dict`, so `==`
+    against a plain manifest-derived list/dict already compares structurally
+    -- but a wholesale `existing_hooks[event_name] = definitions`
+    reassignment, even to an equal value, can still drop ruamel's trailing
+    blank-line/comment bookkeeping attached to the replaced node (observed
+    empirically against the real AppData Hermes config: a genuine no-op
+    dropped the blank line between the `hooks:` block and the next
+    top-level key). Skipping the reassignment when nothing actually changed
+    is what keeps a true no-op byte-identical, the same fidelity goal
+    `apply_hermes_mcp` documents for its own field-clearing discipline.
+    """
+    existing_hooks = doc.get("hooks")
+    if existing_hooks is None:
+        doc["hooks"] = {}
+        existing_hooks = doc["hooks"]
+    if not hasattr(existing_hooks, "items"):
+        raise HookSurfaceError("Existing `hooks` field must be a mapping if present")
+    for event_name, definitions in mapped_hooks.items():
+        if event_name in existing_hooks and existing_hooks[event_name] == definitions:
+            continue
+        existing_hooks[event_name] = definitions
+
+    target_hooks_config = target_cfg.get("hooksConfig")
+    if target_hooks_config is not None:
+        if not isinstance(target_hooks_config, dict):
+            raise HookSurfaceError(
+                "Target `hooksConfig` field must be an object if present"
+            )
+        existing_hooks_config = doc.get("hooksConfig")
+        if existing_hooks_config is None:
+            doc["hooksConfig"] = {}
+            existing_hooks_config = doc["hooksConfig"]
+        if not hasattr(existing_hooks_config, "items"):
+            raise HookSurfaceError(
+                "Existing `hooksConfig` field must be a mapping if present"
+            )
+        for key, value in target_hooks_config.items():
+            if key in existing_hooks_config and existing_hooks_config[key] == value:
+                continue
+            existing_hooks_config[key] = value
+
+
+def apply_yaml_target(
+    target_path: Path,
+    target_cfg: dict[str, Any],
+    *,
+    check: bool,
+    dry_run: bool,
+    variables: dict[str, str] | None = None,
+) -> tuple[str, bool]:
+    """Materialize a `format: "yaml"` hook target.
+
+    A missing file is SKIPPED rather than fabricated -- mirroring how the
+    MCP Hermes target guards with `.exists()` in
+    `materialize_shared_agent_surface.py`. Round-tripping requires an
+    existing document to preserve comments/structure against; nothing here
+    owns creating a fresh YAML config from scratch.
+
+    Before reading, this also refuses to write if a live Hermes gateway is
+    guarding `target_path`'s directory (a `gateway.pid` naming a running
+    process) -- a running gateway rewrites its own config.yaml on shutdown
+    and would clobber anything written underneath it. This check runs
+    unconditionally, even under `--check`/`--dry-run`, the same way and for
+    the same reason `materialize_shared_agent_surface.py`'s Hermes MCP block
+    does: `--check` exists so an operator learns about a blocker *before*
+    attempting a real write. For a target whose directory has no
+    `gateway.pid` at all (claude/gemini/codex today), this is a fast no-op.
+
+    Uses the exact ruamel configuration established for Hermes's
+    `config.yaml` (`apply_hermes_mcp`'s caller): `preserve_quotes = True`,
+    `indent(mapping=2, sequence=4, offset=2)`, `width = 4096`. A bare
+    `ruamel.yaml.YAML()` reflows an entire hand-maintained document on a
+    no-op change (measured on the real Hermes config: a 398-line diff for
+    zero semantic change); this configuration is required to keep a true
+    no-op round-trip byte-identical.
+    """
+    if not target_path.exists():
+        return (f"SKIP  {target_path} (no config at {target_path})", False)
+
+    live_pid = hermes_gateway_alive_for(target_path)
+    if live_pid is not None:
+        return (
+            f"REFUSED {target_path} (gateway PID {live_pid} is live; "
+            "stop it and re-run, or the config is clobbered on shutdown)",
+            True,
+        )
+
+    ruamel_yaml = require_module("ruamel.yaml", str(target_path))
+    yaml_rt = ruamel_yaml.YAML()
+    yaml_rt.preserve_quotes = True
+    yaml_rt.indent(mapping=2, sequence=4, offset=2)
+    yaml_rt.width = 4096
+
+    try:
+        with target_path.open("r", encoding="utf-8") as handle:
+            doc = yaml_rt.load(handle)
+    except HookSurfaceError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - surfaced as one actionable error
+        raise HookSurfaceError(
+            f"Could not read/parse YAML hook target at {target_path}: {exc}"
+        ) from exc
+    if doc is None:
+        raise HookSurfaceError(f"YAML hook target at {target_path} is empty")
+    if not hasattr(doc, "items"):
+        raise HookSurfaceError(
+            f"YAML hook target at {target_path} must parse to a mapping"
+        )
+
+    mapped_hooks = resolve_target_hooks(target_cfg)
+    mapped_hooks = expand_hook_commands(mapped_hooks, variables or {})
+    mapped_hooks = apply_entry_shape(
+        mapped_hooks, target_cfg.get("entry_shape", "nested")
+    )
+    merge_hook_payload_into_yaml_doc(doc, target_cfg, mapped_hooks)
+
+    buffer = io.StringIO()
+    yaml_rt.dump(doc, buffer)
+    return check_or_write_text(
+        target_path, buffer.getvalue(), check=check, dry_run=dry_run
+    )
+
+
+def assert_repo_scope_stays_inside(
+    target_name: str,
+    target_cfg: dict[str, Any],
+    target_path: Path,
+    workspace_root: Path,
+) -> None:
+    """A `scope: "repo"` target must resolve inside the workspace.
+
+    `hook_target_in_scope` checks the DECLARED scope. On its own that is not a
+    protection: a target could declare `scope: "repo"` while its
+    `settings_path` expands, via `%VAR%` or `~`, to somewhere else entirely --
+    and then write there on an ordinary run with no `--include-user-scope`.
+    This repository's own test suite contained exactly that shape
+    (`env_target`, repo scope, `%HOOK_SURFACE_TEST_HOME%/settings.json`), which
+    is what proved the gap.
+
+    So the declared scope and the resolved path have to agree. Escaping the
+    workspace is a user-scope act, and user scope needs the opt-in.
+    """
+    if str(target_cfg.get("scope", "")).strip().lower() != "repo":
+        return
+    try:
+        resolved_root = workspace_root.resolve()
+        resolved_target = target_path.resolve()
+    except OSError:  # pragma: no cover -- unresolvable path, let the write fail
+        return
+    if resolved_root == resolved_target or resolved_root in resolved_target.parents:
+        return
+    raise HookSurfaceError(
+        f"Target {target_name!r} declares scope 'repo' but its settings_path "
+        f"resolves to {resolved_target}, outside the workspace "
+        f"{resolved_root}. Writing outside the repository is user scope: "
+        "declare `\"scope\": \"user\"` and pass --include-user-scope."
+    )
+
+
+def hook_target_in_scope(
+    target_name: str, target_cfg: dict[str, Any], include_user_scope: bool
+) -> bool:
+    """Gate hook targets that write outside the repository.
+
+    This module previously had no scope gate at all, while the sibling
+    agent-surface materializer -- called from the same runner, in the same pass
+    -- gated `~/.codex/config.toml` and the Hermes AppData config carefully and
+    documented why. The asymmetry meant a plain `refresh_agent_surfaces.py`
+    with no `--include-user-scope` still rewrote `~/.claude/settings.json` and
+    the Hermes config, i.e. machine-wide state, from a repo-scope run. Observed
+    doing exactly that on 2026-08-21.
+
+    Skipping out-of-scope targets *before* their `settings_path` is resolved
+    also fixes a portability failure: `hermes_user` points at
+    `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX `os.path.expandvars` does
+    not expand `%VAR%`, so `resolve_target_path` raised on Linux and macOS
+    before the target could be skipped for any other reason. A repo-scope run
+    now never touches it.
+
+    `scope` is required rather than defaulted, for the reason the sibling
+    module gives: defaulting an absent scope to the permissive value would mean
+    a future target that forgets the field writes outside the repo with this
+    gate never consulted.
+    """
+    if "scope" not in target_cfg:
+        raise HookSurfaceError(
+            f"Target {target_name!r} is missing required `scope` field "
+            "(must be 'repo' or 'user'); this gate does not default absence"
+        )
+    scope = str(target_cfg["scope"]).strip().lower()
+    if scope not in {"repo", "user"}:
+        raise HookSurfaceError(
+            f"Target {target_name!r} `scope` must be 'repo' or 'user', got {scope!r}"
+        )
+    return scope == "repo" or include_user_scope
+
+
+def build_registry(
+    manifest: dict[str, Any], workspace_root: Path, variables: dict[str, str]
+) -> dict[str, Any]:
+    """Describe every target, in scope or not.
+
+    Deliberately independent of `include_user_scope`: the registry is the
+    manifest's description, and `--check` compares against it. If its content
+    changed with the opt-in flag, a repo-scope `--check` would report drift
+    purely because the last write happened to use `--include-user-scope`.
+    The gate belongs on the writes, not on the description.
+    """
+    # Same deliberate lazy import as `resolve_target_path` below: the sibling
+    # module imports THIS one at load time, so a module-level import is a real
+    # cycle. We need the exception type it raises in order to catch it.
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from materialize_shared_agent_surface import SharedSurfaceError
+
     registry_targets: dict[str, Any] = {}
     for target_name, target_cfg in manifest["targets"].items():
         if not isinstance(target_cfg, dict):
@@ -236,9 +867,22 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
         resolved_cfg = dict(target_cfg)
         settings_path = target_cfg.get("settings_path")
         if isinstance(settings_path, str) and settings_path.strip():
-            resolved_cfg["resolved_settings_path"] = str(
-                (workspace_root / settings_path).resolve()
-            )
+            try:
+                resolved_cfg["resolved_settings_path"] = str(
+                    resolve_target_path(workspace_root, settings_path)
+                )
+            except SharedSurfaceError as exc:
+                # A platform-specific target that cannot be expressed on this
+                # OS -- `hermes_user` is `%LOCALAPPDATA%/...`, and POSIX
+                # expandvars leaves `%VAR%` literal. Recording it as
+                # unresolved keeps the registry honest and lets a Linux or
+                # macOS run of the repo-scope surface succeed, which it could
+                # not do while this raised.
+                resolved_cfg["resolved_settings_path"] = None
+                resolved_cfg["unresolved_reason"] = str(exc)
+        hooks = resolved_cfg.get("hooks")
+        if isinstance(hooks, dict):
+            resolved_cfg["hooks"] = expand_hook_commands(hooks, variables)
         registry_targets[target_name] = resolved_cfg
 
     return {
@@ -246,7 +890,8 @@ def build_registry(manifest: dict[str, Any], workspace_root: Path) -> dict[str, 
         "workspace_id": manifest.get("workspace_id", "workspace"),
         "workspace_name": manifest.get("workspace_name", "workspace"),
         "rules": manifest.get("rules", []),
-        "hook_scripts": validate_hook_scripts(manifest, workspace_root),
+        "variables": variables,
+        "hook_scripts": validate_hook_scripts(manifest, workspace_root, variables),
         "targets": registry_targets,
     }
 
@@ -264,6 +909,21 @@ def build_index(registry: dict[str, Any]) -> str:
     ]
     for rule in registry.get("rules", []):
         lines.append(f"- {rule}")
+
+    variables = registry.get("variables", {})
+    if isinstance(variables, dict) and variables:
+        lines.extend(
+            [
+                "",
+                "## Resolved Variables",
+                "",
+                "Referenced from hook commands as `${NAME}`. Each may be "
+                "overridden by its declared environment variable.",
+                "",
+            ]
+        )
+        for name in sorted(variables):
+            lines.append(f"- `${{{name}}}` -> `{variables[name]}`")
 
     lines.extend(
         [
@@ -319,9 +979,11 @@ def materialize(
     *,
     check: bool,
     dry_run: bool,
+    include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = load_manifest(manifest_path)
-    registry = build_registry(manifest, workspace_root)
+    variables = resolve_variables(manifest, workspace_root)
+    registry = build_registry(manifest, workspace_root, variables)
     index = build_index(registry)
 
     results: list[str] = []
@@ -346,18 +1008,45 @@ def materialize(
             raise HookSurfaceError(f"Target {target_name!r} must be a JSON object")
         if not target_cfg.get("enabled"):
             continue
+        if not hook_target_in_scope(target_name, target_cfg, include_user_scope):
+            results.append(
+                f"SKIP  user-scope target {target_name!r} "
+                "(pass --include-user-scope to write it)"
+            )
+            continue
         settings_path = target_cfg.get("settings_path")
         if not isinstance(settings_path, str) or not settings_path.strip():
             raise HookSurfaceError(
                 f"Enabled target {target_name!r} must define `settings_path`"
             )
-        target_path = (workspace_root / settings_path).resolve()
+        target_path = resolve_target_path(workspace_root, settings_path)
+        assert_repo_scope_stays_inside(target_name, target_cfg, target_path, workspace_root)
+
+        target_format = target_cfg.get("format", "json")
+        if target_format not in ("json", "yaml"):
+            raise HookSurfaceError(
+                f"Target {target_name!r} has unsupported `format` "
+                f"{target_format!r} (expected 'json' or 'yaml')"
+            )
+
+        if target_format == "yaml":
+            message, changed = apply_yaml_target(
+                target_path,
+                target_cfg,
+                check=check,
+                dry_run=dry_run,
+                variables=variables,
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+            continue
+
         existing = (
             load_jsonc(target_path)
             if target_path.exists() and target_path.suffix == ".jsonc"
             else (load_json(target_path) if target_path.exists() else {})
         )
-        payload = merge_hook_payload(existing, target_cfg)
+        payload = build_target_payload(existing, target_cfg, variables)
         message, changed = check_or_write_json(
             target_path, payload, check=check, dry_run=dry_run
         )
@@ -376,6 +1065,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--include-user-scope",
+        action="store_true",
+        help="Also write targets outside the repository (~/.claude, Hermes AppData)",
+    )
     return parser.parse_args()
 
 
@@ -387,9 +1081,19 @@ def main() -> int:
         output_dir=args.output_dir.resolve(),
         check=args.check,
         dry_run=args.dry_run,
+        include_user_scope=args.include_user_scope,
     )
     for line in results:
         print(line)
+    # A REFUSED write (currently only a live-gateway-blocked Hermes target)
+    # is a failure to converge, not routine drift -- it must exit non-zero
+    # regardless of --check/--dry-run, mirroring
+    # `materialize_shared_agent_surface.py`'s main(), whose orchestrator
+    # (`refresh_agent_surfaces.py`) keys its ok/fail summary off the process
+    # exit code alone.
+    refused = [line for line in results if line.startswith("REFUSED")]
+    if refused:
+        return 1
     if args.check and drift_found:
         return 1
     return 0

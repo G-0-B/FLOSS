@@ -65,7 +65,7 @@ COMMITS = [
             {"type": "commit", "ref": "8bfd4f8"},
         ],
         "risks": [
-            "Pending file renames flagged (ADR-MCP-ORCHESTRATOR.md -> ADR-10, ADR-N-IPFS -> ADR-11) leave dual references in canon.",
+            "Pending file renames flagged (ADR-10-local-agent-node.md -> ADR-10, ADR-N-IPFS -> ADR-11) leave dual references in canon.",
             "ADR-2 evidence drift preserved verbatim, not silently rewritten — must be patched as separate work.",
         ],
         "benefits": [
@@ -275,7 +275,7 @@ COMMITS = [
         "proposal_type": "spec_change",
         "evidence_refs": [
             {"type": "spec", "ref": ".agent-surface/STARTUP_CONTRACT.md"},
-            {"type": "adr", "ref": "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md"},
+            {"type": "adr", "ref": "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md"},
             {"type": "adr", "ref": "docs/adr/ADR-12-consent-gate-protocol.md"},
             {"type": "commit", "ref": "f6b88d4"},
         ],

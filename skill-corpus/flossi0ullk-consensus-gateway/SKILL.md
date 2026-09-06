@@ -13,8 +13,8 @@ The gateway is a router and evidence surface, not a controller.
    - `FLOSS/packages/metacoordinator_mcp`
    - `FLOSS/packages/orchestrator`
    - `FLOSS/packages/source_chain`
-   - `FLOSS/scripts/hook_post_write.py`
-   - `FLOSS/scripts/hook_bg_round.py`
+   - `FLOSS/hooks/hook_post_write.py`
+   - `FLOSS/hooks/hook_bg_round.py`
 2. If provider or roster behavior changes, update:
    - `FLOSS/packages/metacoordinator_mcp/voter_registry.json`
    - `FLOSS/packages/metacoordinator_mcp/voters.py`

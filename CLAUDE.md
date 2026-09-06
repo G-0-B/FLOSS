@@ -10,13 +10,13 @@ FLOSS is the project home for **FLOSSI0ULLK** (Free Libre Open Source Singularit
 
 **Prime directive**: Logic validates, neural assists — never the reverse. LLMs are formatting engines; truth is established by symbolic validation in Holochain integrity zomes, which cannot be bypassed.
 
-**North star** (from the Master Metaprompt v1.3.1): create the conditions for intelligence itself — human, artificial, synthetic, hybrid — to coordinate toward good, without contradiction, across a sovereign commons that neither state nor platform can enclose.
+**North star** (from the Master Metaprompt v1.4.0): create the conditions for intelligence itself — human, artificial, synthetic, hybrid — to coordinate toward good, without contradiction, across a sovereign commons that neither state nor platform can enclose.
 
 ## Directory Map
 
 ```
 FLOSS/
-├── FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md  # CANONICAL kernel — start here for context
+├── FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md  # CANONICAL kernel — start here for context
 ├── SDD-Master-Spec-0.22.md                          # Specification-Driven Development spec
 ├── README.md, LICENSE, MVP_PLAN.md, INSTRUCTIONS_FOR_CODE.md
 │
@@ -40,7 +40,7 @@ FLOSS/
 ├── docs/
 │   ├── adr/                                         # ADR-0..6 + ADR-0.1 + ADR-MCP-ORCHESTRATOR + INDEX
 │   ├── architecture/                                # 31 files — specs, blueprints, integration plans
-│   ├── governance/                                  # spine-v0.5, kernel-v1.2 (drift), seed-packet,
+│   ├── governance/                                  # spine-v0.5, uop-v2.1, build-spine-v0.3, seed-packet,
 │   │                                                #   LOADING_ORDER, HARVEST_LOG, LEGAL_DEFINITIONS
 │   ├── superpowers/                                 # Specs + plans for in-flight design work
 │   │   ├── specs/                                   # e.g. 2026-04-12-local-agent-node-design.md
@@ -61,7 +61,7 @@ For the workspace root (`C:\~shit\`) and the intake-mouth convention, see `C:\~s
 
 **Sibling project:** `C:\~shit\FLOSSI_U/` is the Free YOU-niversity — a separate FLOSS educational/sovereignty project that shares the FLOSSI0ULLK family but has its own ADR-001..019 namespace and canon. Relocated 2026-05-11 from the prior co-located path `FLOSS/FLOSSI_U_Founding_Kit_v1.6/`. The two projects do not share ADR numbering.
 
-## Layer Stack (from Master Metaprompt v1.3.1)
+## Layer Stack (from Master Metaprompt v1.4.0)
 
 | Layer | Technology | Location |
 |-------|-----------|----------|
@@ -92,19 +92,19 @@ An in-flight **Local Agent Node** (landed in commit `096b058` under `packages/`)
 
 - Spec: `docs/superpowers/specs/2026-04-12-local-agent-node-design.md`
 - Plan: `docs/superpowers/plans/2026-04-12-local-agent-node.md`
-- ADR: `docs/adr/ADR-MCP-ORCHESTRATOR.md`
+- ADR: `docs/adr/ADR-10-local-agent-node.md`
 - Code: `packages/{metacoordinator_mcp,orchestrator,source_chain}/`
 
 ### Current Operating Stack
 
-- **Canonical dev-plane code substrate:** `Radicle` (see `docs/adr/ADR-8-radicle-dev-substrate.md`). GitHub remains a pragmatic mirror, not the architectural center.
+- **Current dev-plane code substrate:** `GitHub` (`G-0-B/FLOSS`). Radicle (`docs/adr/ADR-8-radicle-dev-substrate.md`, Accepted, Specified — bridge unproven) is the sovereignty *target*, not the current fact — see `docs/governance/FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md` §C2/§C6 for the reconciliation. Promote to canonical only after a successful mirror workflow and contributor-onboarding test.
 - **Immediate coordination bridge:** the local source chain and MCP gateway under `packages/`.
 - **Runtime truth target:** `Holochain`.
 - **Operating structure:** four harnesses — execution, memory, retrieval, optimization (see `docs/architecture/AGENTIC_OPERATING_MODEL.md`).
 
 ### Inference Posture
 
-- **Cowork (Opus-class, 2× usage limits) — metaplanner / orchestration-manager:** plan-of-action authoring, delegation design, and outreach that Claude Code sessions then execute. ⚠️ **Update 2026-06-13:** public **Fable 5 access was pulled back** following US-government action (on hold). The earlier "Fable metaplanner until 2026-06-22" doctrine is moot — Cowork now runs Opus-class, not Fable. The durable principle stands: planning leverage on the most capable available surface, execution delegated to a cheaper-per-task one. See agent-memory `project-fable5-cowork-metaplanner-window`.
+- **Cowork — metaplanner / orchestration-manager:** plan-of-action authoring, delegation design, and outreach that Claude Code sessions then execute. ⚠️ The **2× usage-limit window has ENDED** (noted by Anthony 2026-07-07) — treat Cowork as standard-limit. ⚠️ **Update 2026-06-13:** public **Fable 5 access was pulled back** following US-government action (on hold). ✅ **Correction 2026-07-05/07 (supersedes the pullback note): Fable-5 access RESTORED 2026-07-03** — the 2026-07-03 sprint packet was executed on `claude-fable-5` and completed 2026-07-04 (all 5 workstreams). **Durable Fable-5 access path: Pioneer.ai API subscription** (monthly, ~$200 credits/mo) serves `claude-fable-5` independent of Anthropic subscription windows — subscription-window expiry no longer gates Fable availability. The time-boxed "metaplanner until 2026-06-22" window is retired; the **post-window escalation policy** now governs (see agent-memory `project-fable5-cowork-metaplanner-window`). The durable principle stands: planning leverage on the most capable available surface, execution delegated to a cheaper-per-task one.
 - **Claude Code (Opus-class):** proposer, integrator, high-risk executor, and final technical synthesis — the execution surface for Cowork-authored plans.
 - **Groq + Cerebras:** cheap background voters, reviewers, explorers, and trace triage. Use these first for repetitive loops.
 - **Gemini:** multimodal analysis, research digestion, design review, writing, and independent dissent.
@@ -114,6 +114,13 @@ The current default LiteLLM voter roster already exercises the Groq/Cerebras pat
 ## Development Commands
 
 All active development assumes you are inside this `FLOSS/` directory. For the ARF Python layer, `cd ARF` first.
+
+### Filesystem & Exploration (Smart Tree)
+```bash
+st --mode ai                   # AI-optimized directory output
+st --search "query"            # Search file contents globally
+# ⚠️ MANDATORY: The `st` (Smart Tree) CLI tool is the required and vastly superior replacement for ls, grep, and find. Always use it to gather context.
+```
 
 ```bash
 # Python environment (ARF)
@@ -151,14 +158,14 @@ ruff check .
 ## Key Entry Points
 
 - **Master index**: `../INDEX.md` (workspace root)
-- **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`
+- **Project kernel**: `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`
 - **Architecture (teleological axis)**: `docs/architecture/HOLISTIC_ARCHITECTURE.md` — CCES 8-layer + Foundation Stack (what flourishing is being served)
 - **Architecture (operational axis)**: `docs/architecture/META_COORDINATION_KERNEL_v4.0.md` — 9-layer agent-centric stack + RICE overlay + Superalignment Triad + 10 named roles (what agents do, where authority sits). See §21 for the orthogonal-axis composition with CCES. Landed 2026-05-13 via consensus claim `019e2293` APPROVED mean +0.717.
 - **Agentic operating structure**: `docs/architecture/AGENTIC_OPERATING_MODEL.md`
 - **Forward-momentum plan**: `docs/superpowers/plans/2026-04-16-forward-momentum-radicle-meta-harnesses.md`
-- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (current set per v2.0 suite is ADR-0, 0.1, 1–11; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10; ADR-N (IPFS) was assigned ADR-11)
+- **Decision history**: `docs/adr/INDEX.md` + `docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` (the v2.0 suite file is frozen at ADR-0, 0.1, 1–12; ADR-MCP-ORCHESTRATOR was assigned permanent number ADR-10 and ADR-N (IPFS) became ADR-11; ADR-12 is the Consent Gate Protocol, `OVERRIDE FORBIDDEN`. **ADR-13..19 live only in `docs/adr/INDEX.md` v2.1.0+, not in the suite file** — always read the ADR INDEX, not the suite, for the current set)
 - **Radicle substrate decision**: `docs/adr/ADR-8-radicle-dev-substrate.md`
-- **Local agent node**: `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 in the v2.0 suite)
+- **Local agent node**: `docs/adr/ADR-10-local-agent-node.md` (ADR-10 in the v2.0 suite)
 - **Coding guide**: `INSTRUCTIONS_FOR_CODE.md`
 - **Symbolic first core**: `ARF/SYMBOLIC_FIRST_CORE.md`
 - **Integration map**: `ARF/INTEGRATION_MAP.md`

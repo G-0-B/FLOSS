@@ -300,7 +300,7 @@ I found a knowledge-heavy workspace with many strategy docs and agent configs, s
 | **Symbolic First Core** | `FLOSS/ARF/SYMBOLIC_FIRST_CORE.md` | Production-ready |
 | **Integration Map** | `FLOSS/ARF/INTEGRATION_MAP.md` | Layer-by-layer |
 | **ADR-0 Recognition Protocol** | `FLOSS/docs/adr/ADR-0-recognition-protocol.md` | Cross-substrate coordination |
-| **ADR-MCP-ORCHESTRATOR** | `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` | Local agent node + analog consensus loop (096b058) |
+| **ADR-MCP-ORCHESTRATOR** | `FLOSS/docs/adr/ADR-10-local-agent-node.md` | Local agent node + analog consensus loop (096b058) |
 | **ADR-8 Radicle Dev Substrate** | `FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md` | Canonical dev-plane code substrate |
 | **Executive Summary** | `FLOSS/ARF/EXECUTIVE_SUMMARY.md` | Symbolic-first overview |
 | **Voluntary Convergence Manifesto** | `FLOSS/ARF/Voluntary_Convergence_Manifesto.md` | Ethical framework |
@@ -472,7 +472,7 @@ The **canonical dev-plane code substrate** is now `Radicle` (ADR-8). GitHub rema
 3. `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (kernel)
 4. `FLOSS/docs/adr/INDEX.md` (decision history)
 5. `FLOSS/ARF/SYMBOLIC_FIRST_CORE.md` (technical core)
-6. `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` (current local-agent-node work)
+6. `FLOSS/docs/adr/ADR-10-local-agent-node.md` (current local-agent-node work)
 7. `FLOSS/docs/architecture/AGENTIC_OPERATING_MODEL.md` (current operating structure)
 
 **Building code?** See:
@@ -743,7 +743,7 @@ The in-flight local multi-model consensus gateway under `FLOSS/packages/` is **A
 
 - Spec: `FLOSS/docs/superpowers/specs/2026-04-12-local-agent-node-design.md`
 - Plan: `FLOSS/docs/superpowers/plans/2026-04-12-local-agent-node.md`
-- ADR: `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10 in the v2.0 suite)
+- ADR: `FLOSS/docs/adr/ADR-10-local-agent-node.md` (ADR-10 in the v2.0 suite)
 - Code: `FLOSS/packages/{orchestrator,source_chain,metacoordinator_mcp}/`
 
 The gateway is a router, not a controller — it accepts Claims/Votes from any agent (human, model, ensemble, or otherwise) and appends them to a file-based source chain. It does not decide outcomes or command voters.

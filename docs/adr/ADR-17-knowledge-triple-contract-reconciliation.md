@@ -11,7 +11,7 @@ relates_to:
   - "ADR-13 (Yumeichan ternary connotation — source of the affective predicates)"
   - "ADR-4 (SDD — spec/schema/code must be one contract)"
   - "F10 in docs/superpowers/plans/2026-07-fable5-adversarial-review.md (the finding this resolves)"
-decision: "+1 adopt D1 and D2 below on acceptance; 0 hold on D3 (provenance shape) pending spec v2.0 rewrite"
+decision: "+1 adopt D1, D2, and D4 below on acceptance; 0 hold on D3 (provenance shape) pending spec v2.0 rewrite"
 truth_status:
   divergence: "Verified — spec.md [0,1]/URIs vs schema.json+zome [-1,+1]/enum, live-read 2026-07-04 (zome lib.rs:225,233)"
   d1_confidence: "Specified — zome already enforces it; spec.md text change pending"
@@ -110,10 +110,19 @@ partially redundant. Constraint for the spec v2.0 rewrite: **`parent_triples`
 must be on-chain-visible** if INV-007/008′ are to be zome-enforced. Resolving
 the full shape belongs to that rewrite, not this ADR.
 
+### D4 — Temporal and Contextual Decay Fields (Synthesis Delta)
+
+Per the Holo-RBI synthesis delta feedback, facts require temporal and contextual bounds to prevent epistemic drift. The following fields are added to the schema:
+- `valid_context` (string): Context in which the fact is considered valid.
+- `known_failures` (array of strings): Conditions or edge cases where the fact fails.
+- `expiry_or_retest_date` (string/ISO8601): When the fact should be retested or expires.
+
+**Data impact:** These fields are optional for backwards compatibility, but strongly recommended for `LlmExtraction`-sourced triples.
+
 ## Consequences
 
 - `knowledge-triple.spec.md` v2.0 rewrite scheduled (confidence domain,
-  predicate section, D3): replaces the divergence banner. Until then the banner
+  predicate section, D3, D4): replaces the divergence banner. Until then the banner
   states the interim authority split (zome for domain, spec for extraction semantics).
 - `knowledge-triple.schema.json` `$id` bumps and gains the mapping-table pointer
   when the first extension batch lands (one claim, three files rule).

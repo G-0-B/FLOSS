@@ -66,7 +66,7 @@ Pre-cull and post-cull file-count target reflected at end of doc.
 | File | Canonical location | Bin | Confidence |
 |---|---|---|---|
 | `AD4M-hREA-Integration-Analysis.md` | `docs/research/` | DEDUP → archive guides/ copy | ✅ |
-| `ADR-N-IPFS-Integration-VVS.md` | `docs/adr/` | DEDUP → archive guides/ copy | ✅ |
+| `ADR-11-ipfs-large-file-integration.md` | `docs/adr/` | DEDUP → archive guides/ copy | ✅ |
 | `EXECUTIVE-SUMMARY-AND-ACTION-PLAN.md` | `docs/architecture/` | DEDUP → archive guides/ copy | ✅ |
 | `FLOSSIOULLK-Alignment-Verification.md` | `docs/research/` | DEDUP → archive guides/ copy | ✅ |
 | `Fractal-Coordination-Patterns.md` | `docs/vision/` | DEDUP → archive guides/ copy | ✅ |
@@ -237,7 +237,7 @@ These are the prior-iteration learning artifacts pointed to in `reference_prior_
 ### Currently live (KEEP)
 
 - `AD4M-hREA-Integration-Analysis.md` — referenced in audit doc (KEEP for now; reconcile with §K of audit)
-- `IPFS-Integration-Evolution-Summary.md` — SPOT-READ; if `ADR-N-IPFS-Integration-VVS.md` superseded, ARCHIVE
+- `IPFS-Integration-Evolution-Summary.md` — SPOT-READ; if `ADR-11-ipfs-large-file-integration.md` superseded, ARCHIVE
 - `FLOSSIOULLK-Alignment-Verification.md` — SPOT-READ
 - `resonance_mechanism_v2.md` — also at workspace root (DEDUP question)
 
@@ -315,7 +315,7 @@ These are the prior-iteration learning artifacts pointed to in `reference_prior_
 
 ### UPDATE / ARCHIVE candidates
 
-- `kernel-v1.2.md` — superseded by `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`. Per `INDEX.md` Intake Queue: "Diff and forward-port any governance-specific content not already in v1.3.1, *then* move v1.2 to `archive/metaprompt-versions/`." Action: UPDATE → ARCHIVE after diff ✅
+- `kernel-v1.2.md` — superseded by `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`. Per `INDEX.md` Intake Queue: "Diff and forward-port any governance-specific content not already in v1.3.1, *then* move v1.2 to `archive/metaprompt-versions/`." Action: UPDATE → ARCHIVE after diff ✅
 - `HARVEST_LOG.md` — SPOT-READ; logs may be useful, may be stale ⚠️
 - `FLOSS Singularity Governance Protocol Specification.md` — SPOT-READ; possibly canonical, possibly superseded by `spine-v0.5.md` ⚠️
 
