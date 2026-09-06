@@ -1,8 +1,8 @@
 # FLOSSI0ULLK Current Engineering Continuation Packet
 ## Evidence-driven implementation alignment — 2026-09-05
-## Packet version: v1.1
+## Packet version: v1.2
 
-**Status:** Specified — execution-control / context-continuation packet (v1.1 amendments applied)
+**Status:** Specified — execution-control / context-continuation packet (v1.2 amendments applied over v1.1)
 **Purpose:** Restore current engineering intent, reconcile the active implementation plans, select the highest-information next work, and prevent stale plans from silently becoming current architecture.
 **Intended location:** `FLOSS/docs/superpowers/plans/2026-09-05-current-engineering-continuation-packet.md` or the current canonical resumption-plan surface if one already exists.
 **Important:** Before creating a new document, apply the repository's doc-budget rule. If an existing canonical resumption/control document serves this role, update that document instead.
@@ -393,6 +393,36 @@ An external provenance witness does not establish consent for a governed decisio
 
 Never allow the word **anchor** to collapse them.
 
+### Integrity scope before an external witness exists
+
+Without an independently held historical witness, provenance-chain validation can establish useful consistency properties against corruption and buggy writers but cannot prove that a host has not removed a consistent suffix of history.
+
+Therefore:
+
+> **Until a real external witness is operationally demonstrated, provenance-history completeness must not be described as adversarially verified.**
+
+This does not invalidate local provenance.
+
+It narrows the claim.
+
+Use explicit scope such as:
+
+`local-chain integrity under the stated writer/store threat model`
+
+rather than:
+
+`complete tamper-proof history`
+
+when the stronger property has not been proven.
+
+An external witness earns stronger language only after:
+
+1. commitment creation works;
+2. publication/witness operation works;
+3. an independent reader can resolve it;
+4. altered/truncated history fails verification;
+5. readback proves the witness survived outside the protected store.
+
 ---
 
 # 5. Current four-lane execution model
@@ -435,6 +465,34 @@ Determine whether each exposure remains live and contain any that does.
 - Record only redacted identifiers and status.
 
 Security containment may interrupt other lanes when a currently live credential or destructive footgun is confirmed.
+
+### Security containment acceptance
+
+Lane S work is complete for a specific exposure only when:
+
+1. the original location has been reverified;
+2. current credential validity/revocation status is established without reproducing the credential;
+3. replacement credential material, if any, is stored through the intended secret mechanism;
+4. generated/shared artifacts no longer reproduce the sensitive value;
+5. committed-history implications have a deliberate disposition;
+6. a current established-tool scan has been run over the relevant scope;
+7. readback confirms the intended change.
+
+Distinguish:
+
+`ROTATED`
+
+`REVOKED`
+
+`REMOVED FROM CURRENT TREE`
+
+`PERSISTS IN HISTORY`
+
+`HISTORY PURGED`
+
+These are not synonymous.
+
+Do not report simply `fixed` when only one of these properties has been established.
 
 ---
 
@@ -719,6 +777,18 @@ Rules:
 
 > Never blindly retry a consequential mutation.
 
+For actions targeting an account, browser, remote service, harness, process, worktree, branch, or session:
+
+> **Verify target identity before mutation when a cheap identity check exists.**
+
+A correctly authorized operation against the wrong session/account/worktree is still incorrect.
+
+Recovery attempts use the same gate.
+
+Repeated recovery is not automatically justified by the failure of the previous attempt.
+
+Define a stopping condition or bounded recovery budget before prolonged retries.
+
 This is a reasoning obligation, not a requirement to emit a six-item checklist before ordinary actions.
 
 ---
@@ -950,13 +1020,82 @@ When schema, specification, runtime constants, registries, and validators descri
 
 Tests should assert the general property, not merely enumerate the last fields that happened to break.
 
+### Gate success must name what the gate actually proves
+
+A successful gate/test/check must not acquire stronger semantics than the predicate it actually evaluates.
+
+Distinguish at minimum:
+
+- **present** — an artifact/record exists;
+- **well-formed** — structure/schema is valid;
+- **executed** — an operation actually ran;
+- **passed** — its tested predicates succeeded;
+- **reviewed** — a review occurred;
+- **approved** — the review/governance outcome was affirmative;
+- **verified** — the claim is supported by the required traceable evidence.
+
+A green gate that checks **review occurrence** does not imply **review approval**.
+
+A valid signature does not imply truth.
+
+A schema-valid evidence record does not imply that the evidence actually ran or supports the claim.
+
+When a gate passes while a known negative or unresolved outcome remains, surface that state explicitly rather than allowing the green signal to imply closure.
+
+> **A predicate may report only the property it actually tested.**
+
+This applies equally to CI, provenance gates, reuse gates, consensus aggregation, materializers, health checks, and agent-generated status reports.
+
+### Audit evidence must be independently resolvable
+
+AI-authored research, audit, prior-art, and governance artifacts are subject to the same truth discipline as implementation claims.
+
+For a claim to receive **Verified** status:
+
+- load-bearing citations/references must resolve;
+- the cited source must actually support the attributed proposition;
+- searched-but-unprobed technology remains **searched/evaluated**, not **operationally verified**;
+- a hallucinated or unsupported citation must be removed even if the underlying finding survives by independent reasoning.
+
+Do not discard a valid finding merely because one supporting citation was bad.
+
+Separate:
+
+`finding validity`
+
+from:
+
+`citation validity`
+
+and record both where consequential.
+
 ---
 
 ## 8.18 Multi-model review policy
 
 > **Model multiplicity is evidence diversity, not authority multiplication.**
 
-Do not claim model/provider-family count establishes statistical independence.
+Provider/model-family diversity is a **coverage heuristic**, not evidence of statistical independence.
+
+Therefore:
+
+- `≥N providers` or `≥N model families` may enforce minimum diversity of exposure;
+- those counts must not be translated into `N independent votes`;
+- unanimity must not be assigned independence-based confidence without empirical justification;
+- correlated co-failure remains possible across different providers and model families;
+- for checkable tasks, compare multi-model performance against a strong single-model baseline;
+- for uncheckable architecture/governance questions, preserve dissent and uncertainty rather than pretending model count yields calibrated confidence.
+
+When aggregation is consequential, report what was actually observed:
+
+- successful reviewers;
+- non-answers/failures;
+- findings by source;
+- conflicts;
+- attribution;
+- any measured dependence diagnostic if one genuinely exists.
+
+Do not report implied independent-vote counts unless they were actually estimated.
 
 For consequential review:
 
@@ -967,6 +1106,24 @@ For consequential review:
 5. inspect raw responses whenever aggregate agreement appears suspiciously high;
 6. run at least one less-structured reviewer/control when rigid schemas could suppress unexpected finding classes;
 7. allow prose synthesis only as a convenience layer over the attributed finding set, never as its replacement.
+
+For high-consequence review, include at least one reviewer/control whose prompt is deliberately less constrained than the structured review schema.
+
+Reason:
+
+A structured schema increases comparability but restricts the classes of finding a reviewer can express.
+
+Therefore use both:
+
+`structured reviewers → comparable known categories`
+
+and
+
+`open reviewer/control → unexpected categories`
+
+Then normalize both into the attributed finding union.
+
+Unexpected findings are not discarded merely because the canonical review schema had no field for them.
 
 Neural consensus remains advisory evidence unless deterministic governance explicitly grants a decision mechanism authority.
 
@@ -985,6 +1142,34 @@ After every trust-path or validation fix:
 5. run an adversarial review against the changed boundary.
 
 A successful regression test is evidence that one failure was closed, not proof that the class was eliminated.
+
+When a defect is found, classify it at two levels:
+
+### Instance
+
+What exact input/path/function failed?
+
+### Failure shape
+
+What broader assumption allowed this class of failure?
+
+Examples:
+
+- coercion used as validation;
+- several authorities representing one vocabulary;
+- assertion standing in for evidence;
+- hidden mutation without readback;
+- manually duplicated state going stale;
+- aggregate erasing dissent;
+- commitment without external witness;
+- generated projection diverging from canonical source;
+- race handled as if execution were sequential.
+
+The preferred fix eliminates or tests the **failure shape** where economically reasonable.
+
+Do not automatically widen a small repair into a repository rewrite.
+
+The generalization still needs an evidential sponsor.
 
 ---
 
@@ -1026,6 +1211,9 @@ The Reality Gate must explicitly establish:
 - Does the relevant Tryorama integration test currently execute and pass?
 - Does the ADR-12 path currently create a real decision action hash?
 - What provenance external-witness mechanism, if any, currently exists?
+- What properties do current green gates actually prove, and do any currently conflate `reviewed`, `approved`, `executed`, `passed`, or `verified`?
+
+This last question should be sampled at the trust-critical gates, not exhaustively audited across every test in the repository before useful work can continue.
 
 Every answer must be:
 
@@ -1286,11 +1474,34 @@ The witness exists precisely to be understood by entities that do not already tr
 
 Do not automatically implement any specific supply-chain framework from historical research; apply the reuse/probe gate against current versions and current requirements first.
 
+Adoption sequence:
+
+`need demonstrated`
+→ `prior-art search`
+→ `current implementation/library availability verified`
+→ `minimal probe`
+→ `compare with simplest bespoke/local alternative`
+→ `adopt / extend / reject`
+
+A standard receives preference **for interoperability**, not immunity from evaluation.
+
+Do not turn historical recommendations for in-toto, Sigstore, Rekor, SCITT, OpenTimestamps, KERI, or any other witness technology into implementation requirements without a current probe.
+
 ---
 
 # 13. Current integration milestone acceptance criteria
 
-Do not call the coordination/governance substrate meaningfully integrated until a test can demonstrate most of the following without hidden manual substitution:
+Integration claims are threat-model scoped.
+
+Do not require every future security property to call the **local coordination/governance walking skeleton** useful.
+
+Instead distinguish two milestones.
+
+### Milestone A — operational local substrate
+
+Required to show that the intended components actually compose under the explicitly stated local-store and non-host-adversarial threat model.
+
+Keep the existing checklist:
 
 - [ ] two independent agent processes/surfaces;
 - [ ] unique agent/session identities;
@@ -1308,7 +1519,22 @@ Do not call the coordination/governance substrate meaningfully integrated until 
 - [ ] no placeholder authority;
 - [ ] an independent observer can reconstruct the important sequence.
 
-This is the long-lived proof target.
+Passing Milestone A does **not** imply Milestone B.
+
+### Milestone B — outsider-verifiable historical integrity
+
+Do not claim this milestone until additionally demonstrated:
+
+- [ ] current provenance state is committed through an independently recognizable witness mechanism;
+- [ ] witness exists outside the packet store whose history it protects;
+- [ ] independent readback resolves the commitment;
+- [ ] a deliberately modified historical packet set fails verification;
+- [ ] a deliberately truncated consistent suffix is detectable against the external witness;
+- [ ] witness provenance/identity itself is inspectable;
+- [ ] failure/recovery behavior is tested;
+- [ ] no project-specific assertion is being mistaken for an external witness merely because it contains a digest.
+
+This is the long-lived proof target, split by threat model.
 
 Individual tasks should implement only the smallest slice necessary to move one unchecked item toward credible evidence.
 
@@ -1370,6 +1596,8 @@ Use the following intent when resuming:
 > Preserve these constraints: logic validates; neural assists; provenance is distinct from authority and truth; the governance authorization anchor is distinct from any historical-integrity witness; A2A does not replace MCP or become a controller; governed decisions may not use placeholder consent hashes; structured validated data must not become syntactically ambiguous at neural boundaries; omission/truncation operates on whole semantic units; trust-critical failure is explicit and normally fail-closed; historical plans do not override current repo evidence; never reproduce secret values into reports or shared surfaces.
 >
 > Prefer a real vertical proof over additional architectural documentation. Do not introduce a new abstraction without an evidential sponsor. After the slice, return `+1 ADOPT`, `0 HOLD`, or `-1 REMOVE`, followed by KEEP / KILL / COMPRESS / AUTOMATE and the next unresolved experiment.
+>
+> Observe before acting. Validate before trusting. Prove before promoting. Read back after mutation. Preserve dissent. Let every green signal mean only what it actually tested.
 
 ---
 
@@ -1391,7 +1619,11 @@ The selection criterion is not age of backlog.
 
 It is:
 
-> **Choose the experiment that removes the most consequential uncertainty while introducing the least unjustified durable commitment and irreversible risk.**
+> **Choose the experiment that removes the most consequential uncertainty while introducing the least unjustified durable commitment and irreversible risk, and state exactly what successful evidence would prove — no more.**
+
+Supporting compression:
+
+> **Observe before acting. Validate before trusting. Prove before promoting. Read back after mutation. Preserve dissent. Let every green signal mean only what it actually tested.**
 
 ---
 
@@ -1406,7 +1638,8 @@ This continuation packet becomes **STALE FOR TASK SELECTION** when any of these 
 5. the security lane discovers or closes a P0 exposure;
 6. A2A crosses its stated stop condition into a real production use case;
 7. a governing ADR supersedes one of this packet's invariants;
-8. a reality-gate observation materially contradicts its lane ordering.
+8. a reality-gate observation materially contradicts its lane ordering;
+9. the provenance historical-witness threat model or implementation materially changes, including an external witness becoming operational or being rejected after probe.
 
 On trigger:
 
