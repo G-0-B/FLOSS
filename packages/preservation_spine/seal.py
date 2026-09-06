@@ -133,7 +133,13 @@ def _open_regular_nofollow(path: Path) -> Iterator[BinaryIO]:
             raise CapsuleVerificationError(
                 "capsule payload cannot be opened safely"
             ) from exc
-    stream = os.fdopen(descriptor, "rb", closefd=True)
+    try:
+        stream = os.fdopen(descriptor, "rb", closefd=True)
+    except OSError as exc:
+        os.close(descriptor)
+        raise CapsuleVerificationError(
+            "capsule payload cannot be opened safely"
+        ) from exc
     try:
         yield stream
     finally:

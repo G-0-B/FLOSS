@@ -400,7 +400,25 @@ def test_inventory_rejects_verification_with_unbound_fields(
     payload["planes"][0]["extra_diagnostic"] = "unvalidated"
     verification_path.write_text(json.dumps(payload), encoding="utf-8")
 
-    assert main(["inventory", "--capsule", str(state_dir)]) != 0
+    assert main(["inventory", "--capsule", str(state_dir)]) == 1
+    assert "unbound fields" in capsys.readouterr().err
+
+    projection = tmp_path / "github-projection"
+    assert (
+        main(
+            [
+                "render-github",
+                "--capsule",
+                str(state_dir),
+                "--output",
+                str(projection),
+            ]
+        )
+        == 1
+    )
+    copied = projection / "artifacts" / "verification.json"
+    if copied.is_file():
+        assert "source_absolute_path" not in copied.read_text(encoding="utf-8")
 
 
 def test_reverification_dedupes_completed_actions(
