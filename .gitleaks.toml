@@ -1,0 +1,68 @@
+# Gitleaks configuration for FLOSSI0ULLK.
+#
+# Extends the upstream default ruleset rather than replacing it, so provider
+# rules (AWS, GitHub, Slack, OpenAI, Anthropic, ...) keep working and arrive
+# for free as gitleaks updates. Everything below is subtraction: places where
+# this repository legitimately contains high-entropy strings that are not
+# secrets, and would otherwise drown the signal.
+#
+# The rule for editing this file: an allowlist entry must name WHY the strings
+# it exempts cannot be credentials. "It was noisy" is not a reason. A path
+# added here stops being scanned, so a wrong entry here is a hole.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret high-entropy content specific to this repository"
+
+paths = [
+  # Provenance packets. Every one is a JSON object of KERI-shaped fields:
+  # a SAID digest (`E` + 43 base64url), an AID (`D`/`B` + 43 base64url), and
+  # an Ed25519 signature (`0B` + 86 base64url). All three are public by
+  # construction -- the whole point of the packet is that anyone can verify it
+  # without a secret. Private keys live in $HOME/.floss_agent/identity, which
+  # is outside the repository.
+  '''^\.agent-surface/provenance/''',
+
+  # Read-only research corpus. 2,300+ third-party files, none of them ours to
+  # rotate, and nothing in it is deployed. Scanning it produces findings no
+  # one can act on.
+  '''^_reference/''',
+
+  # Vendored lockfiles: integrity hashes, not credentials.
+  '''(^|/)(package-lock\.json|Cargo\.lock|poetry\.lock|uv\.lock)$''',
+]
+
+regexes = [
+  # SHA-256 digests. The spec registry, the reuse ledger, provenance artifact
+  # refs and the hashline checkpoints are all built on bare 64-hex strings.
+  # A 64-hex string is a digest in this repository, and digests are meant to
+  # be published.
+  '''\b[0-9a-f]{64}\b''',
+
+  # Test fixtures -- `"a" * 64`, `"E" + "a" * 43` and friends, used throughout
+  # packages/activity_log/tests and the sweettest suite as deliberately
+  # well-formed but fake identifiers -- need no rule of their own: the digest
+  # rule above and the KERI rules below already match them by shape.
+  #
+  # A repeated-character rule was drafted here and removed. It used a
+  # backreference, and gitleaks compiles with Go's RE2, which has none. The
+  # config would not have loaded at all -- and a secret scanner that fails to
+  # start is worse than one that is noisy, because CI reports the job, not the
+  # coverage. Any rule added here must be RE2-expressible: no backreferences,
+  # no lookaround.
+
+  # KERI-shaped public identifiers and signatures, wherever they appear in
+  # docs and specs rather than under .agent-surface/provenance/.
+  #   D/B + 43 base64url -- transferable / non-transferable AID (public key)
+  #   E   + 43 base64url -- SAID digest
+  #   0B  + 86 base64url -- Ed25519 signature
+  '''\b[DBE][A-Za-z0-9_-]{43}\b''',
+  '''\b0B[A-Za-z0-9_-]{86}\b''',
+
+  # Placeholder and example values. Real secrets do not announce themselves.
+  '''(?i)(your[-_]?|example[-_]?|dummy[-_]?|placeholder[-_]?|fake[-_]?|test[-_]?)(api[-_]?key|token|secret)''',
+  '''(?i)<(your|insert|redacted)[^>]*>''',
+  '''(?i)\bREDACTED\b''',
+]

@@ -94,6 +94,13 @@ nul
 *.key
 *_api_key*
 *secret*
+# ...except the workflow that scans for them. `*secret*` is a broad net for
+# stray `secrets.json` / `my-secrets.env` drops, and it caught the secret
+# scanner itself -- a rule about credential hygiene silently blocking the tool
+# that enforces credential hygiene. Workflows are reviewed code in a directory
+# where a credential would never legitimately live, so the hole is narrow and
+# named rather than a widening of the rule.
+!.github/workflows/secret-scan.yml
 
 # Browser-extension JS dumps from sitegeist intake (2026-05-19) — kept on disk for inspection, excluded from repo.
 docs/research/intake_raw/2026-05-19-root/bundles/sitegeist_extracted/
