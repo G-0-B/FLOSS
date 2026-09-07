@@ -123,3 +123,25 @@ documents intact.
 
 The root intake daemon reports remain valuable source material, but this file is
 the canonical architectural reference going forward.
+
+---
+
+## Proposed Extensions (2026-07-21, unratified)
+
+**Truth status: ⚠️ Specified.** Source: `docs/research/intake_raw/2026-08-10-root/reports/ADR-CONTEXT-DAEMON-ROI-v0.2.md`, an ADR-shaped document that was **never allocated an ADR number** (the series runs ADR-0..19). Folded in here 2026-08-10 by operator decision rather than allocated ADR-20, because this cluster had no declared authority ordering and allocating a number is itself a canon-promotion act. Nothing below is ratified; it is recorded so the proposals stop living only at the workspace root.
+
+**Sole-reservoir commitment.** The Knowledge Graph layer is a *materialized, rebuildable projection* of Sourcechain entries (Claims, Votes, ADR records, Episodes) — discarded and regenerated on hash mismatch. **No independent graph store is permitted.** This is the one commitment most worth preserving: it is the guard against the second-source-of-truth failure mode.
+
+**Proposed 5-layer stack.** Observer (watchdog + SHA-256 fingerprint gating; critical paths real-time, the rest batched) → Semantic Index (local `nomic-embed-text` via Ollama + LanceDB hybrid BM25/vector/MMR) → Sourcechain Projection Graph (SQLite or adjacency list; SUPERSEDES / CONTRADICTS edges; always rebuildable) → CRDT Shared State (Delta-CRDTs for task queues and capability registries **only**) → Stakes-aware Curator (consolidation that *reflects* Sourcechain consensus and never decides status).
+
+**Claim-status mutation path.** No direct `set_claim_status` tool. All status changes occur via Votes on the Sourcechain; steward overrides are weighted Votes, not privileged writes. Consistent with the gateway being a router, not a controller.
+
+**Conversation indexing.** Decision-anchored and tag-based only — an explicit ADR ID, Claim ID, or a human `#context-anchor` tag. Untagged conversations get a 90-day active window, then decay to cold full-text search. **Recency alone is never sufficient.**
+
+**Stakes-based model routing.** High stakes (steward-involved, Verified claim cited by an Accepted ADR, new CONTRADICTS edge on steward content) → Opus-class or human-in-the-loop. Medium (Proposed ADRs, new Unverified claims, routine docs churn) → Sonnet-class. Low (`_reference/`, formatting, typos, structural reconciliation) → local model or zero LLM calls.
+
+**Explicit non-goals ("never for now").** Independent knowledge graph as a second source of truth; full-repo nightly Opus-class consolidation; recency-only conversation indexing; unilateral mutation of claim status; premature AD4M executor integration; future-proofing scaffolding without three production recurrences or a dated roadmap item.
+
+> **Unsourced figures — carry as claims, never as measurements.** The source document asserts a routing target of "≥88.7 % of consolidation runs on zero-marginal-cost local tools" and a "70–90 %" saving elsewhere. Neither has a cited derivation or measurement behind it. The *direction* (route cheap work to local models) is sound; the precision is not evidence.
+
+> **AD4M/RDF mapping is deferred** in the source document pending ADR-numbering reconciliation. That reconciliation has since largely happened (ADR-10/ADR-11 renames landed 2026-08-10), so this deferral should be re-examined rather than assumed still-blocking.

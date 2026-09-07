@@ -2,10 +2,10 @@
 
 ```yaml
 id: "flossi0ullk-runtime-surfaces"
-version: "0.1.0"
+version: "0.2.0"
 kind: "operator_guide"
 status: "Active"
-updated: "2026-05-24"
+updated: "2026-07-08"
 truth_status: "Specified with partial implementation evidence"
 evidence_sources:
   - "FLOSS/docs/architecture/METAHARNESS_OPERATING_MODEL.md"
@@ -88,6 +88,10 @@ python C:\~shit\FLOSS\scripts\audit_provenance_packets.py
 | Shared skills | `FLOSS/scripts/materialize_shared_skill_surface.py` | Local | Codex/Claude/Gemini/OpenCode skills | `shared-skill-surface.json` |
 | Shared memory | `FLOSS/scripts/materialize_shared_agent_memory.py` | Local | `FLOSS/docs/agent-memory/`, `.agent-surface/memory/` | `shared-agent-memory-surface.json` |
 | AI/harness roster | `FLOSS/scripts/materialize_shared_ai_roster.py` | Local | `.agent-surface/harness/AI_ROSTER.md`, `ai-roster.json`, `HARNESS_UPDATE_PACKET.md` | `shared-ai-roster-surface.json` |
+| Intake watcher | `FLOSS/scripts/watch_intake.py` | Local | `.agent-surface/events/incoming/` | `docs/architecture/METAHARNESS_OPERATING_MODEL.md` (overlap-dedup + backpressure guard landed 2026-07-07) |
+| Intake processor | `FLOSS/scripts/process_intake_events.py` | Local | `.agent-surface/events/processed/`, `queue-summary.json` | `docs/architecture/METAHARNESS_OPERATING_MODEL.md` |
+| Autonomous synthesis | `FLOSS/scripts/autonomous_synthesis_loop.py` | LLM calls | `docs/knowledge_log/staging/` (Plane A; `--commit` human-gated) | `docs/architecture/METAHARNESS_OPERATING_MODEL.md` |
+| Spec gate | `FLOSS/scripts/spec_gate.py` | Local | `docs/specs/spec-registry.json` (fail-closed `--check`) | `docs/specs/spec-gate.spec.md` |
 
 ## Token-Budget Rules
 

@@ -109,7 +109,9 @@ Then generate code and tests FROM this spec.
 ### Retroactive Documentation Created
 
 1. **ADR-1: Holochain Integration Stack**
-   - Location: `docs/ADRs/ADR-1-Holochain-Integration-Stack.md`
+   - Location: ~~`docs/ADRs/ADR-1-Holochain-Integration-Stack.md`~~ — renumbered to ADR-2, then archived 2026-08-12 to
+     `archive/adr-versions/ADR-2-Holochain-Integration-Stack_shadow-collision_2025-11-17.md`
+     (it collided by number with the real `docs/adr/ADR-2-holochain-substrate.md`)
    - Contents:
      - Honest acknowledgment of violation
      - Multi-lens analysis (what we SHOULD have done)
@@ -128,7 +130,9 @@ Then generate code and tests FROM this spec.
    - Status: PROPOSED (awaiting evidence and review)
 
 3. **Specification: KERI Identity Bridge**
-   - Location: `docs/specifications/keri-identity-bridge.yaml`
+   - Location: ~~`docs/specifications/keri-identity-bridge.yaml`~~ — archived 2026-08-12 to
+     `archive/spec-versions/keri-identity-bridge_retroactive_v0.1.0.yaml`
+     (`docs/specifications/` was an unindexed, ungated shadow of `docs/specs/`)
    - Contents:
      - Machine-readable spec for validation
      - Data structures with invariants

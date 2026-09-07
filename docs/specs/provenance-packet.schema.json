@@ -7,6 +7,7 @@
   "required": ["v", "t", "d", "i", "s", "p", "a", "sigs"],
   "properties": {
     "v": {
+      "description": "Version string: FLOSSI10JSON + 6 hex chars encoding final JCS byte length + _. KERI-shaped but 19 chars against KERI's 17, and JCS sorting means it is not at the head of the frame. See spec section 9.5.",
       "type": "string",
       "pattern": "^FLOSSI10JSON[0-9a-f]{6}_$"
     },
@@ -14,10 +15,12 @@
       "const": "prov"
     },
     "d": {
+      "description": "SAID: BLAKE3-256 digest, CESR 'E' code + 43 base64url chars. Code letter, algorithm and length are CESR-correct; the base64 is post-padded where CESR mid-pads, so this is NOT a CESR primitive. See spec section 9.2 and 9.3.",
       "type": "string",
       "pattern": "^E[A-Za-z0-9_-]{43}$"
     },
     "i": {
+      "description": "Agent identifier: 'D' (transferable) or 'B' (non-transferable) + base64url raw Ed25519 verify key. Post-padded, therefore not CESR-decodable. See spec section 9.1 and 9.3.",
       "type": "string",
       "pattern": "^[DB][A-Za-z0-9_-]{43}$"
     },
@@ -44,9 +47,9 @@
       }
     },
     "sigs": {
+      "description": "Detached Ed25519 signatures, '0B' code + 86 base64url chars, over canonical bytes with sigs emptied. KERI signs the serialized event and attaches signatures outside the body, so these do not verify cross-implementation. See spec section 9.4.",
       "type": "array",
       "minItems": 1,
-      "maxItems": 1,
       "items": {
         "type": "string",
         "pattern": "^0B[A-Za-z0-9_-]{86}$"
@@ -154,7 +157,18 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["spec", "test", "adr", "url", "commit", "provenance_packet"]
+          "enum": [
+            "spec",
+            "test",
+            "adr",
+            "url",
+            "commit",
+            "provenance_packet",
+            "file",
+            "log",
+            "activity",
+            "source_chain"
+          ]
         },
         "ref": {
           "type": "string",

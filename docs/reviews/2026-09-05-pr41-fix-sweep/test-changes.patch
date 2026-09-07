@@ -1,0 +1,1172 @@
+=== COMMIT 2a55711: fix: six PR41 backlog findings, and one the tests refused
+
+
+diff --git a/packages/metacoordinator_mcp/tests/test_voter_independence.py b/packages/metacoordinator_mcp/tests/test_voter_independence.py
+index a8c664a..fba29b7 100644
+--- a/packages/metacoordinator_mcp/tests/test_voter_independence.py
++++ b/packages/metacoordinator_mcp/tests/test_voter_independence.py
+@@ -79,17 +79,17 @@ def test_local_profile_note_still_explains_its_unprobed_model(registry, model_in
+     if all(m in model_index for m in local_models):
+         pytest.skip("local profile now uses probed models; exemption can be revisited")
+     note = registry["_probe"].get("local_profile_note", "")
+-    assert note.strip(), (
+-        "the local profile names an unprobed model and no longer says why"
+-    )
++    assert (
++        note.strip()
++    ), "the local profile names an unprobed model and no longer says why"
+ 
+ 
+ @pytest.mark.parametrize("profile_name", sorted(EXEMPT_PROFILES))
+ def test_exempt_profiles_are_still_declared_in_the_registry(profile_name, registry):
+     """An exemption for a profile that no longer exists is stale bookkeeping."""
+-    assert profile_name in registry["profiles"], (
+-        f"{profile_name!r} is exempted here but absent from the registry"
+-    )
++    assert (
++        profile_name in registry["profiles"]
++    ), f"{profile_name!r} is exempted here but absent from the registry"
+ 
+ 
+ def test_nontrivial_profiles_meet_the_independence_rule(registry, model_index):
+@@ -275,3 +275,76 @@ def test_the_refusal_names_the_unverified_models(monkeypatch):
+     message = str(excinfo.value)
+     assert "openrouter" in message, "the single surface must be named"
+     assert "unverified" in message
++
++
++# One model behind four vendors is one family, not four.
++SAME_LINEAGE_FOUR_SURFACES = {
++    "a": "groq/openai/gpt-oss-120b",
++    "b": "nvidia/openai/gpt-oss-120b",
++    "c": "openrouter/openai/gpt-oss-120b",
++    "d": "huggingface/openai/gpt-oss-120b",
++}
++
++
++def test_one_unprobed_model_behind_four_vendors_is_not_four_families(monkeypatch):
++    """Keying an unverified family on the FULL route made this roster clear the
++    four-family bar while being one model, and the gateway reported it as
++    independent consensus. Four provider surfaces is true here; four families
++    is not, and only the second one is a claim about disagreement.
++    """
++    voters = _voters_module()
++    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
++
++    with pytest.raises(RuntimeError, match="below its own independence rule"):
++        voters.assert_roster_is_independent("balanced", SAME_LINEAGE_FOUR_SURFACES)
++
++
++def test_the_same_lineage_refusal_says_it_grouped_them(monkeypatch):
++    """An operator staring at four different-looking ids needs to be told why
++    they counted as one."""
++    voters = _voters_module()
++    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
++
++    problem = voters.roster_independence_problem("balanced", SAME_LINEAGE_FOUR_SURFACES)
++
++    assert problem is not None
++    # ONE family, not two: `groq/openai/gpt-oss-120b` IS in the probe index, so
++    # its three unprobed twins inherit its probed family rather than adding an
++    # `unverified:` one beside it. Counting them separately would let three
++    # probed families plus one unprobed twin reach the bar.
++    assert "1 model family" in problem, problem
++    assert "gpt-oss-120b" in problem
++
++
++def test_different_unprobed_models_on_one_surface_are_still_one_surface(monkeypatch):
++    """The surface half must not be collapsed with the family half: surfaces
++    ARE derivable from the route without a probe, so they keep counting
++    per-model."""
++    voters = _voters_module()
++    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
++
++    problem = voters.roster_independence_problem("balanced", CUSTOM_NARROW)
++
++    assert problem is not None
++    assert "1 provider surface(s)" in problem
++
++
++def test_unverified_family_keys_drop_only_the_provider():
++    """The mirror of _derive_surface. Asserted directly because the whole
++    finding turns on which half of the route is the lineage."""
++    voters = _voters_module()
++
++    assert (
++        voters._unverified_family("groq/openai/gpt-oss-120b")
++        == "unverified:openai/gpt-oss-120b"
++    )
++    assert voters._unverified_family(
++        "nvidia/openai/gpt-oss-120b"
++    ) == voters._unverified_family("groq/openai/gpt-oss-120b")
++    assert voters._unverified_family(
++        "openrouter/meta-llama/llama-4-70b"
++    ) != voters._unverified_family("together/deepseek-ai/deepseek-v4")
++    # A bare local tag has no provider to drop.
++    assert (
++        voters._unverified_family("phi4-mini:latest") == "unverified:phi4-mini:latest"
++    )
+diff --git a/packages/reasoning_ensemble/tests/test_survivor_independence.py b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+index 3daffe5..3929c28 100644
+--- a/packages/reasoning_ensemble/tests/test_survivor_independence.py
++++ b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+@@ -284,3 +284,60 @@ def test_two_runs_of_one_prompt_in_one_second_do_not_share_an_artifact(
+         json.loads(f.read_text(encoding="utf-8"))["final_synthesis"] for f in written
+     }
+     assert bodies == {"first", "second"}, "one run overwrote the other"
++
++
++# ---------------------------------------------------------------------------
++# Mixed mode judges the pool that actually votes.
++# ---------------------------------------------------------------------------
++
++
++def test_the_local_pool_is_one_surface_not_four():
++    """LOCAL_VOTER_POOL carries bare Ollama tags, and its fourth entry --
++    `hf.co/unsloth/...` -- is an Ollama tag with two slashes in it. Reading the
++    surface off the id turns four local voters into two surfaces (or four, for
++    the bare tags), which would let a mixed roster of nothing but local models
++    clear the surface bar on its own. The transport field is the authority; the
++    same mistake already sent one of these four to a cloud provider once.
++    """
++    from packages.metacoordinator_mcp.voters import _derive_surface
++    from packages.reasoning_ensemble import transport
++
++    routes = [transport._independence_route(v) for v in transport.LOCAL_VOTER_POOL]
++    surfaces = {_derive_surface(route) for route in routes}
++
++    assert surfaces == {"ollama"}, routes
++    assert any("hf.co" in v["model"] for v in transport.LOCAL_VOTER_POOL), (
++        "the slashed-Ollama-tag entry this guards against is gone; if the pool "
++        "changed, re-check that the surface is still read from transport"
++    )
++
++
++def test_mixed_mode_judges_the_combined_pool(monkeypatch):
++    """_online_pool() raised before the local voters were appended, so a narrow
++    credential-filtered online subset refused a run whose combined roster is
++    comfortably independent -- and the only way through was the degraded-roster
++    override, which asserts the opposite of what is true about that roster."""
++    from packages.reasoning_ensemble import transport
++
++    checked: list[dict] = []
++
++    def _narrow_specs(profile=None, include_unavailable=False):
++        # Two surfaces, two families: refused on its own.
++        return {"a": "groq/openai/gpt-oss-120b", "b": "mistral/mistral-large-latest"}
++
++    def _record(profile, resolved):
++        checked.append(dict(resolved))
++
++    monkeypatch.setattr(transport, "resolve_default_voter_specs", _narrow_specs)
++    monkeypatch.setattr(transport, "assert_roster_is_independent", _record)
++    monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
++
++    pool, mode = transport.resolve_voter_pool()
++
++    assert mode == "mixed"
++    assert len(checked) == 1, "the online subset must not be judged on its own"
++    judged = checked[0]
++    assert len(judged) == len(pool), "the check saw a different roster than voted"
++    assert any(
++        "ollama/" in route for route in judged.values()
++    ), "the local voters were not part of the roster that was judged"
+diff --git a/scripts/tests/test_autonomous_synthesis_deferral.py b/scripts/tests/test_autonomous_synthesis_deferral.py
+index b279b69..d40b763 100644
+--- a/scripts/tests/test_autonomous_synthesis_deferral.py
++++ b/scripts/tests/test_autonomous_synthesis_deferral.py
+@@ -293,3 +293,48 @@ def test_a_dry_run_under_a_larger_limit_still_previews_up_to_it(
+     assert module.main() == 0
+ 
+     assert capsys.readouterr().out.count("[DRY RUN]") == 3
++
++
++def test_an_unreadable_file_is_never_staged(tmp_path, capsys, monkeypatch):
++    """A read failure returned a plain "Error reading file: ..." string, which
++    contains neither DEFERRED_PREFIX nor "LLM Extraction Failed", so both of
++    the caller's guards missed it and stage_draft() recorded the I/O error as
++    the file's extracted semantics. A later --commit then wrote a completed
++    knowledge_distillation whose entire content was that error, and the file
++    was thereafter treated as processed with nothing extracted from it.
++    """
++    module = load_module()
++
++    doc = tmp_path / "broken.md"
++    doc.write_bytes(b"\xff\xfe not utf-8 \xff")
++
++    monkeypatch.setattr(module, "_get_files_to_process", lambda *a, **k: [doc])
++    monkeypatch.setattr(module, "_get_processed_files", lambda *a, **k: set())
++
++    def _fail_if_staged(*a, **k):
++        raise AssertionError("an unreadable file must never be staged")
++
++    monkeypatch.setattr(module, "stage_draft", _fail_if_staged)
++    monkeypatch.setattr(sys, "argv", ["autonomous_synthesis_loop.py", "--limit", "1"])
++
++    assert module.main() == 0
++
++    out = capsys.readouterr().out
++    assert "COULD NOT BE READ" in out
++    assert doc.name in out
++
++
++def test_the_unreadable_marker_is_distinct_from_the_deferral_marker(tmp_path):
++    """A deferral says 're-run with --force-full'; an unreadable file says
++    'check encoding and permissions'. Sending an operator to the wrong fix is
++    the reason these are two markers and not one."""
++    module = load_module()
++
++    doc = tmp_path / "broken.md"
++    doc.write_bytes(b"\xff\xfe\x00")
++
++    result = module.extract_semantics(doc, "groq/irrelevant")
++
++    assert result.startswith(module.UNREADABLE_PREFIX)
++    assert not result.startswith(module.DEFERRED_PREFIX)
++    assert "LLM Extraction Failed" not in result
+diff --git a/scripts/tests/test_shared_skill_surface_scope.py b/scripts/tests/test_shared_skill_surface_scope.py
+index 58af703..bc615c9 100644
+--- a/scripts/tests/test_shared_skill_surface_scope.py
++++ b/scripts/tests/test_shared_skill_surface_scope.py
+@@ -216,6 +216,68 @@ def test_the_shipped_manifest_uses_portable_separators_and_declares_scope():
+         assert cfg.get("scope") in {"repo", "user"}, f"{name} must declare a scope"
+         if cfg.get("scope") == "repo":
+             continue
+-        assert not install_path.startswith("C:/"), (
+-            f"{name} hardcodes an absolute Windows path; use a platform variable"
+-        )
++        assert not install_path.startswith(
++            "C:/"
++        ), f"{name} hardcodes an absolute Windows path; use a platform variable"
++
++
++def test_a_withdrawn_skill_projection_is_removed(tmp_path):
++    """The materializer visited only skills still IN the registry, so a
++    withdrawn or renamed skill kept its installed directory forever and
++    --check reported no drift -- the one signal an operator acts on said the
++    surface matched the manifest while agents went on discovering and running
++    instructions that had been deliberately retracted."""
++    module = load_module()
++
++    root = tmp_path / "skills"
++    stale = root / "retired-skill"
++    stale.mkdir(parents=True)
++    (stale / "SKILL.md").write_text("old instructions", encoding="utf-8")
++    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
++
++    messages, drift = module.prune_stale_projections(
++        "codex", root, {"still-here"}, check=False, dry_run=False
++    )
++
++    assert drift is True
++    assert not stale.exists()
++    assert any("retired-skill" in m for m in messages)
++
++
++def test_an_unmanaged_directory_is_never_removed(tmp_path):
++    """The marker is what makes the removal safe. Anything without it belongs
++    to the operator or another tool, and this materializer has no business
++    deleting it."""
++    module = load_module()
++
++    root = tmp_path / "skills"
++    theirs = root / "someone-elses-skill"
++    theirs.mkdir(parents=True)
++    (theirs / "SKILL.md").write_text("not ours", encoding="utf-8")
++
++    messages, drift = module.prune_stale_projections(
++        "codex", root, {"still-here"}, check=False, dry_run=False
++    )
++
++    assert drift is False
++    assert theirs.exists()
++    assert messages == []
++
++
++def test_check_reports_a_stale_projection_as_drift(tmp_path):
++    """--check must fail on it rather than silently agreeing the surface is
++    current; that silence is the whole defect."""
++    module = load_module()
++
++    root = tmp_path / "skills"
++    stale = root / "retired-skill"
++    stale.mkdir(parents=True)
++    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
++
++    messages, drift = module.prune_stale_projections(
++        "codex", root, set(), check=True, dry_run=False
++    )
++
++    assert drift is True
++    assert stale.exists(), "--check must not mutate"
++    assert any("DRIFT" in m for m in messages)
+diff --git a/tests/test_hook_surface_attribution.py b/tests/test_hook_surface_attribution.py
+new file mode 100644
+index 0000000..b4ebb83
+--- /dev/null
++++ b/tests/test_hook_surface_attribution.py
+@@ -0,0 +1,78 @@
++"""Harness attribution for edits the post-write hook accepts.
++
++PR41 review finding: `hook_post_write.infer_surface()` had no Hermes case, so
++every Hermes edit was misattributed the moment the hook was extended to cover
++Hermes at all. `write_file` matched the gemini-cli branch (Gemini uses the same
++tool name) and `patch` fell through to the generic `agent-tool`. That label
++reaches the Claim, the signed packet's `source_systems`, the summary and the
++background memory -- so the provenance this hook exists to record named the
++wrong harness for every edit on its newest surface.
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import sys
++from pathlib import Path
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++HOOK_PATH = REPO_ROOT / "hooks" / "hook_post_write.py"
++
++
++def load_hook():
++    if str(REPO_ROOT) not in sys.path:
++        sys.path.insert(0, str(REPO_ROOT))
++    spec = importlib.util.spec_from_file_location("hook_post_write", HOOK_PATH)
++    module = importlib.util.module_from_spec(spec)
++    assert spec.loader is not None
++    spec.loader.exec_module(module)
++    return module
++
++
++def test_hermes_patch_is_attributed_to_hermes():
++    """`patch` is Hermes-only and fell through to the generic label."""
++    hook = load_hook()
++
++    assert hook.infer_surface("patch", "post_tool_call") == "hermes"
++
++
++def test_hermes_write_file_is_not_attributed_to_gemini():
++    """`write_file` is Gemini's tool name AND Hermes's, so the tool name alone
++    cannot separate them. The event does: Hermes's manifest event_map emits
++    pre_tool_call/post_tool_call, Gemini emits AfterTool."""
++    hook = load_hook()
++
++    assert hook.infer_surface("write_file", "post_tool_call") == "hermes"
++    assert hook.infer_surface("write_file", "pre_tool_call") == "hermes"
++
++
++def test_gemini_is_still_gemini():
++    """Ordering the Hermes branch first must not capture Gemini's events."""
++    hook = load_hook()
++
++    assert hook.infer_surface("write_file", "AfterTool") == "gemini-cli"
++    assert hook.infer_surface("replace", "AfterTool") == "gemini-cli"
++    assert hook.infer_surface("write_file", "") == "gemini-cli"
++
++
++def test_claude_code_is_still_claude_code():
++    hook = load_hook()
++
++    for tool in ("Write", "Edit", "MultiEdit"):
++        assert hook.infer_surface(tool, "PostToolUse") == "claude-code"
++
++
++def test_the_hermes_events_match_the_manifest_event_map():
++    """The event names are the join between the manifest and this guard, so a
++    manifest edit that renames them must break here rather than silently
++    restoring the misattribution."""
++    import json
++
++    manifest = json.loads(
++        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
++    )
++    event_map = manifest["targets"]["hermes_user"]["event_map"]
++    hook = load_hook()
++
++    for hermes_event in event_map.values():
++        assert hook.infer_surface("write_file", hermes_event) == "hermes", hermes_event
+diff --git a/tests/test_shared_agent_surface_mcp.py b/tests/test_shared_agent_surface_mcp.py
+index b1b35d1..f29e521 100644
+--- a/tests/test_shared_agent_surface_mcp.py
++++ b/tests/test_shared_agent_surface_mcp.py
+@@ -36,6 +36,7 @@ def env_ref(name: str) -> str:
+     """
+     return f"%{name}%" if os.name == "nt" else f"${name}"
+ 
++
+ def test_classify_transport_stdio():
+     transport, spec = mas.classify_transport(
+         "serena", {"command": "januscope", "args": ["--config", "x.yaml"]}
+@@ -1129,3 +1130,33 @@ def test_materialize_reports_clear_error_for_hermes_config_path_that_is_a_direct
+ 
+     with pytest.raises(mas.SharedSurfaceError, match="Hermes config"):
+         mas.materialize(tmp_path, manifest_path, check=False, dry_run=False)
++
++
++def test_opencode_remote_projection_keeps_its_headers():
++    """classify_transport() validates and returns the header map, and the
++    OpenCode branch emitted only type and url -- so an MCP whose auth lives in
++    an Authorization header was projected as an unauthenticated server. It
++    parses, it installs, and it fails at connect time against a config file
++    that looks correct, with nothing in it to suggest anything was removed.
++    """
++    projected = mas.convert_mcp_server_to_opencode(
++        "authed",
++        {
++            "type": "http",
++            "url": "https://example.invalid/mcp",
++            "headers": {"Authorization": "Bearer token-value"},
++        },
++    )
++
++    assert projected["type"] == "remote"
++    assert projected["url"] == "https://example.invalid/mcp"
++    assert projected["headers"] == {"Authorization": "Bearer token-value"}
++
++
++def test_opencode_remote_projection_omits_absent_headers():
++    """An unauthenticated server must not gain an empty headers key."""
++    projected = mas.convert_mcp_server_to_opencode(
++        "plain", {"type": "http", "url": "https://example.invalid/mcp"}
++    )
++
++    assert projected == {"type": "remote", "url": "https://example.invalid/mcp"}
+=== COMMIT 29feb91: fix: three defects the pre-push review found in the previous commit
+
+
+diff --git a/packages/metacoordinator_mcp/tests/test_voter_independence.py b/packages/metacoordinator_mcp/tests/test_voter_independence.py
+index fba29b7..c492ee6 100644
+--- a/packages/metacoordinator_mcp/tests/test_voter_independence.py
++++ b/packages/metacoordinator_mcp/tests/test_voter_independence.py
+@@ -348,3 +348,41 @@ def test_unverified_family_keys_drop_only_the_provider():
+     assert (
+         voters._unverified_family("phi4-mini:latest") == "unverified:phi4-mini:latest"
+     )
++
++
++def test_a_registry_that_disagrees_with_itself_is_not_resolved_silently(
++    monkeypatch, capsys
++):
++    """Two probed routes sharing a lineage must agree on its family. Building
++    the lookup with a dict comprehension resolved a disagreement by iteration
++    order, so an unprobed twin inherited whichever side happened to be later --
++    a wrong family, chosen nondeterministically, inside the check that decides
++    whether a poll counts as independent.
++    """
++    voters = _voters_module()
++    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
++    monkeypatch.setattr(
++        voters,
++        "_model_index",
++        lambda: {
++            "groq/openai/x": {"family": "OpenAI", "surface": "groq"},
++            "nvidia/openai/x": {"family": "SomethingElse", "surface": "nvidia"},
++        },
++    )
++
++    problem = voters.roster_independence_problem(
++        "balanced",
++        {
++            "a": "openrouter/openai/x",
++            "b": "huggingface/openai/x",
++            "c": "together/openai/x",
++        },
++    )
++
++    err = capsys.readouterr().err
++    assert "registry conflict" in err
++    assert "unverified:openai/x" in err
++    # The conflicted lineage must NOT be inherited: the unprobed twins fall
++    # back to the unverified key, so this stays one family and is refused.
++    assert problem is not None
++    assert "1 model family" in problem, problem
+diff --git a/packages/reasoning_ensemble/tests/test_survivor_independence.py b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+index 3929c28..3411b05 100644
+--- a/packages/reasoning_ensemble/tests/test_survivor_independence.py
++++ b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+@@ -341,3 +341,29 @@ def test_mixed_mode_judges_the_combined_pool(monkeypatch):
+     assert any(
+         "ollama/" in route for route in judged.values()
+     ), "the local voters were not part of the roster that was judged"
++
++
++def test_a_duplicate_voter_id_in_the_mixed_pool_is_refused(monkeypatch):
++    """assert_roster_is_independent takes a dict keyed by voter_id, so a
++    collision between an online id and a LOCAL_VOTER_POOL id silently drops an
++    entry: the check would approve a SMALLER roster than the one returned,
++    and the duplicate would vote twice. No profile collides today, which is
++    exactly what makes it silent if that stops being true."""
++    import pytest
++
++    from packages.reasoning_ensemble import transport
++
++    collide = transport.LOCAL_VOTER_POOL[0]["voter_id"]
++
++    monkeypatch.setattr(
++        transport,
++        "resolve_default_voter_specs",
++        lambda profile=None, include_unavailable=False: {
++            collide: "groq/openai/gpt-oss-120b"
++        },
++    )
++    monkeypatch.setattr(transport, "assert_roster_is_independent", lambda *a, **k: None)
++    monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
++
++    with pytest.raises(RuntimeError, match="duplicate voter_id"):
++        transport.resolve_voter_pool()
+=== COMMIT 222d27b: fix: second review pass, including the duplicate the helper was added to remove
+
+
+diff --git a/scripts/tests/test_autonomous_synthesis_deferral.py b/scripts/tests/test_autonomous_synthesis_deferral.py
+index d40b763..c3e2583 100644
+--- a/scripts/tests/test_autonomous_synthesis_deferral.py
++++ b/scripts/tests/test_autonomous_synthesis_deferral.py
+@@ -61,15 +61,39 @@ def test_deferral_is_not_mistaken_for_an_llm_failure(tmp_path):
+     assert result.startswith(module.DEFERRED_PREFIX)
+ 
+ 
+-def test_caller_skips_staging_before_it_can_stage_a_deferral():
+-    """main() must test for the deferral sentinel *before* calling stage_draft."""
++def test_caller_classifies_before_it_can_stage():
++    """main() must classify the result *before* calling stage_draft.
++
++    This asserted on the name DEFERRED_PREFIX appearing in main(). That name
++    moved into the shared pending_marker()/record_pending() helpers when the
++    first-attempt and retry sites were unified, so the guard broke on a
++    refactor that did not change the invariant at all -- the fourth
++    source-splitting guard in this session to need repointing. Anchored on the
++    call that does the classifying now, which is the thing that must not move
++    below staging.
++    """
+     module = load_module()
+     source = inspect.getsource(module.main)
+ 
+-    assert "DEFERRED_PREFIX" in source, "main() no longer checks for deferrals"
+-    assert source.index("DEFERRED_PREFIX") < source.index("stage_draft(file_path"), (
+-        "deferral check must precede staging, or deferred files get recorded as "
+-        "completed distillations again"
++    assert "pending_marker(" in source, "main() no longer classifies results"
++    assert source.index("pending_marker(") < source.index("stage_draft(file_path"), (
++        "classification must precede staging, or deferred and unreadable files "
++        "get recorded as completed distillations again"
++    )
++    # Both sites, not one: the retry used to carry its own narrower check.
++    #
++    # Counted over CODE lines only. The first version of this assertion counted
++    # every occurrence in the source and got 3, because a comment in main()
++    # names the function -- matching prose instead of code, in the test written
++    # to replace a test that had matched prose instead of code.
++    calls = [
++        line
++        for line in source.splitlines()
++        if "pending_marker(" in line and not line.strip().startswith("#")
++    ]
++    assert len(calls) == 2, (
++        "the first attempt and the rate-limit retry must both classify, and "
++        f"through the same predicate; found {len(calls)}: {calls}"
+     )
+ 
+ 
+=== COMMIT 05f60e0: fix(surface): headers were dropped by three projections, not one
+
+
+diff --git a/tests/test_shared_agent_surface_mcp.py b/tests/test_shared_agent_surface_mcp.py
+index f29e521..f3a2dd3 100644
+--- a/tests/test_shared_agent_surface_mcp.py
++++ b/tests/test_shared_agent_surface_mcp.py
+@@ -1160,3 +1160,88 @@ def test_opencode_remote_projection_omits_absent_headers():
+     )
+ 
+     assert projected == {"type": "remote", "url": "https://example.invalid/mcp"}
++
++
++HEADERED = {
++    "type": "http",
++    "url": "https://example.invalid/mcp",
++    "headers": {"Authorization": "Bearer token-value"},
++}
++
++
++def test_codex_projects_headers_to_http_headers():
++    """The Codex branch wrote only type and url, so an MCP authenticated by
++    header was emitted as an unauthenticated server -- the same defect fixed
++    for OpenCode one commit earlier, in the same file, three functions away."""
++    doc = tomlkit.parse("")
++    result = mas.apply_codex_mcp(doc, {"authed": HEADERED}, {}, {})
++
++    entry = result["mcp_servers"]["authed"]
++    assert entry["type"] == "streamable_http"
++    assert dict(entry["http_headers"]) == {"Authorization": "Bearer token-value"}
++
++
++def test_codex_drops_a_stale_header_table_when_the_transport_changes():
++    """http_headers is managed, not preserved: a server converted to stdio
++    must not keep credential-bearing headers from its previous configuration.
++    Same reasoning the `env` handling already documents, in reverse.
++
++    The stale table is seeded DIRECTLY rather than produced by a first
++    projection. Written that way, the test passed against the unfixed code for
++    a vacuous reason -- the old code never wrote http_headers at all, so
++    "not in entry" was true either way. It has to start from a config that
++    already carries the credentials.
++    """
++    doc = tomlkit.parse(
++        chr(10).join(
++            [
++                "[mcp_servers.srv]",
++                'type = "streamable_http"',
++                'url = "https://example.invalid/mcp"',
++                "",
++                "[mcp_servers.srv.http_headers]",
++                'Authorization = "Bearer stale-token"',
++            ]
++        )
++    )
++    assert "http_headers" in doc["mcp_servers"]["srv"], "fixture is not stale"
++
++    result = mas.apply_codex_mcp(
++        doc, {"srv": {"command": "run", "args": ["--x"]}}, {}, {}
++    )
++
++    entry = result["mcp_servers"]["srv"]
++    assert entry["type"] == "stdio"
++    assert "http_headers" not in entry, "a stale credential table survived"
++
++
++def test_codex_omits_http_headers_when_there_are_none():
++    doc = tomlkit.parse("")
++    result = mas.apply_codex_mcp(
++        doc, {"plain": {"type": "http", "url": "https://example.invalid/mcp"}}, {}, {}
++    )
++
++    assert "http_headers" not in result["mcp_servers"]["plain"]
++
++
++def test_a_target_with_no_header_field_refuses_rather_than_dropping_them():
++    """Antigravity and Hermes have no verified header field. Inventing one
++    would be the same silent failure with extra steps, and writing the server
++    without its credentials is the defect itself -- so it fails loudly at
++    materialization, naming the server and the target."""
++    with pytest.raises(mas.SharedSurfaceError, match="Antigravity"):
++        mas.build_antigravity_payload({}, {"authed": HEADERED})
++
++    with pytest.raises(mas.SharedSurfaceError, match="no field to carry"):
++        mas.build_antigravity_payload({}, {"authed": HEADERED})
++
++
++def test_an_unauthenticated_http_server_still_projects_everywhere():
++    """Fail-closed must not refuse the ordinary case."""
++    plain = {"type": "http", "url": "https://example.invalid/mcp"}
++
++    payload = mas.build_antigravity_payload({}, {"plain": plain})
++
++    assert payload["mcpServers"]["plain"] == {
++        "serverUrl": "https://example.invalid/mcp"
++    }
+=== COMMIT 172a70b: fix(surface): three review findings on the header projection, and one of mine
+
+
+diff --git a/tests/test_shared_agent_surface_mcp.py b/tests/test_shared_agent_surface_mcp.py
+index f3a2dd3..6b89387 100644
+--- a/tests/test_shared_agent_surface_mcp.py
++++ b/tests/test_shared_agent_surface_mcp.py
+@@ -1232,8 +1232,13 @@ def test_a_target_with_no_header_field_refuses_rather_than_dropping_them():
+     with pytest.raises(mas.SharedSurfaceError, match="Antigravity"):
+         mas.build_antigravity_payload({}, {"authed": HEADERED})
+ 
+-    with pytest.raises(mas.SharedSurfaceError, match="no field to carry"):
+-        mas.build_antigravity_payload({}, {"authed": HEADERED})
++    # Hermes, not Antigravity twice. The second assertion here called the same
++    # function with the same argument and only varied the match pattern -- and
++    # both patterns appear in the one error message, so it asserted nothing the
++    # first had not. The point of the guard is that BOTH header-less targets
++    # refuse; testing one of them twice is how a sibling stays uncovered.
++    with pytest.raises(mas.SharedSurfaceError, match="Hermes"):
++        mas.apply_hermes_mcp({}, {"authed": HEADERED}, {}, {})
+ 
+ 
+ def test_an_unauthenticated_http_server_still_projects_everywhere():
+@@ -1245,3 +1250,49 @@ def test_an_unauthenticated_http_server_still_projects_everywhere():
+     assert payload["mcpServers"]["plain"] == {
+         "serverUrl": "https://example.invalid/mcp"
+     }
++
++
++def test_an_override_that_flips_the_transport_strands_no_credentials():
++    """Overrides are applied last and can set `type` to anything, including
++    flipping an http entry to stdio after http_headers was written -- leaving
++    credentials on an entry that will never send them, in a file an operator
++    reads as current."""
++    doc = tomlkit.parse("")
++
++    result = mas.apply_codex_mcp(
++        doc, {"srv": HEADERED}, {}, {"srv": {"type": "stdio", "command": "run"}}
++    )
++
++    entry = result["mcp_servers"]["srv"]
++    assert entry["type"] == "stdio"
++    assert "http_headers" not in entry, "credentials outlived their transport"
++
++
++def test_a_scalar_override_renders_outside_the_header_table():
++    """Pins the RENDERED shape, and passes against the unfixed code by design.
++
++    Overrides used to be applied wholesale after the tables, which contradicts
++    the ordering rule this function exists to honour -- adding http_headers put
++    a table in front of the override loop for exactly the entries that carry
++    credentials. Splitting overrides into scalars and tables restores the rule.
++
++    This test cannot discriminate that change, and saying so is the point:
++    tomlkit at the pinned version re-orders on render, so the output is
++    identical either way. What it guards is the day that stops being true,
++    which is the same reason the ordering rule is written down at all -- the
++    function's own docstring calls it defense-in-depth, not load-bearing today.
++    """
++    doc = tomlkit.parse("")
++
++    result = mas.apply_codex_mcp(
++        doc, {"srv": HEADERED}, {}, {"srv": {"startup_timeout_sec": 45}}
++    )
++
++    rendered = tomlkit.dumps(result)
++    headers_at = rendered.index("[mcp_servers.srv.http_headers]")
++    scalar_at = rendered.index("startup_timeout_sec")
++    assert scalar_at < headers_at, (
++        "a scalar override was emitted after the header table, which is the "
++        f"re-parenting hazard the ordering rule exists for:\n{rendered}"
++    )
++    assert result["mcp_servers"]["srv"]["startup_timeout_sec"] == 45
+=== COMMIT 216e3ff: fix: five findings, four of them defects in this session's own fixes
+
+
+diff --git a/packages/reasoning_ensemble/tests/test_survivor_independence.py b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+index 3411b05..e5480c2 100644
+--- a/packages/reasoning_ensemble/tests/test_survivor_independence.py
++++ b/packages/reasoning_ensemble/tests/test_survivor_independence.py
+@@ -53,11 +53,38 @@ def test_three_survivors_cannot_satisfy_a_four_family_bar(monkeypatch):
+ 
+ 
+ def test_the_check_is_skipped_where_the_pool_side_check_skips_it(monkeypatch):
+-    """local and mixed are exempt through the same DEGRADED_OK_PROFILES list."""
++    """The invariant in this test's name, applied to what the pool side does NOW.
++
++    `mixed` was exempt here because the pool side exempted it too. That stopped
++    being true when resolve_voter_pool() began applying
++    assert_roster_is_independent() to the combined mixed pool: a mixed run is
++    admitted precisely BECAUSE online and local voters together clear the bar,
++    so an outage that kills the online half leaves a correlated subset that
++    this exemption would have reported as a normal consensus tier. The rule the
++    name states is unchanged; only the list it resolves to moved.
++    """
+     survivors = [_r("a", "phi4-mini:latest", "phi")]
+ 
+     assert synthesizer._survivor_independence_problem(survivors, "local") is None
+-    assert synthesizer._survivor_independence_problem(survivors, "mixed") is None
++
++
++def test_mixed_survivors_are_rechecked_because_the_pool_side_checks_them(
++    monkeypatch,
++):
++    """The other half of the same rule. A mixed pool is judged as a whole at
++    dispatch, so its survivors have to be judged too -- otherwise a provider
++    outage silently converts an independent mixed ensemble into a correlated
++    subset, and nothing downstream can tell."""
++    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
++    survivors = [
++        _r("a", "groq/llama-3.1-8b-instant", "llama"),
++        _r("b", "groq/gemma2-9b-it", "gemma"),
++        _r("c", "groq/qwen-2.5-32b", "qwen"),
++    ]
++
++    problem = synthesizer._survivor_independence_problem(survivors, "mixed")
++
++    assert problem is not None, "a one-surface mixed survivor set was accepted"
+ 
+ 
+ def test_an_empty_survivor_set_is_left_to_the_count_check(monkeypatch):
+diff --git a/packages/tests/test_mcp_daemon.py b/packages/tests/test_mcp_daemon.py
+index e9fce32..b5c3f01 100644
+--- a/packages/tests/test_mcp_daemon.py
++++ b/packages/tests/test_mcp_daemon.py
+@@ -2041,3 +2041,112 @@ def test_claim_singleton_waits_for_a_transition_in_flight(tmp_path):
+ 
+     assert result.stdout.strip().splitlines()[-1] == "False", result.stderr[-2000:]
+     assert not pid_path.exists(), "a claim was created inside another transition"
++
++
++# ---------------------------------------------------------------------------
++# A failure to judge the slot is not a report that the slot is taken.
++# ---------------------------------------------------------------------------
++
++
++def test_an_unavailable_lock_helper_is_not_reported_as_occupancy(tmp_path, monkeypatch):
++    """claim_singleton returned False for OSError and ImportError, the same
++    False that means "someone else holds this". run_http_daemon then printed
++    "already running" and exited 0, and Start-Daemon reads a clean exit as a
++    healthy daemon -- so a machine that simply could not load the shared lock
++    helper reported a successful startup with the port unserved."""
++    import pytest
++
++    from packages import mcp_daemon
++
++    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
++
++    def _no_helper(*a, **k):
++        raise ImportError("no filelock here")
++
++    monkeypatch.setattr(mcp_daemon, "_claim_guard", _no_helper)
++
++    with pytest.raises(mcp_daemon.ClaimUnavailable, match="shared file-lock"):
++        mcp_daemon.claim_singleton("unavailable.pid")
++
++
++def test_an_unwritable_agent_directory_is_not_reported_as_occupancy(
++    tmp_path, monkeypatch
++):
++    """Same distinction, the other exception class."""
++    import pytest
++
++    from packages import mcp_daemon
++
++    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
++
++    def _blows_up(*a, **k):
++        raise OSError(13, "Permission denied")
++
++    monkeypatch.setattr(mcp_daemon, "_claim_guard", _blows_up)
++
++    with pytest.raises(mcp_daemon.ClaimUnavailable, match="could not be claimed"):
++        mcp_daemon.claim_singleton("unwritable.pid")
++
++
++def test_genuine_contention_is_still_a_plain_false(tmp_path, monkeypatch):
++    """Fail-loud must not swallow the case the return value exists for: a live
++    holder is an ANSWER about occupancy, not a failure to produce one."""
++    from packages import mcp_daemon
++
++    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
++    assert mcp_daemon.claim_singleton("contended.pid") is True
++    assert mcp_daemon.claim_singleton("contended.pid") is False
++
++
++def test_the_daemon_exits_nonzero_when_it_cannot_claim(tmp_path, monkeypatch):
++    """The whole point: the exit code is what the launcher reads."""
++    import pytest
++
++    from packages import mcp_daemon
++
++    monkeypatch.setenv("FLOSS_AGENT_DIR", str(tmp_path))
++    monkeypatch.setattr(
++        mcp_daemon,
++        "claim_singleton",
++        lambda *_: (_ for _ in ()).throw(mcp_daemon.ClaimUnavailable("nope")),
++    )
++
++    class _Mcp:
++        settings = type("S", (), {"port": 0, "host": ""})()
++
++        def run(self, **_):  # pragma: no cover - must never be reached
++            raise AssertionError("served despite an unclaimable slot")
++
++    with pytest.raises(SystemExit) as excinfo:
++        mcp_daemon.run_http_daemon(_Mcp(), pid_filename="x.pid", port=20125)
++
++    assert excinfo.value.code == 2, "a clean exit reads as a healthy daemon"
++
++
++def test_an_incomplete_reservation_reaches_the_slot_claim(tmp_path):
++    """The reservation arm was the FIRST of an if/elseif/else chain, so it
++    structurally guaranteed the else block -- where --reserve-slot lives --
++    could never run, while its own comment said "fall through and let the slot
++    claim decide". A launcher that died between reserving and recording left a
++    reservation that was recognised, announced, and never reclaimed even past
++    its stale window; OmniRoute stayed disabled until someone deleted the file,
++    and because that arm added nothing to $skipped the summary still reported
++    every daemon started.
++    """
++    script = (
++        Path(__file__).resolve().parents[2] / "scripts" / "start_mcp_daemons.ps1"
++    ).read_text(encoding="utf-8")
++
++    code = _code_lines(script)
++    announce = next(
++        i for i, line in enumerate(code) if "incomplete reservation" in line
++    )
++    # The announcement must not be an arm of the dispatch chain: the arm that
++    # follows it has to re-test the condition rather than chain off it.
++    tail = code[announce:]
++    assert not any(
++        line.strip().startswith("} elseif") for line in tail[:3]
++    ), "the reservation message is still consuming the dispatch"
++    assert any(
++        "-not $omniIsReservation" in line for line in tail
++    ), "the UNVERIFIABLE arm must exclude reservations, or they never reclaim"
+diff --git a/tests/test_hook_surface_attribution.py b/tests/test_hook_surface_attribution.py
+index b4ebb83..4e04730 100644
+--- a/tests/test_hook_surface_attribution.py
++++ b/tests/test_hook_surface_attribution.py
+@@ -76,3 +76,120 @@ def test_the_hermes_events_match_the_manifest_event_map():
+ 
+     for hermes_event in event_map.values():
+         assert hook.infer_surface("write_file", hermes_event) == "hermes", hermes_event
++
++
++def test_a_declared_surface_beats_inference(monkeypatch):
++    """Codex and Claude register this hook with the SAME matcher and the SAME
++    command, so the payload carries nothing that separates them and the
++    tool-name branch labelled every Codex edit `claude-code`. That label is
++    persisted in the Claim summary and the signed packet's `source_systems`.
++    No heuristic can fix identical events; the registration has to say."""
++    hook = load_hook()
++
++    monkeypatch.setattr(sys, "argv", ["hook_post_write.py", "--surface", "codex"])
++    assert hook.infer_surface("Write", "PostToolUse") == "codex"
++    assert hook.infer_surface("Edit", "PostToolUse") == "codex"
++    assert hook.infer_surface("MultiEdit", "PostToolUse") == "codex"
++
++
++def test_the_declaration_is_read_from_the_flag_the_manifest_writes(monkeypatch):
++    """Plumbed at one end and read at the other is the failure this guards.
++
++    The first version read only FLOSS_HOOK_SURFACE while the manifest wrote
++    only `--surface`, so nothing was declared and the misattribution survived
++    the fix for it.
++    """
++    hook = load_hook()
++
++    assert hook.declared_surface(["--surface", "codex"]) == "codex"
++    assert hook.declared_surface(["--surface=hermes"]) == "hermes"
++    assert hook.declared_surface([]) == ""
++
++    monkeypatch.setenv(hook.DECLARED_SURFACE_ENV, "gemini-cli")
++    assert hook.declared_surface([]) == "gemini-cli", "the env fallback is gone"
++
++
++def test_every_managed_registration_declares_its_surface():
++    """The join between the manifest and the hook. A target that registers
++    this hook without declaring itself falls back to inference, which is what
++    misattributed Codex in the first place."""
++    import json
++
++    manifest = json.loads(
++        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
++    )
++    undeclared = []
++    for target, cfg in manifest["targets"].items():
++        for event, entries in (cfg.get("hooks") or {}).items():
++            for entry in entries:
++                for hook in entry.get("hooks") or [entry]:
++                    command = (hook or {}).get("command", "")
++                    if "hook_post_write.py" in command and "--surface" not in command:
++                        undeclared.append(f"{target}.{event}")
++    assert not undeclared, f"registrations with no declared surface: {undeclared}"
++
++
++def test_inference_still_covers_an_unmanaged_install(monkeypatch):
++    """A hand-written Claude Code settings.json predating this surface passes
++    no flag, and is exactly the case the tool-name branch was written for."""
++    hook = load_hook()
++
++    monkeypatch.setattr(sys, "argv", ["hook_post_write.py"])
++    monkeypatch.delenv(hook.DECLARED_SURFACE_ENV, raising=False)
++
++    assert hook.infer_surface("Write", "PostToolUse") == "claude-code"
++    assert hook.infer_surface("write_file", "AfterTool") == "gemini-cli"
++
++
++def test_the_declaration_survives_materialization_for_every_target():
++    """The join I could not otherwise check: the manifest carries the flag and
++    the hook parses it, but the command string is REWRITTEN by the materializer
++    into each target's own config format before anything runs it. A quoting or
++    variable-expansion bug there would drop the declaration silently and hand
++    every surface back to inference, which is the misattribution this fixes.
++    """
++    import importlib.util
++    import json
++    import os
++
++    import pytest
++
++    spec = importlib.util.spec_from_file_location(
++        "materialize_shared_hook_surface",
++        REPO_ROOT / "scripts" / "materialize_shared_hook_surface.py",
++    )
++    module = importlib.util.module_from_spec(spec)
++    assert spec.loader is not None
++    spec.loader.exec_module(module)
++
++    manifest = json.loads(
++        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
++    )
++    os.environ.setdefault("FLOSS_HOOKS_DIR", str(REPO_ROOT / "hooks"))
++    try:
++        variables = module.resolve_variables(manifest, REPO_ROOT)
++    except Exception as exc:  # noqa: BLE001 -- environment, not the contract
++        pytest.skip(f"hook variables unresolvable here: {type(exc).__name__}: {exc}")
++
++    expected = {
++        target: label
++        for target, label in (
++            ("codex", "codex"),
++            ("claude_user", "claude-code"),
++            ("hermes_user", "hermes"),
++            ("gemini", "gemini-cli"),
++        )
++        if target in manifest["targets"]
++    }
++    assert expected, "no known hook targets in the manifest; update this guard"
++
++    for target, label in expected.items():
++        cfg = manifest["targets"][target]
++        try:
++            rendered = json.dumps(module.build_target_payload({}, cfg, variables))
++        except Exception as exc:  # noqa: BLE001
++            pytest.skip(f"{target} not renderable here: {type(exc).__name__}")
++        assert f"--surface {label}" in rendered, (
++            f"{target}: the declared surface did not survive materialization; "
++            "every edit on this surface would be attributed by inference"
++        )
+diff --git a/tests/test_shared_agent_surface_mcp.py b/tests/test_shared_agent_surface_mcp.py
+index 6b89387..f8195be 100644
+--- a/tests/test_shared_agent_surface_mcp.py
++++ b/tests/test_shared_agent_surface_mcp.py
+@@ -483,8 +483,36 @@ def test_hermes_gateway_alive_detects_own_process(tmp_path):
+     assert mas.hermes_gateway_alive(tmp_path) == os.getpid()
+ 
+ 
+-def test_hermes_gateway_alive_tolerates_corrupt_pid_file(tmp_path):
++def test_a_corrupt_hermes_pid_file_refuses_the_write(tmp_path):
++    """This asserted the opposite, deliberately -- "tolerates" a corrupt file by
++    returning None. That reading is what makes it dangerous: every caller reads
++    None as "no live gateway" and rewrites config.yaml, which a gateway that IS
++    running then overwrites from memory on shutdown. A half-written pid file is
++    likeliest during the gateway's own startup, so the old behaviour failed
++    open exactly when a gateway was most likely to be alive.
++
++    `_pid_alive` in this same module already fails closed for this reason,
++    returning True when liveness cannot be determined. The reader was the half
++    that did not, so the guard had a hole on its input side.
++    """
+     (tmp_path / "gateway.pid").write_text("not json{", encoding="utf-8")
++
++    with pytest.raises(mas.SharedSurfaceError, match="not valid JSON"):
++        mas.hermes_gateway_alive(tmp_path)
++
++
++def test_a_pid_file_with_no_integer_pid_refuses_the_write(tmp_path):
++    """Same hole, different shape: valid JSON carrying no usable pid."""
++    (tmp_path / "gateway.pid").write_text('{"pid": "not-an-int"}', encoding="utf-8")
++
++    with pytest.raises(mas.SharedSurfaceError, match="no integer"):
++        mas.hermes_gateway_alive(tmp_path)
++
++
++def test_an_absent_hermes_pid_file_is_still_no_gateway(tmp_path):
++    """Absent is genuinely absent, and must stay cheap -- failing closed on a
++    missing file would block every materialization on a machine that has never
++    run Hermes."""
+     assert mas.hermes_gateway_alive(tmp_path) is None
+ 
+ 
+=== COMMIT 303b1f9: fix: the review pass on the five fixes, and one finding I disagreed with
+
+
+diff --git a/tests/test_hook_surface_attribution.py b/tests/test_hook_surface_attribution.py
+index 4e04730..46324cc 100644
+--- a/tests/test_hook_surface_attribution.py
++++ b/tests/test_hook_surface_attribution.py
+@@ -129,6 +129,56 @@ def test_every_managed_registration_declares_its_surface():
+     assert not undeclared, f"registrations with no declared surface: {undeclared}"
+ 
+ 
++def test_every_declared_surface_is_one_the_hook_recognises():
++    """Catch a typo where it is INTRODUCED, not where it is consumed.
++
++    `--surface` was accepted verbatim, so `--surface codexx` in the manifest
++    would have been stamped into the Claim summary and the signed packet's
++    `source_systems` with nothing to notice it. The runtime now refuses an
++    unknown label and falls back to inference; this is the half that stops the
++    typo reaching a config at all.
++    """
++    import json
++    import re
++
++    hook = load_hook()
++    manifest = json.loads(
++        (REPO_ROOT / "shared-hook-surface.json").read_text(encoding="utf-8")
++    )
++    seen = []
++    for target, cfg in manifest["targets"].items():
++        for event, entries in (cfg.get("hooks") or {}).items():
++            for entry in entries:
++                for h in entry.get("hooks") or [entry]:
++                    command = (h or {}).get("command", "")
++                    if "hook_post_write.py" not in command:
++                        continue
++                    found = re.search(r"--surface[= ]([^\s\"]+)", command)
++                    assert found, f"{target}.{event} declares no surface"
++                    seen.append((f"{target}.{event}", found.group(1)))
++
++    unknown = [
++        (where, value) for where, value in seen if value not in hook.KNOWN_SURFACES
++    ]
++    assert not unknown, (
++        f"surfaces the hook does not recognise: {unknown}; "
++        f"known: {sorted(hook.KNOWN_SURFACES)}"
++    )
++
++
++def test_an_unrecognised_surface_is_refused_rather_than_stamped(monkeypatch, capsys):
++    """A value nothing downstream can interpret must not reach a signed
++    record. Inference may be imprecise; an unknown label is uninterpretable."""
++    hook = load_hook()
++
++    assert hook.declared_surface(["--surface", "codexx"]) == ""
++    assert "unrecognised --surface" in capsys.readouterr().err
++
++    monkeypatch.setattr(sys, "argv", ["hook_post_write.py", "--surface", "codexx"])
++    monkeypatch.delenv(hook.DECLARED_SURFACE_ENV, raising=False)
++    assert hook.infer_surface("Write", "PostToolUse") == "claude-code"
++
++
+ def test_inference_still_covers_an_unmanaged_install(monkeypatch):
+     """A hand-written Claude Code settings.json predating this surface passes
+     no flag, and is exactly the case the tool-name branch was written for."""
+diff --git a/tests/test_shared_agent_surface_mcp.py b/tests/test_shared_agent_surface_mcp.py
+index f8195be..5ab550d 100644
+--- a/tests/test_shared_agent_surface_mcp.py
++++ b/tests/test_shared_agent_surface_mcp.py
+@@ -1324,3 +1324,34 @@ def test_a_scalar_override_renders_outside_the_header_table():
+         f"re-parenting hazard the ordering rule exists for:\n{rendered}"
+     )
+     assert result["mcp_servers"]["srv"]["startup_timeout_sec"] == 45
++
++
++def test_a_corrupt_pid_file_is_reported_not_raised_through_materialize(tmp_path):
++    """A refusal is a result, not a traceback.
++
++    hermes_gateway_alive raising is right -- the caller writes on its answer --
++    but letting it escape breaks the rule the surrounding block states in its
++    own comment: an unusable file must become one actionable line naming the
++    path, not a traceback that discards every result gathered so far and skips
++    the downstream sub-materializers. It also crashed `--check`, which has to
++    be read-only and has to survive whatever it finds on disk.
++    """
++    home = tmp_path / "hermes"
++    home.mkdir()
++    (home / "gateway.pid").write_text("not json{", encoding="utf-8")
++    (home / "config.yaml").write_text("mcp_servers: {}\n", encoding="utf-8")
++
++    source = (
++        Path(__file__).resolve().parents[1]
++        / "scripts"
++        / "materialize_shared_agent_surface.py"
++    ).read_text(encoding="utf-8")
++
++    call = source.split("live_pid = hermes_gateway_alive(", 1)[0]
++    assert call.rstrip().endswith("try:"), (
++        "hermes_gateway_alive is called outside a try; a corrupt gateway.pid "
++        "would abort materialize() instead of being reported"
++    )
++    tail = source.split("live_pid = hermes_gateway_alive(", 1)[1]
++    assert "except SharedSurfaceError as exc:" in tail.split("if live_pid", 1)[0]
++    assert "REFUSED" in tail.split("if live_pid", 1)[0]

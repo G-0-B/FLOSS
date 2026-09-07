@@ -6,7 +6,6 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 _THIS_DIR = Path(__file__).parent
@@ -14,12 +13,14 @@ _REPO_ROOT = _THIS_DIR.parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from packages.metacoordinator_mcp.voters import (  # noqa: E402
+from packages.metacoordinator_mcp.voters import (
+    _CREDENTIAL_ENV_BY_PREFIX,
+    _load_builtin_registry,  # noqa: E402
     _parse_weight,
     build_default_voters,
     describe_default_roster,
     make_omo_critic_voter,
-    make_omo_momus_voter,
+    make_executability_voter,
     resolve_default_voter_specs,
 )
 from packages.orchestrator.claim_schema import (  # noqa: E402
@@ -39,7 +40,11 @@ ENV_KEYS = (
     "GEMINI_API_KEY",
     "GOOGLE_API_KEY",
     "GROQ_API_KEY",
+    "HF_TOKEN",
+    "HUGGINGFACE_API_KEY",
     "MISTRAL_API_KEY",
+    "NVIDIA_API_KEY",
+    "NVIDIA_NIM_API_KEY",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
     "XAI_API_KEY",
@@ -79,16 +84,19 @@ def test_parse_weight_accepts_leading_dot_float():
 
 
 def _assert_persona_system_keeps_shared_checklist_mandatory(factory):
-    """Exercise a persona wrapper and inspect its higher-priority system contract."""
-    response = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(
-                    content="WEIGHT: -0.4\nRATIONALE: Evidence is missing."
-                )
-            )
-        ]
-    )
+    """Exercise a persona wrapper and inspect its higher-priority system contract.
+
+    Patches `_model_completion` — this repo's own backend seam — rather than
+    injecting a fake `litellm` into sys.modules. The persona voters route through
+    _model_completion so they can reach either litellm or OmniRoute (ADR-19 makes
+    OmniRoute the live default), and a sys.modules-level fake does not survive the
+    builtins.__import__ substitution that test_server_bootstrap.py performs. That
+    made this assertion pass alone and fail after those tests ran. Patching the
+    seam we actually own is both order-independent and backend-agnostic.
+    """
+    from packages.metacoordinator_mcp import voters as voters_module
+
+    completion = Mock(return_value="WEIGHT: -0.4\nRATIONALE: Evidence is missing.")
     voter = factory("persona-probe", "test/model")
     claim = Claim(
         proposer="unit-test",
@@ -99,14 +107,10 @@ def _assert_persona_system_keeps_shared_checklist_mandatory(factory):
         evidence=[],
     )
 
-    litellm = ModuleType("litellm")
-    completion = Mock(return_value=response)
-    litellm.completion = completion
-
-    with patch.dict(sys.modules, {"litellm": litellm}):
+    with patch.object(voters_module, "_model_completion", completion):
         voter(claim)
 
-    messages = completion.call_args.kwargs["messages"]
+    messages = completion.call_args.args[1]
     assert [message["role"] for message in messages] == ["system", "user"]
     system_message = messages[0]["content"]
     user_message = messages[1]["content"]
@@ -127,9 +131,14 @@ def test_omo_critic_system_keeps_shared_checklist_mandatory():
     _assert_persona_system_keeps_shared_checklist_mandatory(make_omo_critic_voter)
 
 
-def test_omo_momus_system_keeps_shared_checklist_mandatory():
-    """The Momus approval bias must not override the shared gate."""
-    _assert_persona_system_keeps_shared_checklist_mandatory(make_omo_momus_voter)
+def test_executability_reviewer_system_keeps_shared_checklist_mandatory():
+    """The executability reviewer's narrow lens must not override the shared gate.
+
+    Renamed with the persona in the 2026-08-12 clean-room rewrite that removed
+    SUL-1.0-derived text (ADR-7). Exercises the current factory rather than the
+    `make_omo_momus_voter` back-compat alias.
+    """
+    _assert_persona_system_keeps_shared_checklist_mandatory(make_executability_voter)
 
 
 def test_resolve_default_voter_specs_honors_profile_and_credentials():
@@ -181,54 +190,86 @@ def test_build_default_voters_raises_when_no_enabled_roster_exists():
             )
 
 
-def test_flowith_profile_enables_when_api_key_is_present():
-    """Enable the Flowith roster when the API key is present."""
-    with patched_env(
-        FLOWITH_API_KEY="flo-test-key",
-        FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
-    ):
-        resolved = resolve_default_voter_specs(profile="flowith")
-    assert resolved == {
-        "flowith-gpt-4.1-mini": "flowith/gpt-4.1-mini",
-        "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-        "flowith-deepseek-chat": "flowith/deepseek-chat",
+def test_flowith_profile_is_removed_after_endpoint_probe():
+    """Flowith must stay out of the registry: its endpoint is gone (probed 2026-08-18).
+
+    Regression guard for a subtle trap. Flowith voters never route through
+    OmniRoute or litellm -- `build_default_voters` dispatches any `flowith/`
+    model to `make_flowith_voter`, a direct HTTPS call to FLOWITH_API_URL
+    authenticated from ~/.flowith/credentials.json. Because that credential
+    file still exists on disk, `_flowith_credential_state` reports the provider
+    as AVAILABLE, so these voters passed the `include_unavailable=False` filter
+    and were enrolled into live polls -- while the endpoint itself returned
+    404 for every model. Re-adding the profile without first re-probing the
+    endpoint would silently reintroduce voters that can only fail at request
+    time.
+    """
+    try:
+        resolve_default_voter_specs(profile="flowith")
+    except ValueError as exc:
+        assert "Unknown voter profile" in str(exc)
+    else:
+        raise AssertionError(
+            "flowith profile is back in voter_registry.json -- re-probe "
+            "FLOWITH_API_URL before restoring it"
+        )
+
+
+def test_every_registry_provider_has_a_credential_gate():
+    """No profile may reference a provider missing from _CREDENTIAL_ENV_BY_PREFIX.
+
+    A provider absent from that table falls through to "no built-in credential
+    gate for provider" and is therefore reported available unconditionally, so
+    its voters survive the `include_unavailable=False` filter and join a live
+    poll that can only fail at request time. That is exactly how the removed
+    flowith voters behaved. `ollama/` is exempt: a local ollama server needs no
+    credential, and the `local` profile is documented as requiring
+    FLOSS_MODEL_BACKEND=litellm.
+    """
+    _, profiles = _load_builtin_registry()
+    gated = {prefix for prefix, _ in _CREDENTIAL_ENV_BY_PREFIX} | {"ollama/"}
+    ungated = {
+        model
+        for roster in profiles.values()
+        for model in roster.values()
+        if not any(model.lower().startswith(prefix) for prefix in gated)
     }
-
-
-def test_flowith_profile_reports_missing_credentials_cleanly():
-    """Report missing Flowith credentials without crashing roster description."""
-    with patched_env(FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json"):
-        described = describe_default_roster(profile="flowith")
-    first = described[0]
-    assert first["enabled"] is False
-    assert "FLOWITH_API_KEY" in str(first["reason"])
+    assert not ungated, f"registry models with no credential gate: {sorted(ungated)}"
 
 
 def test_profile_alias_resolves_to_underlying_registry_profile():
-    """Resolve profile aliases to the registry profile they point at."""
+    """Resolve profile aliases to the registry profile they point at.
+
+    `subscriptions` used to alias the flowith roster; that profile was removed
+    after its endpoint was probed dead, so the alias now points at `diverse`.
+    """
     with patched_env(
-        FLOWITH_API_KEY="flo-test-key",
-        FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
+        GROQ_API_KEY="test-groq-key",
+        MISTRAL_API_KEY="test-mistral-key",
+        HUGGINGFACE_API_KEY="test-hf-key",
+        NVIDIA_NIM_API_KEY="test-nvidia-key",
+        OPENROUTER_API_KEY="test-openrouter-key",
     ):
-        resolved = resolve_default_voter_specs(profile="subscriptions")
-    assert resolved == {
-        "flowith-gpt-4.1-mini": "flowith/gpt-4.1-mini",
-        "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-        "flowith-deepseek-chat": "flowith/deepseek-chat",
-    }
+        by_alias = resolve_default_voter_specs(profile="subscriptions")
+        by_name = resolve_default_voter_specs(profile="diverse")
+    assert by_alias == by_name
+    assert by_alias  # alias must resolve to a non-empty roster
 
 
 def test_heartbeat_alias_uses_budget_safe_balanced_profile():
     """Routine heartbeat profile must not expand to diverse-max by alias."""
     with patched_env(
-        CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
+        MISTRAL_API_KEY="test-mistral-key",
+        HUGGINGFACE_API_KEY="test-hf-key",
+        NVIDIA_NIM_API_KEY="test-nvidia-key",
     ):
         resolved = resolve_default_voter_specs(profile="heartbeat")
     assert resolved == {
-        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
-        "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
+        "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
+        "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+        "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
     }
 
 
@@ -239,49 +280,49 @@ def test_mistral_profile_enables_when_api_key_is_present():
     assert resolved == {
         "mistral-open-nemo": "mistral/open-mistral-nemo",
         "mistral-ministral-8b": "mistral/ministral-8b-2410",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
     }
 
 
 def test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist():
     """Prefer the live multi-provider ROI roster when credentials exist."""
     with patched_env(
-        CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
         MISTRAL_API_KEY="test-mistral-key",
-        FLOWITH_API_KEY="flo-test-key",
-        FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
+        HUGGINGFACE_API_KEY="test-hf-key",
+        NVIDIA_NIM_API_KEY="test-nvidia-key",
+        OPENROUTER_API_KEY="test-openrouter-key",
     ):
         resolved = resolve_default_voter_specs(profile="roi")
     assert resolved == {
-        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
-        "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
-        "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-        "flowith-deepseek-chat": "flowith/deepseek-chat",
+        "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+        "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
+        "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+        "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
+        "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini",
     }
 
 
-def test_diverse_plus_profile_adds_optional_openai_lane_when_available():
-    """Add the optional OpenAI lane when the wider ROI roster can use it."""
+def test_diverse_plus_profile_adds_optional_openrouter_lane_when_available():
+    """Add the optional OpenRouter lane when the wider ROI roster can use it."""
     with patched_env(
-        CEREBRAS_API_KEY="test-cerebras-key",
         GROQ_API_KEY="test-groq-key",
         MISTRAL_API_KEY="test-mistral-key",
-        FLOWITH_API_KEY="flo-test-key",
-        FLOWITH_CREDENTIALS_PATH="C:/definitely/missing/flowith.json",
-        OPENAI_API_KEY="test-openai-key",
+        HUGGINGFACE_API_KEY="test-hf-key",
+        NVIDIA_NIM_API_KEY="test-nvidia-key",
+        OPENROUTER_API_KEY="test-openrouter-key",
     ):
         resolved = resolve_default_voter_specs(profile="roi-plus")
     assert resolved == {
-        "cerebras-gpt-oss-120b": "cerebras/gpt-oss-120b",
+        "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
         "groq-gpt-oss-20b": "groq/openai/gpt-oss-20b",
-        "groq-qwen3-32b": "groq/qwen/qwen3-32b",
-        "mistral-devstral-small": "mistral/devstral-small-2507",
-        "flowith-gemini-2.5-flash": "flowith/gemini-2.5-flash",
-        "flowith-deepseek-chat": "flowith/deepseek-chat",
-        "openai-gpt-4.1-mini": "openai/gpt-4.1-mini",
+        "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+        "mistral-devstral-small": "mistral/devstral-small-latest",
+        "mistral-large": "mistral/mistral-large-latest",
+        "huggingface-deepseek-v4-flash": "huggingface/deepseek-ai/DeepSeek-V4-Flash",
+        "nvidia-nemotron-super-49b": "nvidia/nvidia/llama-3.3-nemotron-super-49b-v1",
+        "openrouter-gpt-4o-mini": "openrouter/openai/gpt-4o-mini",
     }
 
 
@@ -290,19 +331,18 @@ def _run_all() -> int:
     tests = [
         test_parse_weight_accepts_leading_dot_float,
         test_omo_critic_system_keeps_shared_checklist_mandatory,
-        test_omo_momus_system_keeps_shared_checklist_mandatory,
         test_resolve_default_voter_specs_filters_missing_provider_keys,
         test_resolve_default_voter_specs_honors_profile_and_credentials,
         test_roster_override_takes_precedence_over_profile_and_extra,
         test_describe_default_roster_marks_missing_credentials_disabled,
         test_build_default_voters_raises_when_no_enabled_roster_exists,
-        test_flowith_profile_enables_when_api_key_is_present,
-        test_flowith_profile_reports_missing_credentials_cleanly,
+        test_flowith_profile_is_removed_after_endpoint_probe,
+        test_every_registry_provider_has_a_credential_gate,
         test_profile_alias_resolves_to_underlying_registry_profile,
         test_heartbeat_alias_uses_budget_safe_balanced_profile,
         test_mistral_profile_enables_when_api_key_is_present,
         test_diverse_profile_prefers_live_cross_provider_roster_when_credentials_exist,
-        test_diverse_plus_profile_adds_optional_openai_lane_when_available,
+        test_diverse_plus_profile_adds_optional_openrouter_lane_when_available,
     ]
     passed = failed = 0
     for test in tests:
@@ -319,3 +359,49 @@ def _run_all() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_run_all())
+
+
+def test_both_model_backends_carry_the_per_voter_budget(monkeypatch):
+    """litellm received no timeout at all, so a stalled provider could run past
+    the 60s worst_case_round_seconds() assumes -- and votes are collected
+    sequentially, so a couple of slow calls put the round beyond the client
+    projection while the server carried on voting. OmniRoute only looked
+    correct: it forwarded nothing either and its client happens to default to
+    60s."""
+    from packages.metacoordinator_mcp import voters
+
+    seen = {}
+
+    class _Resp:
+        choices = [type("C", (), {"message": type("M", (), {"content": "ok"})()})()]
+
+    def fake_litellm_completion(**kwargs):
+        seen["litellm_timeout"] = kwargs.get("timeout")
+        return _Resp()
+
+    def fake_omni(model, messages, **kwargs):
+        seen["omni_timeout"] = kwargs.get("timeout")
+        return "ok"
+
+    import sys
+    import types
+
+    monkeypatch.setitem(
+        sys.modules,
+        "litellm",
+        types.SimpleNamespace(completion=fake_litellm_completion),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "packages.omniroute_client",
+        types.SimpleNamespace(completion=fake_omni),
+    )
+
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "litellm")
+    voters._model_completion("groq/whatever", [{"role": "user", "content": "x"}])
+
+    monkeypatch.setenv("FLOSS_MODEL_BACKEND", "omniroute")
+    voters._model_completion("groq/whatever", [{"role": "user", "content": "x"}])
+
+    assert seen["litellm_timeout"] == voters.VOTER_CALL_TIMEOUT_SECONDS
+    assert seen["omni_timeout"] == voters.VOTER_CALL_TIMEOUT_SECONDS

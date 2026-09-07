@@ -71,7 +71,7 @@ Plus the intake digestion map this session wrote:
 
 ## Hard constraints to respect on resumption
 
-- **Kernel discipline** per `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`: Intent Echo → Multi-Lens (or Fast-Path) → Decision [+1/0/-1] → Actions; every claim labeled Verified/Specified/Aspirational/Unverified.
+- **Kernel discipline** per `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`: Intent Echo → Multi-Lens (or Fast-Path) → Decision [+1/0/-1] → Actions; every claim labeled Verified/Specified/Aspirational/Unverified.
 - **Startup contract** per `.agent-surface/harness/HARNESS_UPDATE_PACKET.md`: load `CONTEXT_L0.md` before expanding; treat `AGENTMEMORY.md` + `agentmemory` MCP as recall/federation surfaces not canon; emit provenance packets for substrate-level changes; append Action rows to `.agent-surface/activity.jsonl`.
 - **Doc-budget** per `docs/research/2026-05-09-ad4m-coasys-audit-delta.md §K`: default position is do not add a doc; check if the thought belongs in an existing surface.
 - **Truth labels** per ADR-Suite v2.0: no claim presented as Verified without traceable repo artifacts.

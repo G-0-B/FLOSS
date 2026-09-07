@@ -23,7 +23,7 @@ Meanwhile, the local agent node under `packages/` already implements an immediat
 
 - `packages/source_chain/` for file-based per-cell source chains
 - `packages/metacoordinator_mcp/` for claim/vote/decision routing
-- `.claude/settings.json` + `scripts/hook_post_write.py` for cheap automatic submission of substantive edits
+- `.claude/settings.json` + `hooks/hook_post_write.py` for cheap automatic submission of substantive edits
 
 That local bridge is not a replacement for the dev-plane forge. It is the provenance and coordination seam that must connect the forge to the runtime substrate.
 

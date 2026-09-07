@@ -1,6 +1,6 @@
 # Working Todo List — FLOSSI0ULLK
 
-**Last refreshed:** 2026-07-03 (Fable 5 sprint WS0 repo-state verification)
+**Last refreshed:** 2026-08-21 (branch separation + CI config + PR41 landing — see Section 0.1c. Prior: 2026-08-19 PR41 review fixes, see 0.1b; triage in 0.1a. Prior: 2026-08-18 Active Work Board added, see Section 0. Prior: 2026-08-10 process-surface audit, see A.0000000)
 **Status:** Living working-memory artifact. Update on every significant work landing or completion.
 **Purpose:** Single canonical surface for "what are we tracking right now?" — the answer to "do we have a working list of items we need to remember?"
 
@@ -8,7 +8,347 @@ This is NOT canon; it is operational working-memory. Items here get promoted to 
 
 ---
 
+## Section 0 — Active Work Board (who / where / domain / state)
+
+**Refreshed:** 2026-08-18 by Claude Code (Opus 5) session, all rows verified against live `git`,
+`gh`, and running services this session — not carried forward from recall.
+
+**Why this section exists:** the operator works across several harnesses (Claude Code, Codex,
+Gemini/Antigravity, OpenCode, Hermes) and loses track of what is mid-flight, where it lives, and
+which agent touched it. Sections A–I below say *what* is open; they do not say *where the work
+physically is* or *whether a branch/PR is carrying it*. This section is that missing index.
+Update the row, not just the prose, when work lands.
+
+### Branch & PR topology (verified 2026-08-18)
+
+Containment is a clean ladder — each contains the one before it, nothing is behind:
+
+```
+main  ──  origin/main  ──  PR38 branch  ──  PR41 branch  ──  feat/preservation-spine (HEAD)
+                            (+120 to HEAD)  (+32 to HEAD)     == origin/  (0 ahead, 0 behind)
+```
+
+| Ref | Ahead of HEAD | PR | Files | State |
+|---|---|---|---|---|
+| `main` (local) | HEAD is +344 | — | — | far behind the work line |
+| `origin/main` | HEAD is +207 | — | — | the merge target |
+| `working/2026-06-16-adr-cleanup-reconverge` | HEAD is +120 | **PR38** OPEN | 99 (+13089/-805) | `MERGEABLE` / `CLEAN`, **no review decision recorded** |
+| `reconcile/pr38-salvage-20260817` | HEAD is +32 | **PR41** OPEN | 368 (+42743/-3172) | the big reconciliation |
+| `feat/preservation-spine` | — (HEAD) | **none** | — | in sync with origin; **carries everything, has no PR** |
+
+**The structural fact worth acting on:** `feat/preservation-spine` is a strict superset of both PR
+branches and is fully pushed, yet has no PR of its own. PR38 and PR41 are therefore reviewing
+*subsets* of a line that has already moved past them. Confirmed via
+`git merge-base --is-ancestor` for both.
+
+Also open and unrelated to the reconciliation: PR37 (dependabot npm), PR32 + PR30 (deepsource
+autofix). These are small and independent — they do not need to wait on the reconciliation.
+
+### 0.1a PR41 review triage (27 inline comments, verified 2026-08-19)
+
+**Conflict-safety question answered first**, because it drove the merge decision: merging PR38
+into `main` did **not** resurrect any content that PR41 had manually conflict-fixed. Verified by
+test-merging `origin/main` into the PR41 branch in a throwaway worktree: **0 conflicts**, and of
+PR38's 99 changed files the merge alters **none**. The only files `main` now brings in are
+`package-lock.json` ×2, `ARF/tests/tryorama/package.json`, and `ARF/validation/models.py` — all
+from the dependabot/deepsource PRs, none from PR38. PR41's branch already carried a merge of the
+reconciled line (`31bcad0`, then `c96b2a2`), so its manual fixes sit on top. **PR41 wins on every
+PR38 file.** Re-verify with the same worktree test if `main` moves again before PR41 lands.
+
+CI: one failing check only — `Workers Builds: floss` (Cloudflare). CodeQL, Semgrep, Vercel,
+CodeRabbit all pass.
+
+| Sev | Where | Finding | Verified? |
+|---|---|---|---|
+| **Critical** | `scripts/stop_mcp_daemons.ps1:19` | `$pid = ...` assigns to PowerShell's **read-only automatic variable** `$PID` → terminating error *before* `Stop-Process` runs, so the script never actually stops the daemons | ✅ **confirmed by reading the file** — one-line rename to `$daemonPid` |
+| **P1** | `packages/reasoning_ensemble/synthesizer.py:326` | Provider exceptions outside the four caught types (`httpx.ConnectError`, LiteLLM errors) propagate out of `dispatch_parallel()` and abort the whole synthesis instead of degrading to an errored `VoterResponse` | ⚠️ plausible, and the failure mode is *live* — this session saw provider 404s/timeouts constantly |
+| **P1** | `scripts/autonomous_synthesis_loop.py:100` | Files >20 chunks return `SKIPPED` as if extracted; caller stages it and `--commit` records a completed `knowledge_distillation`, so ~240 KB+ files are permanently marked processed with nothing extracted. Suggested `--force-full` flag does not exist | ⚠️ not yet reproduced |
+| **P1** | `packages/activity_log/provenance.py:706` | `validate_packet()` recurses per prior; the depth increment was deliberately removed to allow long honest chains, so a long acyclic chain raises `RecursionError` instead of returning `PacketValidation` | ⚠️ not yet reproduced |
+| **P2** | `packages/metacoordinator_mcp/server.py:149` | `_AUDIT_SINK` is never read and `audit_appender()` has no production caller → **every consensus MCP invocation bypasses the audit trail** the JanuScope migration claims to replace. Same omission in the reasoning-ensemble server | ⚠️ matches the `_AUDIT_SINK` unused-global CodeQL hit (#17/#19) — two independent tools agreeing |
+| **P2** | `hooks/session_start_inject.py:70` | `agentmemory_client.recall()` catches everything and returns `[]`, so a timeout/dead-server looks identical to a genuine empty recall and the `RECALL_FAILED` warning never fires — omitted precisely during the outage it exists to expose | ✅ **confirmed twice**: by reading both modules, and empirically — the wedged agentmemory server on 2026-08-18 produced exactly this silent-empty case |
+| **P2** | `scripts/autonomous_synthesis_loop.py:129` | With `FLOSS_MODEL_BACKEND=omniroute`, `stage_draft()` still writes `provider: "litellm"`, misattributing every run in the durable activity log | ✅ **confirmed relevant** — `FLOSS/.env` sets `omniroute` as the default, so this misattributes *all current runs* |
+| **P2** | `scripts/mcp_daemon.py:76` | PID file not claimed atomically; two concurrent launchers both write it, and the loser's `atexit` can unlink the survivor's file | ⚠️ not yet reproduced |
+| Low | 19 × CodeQL | 4 genuine security findings in `skill-corpus/superpowers-brainstorming/scripts/server.cjs` (remote property injection, reflected XSS, insecure temp file, indirect uncontrolled command line); rest are empty-except ×5, cyclic-import ×2, unused import/var ×6 | The empty-excepts in `hooks/agentmemory_client.py` and the cyclic imports in `scripts/materialize_shared_hook_surface.py` are **deliberate and documented in their docstrings** — they need explanatory comments to satisfy CodeQL, not behaviour changes |
+
+**Cheapest real wins:** the PowerShell `$pid` rename (Critical, one line, confirmed) and the
+omniroute provider attribution (P2, confirmed, small). The audit-sink gap (P2) is the most
+*consequential* — it silently voids the audit trail the migration was justified by.
+
+### 0.1b PR41 review fixes landed (2026-08-19)
+
+All eight commits are on `feat/preservation-spine`, which is a strict superset of
+the PR41 branch. **They are therefore NOT in PR41 yet** — see row 0.3; deciding
+the branch topology is still the gating step.
+
+| Commit | Finding | Evidence |
+|---|---|---|
+| `f0abc89` | `stop_mcp_daemons.ps1` assigned to PowerShell's read-only `$PID` | Reproduced: the error is non-terminating, so the script carried on with `$pid` holding its OWN process id, tried to `Stop-Process` itself, and deleted the pid file anyway — orphaning the daemons. Worse than the review described. |
+| `c51779f` | Audit sink never wired to any tool | `audit_appender` had only test callers; `_AUDIT_SINK` never read. Wrapper preserves the FastMCP schema (asserted, and checked against the live server). |
+| `8644707` | Provenance `RecursionError` on long chains | Reproduced at 1000 links. Fixing it exposed a pre-existing O(n²) fork check (97% of runtime). Both fixed: 1200 links went from crashing to 2.93s, and scaling is now linear to 2500. |
+| `94a2014` | agentmemory outage indistinguishable from empty recall | The warning could only fire on import failure. Confirmed live against the wedged engine on 2026-08-18. Also un-stuck two tests asserting a 1.0s budget the code deliberately abandoned in the 2026-08-10 audit. |
+| `e870497` | Staged actions hardcoded `provider: "litellm"` | `.env` sets `omniroute`, so every run was misattributed. |
+| `bdae612` | Oversized files staged a skip marker as if extracted | Silent data loss: `--commit` recorded them as completed distillations. `--force-full`, which the message advertised, did not exist; implemented. |
+| `c44ce8b` | Daemon pid file not claimed atomically | Verified cross-process (threads share a PID and cannot show it): 8 racers → exactly 1 WON, 7 BLOCKED. |
+| `284047f` | 19 CodeQL findings triaged | One real (cookie prototype pollution, fixed). Two guarded by design. The rest deliberate and now annotated at the site so they are not "fixed" into breakage. |
+
+**Not addressed, with reasons:**
+
+- `scripts/tests/test_audit_provenance_packets.py::...as_superseded` fails
+  (`assert 2 == 0`). Verified **identical with and without** every change above by
+  stashing — genuinely pre-existing, unrelated, and left alone.
+- Cloudflare `Workers Builds: floss` — operator reports it fixed on `main`; the
+  Worker has been running ~6 days. No action taken.
+
+### 0.1c Branch separation, CI config, and PR41 landing (2026-08-21)
+
+**What changed structurally.** The preservation spine had been entangled with the
+reconciliation line by `c7c62d0` ("merge: bring the salvage/preservation spine onto the
+reconciled line"), which is what made `feat/preservation-spine` a superset of PR41 and
+unreviewable as a feature. That merge was dropped: the 31 non-merge spine commits were
+cherry-picked onto `origin/main` in an isolated worktree, resolving one conflict in
+`docs/specs/spec-registry.json` by taking main's registry wholesale and adding only the
+three spine entries. Row 0.3 is now resolved.
+
+**Open PRs after this pass:**
+
+| PR | Branch | Files | State |
+|---|---|---|---|
+| **#44** | `chore/github-ci-config` | 34 | green; `green-set` required-ready |
+| **#43** | `feat/preservation-spine-standalone` | 25 | green; the spine as its own feature PR |
+| **#42** | dependabot npm group | 4 | green; open since before this session |
+| **#41** | `reconcile/pr38-salvage-20260817` | 288 | green; now carries `main` + all 11 review fixes |
+
+Suggested order **#44 → #42 → #43 → #41**. #44 first so everything after is gated by a
+real Python check. #43 and #41 overlap on exactly one file (`docs/specs/spec-registry.json`);
+everything else is disjoint — PR41 contains zero `preservation_spine` paths, verified.
+
+**Caveat on gating:** `python-ci.yml` exists only on #44's branch, and GitHub runs
+`pull_request` workflows from the PR head. So #41 and #43 are **not** currently gated by
+it. After #44 merges, both need a merge from `main` to pick the gate up.
+
+**GitHub config findings (PR #44).** `.github/` held exactly two files, and the second
+was `rust-ci.md` — renamed from `.yml` by `593f9e1` (2025-11-15) to put Rust CI "on hold".
+GitHub only loads `.yml`/`.yaml` from that directory, so the rename silently disabled the
+whole workflow for nine months and left a file that reads as documentation. It also ran
+cargo from the repo root, which has no `Cargo.toml`. Restored with the hold made explicit
+and selective: `fmt` runs (verified green), `clippy`/`test`/`sarif` stay `workflow_dispatch`-only.
+
+`pytest.ini` had **never been committed** — the four `--ignore` entries that make the
+suite runnable existed only in the operator's working tree, so a clean checkout hit five
+collection errors and aborted before running a single test. Now committed with each
+ignore naming the import that breaks it. See [[project-ci-green-list-ratchet]] for the
+measured baseline and the green-list contract.
+
+Also: CodeQL query suite is now conditional (`security-extended` on PRs,
+`security-and-quality` on push/schedule) after triage found **1 real finding out of 19**
+on PR41; concurrency groups added (every push previously stacked another full matrix);
+`dependabot.yml` added against 23 open vulns with nothing configured to fix them;
+CODEOWNERS and a PR template that asks for changed-vs-inherited file separation; and 25
+tracked `.pyc` files untracked.
+
+**Two findings the new gate produced on its first runs**, both recorded as memories:
+
+- [[project-jsonschema-format-silent-noop]] — `FormatChecker()` registers no checker for
+  `date-time` without an RFC-3339 backend, so capability `issued_at` validation accepted
+  anything. Passed locally only because `rfc3339-validator` was present transitively.
+- [[project-hash-pins-need-repin-discipline]] — the orient-skill sha256 contract had been
+  red since a kernel-rename commit changed the pinned file without re-pinning.
+
+**Process defect in this session, recorded rather than glossed:** zero agentmemory
+writes, zero work-board entries, and 1 of 29 skills invoked, until the operator asked.
+Zero consensus claims on Module-to-System-class changes. This is a verbatim repeat of
+A.0000000. See [[feedback-record-as-you-go-not-at-the-end]].
+
+**Still needs the operator (cannot be done from the repo):**
+
+1. **Branch protection** on `green-set`, after #44 merges and it runs once on `main`.
+2. **`Workers Builds: floss`** — red on all four PRs including ones touching no worker
+   code. Cloudflare-side build pointed at the repo root, where there is no wrangler
+   config; the only one is `workers/commons-gateway/wrangler.jsonc`. Repoint it or
+   disconnect it.
+3. **Hook-surface split-brain**, see row 0.12.
+
+### Working-tree state (uncommitted, verified 2026-08-18)
+
+| Repo | Branch | Tracked-modified | Untracked | Note |
+|---|---|---|---|---|
+| `C:\~shit` (workspace) | `codex/improve_gates` | 20 + 1 deleted | 17 | mostly generated surfaces + skill projections |
+| `C:\~shit\FLOSS` | `feat/preservation-spine` | 7 | 17 | the 7 are this session's hook/voter work, listed below |
+
+Nothing from this session is committed in either repo.
+
+### Rows
+
+| # | Item | Domain | Where it lives | Who/what | State |
+|---|---|---|---|---|---|
+| 0.1 | PR41 reconciliation review backlog (~2 months of work) | canon + repo reconciliation | `reconcile/pr38-salvage-20260817`, now 288 files | Codex sessions (`_codex_pr38_*`, `_pr38_*` scratch dirs at workspace root) | **OPEN — the dominant blocker**; 27 inline review comments triaged 2026-08-19, see Section 0.1a |
+| 0.2 | PR38 ADR cleanup / INDEX drift | governance / ADR | merged to `main` 2026-08-19 (`873cc0c`) | operator | **MERGED** — verified harmless to PR41, see conflict note in 0.1a. PR37/PR32/PR30 also merged |
+| 0.3 | `feat/preservation-spine` has no PR | repo topology | `feat/preservation-spine-standalone` | Claude Code, 2026-08-21 | **RESOLVED** — split back into **PR #43**, 25 files, green. The entangling merge `c7c62d0` was dropped; the old branch is left untouched |
+| 0.4 | Hook surface: variables + `claude_user` + agentmemory 12 hooks | harness / metaharness | `shared-hook-surface.json` v0.2.0, `scripts/materialize_shared_hook_surface.py` | Claude Code, 2026-08-18 | **DONE, committed** `c2b38be` — 46 tests pass, drift gate clean, reviewed 3-family (unanimous `extend`, mean -0.61) |
+| 0.5 | Voter registry repaired to probed-working models | consensus gateway | `packages/metacoordinator_mcp/voter_registry.json`, `voters.py`, `tests/test_voters.py` | Claude Code, 2026-08-18 | **DONE, committed** `83894e2` — 112 tests pass; see `[[project-omniroute-voter-probe-log]]` |
+| 0.6 | Independence is policy, not enforcement | consensus gateway | `voters.py` roster build | unassigned | **OPEN** — degraded `balanced` (2 voters, 1 surface) voted normally and nothing detected it |
+| 0.7 | agentmemory project scope on 115/119 memories | memory substrate | `~/.agentmemory` state store | Claude Code attempted 2026-08-18 | **BLOCKED — not fixable via supported API**; see note below |
+| 0.8 | `mem::compress` failing 100% | memory substrate | agentmemory `mem::compress` | unassigned | **OPEN** — 192 calls, 192 failures, 0 successes (from `/agentmemory/health`) |
+| 0.9 | Session `project` identifiers inconsistent | memory substrate | agentmemory sessions | unassigned | **OPEN** — 18 sessions use three different ids: `C:\~shit`, `~shit`, `kalis` |
+| 0.10 | Workspace + FLOSS both dirty, nothing committed | repo hygiene | both repos | Claude Code | **RESOLVED for tracked files** 2026-08-19 — 3 + 8 commits; untracked scratch dirs remain |
+| 0.11 | `context` + `agent-surface` materializer steps drifting | harness surfaces | `.agent-surface/context/CONTEXT_L1.md`, `context-view-registry.json` | pre-existing, predates 2026-08-18 | **OPEN** — `--check` reports DRIFT on 2 of 6 steps |
+| 0.12 | Hook surface split-brain: live projections are v0.2.0, FLOSS working tree is v0.1.0 | harness surfaces | `C:\~shit\FLOSS` checked out on `feat/preservation-spine` | Claude Code, found 2026-08-21 | **OPEN — armed footgun.** Running `refresh_agent_surfaces.py` *without* `--check` from that tree regresses `~/.claude/settings.json`, `.gemini/settings.json`, `.codex/hooks.json` and the hermes config back to v0.1.0, wiping the 12 agentmemory hooks and the `claude_user` target. The v0.2.0 manifest is now reachable on PR41's branch, so it is recoverable rather than stranded; the tree still needs to move off `feat/preservation-spine` |
+| 0.13 | `jsonschema` undeclared in `ARF/requirements.txt` | dependencies / validation | `ARF/requirements.txt` | unassigned | **OPEN** — `scripts/` and `packages/` import it. Runtime carries the same silent-no-op exposure that [[project-jsonschema-format-silent-noop]] fixed for CI |
+| 0.14 | Session recorded nothing durable until asked | process | this work board, `docs/agent-memory/` | Claude Code, 2026-08-21 | **CORRECTED same session** — 4 memories written, this section added. Root cause and the standing rule in [[feedback-record-as-you-go-not-at-the-end]] |
+
+**On row 0.7 (recorded so nobody retries it blind):** the documented fix
+`POST /agentmemory/migrate {"step":"infer-memory-projects"}` was run and returned
+`{updated: 0, ambiguous: 117, skipped: 4}`. Reading the implementation, it infers a memory's
+project *from its sessions'* project field. All 18 sessions **do** have a project, so `ambiguous`
+here means those memories carry **no `sessionIds` at all** — they were written by direct
+`memory_save` calls with no session linkage, so there is nothing to infer from. agentmemory
+exposes no update/PATCH endpoint for a memory's project (only create, export, and
+governance-delete), so backfilling is not reachable without editing the state store directly.
+Getting this to zero means either accepting the 115 as legacy and scoping all *new* writes with an
+explicit stable `project`, or an upstream feature request. **Do not just re-run the migrate — it
+is a no-op for these records.**
+
+**Also fixed in passing 2026-08-18:** the agentmemory REST server was wedged — PID holding
+`127.0.0.1:3111` LISTENING with sockets in `CLOSE_WAIT`, serving nothing (every HTTP path returned
+`000`), because the engine was started before the 0.9.28→0.9.29 upgrade replaced its files
+underneath it. Only the MCP stdio path worked, which reads the store directly and so masked the
+outage. Restarted; `/agentmemory/health` now responds. **If agentmemory tools time out, check for
+this exact shape before assuming the data is gone.**
+
+---
+
 ## Section A — Immediate threads (this session or next)
+
+### A.0000000 Process-surface audit: skills, hooks, agentmemory (2026-08-10)
+
+**Trigger:** operator asked whether this workspace's own skills were being used and whether the hooks actually remind anyone to use them. Audit answer: **no, and the reminder infrastructure did not exist.** The 8-phase consolidation pass immediately preceding this entry ran with **0 Skill invocations, 0 consensus claims, 0 agentmemory writes** — while making System/Substrate-class changes.
+
+**Root causes found (not assumed) and fixed the same day:**
+
+| # | Finding | Evidence | Fix |
+|---|---|---|---|
+| 1 | **No skills reminder existed anywhere.** | `grep -riE 'skill\|superpower' FLOSS/hooks/*.py` → empty; `STARTUP_CONTRACT.md` never named a skill | New **Skills** section in `.agent-surface/STARTUP_CONTRACT.md` — situation→skill table, the 1%-chance rule, and an explicit "persist what you learn" clause |
+| 2 | **Provenance spine silently dead.** Every `submit_claim` failed `E_PROVENANCE_ARTIFACT_MISSING;E_PROVENANCE_PRIOR_NOT_FOUND` | Reproduced deterministically against `.agent-surface/provenance/2026-08-11/Eu_HxHK…json` | Ancestor artifact-**absence** → warning (new `PacketValidation.warnings`); hash **mismatch** stays fatal at any depth. Regression test added |
+| 3 | **Canon edits invisible to the hook.** Fired once in the whole pass | `hook_post_write.py` gated on `/packages/` + `.py/.rs/.toml` only | Added canon rule set: `.md`/`.json` under `docs/adr`, `docs/specs`, `docs/governance` — same surfaces `spec_gate` gates. Research/intake_raw deliberately still excluded |
+| 4 | **agentmemory recall failed silently.** | `hook.log`: `memory_recall timed out after 0.8s, killing child` | Default 0.8 s → **2.5 s**, overridable via `FLOSS_MEMORY_RECALL_TIMEOUT`; failure now renders a visible ⚠️ block instead of looking like "no memories exist" |
+
+**Verified after:** 162 tests pass · `session_start_inject.py` dry run emits the Skills section and a populated memory block · filter behaviour table 11/11 correct · `spec_gate --check` green.
+
+**Still open from this audit:**
+
+- **`test_concurrent_first_packet_creation_converges_on_one_identity` is flaky** — 12 threads racing on identity creation with a 0.02 s sleep; failed once, passed on two immediate re-runs. Pre-existing, not caused by the provenance change. Needs a deterministic barrier or a retry marker.
+- **`E_PROVENANCE_PRIOR_UNAVAILABLE` warnings are now expected on this machine's chain** — packet `Eg-62YdKOGORtcko0_lyJ4YPavKrcNZiXRivoH_sD3Zs` is referenced as a prior but absent from `.agent-surface/provenance/`. Decide whether to backfill it or accept the truncation.
+- **Nothing consumes `PacketValidation.warnings` yet.** The gateway logs errors only; warnings are collected and dropped. Surface them in `submit_claim` output so a truncated chain is visible rather than silent.
+- **Consensus claims still aren't being submitted for canon edits** — fix 3 makes them *eligible*; whether the gateway is reachable and voters respond is untested since the MCP surface dropped mid-session.
+- **Per-harness parity:** the Skills section lives in `STARTUP_CONTRACT.md`, which Codex/Gemini/OpenCode reference by path. Confirm each harness actually loads it rather than only Claude Code.
+
+### A.000000 Root-drop consolidation backlog (2026-08-10)
+
+Merged and deduplicated from four sources that had been tracking the same work separately: `CONTEXT.yaml.delta.next_actions` (11 `now` + 4 `later`), `HANDOFF.md` lanes A–D, the 2026-07-07 intake map's distillation queue (7 items), and open items harvested from Ember Seed Pack `02`/`03` before that pack was relocated. Landed here per the standing rule *"update, do not create a parallel one."*
+
+Provenance: `docs/research/2026-08-10-root-intake-digestion.md`, ledger `.agent-surface/intake/root-intake-moves-2026-08-10.json`.
+
+**P0 — blocking**
+
+1. **Rotate the `ow_mcp_at_…` bearer token** at app.openworklabs.com and de-inline it from `opencode.jsonc:22`. Verified never committed (`git log -S` empty) — exposure is working-tree-only, on one disk — but `opencode.jsonc` is tracked, so it cannot be committed until this is done.
+2. **Rotate the six provider keys** in `.hermes/plans/artifacts/omni-providers-before.json` (`sk-…` ×4, `gsk_…`). Untracked; blocks tracking any of `.hermes/`.
+3. ~~Working-tree triage, both repos~~ — **DONE 2026-08-10.** Root 137 → single digits; FLOSS salvage tree committed to `wip/salvage-20260804`.
+4. **FLOSS is 6 behind / 94 AHEAD of `origin/main`**, and `wip/salvage-20260804` has no upstream. ~2 months of work exists only on this machine. Push or merge; this is a data-loss exposure, not a staleness one.
+
+**P1 — keystone (each unblocks several others)**
+
+5. **ADR-12 consent anchoring.** Blocks provenance delta D1, ADR-19 ratification, and every governed binding.
+6. **ADR-15 implementation.** Semgrep HIGH ×2; unconditional `Ok(Valid)` in `BudgetEntry.validate()`. Needs `cargo test` + human review — not an agent edit. Confirm the author accessor against hdi 0.7.1 (tripwire T6).
+7. **Rebase and merge PR #38.** Correction on record: it is docs-only and stacks cleanly on #36.
+8. ~~Commit the untracked canon files INDEX.md cites~~ — **DONE 2026-08-10** (`9f18f07`): ADR-10, ADR-11, ADR-18, YUMEICHAN_ARCHITECTURE, Rose Forest spec.
+
+**P2 — bookkeeping**
+
+9. **`spec_gate --check` fails: 6 unregistered artifacts** — `refresh_agent_surfaces.py`, `research_log.py`, `start_mcp_daemons.ps1`, `stop_mcp_daemons.ps1`, `sweep_mcp_orphans.ps1`, `docs/adr/ADR-19-omniroute-inference-plane.md`.
+10. **4 dead `FLOSS/hooks/…` entries in `spec-registry.json`** — hooks moved off the gated surface in `cc216f8`, so `--check` cannot see this rot. Needs a deliberate edit.
+11. ~~Repoint the stale `context_views` root-intake source~~ — supersede the 2026-05-19 pointer with `2026-08-10-root-intake-digestion.md`.
+12. **ADR-7 is decided and ratified; only `FLOSS/LICENSE` was never updated.** *(Corrected twice. The 2026-08-11 wording said "declared resolved but never executed", implying no decision record existed. That was wrong — and it inverted the consequence.)*
+    **The decision exists and is sound.** `docs/adr/ADR-7-agpl-cascade.md`, "Embracing AGPL-3.0 Copyleft Cascade", **Accepted 2026-04-15**, listed in `docs/adr/INDEX.md:34` with Truth Status **Specified** — which is the honest label: decided, not yet executed. Rewritten and committed by a parallel Gemini as `9ef2b70` on `lappytop`, with explicit operator approval ("Go."), per `docs/agent-memory/project/adr7-agpl-cascade.md`. It is not a stray claim in a register.
+    **Executed in part.** `FLOSSI_U/LICENSE` is a bare `SPDX-License-Identifier: AGPL-3.0-or-later`, exactly as ADR-7 describes. `FLOSS/LICENSE` is still the 674-line GPL-3.0 text. That single stale file is the whole gap.
+    **The consequence runs the other way from what I wrote.** ADR-7 §2 explicitly *unblocks* porting AIngram and Agorai code directly into our Python/Rust trees — that is the decision's stated purpose. The April AIngram plan is **not** license-blocked. `reuse-ledger-seed.yaml` entry `0068` already records this correctly: `license_status: "AGPL-3.0 per metadata; compatible with AGPL-3 cascade per ADR-7"`.
+    ✅ **DONE 2026-08-12** (operator-authorized). `FLOSS/LICENSE` is now the SPDX one-liner, byte-identical to `FLOSSI_U/LICENSE`; GPL text archived at `archive/LICENSE_GPL-3.0_superseded-by-ADR-7_2026-08-12.txt`; kernel header, `README.md` §License and `adr/INDEX.md:34` (→ **Verified**) all updated. Execution record appended to ADR-7 itself.
+    **Two residuals, both governance rather than licensing:**
+    (a) ADR-7 §3 reserves a dual-licensing / Steward Vote carve-out for humanitarian, medical and educational users, and **no procedure exists for requesting or granting one**. AGPL is the default grant with no defined exception path. Needs a process, not another ADR.
+    (b) **The Compassion Clause has no home.** `RESEARCH-REGISTER.md:49` records it as "moved to `CODE_OF_CONDUCT.md`" — **that file does not exist** anywhere in FLOSS or at workspace root (verified 2026-08-12), and `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md:100` independently observed "No Compassion Clause rider present as a file." The clause survives only as prose in `docs/architecture/flossi_0_ullk_unified_reference_design_v_0.5.md` §10. Land it somewhere real, scoped non-binding-on-licence-terms per the `LEGAL_DEFINITIONS.md` pattern (build spine §215) so OSI/FSF compatibility for funding is preserved. Until then, both the register entry and any doc citing `CODE_OF_CONDUCT.md` are asserting a file that isn't there.
+
+12b. ✅ **DONE 2026-08-12 — clean-room rewrite landed.** `MOMUS_PERSONA_SYSTEM` → `EXECUTABILITY_REVIEWER_SYSTEM`, written from our own consensus schema rather than the upstream text. `make_executability_voter` (old factory name aliased), registry keys `exec-review-*` (old prefix still routes). No SUL-1.0-derived text remains under `packages/`. 162 tests pass; both voters still resolve in `diverse-max`. The new persona is ⚠️ Specified — consensus round `019e1d61` validated the persona it replaced, so a fresh round should exercise this one. Records updated: ADR-7 execution record, `docs/agent-memory/project/omo-momus-voter.md`.
+    Side fix caught during the rewrite: `VOTER_PROMPT`'s evidence-type checklist still listed only the original six types, so voters were being told to reject the `file`/`log`/`activity`/`source_chain` values added by the v1.5 D3 widening. Now consistent with the schema.
+    *Original finding, for the record:* **SUL-1.0 text inside a GPL-3.0 codebase.** `packages/metacoordinator_mcp/voters.py:198–211` carries `MOMUS_PERSONA_SYSTEM`, documented in-file as "system-prompts adapted from oh-my-openagent", sourced from `oh-my-opencode v4.0.0 MOMUS_DEFAULT_PROMPT`. oh-my-openagent is **SUL-1.0** (`package.json:149`) — source-available, not OSI open-source. Provenance was recorded honestly (see `docs/agent-memory/project/omo-momus-voter.md`) and the text is adapted rather than copied verbatim, so this is a license question, not a lift. But it is shipped code in a GPL-3.0 tree and needs a real call: keep with permission, rewrite clean-room, or drop. Blocks nothing today; blocks any redistribution claim.
+13. **`spec-registry.json` `updated` field says 2026-06-12** but contains 2026-07-16 entries.
+14. **Backfill ADR-18 reuse blocks** for architecture-class registry entries, or record the coverage gap (91/92 missing).
+15. **Triage the PR backlog** — #37/#35/#34/#27/#26 (dependabot), #32/#31/#30 (deepsource), #33 (CodeQL), #29 (branch = main, inspect). Note `origin/main` now carries **PR #40** (`2c1db43`, 2026-08-02), later than anything this backlog was organized around.
+16. **Gate `ARF/**` or relocate its loose root docs.**
+17. **Write the PR size cap** (~15 files / 72 h) into `AGENTS.md`.
+18. ✅ **DONE 2026-08-12 — shadow directories eliminated.** `docs/ADRs/` and `docs/specifications/` no longer exist. All three files archived (never deleted):
+    - `ADR-2-Holochain-Integration-Stack.md` → `archive/adr-versions/…_shadow-collision_2025-11-17.md`. It already declared itself SUPERSEDED by `ADR-2-holochain-substrate.md`, retained only as a record of a methodology violation.
+    - `ADR-3-Documentation-Consolidation.md` → `archive/adr-versions/…_shadow-collision_2025-12-11.md`. Number held by `ADR-3-metaprompt-kernelization.md`; its subject was superseded by the 2026-05 doc-cull triage and the 2026-08 passes.
+    - `keri-identity-bridge.yaml` (marked RETROACTIVE, no `docs/specs/` counterpart) → `archive/spec-versions/keri-identity-bridge_retroactive_v0.1.0.yaml`.
+    Numbering-history rows and a "rule going forward" note added to `docs/adr/INDEX.md`; the stale pointers in `LESSONS-LEARNED-Integration-Work.md` annotated rather than rewritten. **Root cause recorded:** a document outside a `spec_gate` surface is invisible to `--check`, which is exactly how these survived a numbering reconciliation.
+
+18b. ⚠️ **`serena-memory` — the drift is real but the fix direction was wrong. NEEDS AN OPERATOR CALL.**
+    `shared-context-surface.json` declares `serena-memory` (`floss://serena-memory`, tier L1, priority 80) with roots `FLOSS/.serena/project.yml` and `FLOSS/.serena/memories`, and lists it in `default_route_order`. On `wip/salvage-20260804` it fully resolves — 8 tracked files, `context_router.py` scores it 745. On PR #38's head it has **0 tracked files**.
+    **The earlier framing here ("land `.serena/` on the integration branch") was wrong.** `.serena/` was added in `a2186bc`, *before* the branches diverged, so PR #38 did not miss it — it **removed** it, in commit **`4657bda` "chore: remove unused Serena project files" (2026-08-11, kalisam)**. That is the same commit the repository atlas anchored to, so the atlas observed the drift on the day it was created.
+    So the two branches encode opposite judgments: PR #38 says the Serena files are unused; this branch treats them as a live L1 corpus. **Do not resolve mechanically.** Either (a) honour the deletion — drop the `serena-memory` corpus from the manifest and remove the files here too, or (b) reverse it — keep the corpus and restore the files on the integration branch. Serena is still a live MCP surface in this workspace, which is the argument for (b); the explicit "unused" judgment is the argument for (a). Whichever wins, manifest and filesystem must agree on one integration branch.
+
+18c. **Repo composition is 57% non-implementation** — measured, not asserted. The atlas domain census over PR #38's 1,194 tracked files: `research-intake` 272, `archive-history` 207, `arf-lab-history` 201 = **680 files**. Active implementation (holochain-runtime 37 + semantic-memory 30 + consensus-gateway 22 + provenance-source-chain 8 + reasoning-ensemble 4 + commons-web 16) = **117 files, under 10%**. This independently corroborates `2026-05-10-doc-cull-triage-v1.md` and the `doc-explosion-acknowledged` memory. Not a task in itself — it is the sizing evidence for the consolidation work, and the reason the kernel's §11d doc-discipline clause is load-bearing rather than decorative. Numbers are PR-38-relative.
+19. **27 unreviewed drafts** in `docs/knowledge_log/staging/`, all untracked. Review or expire.
+20. **PR #25 vs PR #36 discrepancy** — the v1.4 verification report cites #25 as merged 2026-06-16; the merged 2026-08-04 correction attributes that date to #36. One is wrong; needs authenticated repo access. Flagged in-place in the report.
+
+**P2b — openwork rebuild (new 2026-08-17)**
+
+18b. **Openwork was massively misconfigured; all its configs were deliberately wiped 2026-08-17.** Rebuild from scratch. Three things to get right on the way back in:
+   - **`opworkers/` is the wrong home.** It was a workspace-setup mistake; the intended root is `C:\~shit` itself, whose openwork surface is the root `.openwork` folder. The roster manifest still points at three `opworkers/` paths (`shared-ai-roster-surface.json` provider_sources ×2, agent_sources ×1) — repoint them during the rebuild, don't preserve the mistake.
+   - **Suspected propagator duplication bug.** One config file was observed carrying nearly the entire config *and* the agent instructions duplicated back-to-back in the same file. Not the MCP config and not skills — the agent-instruction surface. Most plausibly openwork-side rather than ours. A scan of all 29 current instruction surfaces on 2026-08-17 found **zero** duplicated blocks, so the artifact is likely gone with the wipe; re-check after the rebuild, when a fresh propagation has actually run.
+   - Absent openwork configs no longer break the toolchain — see below.
+
+18c. ✅ **DONE 2026-08-17.** `materialize_shared_ai_roster.py` now honours an `optional: true` flag on manifest sources: absent-and-optional is skipped with a `SKIP` line, present-but-malformed still fails loudly. The three openwork sources are marked optional. Before this, one wiped provider config raised `AIRosterError` and took the `agent-surface` and `ai-roster` steps down with it — turning routine third-party cleanup into a broken toolchain.
+
+**P3 — runtime**
+
+21. **Fix `watch_intake.py`** — it does not exclude `node_modules`, so any run re-floods the queue (the 1.23M-event incident). Also decide the no-PDF gap. **Do this before item 22.**
+22. **Restart the heartbeat**, PYTHONPATH-clean, per A.00000's canonical invocation.
+23. **Heartbeat service runner** decision (Servy recipe + clean env).
+24. **M13** via `@holochain/client@0.19.3`.
+25. **`ConversationMemory.from_dict`** API reconciliation.
+26. **`loop_stdout.log`** dead surface — archive.
+
+**P4 — structural / long-horizon**
+
+27. **Generate `CONTEXT.yaml` from repo state.** Retires the entire drift error class; it is `0.5.0` on the artifact's own upgrade path.
+28. **Arkology Studio outreach** — the only non-code `now` item, flagged "long overdue".
+29. **Distillation queue.** First: `whites_resonance_corrections_critical_analysis.md` (2026-07-08, now in `intake_raw/2026-08-10-root/reports/`) — the strongest undigested critique in the tree; its Holochain findings are checkable against official docs. Then the memory-spine adversarial verification. Then the carried 2026-07-07 queue: permeable-shells reduction test, UTN v0.3 dogfooding, Peony doula MVP, anti-sycophancy/anti-dependence metrics, capability-token coverage audit, Self-Harness paper digestion, Carse → governance vocabulary.
+30. **Locate or declare-gone** the "antigravity" batch intake script.
+31. **Kernel §11d follow-through** — v1.4.0 now carries the doc-discipline clause and the explicit rescission of "integrate everything everywhere". Apply it: the next new doc should absorb or retire an old one.
+
+**Open questions (unanswered — do not guess)**
+
+- Does `evals/provenance_packet_validation/rubric.json` already cover delta items D1–D6?
+- Do the `_pr38_*` / `_codex_pr38_*` working dirs fold into intake once PR #38 lands? They are currently the evidence base for ADR-18's PR38 counterfactual.
+- Is the deferred AD4M/RDF mapping still blocked? Its stated blocker (ADR-numbering reconciliation) largely resolved with the ADR-10/11 renames.
+
+**Never unless evidence changes** — a fourth greenfield restart; Radicle-canonical migration; a bespoke provenance format where in-toto / SLSA / C2PA fits.
+
+### A.00000 Heartbeat runtime repair + intake-flood quarantine (2026-07-07, Hermes session)
+
+**Status:** ✅ REPAIRED 2026-07-07 — heartbeat healthy again after three stacked faults were cleared:
+1. **Intake-event flood (root cause of tick failures):** `.agent-surface/events/incoming/` had accumulated **1,227,833 events** (1.02M on 2026-06-17 + 211k on 2026-06-16). **Root cause FOUND (same session): overlapping watch specs** — `default_watch_specs()` registers both `canon → FLOSS/docs` and `shared-surface → FLOSS/` (recursive), so every file under `FLOSS/docs` was visited twice per scan with different `watch_domain` fingerprints; the stored state oscillated between the two, emitting a spurious "modified" event per overlapped file per scan, forever. **Fixes landed in `watch_intake.py`:** (a) first-spec-wins dedup on `abs_path` in `scan_once`; (b) `MAX_INCOMING_QUEUE_DEPTH = 5000` backpressure guard (early-exit `os.scandir` count; watcher skips emission and prints a drain hint when exceeded). Verified: scan 1 emitted 799 (fresh state), scans 2 & 3 emit **0**; queue drained to 0 via 16 `process_intake_events.py` runs. Flood quarantined (not deleted) at `.agent-surface/events/incoming.flood-quarantine-20260616-17/` — safe to delete after a week of stable scans.
+2. **Wrong interpreter / env contamination:** `heartbeat.py` launches children via `sys.executable`; running it from shells carrying Hermes/Codex `PYTHONPATH` or py-3.14 broke `litellm` imports (`autonomous_synthesis` rc=1: litellm lives in `C:\Python313` user-site; PYTHONPATH shadowing pulled an incompatible pydantic_core). **Canonical invocation (PowerShell):**
+   ```powershell
+   $env:PYTHONPATH=""; C:\Python313\python.exe C:\~shit\FLOSS\scripts\heartbeat.py --loop --interval-seconds 600
+   ```
+   (`--once` for a single tick; `--interval-seconds` default 600. Must run as `MSI\kalis` — LocalSystem lacks user-site litellm, `.env`, `~/.floss_agent`; re-verified 2026-07-07 by Anthony's LocalSystem test.)
+3. **Stale accounting:** `daily_state.json` was frozen at 2026-06-14 (loop had been down since then except brief 07-07 starts that died mid-tick before `save_daily_state`, which only runs at tick end). Verified clean tick 2026-07-07 15:41 UTC: **3 ok / 0 err / 0 skip**, daily_state rolled to 2026-07-07, RESUMPTION.md regenerating again.
+
+**Open items:** (a) service runner still undecided — §A.1 Servy recipe stands, but arguments must include the PYTHONPATH-clean env (Servy env field: `PYTHONPATH=`) and `C:\Python313\python.exe` explicitly; (b) ✅ CLOSED (2026-07-08) `save_daily_state` now persists immediately after tick increment and round accumulation; (c) `loop_stdout.log` is a dead surface (frozen 2026-05-13, superseded by `ticks.log`) — archive or delete; (d) root operator-surface repo gc'd 6.8 GB → **55 MB** 2026-07-07 (`git gc --aggressive --prune=now`; only unreachable pre-gitignore blobs dropped) + `README-REPO.md` added at workspace root documenting the intentional two-repo topology so agents stop re-diagnosing it; (e) Anthony recalls an "antigravity" batch intake-processing script — not found under `FLOSS/scripts/` (only `process_intake_events.py` + `watch_intake.py` exist there; closest other artifact is `major_consolidation_sweep.py`, mtime 2026-07-05, an LLM corpus-consolidation sweeper) — locate or confirm gone.
+
+### A.0000 Holo-RBI synthesis delta follow-ups (2026-07-07)
+
+**Status:** ⚠️ OPEN — delta doc landed at `FLOSS/docs/research/2026-07-07-holo-rbi-synthesis-delta.md` (comparison only, no adoption). Follow-ups: (a) ✅ LANDED (2026-07-16) **ADR-17 review item** — `valid_context` / `known_failures` / `expiry_or_retest_date` fields implemented in KnowledgeTriple contract; (b) proposing-coordinator ADR question (dormant — trigger is anyone actually wanting adaptive orchestration; adoption shape constrained by ADR-10 router-not-controller and the 2026-05-18 Conductor digestion); (c) optional governance paragraph for the staged economic-agency ladder. Trading/RBI vertical explicitly out of scope.
 
 ### A.000 Fable 5 sprint WS0 — repo-state verification (2026-07-03)
 

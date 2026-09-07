@@ -64,7 +64,7 @@ SPECS, ADRS, AND RELATED RESEARCH
   semantics, 4-tier authority, LSM-Override)
 - Empirical validation: `docs/research/2026-05-16-mdash-cfis-
   architectural-transfer.md` (MDASH harness-over-model evidence)
-- Decision-grade peer: `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10
+- Decision-grade peer: `docs/adr/ADR-10-local-agent-node.md` (ADR-10
   consensus gateway — different stakes, different retention)
 - Voter diversity policy: ADR-Suite v2.0 §"Voter roster"
 - Consent: `docs/adr/ADR-12-consent-gate-protocol.md` (voter pool
@@ -93,9 +93,12 @@ module:
   7. Produces a synthesized response
   8. Emits one Action to the global activity log
 
-v0.1 voter pool: local Ollama models only (gemma3:12b-it-qat, phi4-mini,
-qwen2.5-coder-3b, llama3.1, llama3.2) for $0 cost and no rate limits. Cloud
-voters via LiteLLM are Later — same shape, different transport.
+Voter pool: **online-primary by default** (v0.2). Generation runs on the
+consensus-gateway provider roster via `transport.py`
+(FLOSS_ENSEMBLE_VOTER_MODE=online), because the local Ollama pool reliably
+degraded on VRAM-constrained hardware (see DEFAULT_VOTER_POOL note below).
+Local-only (=local) and mixed (=mixed) modes remain available. Embeddings use
+local mxbai when reachable, else a single cloud embedder — resolved once per run.
 
 Plane A: drafts go to `.agent-surface/reasoning/ensemble/<id>_synthesis.json`
 for review; never auto-promotes to canon.
@@ -118,7 +121,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -132,6 +135,11 @@ except ImportError:
     from packages.activity_log import Action, append_action
     from packages.activity_log.schema import prompt_hash, utc_iso
 
+try:
+    from FLOSS.packages.reasoning_ensemble import transport
+except ImportError:
+    from packages.reasoning_ensemble import transport
+
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 ENSEMBLE_STAGING = WORKSPACE_ROOT / ".agent-surface" / "reasoning" / "ensemble"
 # Same file the Router appends its decision rows to and scans in
@@ -143,11 +151,17 @@ REASONING_ACTIVITY_LOG = (
 )
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
+# Imported, not re-derived: three copies of this lookup is how a vector came
+# to be embedded by one model and labelled with another.
+EMBED_MODEL = transport.EMBED_MODEL
 
-# v0.1 default voter pool. All local. ~$0 cost. Each is a distinct family,
-# satisfying the ≥3 providers / ≥4 model families diversity policy (where
-# "provider" is the model family lineage, not the inference host).
+# LEGACY (v0.1) local pool. As of v0.2 the live pools are resolved in
+# `transport.resolve_voter_pool()` (transport.LOCAL_VOTER_POOL mirrors this for
+# mode=local/mixed). Kept for reference / direct-call callers that pass an
+# explicit voter_pool. Edit transport.LOCAL_VOTER_POOL, not this, to change the
+# local roster.
+# All local. ~$0 cost. Each is a distinct family, satisfying the ≥3 providers /
+# ≥4 model families diversity policy (provider = model family lineage, not host).
 #
 # Note: per the reasoning-ensemble v0.2 §12.6 frame-cousin detection,
 # voters that always cluster together over time become flagged as "frame
@@ -186,12 +200,67 @@ MIN_VOTERS = 3
 # serialization can stretch the slowest voter when models are swapping.
 VOTER_TIMEOUT_SECONDS = 180
 EMBED_TIMEOUT_SECONDS = 90
+# Health-probe timeout for the local embedder, distinct from the real embed
+# timeout above. resolve_embedder() probes local Ollama before any voter is
+# dispatched; at 90s a machine where Ollama accepts the connection but stalls on
+# the embedding endpoint blocked the whole run past the 120s reasoning-MCP
+# timeout, even though the cloud fallback was sitting right there.
+EMBED_PROBE_TIMEOUT_SECONDS = 5
+
+# The worst case a caller must be prepared to wait, summed HERE next to the
+# budgets it adds up rather than in the config that has to clear it. A client
+# timeout below this fails runs that are behaving correctly, and the failure
+# looks like a server fault.
+#
+# probe + slowest voter (dispatch is parallel, so one voter's generate+embed)
+# + the Tier-4 prompt embedding in _log_synthesis_action, which happens AFTER
+# dispatch and was missed when this was first derived: the sum said 275 and the
+# real path was 365.
+WORST_CASE_RUN_SECONDS = (
+    EMBED_PROBE_TIMEOUT_SECONDS
+    + VOTER_TIMEOUT_SECONDS
+    + EMBED_TIMEOUT_SECONDS
+    + EMBED_TIMEOUT_SECONDS
+)
 
 # Cluster-similarity threshold for grouping voter responses into the same cluster.
 # Cosine similarity > THRESHOLD → same cluster.
 # Calibrated based on mxbai-embed-large semantic similarity for related-but-distinct
 # answers. 0.75 = "saying basically the same thing"; 0.85 = "near-paraphrase."
 CLUSTER_SIMILARITY_THRESHOLD = 0.75
+
+# Measured 2026-08-25 across all six syntheses in .agent-surface/reasoning/ensemble:
+# the LOWEST off-diagonal cosine similarity in the entire corpus is 0.791, and the
+# median run sits between 0.86 and 0.94. Every pair, in every run -- including four
+# prompts explicitly written to elicit disagreement, one of which said "Attack it.
+# Do not summarize or agree" -- is above 0.75. All six runs therefore reported
+# largest_cluster_fraction = 1.0 with an empty minority set.
+#
+# That is not six unanimous panels. It is one metric with no discriminative power.
+# Whole-response cosine similarity over long-form model prose is dominated by
+# topic, vocabulary and register, not by position: six models asked the same
+# question about the same repository name the same files in the same voice, and
+# land at ~0.9 regardless of whether they agree. Raising the threshold does not
+# fix this -- at 0.79 it still separates nothing, and by 0.90 it is splitting on
+# writing style rather than on claims.
+#
+# The threshold is left where it is on purpose. It is not the defect, and moving
+# it would hide the defect behind a number that looks tuned. Instead
+# separation_diagnostics() below detects when the clustering could not have
+# separated anything and refuses to report the result as consensus.
+SIMILARITY_FLOOR_OBSERVED = 0.791
+
+# Marker emitted when every pair sits above the clustering threshold, so a
+# single cluster was the only reachable outcome.
+CONSENSUS_NOT_MEASURED = "E_CONSENSUS_NOT_MEASURED"
+
+# The machine-readable tier for a run whose clustering could not have separated
+# anything. `tier1` means unanimous consensus in the spec, and every automated
+# consumer -- the staged JSON, the activity action, the deliberate() MCP
+# response -- exported it verbatim while the warning went only into human prose.
+# A reader parsing `tier` therefore treated an explicitly unmeasured run as
+# corroboration. The tier itself has to carry the finding.
+TIER_UNMEASURED = "unmeasured"
 
 # Coherence threshold for the anti-sycophancy override (v0.2 §12.5).
 # A single-voter dissent is only surfaced verbatim if its response_length and
@@ -217,6 +286,15 @@ class VoterResponse:
     response_embedding: Optional[list[float]]
     duration_seconds: float
     error: Optional[str] = None
+    # Which wire this voter actually went over ("ollama" / "litellm" /
+    # "flowith"), carried through so the staged Action can name the real
+    # provider instead of guessing from the model id.
+    #
+    # The default is the answer transport.transport_name() gives for a voter
+    # with no `transport` field, and test_synthesizer_attribution asserts the
+    # two are equal rather than trusting them to stay in step. It read
+    # "litellm" while the router sent that same voter to Ollama.
+    transport_name: str = transport.transport_name({})
 
     @property
     def is_coherent(self) -> bool:
@@ -238,6 +316,15 @@ class TierClassification:
     largest_cluster_fraction: float
     minority_coherent_voters: list[str]  # voter_ids of small but coherent dissenters
     similarity_matrix: list[list[float]]  # N×N for log/debug
+    # Whether the clustering could have produced more than one cluster at all.
+    # False means the tier is an artifact of the metric, not a finding about the
+    # voters. Defaulted so existing constructors keep working; every real path
+    # sets it explicitly.
+    separation: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def consensus_was_measurable(self) -> bool:
+        return bool(self.separation.get("discriminative", True))
 
 
 @dataclass
@@ -267,17 +354,200 @@ def _ollama_request(path: str, payload: dict, timeout: int) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def ollama_embed(text: str) -> list[float]:
+def ollama_embed(text: str, timeout: int = EMBED_TIMEOUT_SECONDS) -> list[float]:
     """Get a 1024-d mxbai embedding for text. Raises on failure."""
     response = _ollama_request(
         "/api/embeddings",
         {"model": EMBED_MODEL, "prompt": text},
-        timeout=EMBED_TIMEOUT_SECONDS,
+        timeout=timeout,
     )
     emb = response.get("embedding", [])
     if not emb:
         raise RuntimeError(f"Empty embedding from {EMBED_MODEL}")
     return emb
+
+
+def _local_embed_probe(text: str) -> list[float]:
+    """Health-probe the local embedder under a short, separate timeout."""
+    return ollama_embed(text, timeout=EMBED_PROBE_TIMEOUT_SECONDS)
+
+
+def _unique_staging_path(directory: Path, stem: str) -> Path:
+    """A path no concurrent run of the same prompt can also be writing.
+
+    O_CREAT|O_EXCL decides, the same way the anchor's retained series does:
+    losing the race is not an error, it means take the next name.
+    """
+
+    attempt = 1
+    while True:
+        suffix = "" if attempt == 1 else f".{attempt}"
+        candidate = directory / f"{stem}{suffix}_synthesis.json"
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            return candidate
+        except FileExistsError:
+            attempt += 1
+        except OSError:
+            # Cannot create here at all; hand back the plain name and let the
+            # caller's own OSError guard report it.
+            return directory / f"{stem}_synthesis.json"
+
+
+def _stage_synthesis(
+    prompt: str,
+    p_hash: str,
+    started_iso: str,
+    tier_class: "TierClassification",
+    responses: list["VoterResponse"],
+    embedded: list["VoterResponse"],
+    final: str,
+) -> Optional[str]:
+    """Write the durable draft. Returns its workspace-relative path, or None.
+
+    Extracted because the DEGRADED path returned before ever reaching it: a run
+    that lost voters mid-flight -- exactly the run an operator most needs to
+    inspect -- reported a null staging path, and its raw responses survived only
+    in the transient reply. The Action keeps hashes and a 400-character preview,
+    which cannot reproduce an outage. One writer, both paths.
+    """
+
+    # mkdir INSIDE the guard. It was outside, so a read-only workspace or a
+    # denied parent raised straight out of a function whose contract is to warn
+    # and return None -- and the caller it broke was the degraded path added in
+    # the same commit, which then discarded the very voter responses it had
+    # just been changed to preserve. A best-effort writer has to be best-effort
+    # for the whole write, directory included.
+    ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # EXCLUSIVE CREATE. The name is a second-resolution timestamp plus the
+    # prompt hash, so two concurrent runs of the SAME prompt inside one second
+    # derive the same path and race: one overwrites the other's raw voter
+    # responses, or a reader sees a truncated file, and both Actions then cite
+    # the same artifact. That matters most for the degraded path, which exists
+    # specifically to preserve outage evidence.
+    #
+    # The unique-name claim is INSIDE the guard too: it creates the directory
+    # and the file, so calling it above the try put mkdir back outside the
+    # handler -- the same defect this comment block was written about, moved
+    # into a helper one commit later.
+    try:
+        ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
+        out_path = _unique_staging_path(ENSEMBLE_STAGING, f"{ts_short}_{p_hash}")
+        out_path.write_text(
+            json.dumps(
+                {
+                    "prompt": prompt,
+                    "prompt_hash": p_hash,
+                    "timestamp": started_iso,
+                    "tier": tier_class.tier,
+                    "voter_count": len(responses),
+                    "embedded_voter_count": len(embedded),
+                    "cluster_assignments": tier_class.cluster_assignments,
+                    "cluster_sizes": tier_class.cluster_sizes,
+                    "largest_cluster_fraction": tier_class.largest_cluster_fraction,
+                    "minority_coherent_voters": tier_class.minority_coherent_voters,
+                    "similarity_matrix": tier_class.similarity_matrix,
+                    "separation": tier_class.separation,
+                    "degenerate_voters": degenerate_voters(embedded),
+                    "voter_responses": [asdict(r) for r in responses],
+                    "final_synthesis": final,
+                },
+                indent=2,
+                ensure_ascii=False,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+        return str(out_path.relative_to(WORKSPACE_ROOT).as_posix())
+    except OSError as e:
+        print(f"[synthesizer] WARN: failed to stage artifact: {e}", file=sys.stderr)
+        return None
+
+
+def _degraded_reason(
+    embedded: list["VoterResponse"],
+    responses: list["VoterResponse"],
+    independence: Optional[str],
+) -> str:
+    """Say which gate actually failed.
+
+    The degraded writeup always read "Fewer than N voters produced embeddings",
+    including when enough voters embedded and the SURVIVING roster was the
+    problem. An operator reading that diagnoses an outage and goes looking for
+    dead voters, while the real fault is that the ones which lived are not
+    independent of each other. Both conditions can hold at once, so both are
+    reported.
+    """
+
+    reasons = []
+    if len(embedded) < MIN_VOTERS:
+        reasons.append(
+            f"Fewer than {MIN_VOTERS} voters produced embeddings "
+            f"({len(embedded)}/{len(responses)})."
+        )
+    if independence is not None:
+        reasons.append(
+            f"The voters that survived do not meet the independence bar: "
+            f"{independence}"
+        )
+    return " ".join(reasons) or "Degraded run."
+
+
+def _survivor_independence_problem(
+    embedded: list["VoterResponse"], resolved_mode: str | None
+) -> Optional[str]:
+    """Re-apply the roster independence bar to the voters that survived.
+
+    Reuses `voters.roster_independence_problem` rather than counting families
+    here: a second implementation of "is this roster independent" is how the
+    pool-side and poll-side answers drift apart, which is the defect this
+    guards against. Local and mixed runs are exempt the same way the pool-side
+    check exempts them, through the same DEGRADED_OK_PROFILES list.
+    """
+
+    if not embedded:
+        return None
+    # LOCAL ONLY. `mixed` was exempted here alongside `local`, and that stopped
+    # being defensible the moment resolve_voter_pool() started applying
+    # assert_roster_is_independent() to the COMBINED mixed pool: the run is now
+    # admitted precisely because online and local voters together clear the
+    # bar, so an outage that kills the online half leaves a correlated subset
+    # that this exemption would report as a normal consensus tier. Two views of
+    # one roster disagreeing about whether it counts as independent is the
+    # exact defect the combined-pool check was added to remove.
+    #
+    # `local` stays exempt because it is deliberately narrow by construction --
+    # one surface, chosen on purpose -- not degraded by circumstance.
+    if resolved_mode == "local":
+        return None
+    try:
+        from packages.metacoordinator_mcp.voters import roster_independence_problem
+
+        return roster_independence_problem(
+            transport.active_online_profile(),
+            {r.voter_id: r.model for r in embedded},
+        )
+    except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
+        return None
+
+
+def _provider_label(response: "VoterResponse") -> str:
+    """Name the transport a voter's call actually went over.
+
+    The staged Action used to read the model id's prefix, so with
+    FLOSS_MODEL_BACKEND=omniroute every online voter was recorded as `groq`,
+    `mistral`, and so on -- the model's vendor, not the wire the request took.
+    scripts/autonomous_synthesis_loop.py already records this correctly via
+    active_model_backend(); the two paths disagreed about the same run, which is
+    exactly what provider-level audit and migration comparison cannot tolerate.
+    """
+    if response.transport_name == "ollama":
+        return "ollama-local"
+    if response.transport_name == "flowith":
+        return "flowith"
+    if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+        return "omniroute"
+    return "litellm"
 
 
 def ollama_generate(
@@ -302,11 +572,30 @@ def ollama_generate(
 # ---------------------------------------------------------------------------
 
 
-def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
-    """Call one voter. Wraps errors into the response. Never raises."""
+def _dispatch_voter(voter: dict, prompt: str, embed_fn=ollama_embed) -> VoterResponse:
+    """Call one voter. Wraps errors into the response. Never raises.
+
+    Generation is routed by the voter's transport (ollama / litellm / flowith)
+    via transport.generate. `embed_fn` is the run's single resolved embedder
+    (local mxbai or a cloud fallback) so every voter shares one vector space.
+    """
     started = time.perf_counter()
+    # Resolved OUTSIDE the try. When it lived inside, the except branch below
+    # built its VoterResponse without it and the field fell back to its
+    # field default -- so every failed ollama or flowith call was attributed
+    # to litellm in the staged artifact and in _log_synthesis_action(), which is
+    # precisely the data a provider failure-rate audit reads.
+    #
+    # Resolved by transport.transport_name(), the same function generate() uses
+    # to pick the wire, because a second copy of the rule here disagreed with
+    # it: a pool entry with no `transport` (every DEFAULT_VOTER_POOL entry) was
+    # dispatched to Ollama and recorded as LiteLLM.
     try:
-        text = ollama_generate(voter["model"], prompt)
+        voter_transport = transport.transport_name(voter)
+    except Exception:  # noqa: BLE001 -- a malformed voter must not raise here
+        voter_transport = transport.transport_name({})
+    try:
+        text = transport.generate(voter, prompt, VOTER_TIMEOUT_SECONDS, ollama_generate)
         duration = time.perf_counter() - started
         if not text:
             return VoterResponse(
@@ -318,10 +607,11 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
                 response_embedding=None,
                 duration_seconds=duration,
                 error="empty_response",
+                transport_name=voter_transport,
             )
         # Embed in this voter's thread to keep things parallel-friendly
         try:
-            emb = ollama_embed(text)
+            emb = embed_fn(text)
         except Exception as e:  # noqa: BLE001
             emb = None
             embed_err = f"embed_failed: {e}"
@@ -336,13 +626,27 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
             response_embedding=emb,
             duration_seconds=round(duration, 3),
             error=embed_err,
+            transport_name=voter_transport,
         )
-    except (
-        urllib.error.URLError,
-        RuntimeError,
-        json.JSONDecodeError,
-        TimeoutError,
-    ) as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate, see below
+        # Catch EVERYTHING. This function's contract, stated in its own
+        # docstring, is that it never raises: one voter failing must degrade to
+        # an errored VoterResponse so the other voters' answers still count.
+        #
+        # The previous tuple (URLError, RuntimeError, JSONDecodeError,
+        # TimeoutError) did not hold that contract. Provider clients raise their
+        # own types -- httpx.ConnectError, LiteLLM's API exception classes,
+        # ssl.SSLError, bare OSError -- and none of those are subclasses of the
+        # four listed. Such an exception propagated out of `fut.result()` in
+        # dispatch_parallel and aborted the entire synthesis, so a single
+        # transient provider hiccup discarded every other voter's work. Provider
+        # 404s and timeouts are routine on this stack, so this was not a rare
+        # path.
+        #
+        # Naming provider exception types explicitly is not an option worth
+        # taking: it would make this module import-depend on every transport's
+        # client library, and the next new provider would silently reintroduce
+        # the same bug. A voter boundary is exactly where a broad catch belongs.
         duration = time.perf_counter() - started
         return VoterResponse(
             voter_id=voter["voter_id"],
@@ -353,22 +657,26 @@ def _dispatch_voter(voter: dict, prompt: str) -> VoterResponse:
             response_embedding=None,
             duration_seconds=round(duration, 3),
             error=f"{type(e).__name__}: {e}",
+            transport_name=voter_transport,
         )
 
 
-def dispatch_parallel(voter_pool: list[dict], prompt: str) -> list[VoterResponse]:
+def dispatch_parallel(
+    voter_pool: list[dict], prompt: str, embed_fn=ollama_embed
+) -> list[VoterResponse]:
     """Fan out to all voters in parallel via ThreadPoolExecutor.
 
-    Ollama serializes GPU access internally (single-model loading + queuing),
-    so true parallelism is partial. But submitting all calls simultaneously
-    lets Ollama overlap embed + generate for different models, which is
-    better than strict-serial.
+    For online voters (mode=online, the default) generation is network-bound and
+    genuinely parallel. For local Ollama voters (mode=local/mixed) GPU access is
+    serialized internally, so parallelism is partial — but submitting together
+    still lets Ollama overlap different models better than strict-serial.
     """
     voter_prompt = _build_voter_prompt(prompt)
     responses: list[VoterResponse] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(voter_pool)) as executor:
         futures = {
-            executor.submit(_dispatch_voter, v, voter_prompt): v for v in voter_pool
+            executor.submit(_dispatch_voter, v, voter_prompt, embed_fn): v
+            for v in voter_pool
         }
         for fut in concurrent.futures.as_completed(futures):
             responses.append(fut.result())
@@ -434,7 +742,6 @@ def greedy_cluster(
     n = len(responses)
     assignments: dict[str, int] = {}
     next_cluster_id = 0
-    voter_to_idx = {r.voter_id: i for i, r in enumerate(responses)}
 
     for i, r in enumerate(responses):
         if r.voter_id in assignments:
@@ -475,6 +782,143 @@ def greedy_cluster(
     return assignments
 
 
+# A response can be present, long, and still contain no position. Two of the
+# six voters in the 2026-08-24 campaign were non-functional in every run and
+# were counted as converged voters in all of them: one emitted a bare `<think>`
+# restatement of the prompt (5/5 runs), the other was truncated mid-sentence
+# (5/5, 212-1466 chars against 2000-3200 for peers). The "≥3 provider surfaces /
+# ≥4 model families" diversity policy was therefore satisfied on paper by voters
+# that produced no positions.
+#
+# Length alone does not catch this -- the restating voter was the SECOND-LONGEST
+# response in one run. These checks are shape-based and deliberately
+# conservative: they flag, they do not exclude, because a wrong exclusion loses
+# a real vote while a wrong flag costs a line of output.
+DEGENERATE_TRUNCATION_RATIO = 0.4
+THINK_OPENERS = ("<think>", "<thinking>", "<reasoning>")
+SENTENCE_ENDINGS = (".", "!", "?", "`", ")", "]", '"', "'")
+
+
+def degenerate_voters(responses: list[VoterResponse]) -> dict[str, str]:
+    """Name voters whose text is present but carries no position.
+
+    Returns voter_id -> reason. Empty when every response looks substantive.
+    """
+
+    scored = [r for r in responses if r.response and not r.error]
+    if not scored:
+        return {}
+    lengths = sorted(len(r.response) for r in scored)
+    median = lengths[len(lengths) // 2]
+
+    flagged: dict[str, str] = {}
+    for response in scored:
+        text = response.response.strip()
+        lowered = text.lower()
+        if lowered.startswith(THINK_OPENERS) and "</" not in lowered:
+            flagged[response.voter_id] = (
+                "opens a reasoning block that never closes -- prompt "
+                "restatement, not an answer"
+            )
+            continue
+        if not text.endswith(SENTENCE_ENDINGS) and len(text) < median:
+            flagged[response.voter_id] = (
+                f"ends mid-sentence at {len(text)} chars against a "
+                f"{median}-char median -- truncated, not concluded"
+            )
+    return flagged
+
+
+def separation_diagnostics(
+    similarity: list[list[float]],
+    threshold: float,
+    embedded: list[bool] | None = None,
+) -> dict[str, object]:
+    """Report whether the clustering could have separated anything at all.
+
+    A cluster assignment only carries information if the similarity values
+    actually straddle the threshold. If every off-diagonal pair is above it, a
+    single cluster was the only reachable outcome and ``tier1`` says nothing
+    about whether the voters agreed -- it says the metric never looked.
+
+    That is not hypothetical. Every synthesis this repository has produced to
+    date reports ``largest_cluster_fraction = 1.0`` with an empty minority set,
+    including four prompts written specifically to provoke dissent. The measured
+    floor across the whole corpus is 0.791 against a 0.75 threshold.
+
+    Returns a dict rather than a bool so the numbers travel with the verdict and
+    a future calibration argument can be made from data instead of from memory.
+    """
+
+    def _has_embedding(index: int) -> bool:
+        if embedded is None:
+            return True
+        return index < len(embedded) and bool(embedded[index])
+
+    # ONE TRIANGLE. The matrix is symmetric, so iterating the full off-diagonal
+    # visited (i,j) and (j,i) and reported exactly twice the number of distinct
+    # pairs -- six for three voters. Those counts are persisted and presented as
+    # experimental diagnostics, so they were wrong wherever they were read.
+    scored: list[float] = []
+    missing_pairs = 0
+    for i in range(len(similarity)):
+        for j in range(i + 1, len(similarity)):
+            value = similarity[i][j]
+            # pairwise_similarity_matrix writes 0.0 for a voter with no
+            # embedding. A genuine cosine can also be 0.0 or negative, and
+            # dropping those as "missing" hid real disagreement: a panel whose
+            # only separating pairs were negative reported that every scored
+            # pair converged and that separation was impossible, while the
+            # clustering used those same negatives and split the voters.
+            if _has_embedding(i) and _has_embedding(j):
+                scored.append(value)
+            else:
+                missing_pairs += 1
+    if not scored:
+        return {
+            "discriminative": False,
+            "reason": "no scored pairs (missing embeddings)",
+            "pair_count": 0,
+            "pairs_missing_embeddings": missing_pairs,
+            "threshold": threshold,
+        }
+
+    low = min(scored)
+    high = max(scored)
+    below = sum(1 for value in scored if value < threshold)
+    # Discriminative means the threshold actually falls inside the observed
+    # spread. If it sits below the floor, no pair could ever have been split;
+    # if it sits above the ceiling, every voter would be its own cluster and
+    # "dissent" would be equally meaningless.
+    discriminative = low < threshold <= high
+
+    diagnostics: dict[str, object] = {
+        "discriminative": discriminative,
+        "pair_count": len(scored),
+        "pairs_missing_embeddings": missing_pairs,
+        "threshold": threshold,
+        "min": round(low, 4),
+        "max": round(high, 4),
+        "mean": round(sum(scored) / len(scored), 4),
+        "pairs_below_threshold": below,
+    }
+    if not discriminative:
+        if low >= threshold:
+            diagnostics["reason"] = (
+                f"{CONSENSUS_NOT_MEASURED}: every one of {len(scored)} pairs "
+                f"scored >= {threshold} (floor {low:.3f}); a single cluster was "
+                f"the only reachable outcome, so the tier reflects the metric "
+                f"and not the voters"
+            )
+        else:
+            diagnostics["reason"] = (
+                f"{CONSENSUS_NOT_MEASURED}: every one of {len(scored)} pairs "
+                f"scored < {threshold} (ceiling {high:.3f}); every voter is its "
+                f"own cluster, so dissent is equally unmeasured"
+            )
+    return diagnostics
+
+
 def classify_tier(
     responses: list[VoterResponse],
     similarity: list[list[float]],
@@ -504,6 +948,7 @@ def classify_tier(
     )
     if len(cluster_sizes) == 1:
         tier = "tier1"
+        # Overwritten below if the clustering could not have separated anything.
     elif largest_size >= ceil_half and unique_largest:
         tier = "tier2"
     else:
@@ -518,6 +963,27 @@ def classify_tier(
             if voter.is_coherent:
                 minority_coherent_voters.append(v_id)
 
+    separation = separation_diagnostics(
+        similarity,
+        CLUSTER_SIMILARITY_THRESHOLD,
+        embedded=[r.response_embedding is not None for r in responses],
+    )
+    if not separation.get("discriminative", True):
+        # ANY tier, not just tier1. The guard was written for the documented
+        # all-pairs-above-threshold case and therefore only caught single-cluster
+        # runs -- while the equally non-discriminative all-pairs-BELOW case
+        # produces many clusters, lands on tier4, and was exported and rendered
+        # as measured divergence.
+        #
+        # separation_diagnostics already reports discriminative=False for both
+        # sides. Guarding one of them was reading the diagnostic and then
+        # re-deciding the question from the tier.
+        #
+        # `tier1` is a claim that the voters agreed; `tier4` is a claim that they
+        # diverged. A run whose threshold sat outside the observed spread
+        # supports neither.
+        tier = TIER_UNMEASURED
+
     return TierClassification(
         tier=tier,
         cluster_assignments=assignments,
@@ -526,6 +992,7 @@ def classify_tier(
         largest_cluster_fraction=round(largest_fraction, 3),
         minority_coherent_voters=minority_coherent_voters,
         similarity_matrix=[[round(v, 3) for v in row] for row in similarity],
+        separation=separation,
     )
 
 
@@ -535,9 +1002,20 @@ def classify_tier(
 
 
 def write_synthesis(
-    prompt: str, responses: list[VoterResponse], tier_class: TierClassification
+    prompt: str,
+    responses: list[VoterResponse],
+    tier_class: TierClassification,
+    all_responses: list[VoterResponse] | None = None,
 ) -> str:
-    """Produce the human-readable synthesis. Tier-aware formatting."""
+    """Produce the human-readable synthesis. Tier-aware formatting.
+
+    `responses` are the voters that produced an embedding and were therefore
+    clusterable. `all_responses` is every voter that was dispatched. They differ
+    whenever a voter times out, and the difference used to vanish: the header
+    printed `len(responses)`, so a file could read "Voters: 5" while its own
+    `voter_count` field said 6 and no line anywhere said a voter was lost.
+    """
+    dispatched = all_responses if all_responses is not None else responses
     voter_by_id = {r.voter_id: r for r in responses}
     largest_cluster_voters = [
         v_id
@@ -552,30 +1030,102 @@ def write_synthesis(
 
     lines: list[str] = []
     lines.append(f"# Ensemble synthesis — {tier_class.tier.upper()}")
+    if tier_class.tier == TIER_UNMEASURED:
+        lines.append("")
+        # Same false claim as the body branch had: this asserted the all-above
+        # shape for both non-discriminative sides. The header is a sibling of
+        # that defect and was written in the same commit.
+        lines.append(
+            "_(`tier: unmeasured`, not `tier1` or `tier4`. The clustering "
+            "threshold sat outside the observed similarity range, so it could "
+            "not have separated the voters differently however they answered. "
+            "This run makes no claim about agreement OR divergence, and machine "
+            "consumers must not read it as either.)_"
+        )
     lines.append("")
     lines.append(
         f"**Voters:** {len(responses)} ({', '.join(r.family for r in responses)})"
     )
+    lost = [r for r in dispatched if r.voter_id not in voter_by_id]
+    if lost:
+        lines.append(
+            f"**Dispatched but not counted:** {len(lost)} of {len(dispatched)} — "
+            + ", ".join(f"{r.voter_id} ({r.error or 'no embedding'})" for r in lost)
+        )
     lines.append(
         f"**Largest cluster:** {len(largest_cluster_voters)}/{len(responses)} "
         f"({100 * tier_class.largest_cluster_fraction:.0f}%)"
     )
+    if not tier_class.consensus_was_measurable:
+        # Say this above the fold, before any number that looks like agreement.
+        # A reader who takes "6/6, 100%" at face value and cites it as
+        # multi-model corroboration is making a claim the measurement does not
+        # support, and the measurement is the only thing that knows that.
+        separation = tier_class.separation
+        lines.append("")
+        lines.append("> **This run did not measure consensus.**")
+        lines.append(">")
+        lines.append(f"> {separation.get('reason', CONSENSUS_NOT_MEASURED)}")
+        lines.append(">")
+        lines.append(
+            f"> Observed pairwise similarity: min {separation.get('min')}, "
+            f"mean {separation.get('mean')}, max {separation.get('max')} "
+            f"across {separation.get('pair_count')} pairs, threshold "
+            f"{separation.get('threshold')}. "
+            f"{separation.get('pairs_below_threshold')} pairs fell below it."
+        )
+        lines.append(">")
+        lines.append(
+            "> Treat the cluster numbers above as diagnostics of the metric, not "
+            "as agreement between voters. Do not cite this run as corroboration."
+        )
+    degenerate = degenerate_voters(responses)
+    if degenerate:
+        lines.append("")
+        lines.append(
+            f"> **{len(degenerate)} of {len(responses)} counted voters returned "
+            f"no position.**"
+        )
+        for voter_id, reason in degenerate.items():
+            lines.append(f">   - `{voter_id}`: {reason}")
+        lines.append(">")
+        lines.append(
+            "> These were clustered as agreement. A voter that restates the "
+            "prompt or stops mid-sentence agrees with nothing; count the "
+            "diversity policy against the voters that actually answered."
+        )
     lines.append("")
 
     if tier_class.tier == "tier1":
-        lines.append("## Unanimous consensus")
+        if tier_class.consensus_was_measurable:
+            lines.append("## Unanimous consensus")
+        else:
+            lines.append("## Single cluster — consensus not established")
         lines.append("")
-        # Pick the most coherent / longest response from the cluster as the synthesis
+        # The "synthesis" of a single cluster is one voter's verbatim text,
+        # selected by character count. That is worth stating plainly rather than
+        # letting the word "synthesis" imply that anything was combined.
         rep = max(
             (voter_by_id[v] for v in largest_cluster_voters),
             key=lambda r: len(r.response),
         )
         lines.append(f"> {rep.response}")
         lines.append("")
-        lines.append(
-            f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
-            f"All {len(responses)} voters converged.)_"
-        )
+        if tier_class.consensus_was_measurable:
+            lines.append(
+                f"_(Representative voter: {rep.voter_id} / {rep.family} family. "
+                f"All {len(responses)} voters converged.)_"
+            )
+        else:
+            lines.append(
+                f"_(Text above is the verbatim response of {rep.voter_id} / "
+                f"{rep.family} family, selected as the longest of "
+                f"{len(responses)}. Nothing was combined, and the clustering "
+                f"could not have placed any voter elsewhere. The other "
+                f"{len(responses) - 1} responses are preserved in "
+                f"`voter_responses[]` and are the only place a disagreement, if "
+                f"there was one, still exists.)_"
+            )
 
     elif tier_class.tier == "tier2":
         lines.append("## Majority consensus (with named dissent)")
@@ -595,7 +1145,7 @@ def write_synthesis(
             lines.append("## Named dissent (passed coherence guard)")
             for v_id in tier_class.minority_coherent_voters:
                 v = voter_by_id[v_id]
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"**{v.voter_id} / {v.family}:**")
                 lines.append(f"> {v.response}")
         elif minority_voters:
@@ -604,6 +1154,57 @@ def write_synthesis(
                 "their responses failed the coherence guard — "
                 "logged to activity log but not surfaced.)_"
             )
+
+    elif tier_class.tier == TIER_UNMEASURED:
+        # Its own branch. Reclassifying a single-cluster run to `unmeasured`
+        # dropped it into the tier4 `else`, so the artifact said consensus was
+        # unmeasured and then, three lines later, claimed "Tier-4 divergence
+        # preserved" and "No single cluster carried the majority" -- about a run
+        # that had exactly ONE cluster. A reader could believe either half.
+        lines.append("## Consensus not measured")
+        lines.append("")
+        # Read the REASON from the diagnostic instead of assuming the case the
+        # branch was written for. Generalising classify_tier to both
+        # non-discriminative sides while leaving this prose describing only the
+        # all-above one produced an artifact that told an all-below run every
+        # voter had landed in one cluster -- when in fact each had its own.
+        separation = tier_class.separation or {}
+        cluster_count = len(set(tier_class.cluster_assignments.values()))
+        if cluster_count <= 1:
+            shape = (
+                "Every voter landed in one cluster, and the clustering could "
+                "not have produced more than one."
+            )
+        else:
+            shape = (
+                f"The clustering produced {cluster_count} clusters -- one per "
+                f"voter -- because no pair reached the threshold, so it could "
+                f"not have produced fewer."
+            )
+        lines.append(
+            f"{shape} That is a property of the metric, not a finding about the "
+            f"voters: this run neither established agreement nor observed "
+            f"divergence."
+        )
+        if separation.get("reason"):
+            lines.append("")
+            lines.append(f"> {separation['reason']}")
+        lines.append("")
+        lines.append("**The responses are the output. All of them, unranked:**")
+        lines.append("")
+        for voter_id in tier_class.cluster_assignments:
+            voter = voter_by_id.get(voter_id)
+            if voter is None:
+                continue
+            lines.append(f"### {voter.voter_id} ({voter.family})")
+            lines.append("")
+            lines.append(f"> {voter.response}")
+            lines.append("")
+        lines.append(
+            "_(Nothing was combined and nothing was selected as representative. "
+            "Any disagreement between these responses is present above and was "
+            "not measured by the clustering.)_"
+        )
 
     else:  # tier4
         lines.append("## Tier-4 divergence preserved")
@@ -643,8 +1244,18 @@ def write_synthesis(
 def synthesize(
     prompt: str, voter_pool: Optional[list[dict]] = None, stage_artifact: bool = True
 ) -> EnsembleSynthesis:
-    """Run the full ensemble: voters → embed → cluster → tier → synthesize."""
-    pool = voter_pool or DEFAULT_VOTER_POOL
+    """Run the full ensemble: voters → embed → cluster → tier → synthesize.
+
+    When `voter_pool` is None the pool is resolved from FLOSS_ENSEMBLE_VOTER_MODE
+    (online-primary by default), so a deliberation no longer depends on local GPU
+    headroom. The embedder is resolved once per run (local mxbai preferred, cloud
+    fallback) so all voter responses share one vector space.
+    """
+    resolved_mode = "local" if voter_pool is not None else None
+    if voter_pool is not None:
+        pool = voter_pool
+    else:
+        pool, resolved_mode = transport.resolve_voter_pool()
     if len(pool) < MIN_VOTERS:
         raise ValueError(f"Voter pool too small: {len(pool)} < {MIN_VOTERS}")
 
@@ -652,12 +1263,32 @@ def synthesize(
     started_perf = time.perf_counter()
     p_hash = prompt_hash(prompt)
 
+    # Resolve the single embedder for this run (shared vector space required).
+    # The local probe is bounded separately from the real embed timeout: see
+    # EMBED_PROBE_TIMEOUT_SECONDS. Once resolved, the returned embedder uses the
+    # full timeout for actual work.
+    embed_name, embed_fn = transport.resolve_embedder(
+        _local_embed_probe,
+        local_embed_fn=ollama_embed,
+        embed_timeout=EMBED_TIMEOUT_SECONDS,
+    )
+
     # 1-3: dispatch + embed (embed is inside _dispatch_voter)
-    responses = dispatch_parallel(pool, prompt)
+    responses = dispatch_parallel(pool, prompt, embed_fn)
 
     # Filter to voters that produced an embedding (others can't be clustered)
     embedded = [r for r in responses if r.response_embedding is not None]
-    if len(embedded) < MIN_VOTERS:
+    # INDEPENDENCE IS A PROPERTY OF WHO SURVIVED, NOT OF WHO WAS INVITED.
+    #
+    # The bar (>=3 provider surfaces, >=4 model families) was enforced once, on
+    # the pool, before any voter ran. MIN_VOTERS is a COUNT and three voters
+    # cannot span four families, so an outage that left three survivors of a
+    # four-family profile passed this gate and went on to report Tier-1
+    # consensus -- the same "two views of one roster" failure the pool-side
+    # check exists to prevent, one stage later. Re-check the same bar, via the
+    # same function, on the voters that actually produced embeddings.
+    independence = _survivor_independence_problem(embedded, resolved_mode)
+    if len(embedded) < MIN_VOTERS or independence is not None:
         # Degraded — log + return a sentinel
         duration = time.perf_counter() - started_perf
         result = EnsembleSynthesis(
@@ -674,12 +1305,22 @@ def synthesize(
                 largest_cluster_fraction=1.0,
                 minority_coherent_voters=[],
                 similarity_matrix=[],
+                separation={
+                    "discriminative": False,
+                    "reason": (
+                        f"{CONSENSUS_NOT_MEASURED}: degraded run, "
+                        f"{len(embedded)}/{len(responses)} voters embedded"
+                        + (f"; {independence}" if independence else "")
+                    ),
+                    "pair_count": 0,
+                    "threshold": CLUSTER_SIMILARITY_THRESHOLD,
+                },
             ),
             final_synthesis=(
                 f"# Ensemble synthesis — DEGRADED\n\n"
-                f"Fewer than {MIN_VOTERS} voters produced embeddings "
-                f"({len(embedded)}/{len(responses)}). Cannot run cluster-based Tier "
-                f"classification. Raw voter responses follow:\n\n"
+                f"{_degraded_reason(embedded, responses, independence)} "
+                f"Cannot run cluster-based Tier classification. Raw voter "
+                f"responses follow:\n\n"
                 + "\n\n---\n\n".join(
                     f"**{r.voter_id} ({r.family})** "
                     f"{'OK' if not r.error else 'ERR: ' + r.error}\n\n{r.response}"
@@ -687,13 +1328,33 @@ def synthesize(
                 )
             ),
         )
+        # STAGE THE DEGRADED ROUND TOO, and before logging, so the Action's
+        # staging_paths names it. A run that lost voters is the one an operator
+        # most needs to read afterwards, and it was the only run with no durable
+        # draft to read.
+        if stage_artifact:
+            result.staging_path = _stage_synthesis(
+                prompt,
+                p_hash,
+                started_iso,
+                result.tier_classification,
+                responses,
+                embedded,
+                result.final_synthesis,
+            )
         _log_synthesis_action(
             result,
             prompt,
             p_hash,
             started_iso,
             success=False,
-            error=f"insufficient_voters: {len(embedded)}/{len(responses)}",
+            error=(
+                f"insufficient_voters: {len(embedded)}/{len(responses)}"
+                if independence is None
+                else f"roster_not_independent: {independence}"
+            ),
+            embed_fn=embed_fn,
+            embed_name=embed_name,
         )
         return result
 
@@ -705,41 +1366,16 @@ def synthesize(
     tier_class = classify_tier(embedded, sim, assignments)
 
     # 6: synthesis writeup
-    final = write_synthesis(prompt, embedded, tier_class)
+    final = write_synthesis(prompt, embedded, tier_class, all_responses=responses)
 
     # 7: stage artifact
-    staging_path: Optional[str] = None
-    if stage_artifact:
-        ENSEMBLE_STAGING.mkdir(parents=True, exist_ok=True)
-        ts_short = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        out_path = ENSEMBLE_STAGING / f"{ts_short}_{p_hash}_synthesis.json"
-        try:
-            out_path.write_text(
-                json.dumps(
-                    {
-                        "prompt": prompt,
-                        "prompt_hash": p_hash,
-                        "timestamp": started_iso,
-                        "tier": tier_class.tier,
-                        "voter_count": len(responses),
-                        "embedded_voter_count": len(embedded),
-                        "cluster_assignments": tier_class.cluster_assignments,
-                        "cluster_sizes": tier_class.cluster_sizes,
-                        "largest_cluster_fraction": tier_class.largest_cluster_fraction,
-                        "minority_coherent_voters": tier_class.minority_coherent_voters,
-                        "similarity_matrix": tier_class.similarity_matrix,
-                        "voter_responses": [asdict(r) for r in responses],
-                        "final_synthesis": final,
-                    },
-                    indent=2,
-                    ensure_ascii=False,
-                    default=str,
-                ),
-                encoding="utf-8",
-            )
-            staging_path = str(out_path.relative_to(WORKSPACE_ROOT).as_posix())
-        except OSError as e:
-            print(f"[synthesizer] WARN: failed to stage artifact: {e}", file=sys.stderr)
+    staging_path = (
+        _stage_synthesis(
+            prompt, p_hash, started_iso, tier_class, responses, embedded, final
+        )
+        if stage_artifact
+        else None
+    )
 
     duration = time.perf_counter() - started_perf
     result = EnsembleSynthesis(
@@ -754,7 +1390,15 @@ def synthesize(
     )
 
     # 8: emit Action to global activity log
-    _log_synthesis_action(result, prompt, p_hash, started_iso, success=True)
+    _log_synthesis_action(
+        result,
+        prompt,
+        p_hash,
+        started_iso,
+        success=True,
+        embed_fn=embed_fn,
+        embed_name=embed_name,
+    )
     return result
 
 
@@ -765,11 +1409,22 @@ def _log_synthesis_action(
     started_iso: str,
     success: bool,
     error: Optional[str] = None,
+    embed_fn=None,
+    embed_name: Optional[str] = None,
 ) -> None:
+    """Emit the run's Action and the reasoning-activity row.
+
+    `embed_fn`/`embed_name` are the run's ALREADY RESOLVED embedder. They are
+    not optional in practice: re-deriving an embedder here would re-probe a
+    backend the run has already ruled out, and -- worse -- could embed the
+    prompt in a different vector space than the one the run used, which
+    `check_tier4_similarity_bias()` then cosine-compares as if it were
+    commensurable. They default to None only so older callers keep working.
+    """
     llm_calls = [
         {
             "model": r.model,
-            "provider": "ollama-local",
+            "provider": _provider_label(r),
             "voter_id": r.voter_id,
             "family": r.family,
             "prompt_hash": p_hash,
@@ -819,10 +1474,16 @@ def _log_synthesis_action(
         "tier_classification": tier,
     }
     if tier == "tier4":
+        embedder = embed_fn or ollama_embed
         try:
-            row["prompt_embedding"] = ollama_embed(prompt)
+            row["prompt_embedding"] = embedder(prompt)
+            # EMBED_MODEL is what this module's ollama_embed() uses and is
+            # operator overridable, so the hardcoded string was the same defect
+            # as the router's: a vector labelled with a model that may not have
+            # produced it.
+            row["prompt_embedding_model"] = embed_name or EMBED_MODEL
         except Exception:  # noqa: BLE001 — embedding is best-effort
-            pass
+            row.pop("prompt_embedding", None)
     try:
         REASONING_ACTIVITY_LOG.parent.mkdir(parents=True, exist_ok=True)
         with REASONING_ACTIVITY_LOG.open("a", encoding="utf-8") as f:

@@ -27,13 +27,28 @@ Design rules:
   - one-way projection only
   - preserve unrelated agent-native settings
   - plain JSON output even when a target supports JSONC
+
+Exit codes (`main()`, non-`--doctor` path):
+  - A `REFUSED` result (currently only a Hermes target blocked by a live
+    gateway) always exits 1 -- on a plain run, under `--dry-run`, and under
+    `--check` alike. A refused write is a failure to converge, not routine
+    drift, and orchestrators such as `refresh_agent_surfaces.py` treat any
+    non-zero exit as a hard failure rather than parsing per-line output, so
+    this must not depend on which flags were passed. This check runs first,
+    before the `--check`/drift check below.
+  - Otherwise, `--check` exits 1 if any target drifted from canonical
+    source; a plain run or `--dry-run` (with no refusals) exits 0.
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
 from pathlib import Path
+import re
+import subprocess
 import textwrap
 from typing import Any
 from urllib import error, request
@@ -58,6 +73,23 @@ DEFAULT_AI_ROSTER_MANIFEST_PATH = REPO_ROOT / "shared-ai-roster-surface.json"
 
 class SharedSurfaceError(Exception):
     """Raised for manifest, source, or target projection problems."""
+
+
+def require_module(module_name: str, target: str) -> Any:
+    """Import a round-trip serializer, failing loudly for one target only.
+
+    Never fall back to a non-round-trip writer -- that would silently strip
+    comments and reorder keys in large hand-maintained configs.
+    """
+    import importlib
+
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise SharedSurfaceError(
+            f"Target {target!r} requires the {module_name!r} package "
+            f"(pip install {module_name.split('.')[0]})"
+        ) from exc
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -197,11 +229,36 @@ def toml_inline_table(mapping: dict[str, Any]) -> str:
     return "{ " + rendered + " }"
 
 
+# Every literal key `materialize()` dispatches on under manifest["targets"].
+# Kept in sync manually with the dispatch code below -- an unrecognized
+# target key (a typo, or a not-yet-wired 7th harness) must raise loudly here
+# rather than silently materializing nothing for it and reporting clean.
+KNOWN_TARGET_KEYS = frozenset(
+    {
+        "antigravity",
+        "gemini",
+        "opencode",
+        "vibe",
+        "codex",
+        "codex_user",
+        "hermes_workspace",
+        "hermes_user",
+    }
+)
+
+
 def resolve_manifest(workspace_root: Path, manifest_path: Path) -> dict[str, Any]:
     manifest = load_json(manifest_path)
     if not isinstance(manifest.get("targets"), dict):
         raise SharedSurfaceError(
             f"{manifest_path} must contain an object-valued `targets` field"
+        )
+    unknown_target_keys = set(manifest["targets"]) - KNOWN_TARGET_KEYS
+    if unknown_target_keys:
+        raise SharedSurfaceError(
+            f"{manifest_path} `targets` has unrecognized key(s) "
+            f"{sorted(unknown_target_keys)!r}; known targets are "
+            f"{sorted(KNOWN_TARGET_KEYS)!r}"
         )
     if (
         not isinstance(manifest.get("mcp_source"), str)
@@ -273,31 +330,130 @@ def build_gemini_payload(
     return payload
 
 
-def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[str, Any]:
+def classify_transport(name: str, server: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Classify a shared MCP server entry as `stdio` or `http`.
+
+    Returns `(transport, spec)`. For stdio, `spec` has `command` (str),
+    `args` (list[str]) and `env` (dict[str, str] | None). For http, `spec`
+    has `url` (str) and `headers` (dict[str, str] | None).
+
+    This is the single source of transport dispatch for every target. Do not
+    reimplement it per target -- divergent copies are what broke the surface
+    on 2026-07-17.
+
+    Precedence when a server entry defines both `command` and `url`: stdio
+    wins and `url` is silently ignored. This is intentional, existing
+    behavior -- documented here so downstream targets (OpenCode, Codex,
+    Hermes, ...) don't each reinvent a different tie-break.
+    """
+    if not isinstance(server, dict):
+        raise SharedSurfaceError(f"Shared MCP server {name!r} must be a JSON object")
+
     command = server.get("command")
-    args = server.get("args") or []
-    env = server.get("env")
-    if not isinstance(command, str) or not command.strip():
-        raise SharedSurfaceError(
-            f"Shared MCP server {name!r} cannot be projected to OpenCode without a `command` string"
-        )
-    if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
-        raise SharedSurfaceError(
-            f"Shared MCP server {name!r} has non-string args and cannot be projected to OpenCode"
-        )
-    payload: dict[str, Any] = {
-        "command": [command, *args],
-        "type": "local",
-    }
-    if env is not None:
-        if not isinstance(env, dict) or not all(
-            isinstance(key, str) and isinstance(value, str)
-            for key, value in env.items()
+    url = server.get("url")
+
+    if isinstance(command, str) and command.strip():
+        args = server.get("args") or []
+        if not isinstance(args, list) or not all(
+            isinstance(item, str) for item in args
         ):
             raise SharedSurfaceError(
-                f"Shared MCP server {name!r} has non-string env values and cannot be projected to OpenCode"
+                f"Shared MCP server {name!r} stdio `args` must be a list of strings"
             )
-        payload["environment"] = env
+        env = server.get("env")
+        if env is not None and (
+            not isinstance(env, dict)
+            or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in env.items()
+            )
+        ):
+            raise SharedSurfaceError(
+                f"Shared MCP server {name!r} stdio `env` must be a string map"
+            )
+        return "stdio", {
+            "command": command,
+            "args": list(args),
+            "env": dict(env) if env else None,
+        }
+
+    if isinstance(url, str) and url.strip():
+        headers = server.get("headers")
+        if headers is not None and (
+            not isinstance(headers, dict)
+            or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in headers.items()
+            )
+        ):
+            raise SharedSurfaceError(
+                f"Shared MCP server {name!r} HTTP `headers` must be a string map"
+            )
+        return "http", {"url": url, "headers": dict(headers) if headers else None}
+
+    raise SharedSurfaceError(
+        f"Shared MCP server {name!r} must define either `command` or `url`"
+    )
+
+
+def build_antigravity_payload(
+    existing: dict[str, Any], shared_mcp: dict[str, Any]
+) -> dict[str, Any]:
+    """Project shared MCP servers into Antigravity's mcp_config.json shape.
+
+    Antigravity uses `{"serverUrl": ...}` for HTTP remote servers and
+    `{"command": ..., "args": [...]}` for stdio local servers. Preserves
+    existing unmanaged servers in `mcpServers`.
+    """
+    payload = dict(existing)
+    servers: dict[str, Any] = dict(payload.get("mcpServers") or {})
+    for name, raw_server in shared_mcp.items():
+        transport, spec = classify_transport(name, raw_server)
+        if transport == "http":
+            reject_unsupported_headers(name, "Antigravity", spec)
+            servers[name] = {"serverUrl": spec["url"]}
+        elif transport == "stdio":
+            entry: dict[str, Any] = {
+                "command": spec["command"],
+                "args": spec["args"],
+            }
+            if spec.get("env"):
+                entry["env"] = spec["env"]
+            servers[name] = entry
+    payload["mcpServers"] = servers
+    return payload
+
+
+def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[str, Any]:
+    """Project a shared MCP server into OpenCode's config shape.
+
+    OpenCode uses `{"type": "local", "command": [...]}` for stdio and
+    `{"type": "remote", "url": ...}` for HTTP (the shape its own
+    `openwork-browser`/`chrome` entries already use).
+    """
+    transport, spec = classify_transport(name, server)
+
+    if transport == "http":
+        # HEADERS ARE CREDENTIALS, AND DROPPING THEM IS SILENT.
+        #
+        # classify_transport() validates and returns the header map; this
+        # branch emitted only type and url, so an MCP whose auth lives in an
+        # Authorization header was projected as an unauthenticated server. It
+        # parses, it installs, and it fails at connect time against a config
+        # that looks correct -- there is nothing in the generated file to
+        # suggest anything was removed. OpenCode's remote MCP config supports
+        # a `headers` map, so project it.
+        remote: dict[str, Any] = {"type": "remote", "url": spec["url"]}
+        if spec.get("headers"):
+            remote["headers"] = dict(spec["headers"])
+        return remote
+
+    payload: dict[str, Any] = {
+        "command": [spec["command"], *spec["args"]],
+        "type": "local",
+    }
+    if spec["env"]:
+        payload["environment"] = spec["env"]
     return payload
 
 
@@ -321,6 +477,493 @@ def build_opencode_payload(
         merged_mcp[name] = convert_mcp_server_to_opencode(name, server)
     payload["mcp"] = merged_mcp
     return payload
+
+
+# Transport fields the propagator owns on a managed server. Everything else
+# on that server (tools tables, timeouts, approval modes) is preserved.
+# `http_headers` is MANAGED, not preserved: a target converted from http to
+# stdio, or to an http entry that no longer carries credentials, must not keep
+# the old header table. Same reasoning the `env` handling below already
+# documents, in the other direction.
+MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url", "http_headers")
+
+
+def reject_unsupported_headers(name: str, target: str, spec: dict[str, Any]) -> None:
+    """Refuse to project an authenticated HTTP server onto a target that
+    cannot carry its headers.
+
+    classify_transport() validates and returns `headers`, and three of the four
+    HTTP projections discarded it -- so an MCP authenticated by header was
+    written out as an unauthenticated server: a config that parses, installs,
+    and fails at connect time with nothing in the generated file to suggest
+    anything was removed. OpenCode and Codex have documented header fields and
+    now receive them. For the rest there is no verified field name, and
+    inventing one would be the same silent failure with extra steps.
+
+    Loud refusal is the honest option: it happens at materialization, names the
+    server and the target, and leaves the operator to remove the credentials
+    from the shared entry or drop the target. One definition, three callers --
+    a per-target copy of this is how the OpenCode fix came to be applied to one
+    projection out of four.
+    """
+
+    if spec.get("headers"):
+        raise SharedSurfaceError(
+            f"Shared MCP server {name!r} is an HTTP server with `headers`, and "
+            f"the {target} projection has no field to carry them. Writing it "
+            f"anyway would emit an unauthenticated server that fails at "
+            f"connect time. Remove the headers from the shared entry, or "
+            f"exclude {name!r} from the {target} target."
+        )
+
+
+def ensure_no_name_map_collisions(
+    shared_mcp: dict[str, Any], name_map: dict[str, str], target: str
+) -> None:
+    """Raise if two shared servers would collide on one target name.
+
+    Two shared servers silently colliding on one target name would
+    last-write-win and lose a server's config with no warning -- and this
+    comes from a manifest file, so that's silent data loss. Shared by every
+    writer (Codex, Hermes, ...) that accepts a `name_map`.
+    """
+    target_to_shared: dict[str, list[str]] = {}
+    for shared_name in shared_mcp:
+        target_name = name_map.get(shared_name, shared_name)
+        target_to_shared.setdefault(target_name, []).append(shared_name)
+    for target_name, shared_names in target_to_shared.items():
+        if len(shared_names) > 1:
+            raise SharedSurfaceError(
+                f"{target} name_map collision: shared servers {shared_names!r} "
+                f"all map to target name {target_name!r}"
+            )
+
+
+def apply_codex_mcp(
+    doc: Any,
+    shared_mcp: dict[str, Any],
+    name_map: dict[str, str],
+    overrides: dict[str, Any],
+) -> Any:
+    """Merge shared MCP servers into a parsed Codex config.toml document.
+
+    Codex requires an explicit transport discriminator: `type = "stdio"` with
+    command/args, or `type = "streamable_http"` with url. A bare `url` key is
+    rejected with `url is not supported for stdio`.
+
+    `env` is treated as managed only when the shared entry defines it, so a
+    target-local templated env block survives -- but only for a target that
+    stays on stdio. A target whose transport switches to http never carries
+    its old `env` forward, even if the shared entry doesn't define one:
+    an env block (which may hold credentials) must not survive a transport
+    switch away from stdio.
+
+    Precedence, low to high: managed transport fields, then whatever already
+    existed on the target entry, then manifest `overrides` -- overrides beat
+    everything, including pre-existing file content. This matches the
+    contract the Hermes writer (Task 6) uses.
+
+    Scalar transport keys are written into a fresh table before any preserved
+    sub-tables are re-attached (overrides land last, per the precedence rule
+    above, and may be scalars or tables). On tomlkit 0.15.0
+    this ordering is not load-bearing -- `Container` reliably bubbles scalar
+    keys ahead of sub-tables at render time regardless of assignment order
+    (verified empirically: assigning a table then a scalar into the same
+    `tomlkit.table()` still renders the scalar inside `[mcp_servers.<name>]`,
+    not the sub-table). We keep the ordering anyway as cheap defense-in-depth
+    against a future tomlkit behavior change, not because today's output
+    depends on it.
+    """
+    tomlkit = require_module("tomlkit", "codex")
+
+    # Detect name_map collisions up front (shared with the Hermes writer).
+    ensure_no_name_map_collisions(shared_mcp, name_map, "Codex")
+
+    if "mcp_servers" not in doc:
+        doc["mcp_servers"] = tomlkit.table(is_super_table=True)
+    servers = doc["mcp_servers"]
+
+    for shared_name, server in shared_mcp.items():
+        target_name = name_map.get(shared_name, shared_name)
+        transport, spec = classify_transport(shared_name, server)
+
+        existing = servers.get(target_name)
+        preserved_scalars: dict[str, Any] = {}
+        preserved_tables: dict[str, Any] = {}
+        preserved_env: Any = None
+        if existing is not None:
+            if not hasattr(existing, "items"):
+                raise SharedSurfaceError(
+                    f"Codex mcp_servers.{target_name!r} exists but is not a "
+                    f"table (got {type(existing).__name__}); refusing to "
+                    "merge into it"
+                )
+            for key, value in existing.items():
+                if key in MANAGED_TRANSPORT_FIELDS:
+                    continue
+                if key == "env":
+                    preserved_env = value
+                elif isinstance(
+                    value,
+                    (tomlkit.items.Table, tomlkit.items.AoT, tomlkit.items.InlineTable),
+                ):
+                    preserved_tables[key] = value
+                else:
+                    preserved_scalars[key] = value
+
+        entry = tomlkit.table()
+
+        # 1. managed scalars
+        if transport == "http":
+            entry["type"] = "streamable_http"
+            entry["url"] = spec["url"]
+        else:
+            entry["type"] = "stdio"
+            entry["command"] = spec["command"]
+            entry["args"] = spec["args"]
+
+        # 2. preserved scalars (startup_timeout_sec, enabled, ...)
+        for key, value in preserved_scalars.items():
+            entry[key] = value
+
+        # 2b. OVERRIDE SCALARS, BEFORE ANY TABLE.
+        #
+        # Overrides used to be applied wholesale at the very end, after the
+        # tables -- which contradicts the ordering rule this function exists to
+        # honour, because tomlkit can re-parent a scalar written after a table
+        # into it. That was harmless while the only table was `env` on stdio
+        # entries and overrides in practice set scalars; adding `http_headers`
+        # put a table in front of the override loop for http entries too, which
+        # is exactly the case that carries credentials. Split by shape instead:
+        # scalars here, tables after the managed and preserved ones, so
+        # overrides still beat everything of their own kind.
+        override_items = (overrides.get(shared_name) or {}).items()
+        override_scalars = {k: v for k, v in override_items if not isinstance(v, dict)}
+        override_tables = {k: v for k, v in override_items if isinstance(v, dict)}
+        for key, value in override_scalars.items():
+            entry[key] = value
+
+        # 3. tables, or TOML re-parents every later scalar into them.
+        #    `env` is managed only when the shared entry defines one, and is
+        #    only ever carried over for a stdio target: a target converted
+        #    to http must not keep a stale (possibly credential-bearing)
+        #    `env` table from its previous stdio configuration.
+        if transport == "stdio":
+            if spec["env"] is not None:
+                entry["env"] = spec["env"]
+            elif preserved_env is not None:
+                entry["env"] = preserved_env
+        elif spec.get("headers"):
+            # `http_headers`, per Codex's documented config reference: "Map of
+            # HTTP header names to static values." A table, so it belongs here
+            # and not with the managed scalars above. It is also in
+            # MANAGED_TRANSPORT_FIELDS, so a stale header table from a previous
+            # configuration is dropped before this runs.
+            entry["http_headers"] = spec["headers"]
+        for key, value in preserved_tables.items():
+            entry[key] = value
+        for key, value in override_tables.items():
+            entry[key] = value
+
+        # 5. A CREDENTIAL TABLE MUST NOT OUTLIVE ITS TRANSPORT.
+        #
+        # An override can set `type` to anything, including flipping an http
+        # entry to stdio after http_headers was written -- leaving the headers
+        # stranded on an entry that will never send them, in a file an operator
+        # reads as current. Reconciled from the FINAL type rather than from
+        # `transport`, because the override is what decides it.
+        if entry.get("type") != "streamable_http" and "http_headers" in entry:
+            del entry["http_headers"]
+
+        servers[target_name] = entry
+
+    return doc
+
+
+def _pid_alive(pid: int) -> bool:
+    """Return True if `pid` is a live process, or if liveness cannot be
+    determined.
+
+    This is a liveness *guard*, not a liveness *report*: its only purpose is
+    to stop a config write while a Hermes gateway might still be running and
+    about to clobber the file on shutdown. So an inability to determine
+    liveness (`tasklist` missing or blocked by policy, an unexpected
+    non-zero exit, empty output) must fail CLOSED -- treated as "alive" so
+    the caller refuses to write -- rather than fail open into the exact
+    silent data loss this guard exists to prevent.
+    """
+    if os.name == "nt":
+        try:
+            completed = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return True  # could not even invoke tasklist -- fail closed
+        if completed.returncode != 0 or not completed.stdout.strip():
+            return True  # no usable output to judge liveness -- fail closed
+        # `tasklist /FI "PID eq N"` does exact PID filtering server-side, so
+        # this substring check is belt-and-suspenders, not the actual safety
+        # mechanism (verified: "PID eq 122" does not match a running pid
+        # 1220 -- tasklist's own filter already disambiguates that).
+        return str(pid) in completed.stdout
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True  # e.g. PermissionError -- process exists, fail closed
+    return True
+
+
+def hermes_gateway_alive(home: Path) -> int | None:
+    """Return the PID of a live Hermes gateway for `home`, else None.
+
+    A running gateway rewrites its own config.yaml on shutdown and would
+    clobber anything written underneath it, so writes must be refused while
+    it is alive.
+    """
+    pid_file = home / "gateway.pid"
+    if not pid_file.exists():
+        return None
+
+    # INDETERMINATE IS NOT ABSENT.
+    #
+    # An unreadable or malformed gateway.pid returned None, and every caller
+    # reads None as "no live gateway" and rewrites config.yaml -- which a
+    # gateway that IS running then overwrites from memory on shutdown, losing
+    # exactly the MCP and hook changes this guard exists to protect. A
+    # PermissionError or a half-written file is the likeliest state during a
+    # gateway's own startup, so the failure mode is worst when it matters most.
+    #
+    # `_pid_alive` already fails closed the same way for the same reason: it
+    # returns True when liveness cannot be determined. The reader was the half
+    # that did not.
+    try:
+        raw = pid_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} exists but could not be read "
+            f"({type(exc).__name__}); refusing to write under a gateway whose "
+            "state is unknown. Stop the gateway, or remove the file if you "
+            "know it is stale."
+        ) from exc
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+            "to write under a gateway whose state is unknown. Stop the "
+            "gateway, or remove the file if you know it is stale."
+        ) from exc
+    pid = payload.get("pid")
+    if not isinstance(pid, int):
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} carries no integer `pid` (got "
+            f"{type(pid).__name__}); refusing to write under a gateway whose "
+            "state is unknown. Stop the gateway, or remove the file if you "
+            "know it is stale."
+        )
+    return pid if _pid_alive(pid) else None
+
+
+def resolve_dotted_key(doc: Any, dotted_path: str) -> tuple[bool, Any]:
+    """Resolve a dotted key path (e.g. `"approvals.mode"`) against a parsed
+    mapping document.
+
+    Returns `(found, value)`. `found` is `False` if any segment of the path
+    is missing, or an intermediate segment resolves to something that is
+    not itself a mapping. This is deliberately different from
+    `dict.get(path, None)`: a guarded key that legitimately resolves to
+    `None`/`False`/`0` must not be conflated with "the key does not exist
+    at all" -- that distinction is exactly what lets the guard report
+    "absent" separately from "expected X, found Y".
+    """
+    current = doc
+    for segment in dotted_path.split("."):
+        if not isinstance(current, dict) or segment not in current:
+            return False, None
+        current = current[segment]
+    return True, current
+
+
+def check_guarded_keys(
+    target: str, doc: dict[str, Any], guarded_keys: dict[str, Any]
+) -> list[str]:
+    """Compare guarded key expectations against an already-parsed config doc.
+
+    Emits one `GUARD DRIFT {target} {dotted_path}: ...` line per drifted
+    key, in `guarded_keys` iteration order. A key whose live value equals
+    its expectation produces no output at all -- this function is silent
+    on a clean config.
+
+    Read-only and side-effect-free: never mutates `doc`, never writes
+    anything, never restores a drifted value. Auto-restoring a guarded key
+    would silently override a deliberate operator change to their own
+    config -- the same class of silent, unasked-for mutation this guard
+    exists to detect, not repeat. Reporting drift loudly and leaving the
+    decision to the operator is the entire point.
+    """
+    findings: list[str] = []
+    for dotted_path, expected in guarded_keys.items():
+        found, actual = resolve_dotted_key(doc, dotted_path)
+        if not found:
+            findings.append(
+                f"GUARD DRIFT {target} {dotted_path}: expected {expected!r}, "
+                "key is absent"
+            )
+        elif actual != expected:
+            findings.append(
+                f"GUARD DRIFT {target} {dotted_path}: expected {expected!r}, "
+                f"found {actual!r}"
+            )
+    return findings
+
+
+def guard_hermes_config(
+    target: str, config_path: Path, guarded_keys: dict[str, Any]
+) -> list[str]:
+    """Read-only drift check for guarded Hermes approval/hook-gate keys.
+
+    This MUST be called for a Hermes target regardless of `target_in_scope`
+    and regardless of whether the config write path runs this call --
+    see the call site in `materialize()`. A guard check never writes
+    anything, so gating it behind `--include-user-scope` (a write-scope
+    flag meant to protect writes outside the repo) would silently leave
+    user-scope Hermes homes (e.g. the AppData `hermes_user` config)
+    unguarded on every routine repo-scope `--check` run. That is exactly
+    the hole that let a live `hooks_auto_accept` flip in that file go
+    unnoticed: the flip happened in user scope, and nothing read-only was
+    watching it.
+
+    Uses plain `yaml.safe_load` (PyYAML) rather than the round-trip
+    `ruamel.yaml` loader `apply_hermes_mcp` uses: guarding only ever reads a
+    value for comparison and never re-serializes the document, so there is
+    no comment/key-order fidelity to preserve here, and no reason to pull
+    in the heavier round-trip parser (or its `require_module` hard-fail
+    gate) just to look at a handful of scalars.
+
+    Returns `[]` when there is nothing to guard: `guarded_keys` is empty,
+    or no config file exists at `config_path` (an absent config has nothing
+    to drift -- that is not itself a finding). A parse failure (invalid
+    YAML, a non-mapping document, or a missing YAML dependency) is
+    reported as a single finding line rather than raised: this function
+    must never throw, since a broken Hermes config is precisely the kind
+    of thing this guard exists to surface, not to crash `materialize()`
+    over before the other sub-materializers get a chance to run.
+    """
+    if not guarded_keys:
+        return []
+    if not config_path.exists():
+        return []
+    try:
+        import yaml as pyyaml
+
+        doc = pyyaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # guard must report, never crash materialize()
+        return [
+            f"GUARD DRIFT {target}: could not parse {config_path} for guard "
+            f"check ({type(exc).__name__}: {exc}); guarded keys unchecked"
+        ]
+    if not isinstance(doc, dict):
+        return [
+            f"GUARD DRIFT {target}: {config_path} did not parse to a mapping "
+            "document; guarded keys unchecked"
+        ]
+    return check_guarded_keys(target, doc, guarded_keys)
+
+
+def apply_hermes_mcp(
+    data: Any,
+    shared_mcp: dict[str, Any],
+    name_map: dict[str, str],
+    overrides: dict[str, Any],
+) -> Any:
+    """Merge shared MCP servers into a parsed Hermes config.yaml document.
+
+    Hermes supports Streamable HTTP natively via `type: http` + `url`, and
+    stdio via `command`/`args`/`env`.
+
+    Precedence matches `apply_codex_mcp`: managed transport fields, then
+    whatever already existed on the entry, then manifest `overrides` last --
+    overrides beat everything. `env` follows the same rule as Codex: the
+    shared entry's `env` replaces any existing `env` when it defines one;
+    otherwise a target-local `env` block survives untouched for a stdio
+    entry, and is dropped as stale if the entry is converted to http.
+
+    Unlike the Codex writer this mutates the existing mapping in place. YAML
+    mappings have no positional/header hazard, so there is no need to rebuild
+    the node, and mutating in place is what lets ruamel preserve comments.
+
+    Only the fields belonging to the transport being *vacated* are cleared
+    before the managed fields are (re)assigned -- never every managed field
+    unconditionally. `CommentedMap.__setitem__` preserves an existing key's
+    position; it is `del` followed by re-add that moves a key to the end of
+    the mapping. Deleting unconditionally therefore reordered every touched
+    entry on every run, including a true no-op merge where nothing actually
+    changed -- which breaks Task 9's fidelity gate (regenerating must
+    produce no spurious diff against a verified-good config).
+
+    A `target_name` that exists but isn't a mapping (including a YAML null,
+    e.g. `serena:` with nothing after it) raises `SharedSurfaceError` rather
+    than being silently coerced or merged into -- consistent with the
+    non-mapping guard `apply_codex_mcp` applies to malformed TOML tables.
+
+    Callers are responsible for checking `hermes_gateway_alive()` and
+    importing `ruamel.yaml` (via `require_module`) before calling this --
+    this function operates on an already-parsed document and needs neither.
+    """
+    ensure_no_name_map_collisions(shared_mcp, name_map, "Hermes")
+
+    servers = data.get("mcp_servers")
+    if servers is None:
+        data["mcp_servers"] = {}
+        servers = data["mcp_servers"]
+
+    for shared_name, server in shared_mcp.items():
+        target_name = name_map.get(shared_name, shared_name)
+        transport, spec = classify_transport(shared_name, server)
+
+        # `.get()` can't distinguish "key absent" from "key present with a
+        # YAML null value" -- both come back None. Check membership
+        # explicitly so a present-but-null entry hits the malformed-entry
+        # guard instead of silently becoming `entry = None` and crashing
+        # later with a TypeError.
+        if target_name in servers:
+            existing = servers[target_name]
+            if not hasattr(existing, "items"):
+                raise SharedSurfaceError(
+                    f"Hermes mcp_servers.{target_name!r} exists but is not a "
+                    f"mapping (got {type(existing).__name__}); refusing to "
+                    "merge into it"
+                )
+        else:
+            servers[target_name] = {}
+        entry = servers[target_name]
+
+        if transport == "http":
+            reject_unsupported_headers(shared_name, "Hermes", spec)
+            # `http_headers` in both lists: Hermes never writes one, but a hand
+            # edit can, and a credential table that survives a transport change
+            # is the same stranded-secret shape the Codex path reconciles.
+            for key in ("command", "args", "env", "http_headers"):
+                entry.pop(key, None)
+            entry["type"] = "http"
+            entry["url"] = spec["url"]
+        else:
+            for key in ("type", "url", "http_headers"):
+                entry.pop(key, None)
+            entry["command"] = spec["command"]
+            entry["args"] = spec["args"]
+            if spec["env"] is not None:
+                entry["env"] = spec["env"]
+
+        for key, value in (overrides.get(shared_name) or {}).items():
+            entry[key] = value
+
+    return data
 
 
 def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
@@ -400,8 +1043,44 @@ def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+# Matches a residual, unresolved environment-variable reference left behind
+# by `os.path.expandvars` -- either Windows `%VAR%` or POSIX `$VAR`/`${VAR}`.
+# `expandvars` silently leaves an undefined reference as a literal string
+# rather than raising, so this is the only signal available that expansion
+# didn't actually happen.
+_UNRESOLVED_ENV_VAR_RE = re.compile(
+    r"%[A-Za-z_][A-Za-z0-9_]*%|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?"
+)
+
+
 def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
-    path = Path(raw_path).expanduser()
+    """Resolve a manifest-declared path against the workspace root.
+
+    Expands both `~` (user home, e.g. `~/.codex/config.toml`) and
+    environment-variable references such as `%LOCALAPPDATA%` on Windows or
+    `$HOME` on POSIX (e.g. `%LOCALAPPDATA%/hermes/config.yaml`). This is the
+    single path resolver every target should route through -- do not
+    hand-roll a second one for a new writer.
+
+    An undefined variable is a loud `SharedSurfaceError`, not a silent
+    pass-through: `os.path.expandvars` leaves an undefined `%VAR%`/`$VAR` as
+    a literal string instead of raising, which would otherwise resolve to a
+    bogus path nested inside the workspace tree (e.g.
+    `<workspace_root>/%LOCALAPPDATA%/hermes/config.yaml`). A caller checking
+    `.exists()` on that path sees the same "no config there" result as a
+    legitimately-absent config, which would make a stripped-environment run
+    (a scheduled task, a minimal CI shell, ...) silently skip a target
+    instead of failing loudly.
+    """
+    expanded = os.path.expandvars(raw_path)
+    unresolved = _UNRESOLVED_ENV_VAR_RE.search(expanded)
+    if unresolved is not None:
+        raise SharedSurfaceError(
+            f"Manifest path {raw_path!r} references undefined environment "
+            f"variable {unresolved.group()!r} (expands to {expanded!r}); "
+            "set the variable or fix the manifest"
+        )
+    path = Path(expanded).expanduser()
     if path.is_absolute():
         return path
     return (workspace_root / path).resolve()
@@ -708,12 +1387,20 @@ def build_vibe_launcher(vibe_cfg: dict[str, Any]) -> str:
     startup_prompt_rel = str(
         vibe_cfg.get("startup_prompt_path", ".agent-surface/VIBE_STARTUP.md")
     )
+    # Hoisted out of the f-string below: backslashes inside f-string
+    # expressions are only legal on Python 3.12+ (PEP 701). The workspace
+    # convention is C:\Python313\python.exe, but heartbeat/CI shells have
+    # invoked this via a bare `python` (3.11) where the inline form is a
+    # SyntaxError at import time — which took down every materializer that
+    # imports this module (hook surface, refresh runner). Keep these hoisted.
+    env_rel_win = env_rel.replace("/", "\\")
+    startup_prompt_rel_win = startup_prompt_rel.replace("/", "\\")
     script = f"""
     $ErrorActionPreference = "Stop"
 
     $workspaceRoot = (Split-Path -Parent $PSCommandPath)
-    $envFile = Join-Path $workspaceRoot "{env_rel.replace('/', '\\')}"
-    $startupPromptPath = Join-Path $workspaceRoot "{startup_prompt_rel.replace('/', '\\')}"
+    $envFile = Join-Path $workspaceRoot "{env_rel_win}"
+    $startupPromptPath = Join-Path $workspaceRoot "{startup_prompt_rel_win}"
     $vibeFallback = Join-Path $env:USERPROFILE ".local\\bin\\vibe.exe"
     $vibeCommand = Get-Command vibe.exe -ErrorAction SilentlyContinue
     if (-not $vibeCommand) {{
@@ -989,8 +1676,41 @@ def check_or_write_text(
     return (f"OK    {path}", changed)
 
 
+def target_in_scope(target_cfg: dict[str, Any], include_user_scope: bool) -> bool:
+    """Repo-scope targets always run; user-scope needs an explicit opt-in.
+
+    User-scope targets write outside the repo (e.g. `~/.codex/config.toml`,
+    `%LOCALAPPDATA%/hermes/config.yaml`), which affects every project on the
+    machine, not just this workspace -- so they only run when the caller
+    explicitly opts in via `--include-user-scope`.
+
+    `scope` is required, not defaulted to `"repo"`. This function exists
+    specifically to gate writes outside the repo; defaulting an *absent*
+    scope to the affirmative ("repo", which always runs) would mean a
+    future manifest entry that forgets to set `scope` on a user-scope
+    target runs unconditionally, with this gate never actually consulted.
+    A garbage value already raised -- absence is equally strict.
+    """
+    if "scope" not in target_cfg:
+        raise SharedSurfaceError(
+            "Target is missing required `scope` field (must be 'repo' or "
+            "'user'); this gate does not default absence to 'repo'"
+        )
+    scope = str(target_cfg["scope"]).strip().lower()
+    if scope not in {"repo", "user"}:
+        raise SharedSurfaceError(
+            f"Target `scope` must be 'repo' or 'user', got {scope!r}"
+        )
+    return scope == "repo" or include_user_scope
+
+
 def materialize(
-    workspace_root: Path, manifest_path: Path, *, check: bool, dry_run: bool
+    workspace_root: Path,
+    manifest_path: Path,
+    *,
+    check: bool,
+    dry_run: bool,
+    include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = resolve_manifest(workspace_root, manifest_path)
     shared_mcp = manifest["_resolved_mcp"]["mcpServers"]
@@ -1020,6 +1740,22 @@ def materialize(
 
     targets: dict[str, Any] = manifest["targets"]
 
+    antigravity_cfg = targets.get("antigravity")
+    if isinstance(antigravity_cfg, dict) and antigravity_cfg.get("config_path"):
+        if target_in_scope(antigravity_cfg, include_user_scope):
+            antigravity_path = resolve_manifest_path(
+                workspace_root, str(antigravity_cfg["config_path"])
+            )
+            existing = load_json(antigravity_path) if antigravity_path.exists() else {}
+            payload = build_antigravity_payload(existing, shared_mcp)
+            message, changed = check_or_write(
+                antigravity_path, payload, check=check, dry_run=dry_run
+            )
+            results.append(message)
+            drift_found = drift_found or changed
+        else:
+            results.append("SKIP  antigravity (user scope; pass --include-user-scope)")
+
     gemini_cfg = targets.get("gemini")
     if isinstance(gemini_cfg, dict) and gemini_cfg.get("settings_path"):
         gemini_path = workspace_root / gemini_cfg["settings_path"]
@@ -1042,16 +1778,6 @@ def materialize(
         results.append(message)
         drift_found = drift_found or changed
 
-    vibe_cfg = targets.get("vibe")
-    if isinstance(vibe_cfg, dict) and vibe_cfg.get("config_path"):
-        vibe_config_path = workspace_root / str(vibe_cfg["config_path"])
-        vibe_config = build_vibe_config(workspace_root, shared_mcp, vibe_cfg)
-        message, changed = check_or_write_text(
-            vibe_config_path, vibe_config, check=check, dry_run=dry_run
-        )
-        results.append(message)
-        drift_found = drift_found or changed
-
         agent_instruction_raw = opencode_cfg.get("agent_instruction_path")
         if agent_instruction_raw is not None:
             if (
@@ -1070,6 +1796,16 @@ def materialize(
             )
             results.append(message)
             drift_found = drift_found or changed
+
+    vibe_cfg = targets.get("vibe")
+    if isinstance(vibe_cfg, dict) and vibe_cfg.get("config_path"):
+        vibe_config_path = workspace_root / str(vibe_cfg["config_path"])
+        vibe_config = build_vibe_config(workspace_root, shared_mcp, vibe_cfg)
+        message, changed = check_or_write_text(
+            vibe_config_path, vibe_config, check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
 
         startup_prompt_raw = vibe_cfg.get("startup_prompt_path")
         if startup_prompt_raw is not None:
@@ -1122,6 +1858,166 @@ def materialize(
             results.append(message)
             drift_found = drift_found or changed
 
+    for codex_key in ("codex", "codex_user"):
+        codex_cfg = targets.get(codex_key)
+        if not (isinstance(codex_cfg, dict) and codex_cfg.get("config_path")):
+            continue
+        if not target_in_scope(codex_cfg, include_user_scope):
+            results.append(f"SKIP  {codex_key} (user scope; pass --include-user-scope)")
+            continue
+        codex_path = resolve_manifest_path(
+            workspace_root, str(codex_cfg["config_path"])
+        )
+        tomlkit = require_module("tomlkit", codex_key)
+        # A malformed hand-edited config or a config_path that resolves to a
+        # directory (`.exists()` is True for both a file and a directory, so
+        # nothing upstream rules the latter out) must not raise a raw
+        # traceback here: `results` is only printed by main() after
+        # materialize() returns in full, so an unguarded crash mid-loop
+        # would discard every result computed before it and silently skip
+        # the five downstream sub-materializers (roster/memory/context/
+        # hook/skill) that run later in this function.
+        try:
+            existing_text = (
+                codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
+            )
+            doc = tomlkit.parse(existing_text)
+        except SharedSurfaceError:
+            raise
+        except Exception as exc:
+            raise SharedSurfaceError(
+                f"Could not read/parse Codex config at {codex_path}: {exc}"
+            ) from exc
+        apply_codex_mcp(
+            doc,
+            shared_mcp,
+            codex_cfg.get("name_map") or {},
+            codex_cfg.get("overrides") or {},
+        )
+        message, changed = check_or_write_text(
+            codex_path, tomlkit.dumps(doc), check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
+
+    # Whether a REFUSED Hermes write should also fire under `--check`:
+    # decided YES. `--check` never writes either way, so refusing isn't
+    # strictly necessary to prevent data loss here -- but `--check` exists
+    # so an operator can learn about drift/blockers *before* attempting a
+    # real write, and "a live gateway will clobber this on shutdown" is
+    # exactly that kind of actionable, pre-write-discoverable fact. Reporting
+    # it only during a real write attempt would mean the first time an
+    # operator learns the gateway is blocking is when their write already
+    # failed, which defeats the point of having a dry, inspectable `--check`
+    # pass. So the liveness guard runs unconditionally, before the
+    # check/dry_run branch, same as every other check in this block.
+    for hermes_key in ("hermes_workspace", "hermes_user"):
+        hermes_cfg = targets.get(hermes_key)
+        if not (isinstance(hermes_cfg, dict) and hermes_cfg.get("config_path")):
+            continue
+        try:
+            hermes_path = resolve_manifest_path(
+                workspace_root, str(hermes_cfg["config_path"])
+            )
+        except SharedSurfaceError as exc:
+            # A PLATFORM-SPECIFIC TARGET THAT CANNOT BE EXPRESSED ON THIS OS.
+            #
+            # `hermes_user` is `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX
+            # `os.path.expandvars` leaves `%VAR%` literal, so this raised on
+            # Linux and macOS BEFORE the user-scope skip below could run --
+            # taking an ordinary repo-scope materialization or `--check` down
+            # with it while processing a Windows-only target.
+            #
+            # materialize_shared_hook_surface already solved exactly this and
+            # says so in its own docstring; the guard loop here never got the
+            # same treatment. Skipping keeps the surface refresh completable on
+            # POSIX, and a target whose path cannot be resolved is a target
+            # nothing can be guarding.
+            print(
+                f"[surface] {hermes_key}: skipping guard check -- path not "
+                f"resolvable on this platform ({exc})"
+            )
+            continue
+
+        # Guard check runs unconditionally, BEFORE the target_in_scope
+        # write-gate below, and regardless of whether this target is about
+        # to be scope-skipped. It is a read-only inspection -- it writes
+        # nothing -- so gating it behind `--include-user-scope` would leave
+        # exactly the hole that let a real `hooks_auto_accept` flip in the
+        # user-scope (AppData) Hermes home go unnoticed. See
+        # `guard_hermes_config` for the full rationale.
+        guard_findings = guard_hermes_config(
+            hermes_key, hermes_path, hermes_cfg.get("guarded_keys") or {}
+        )
+        if guard_findings:
+            results.extend(guard_findings)
+            drift_found = True
+
+        if not target_in_scope(hermes_cfg, include_user_scope):
+            results.append(
+                f"SKIP  {hermes_key} (user scope; pass --include-user-scope)"
+            )
+            continue
+        if not hermes_path.exists():
+            results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
+            continue
+        # A REFUSAL IS A RESULT, NOT A TRACEBACK.
+        #
+        # hermes_gateway_alive now raises rather than reporting an unreadable
+        # gateway.pid as "no gateway" -- correct, because the caller writes on
+        # that answer. But letting it escape here breaks the rule the block
+        # below states in its own comment: an unusable file must become one
+        # actionable line naming the path, not a raw traceback that discards
+        # every result gathered so far and skips the downstream
+        # sub-materializers. It also crashed `--check`, which must be
+        # read-only and must survive anything it finds on disk.
+        try:
+            live_pid = hermes_gateway_alive(hermes_path.parent)
+        except SharedSurfaceError as exc:
+            results.append(f"REFUSED {hermes_key}: {exc}")
+            drift_found = True
+            continue
+        if live_pid is not None:
+            results.append(
+                f"REFUSED {hermes_key}: gateway PID {live_pid} is live; "
+                "stop it and re-run, or the config is clobbered on shutdown"
+            )
+            drift_found = True
+            continue
+        ruamel_yaml = require_module("ruamel.yaml", hermes_key)
+        yaml_rt = ruamel_yaml.YAML()
+        yaml_rt.preserve_quotes = True
+        yaml_rt.indent(mapping=2, sequence=4, offset=2)
+        yaml_rt.width = 4096
+        # Same guard as the Codex block above: a malformed hand-edited
+        # config, or `config_path` resolving to a directory (the `.exists()`
+        # check above is True for a directory too), must become one
+        # actionable SharedSurfaceError naming the path, not a raw
+        # traceback that discards every result gathered so far and skips
+        # the downstream sub-materializers.
+        try:
+            with hermes_path.open("r", encoding="utf-8") as handle:
+                data = yaml_rt.load(handle)
+        except SharedSurfaceError:
+            raise
+        except Exception as exc:
+            raise SharedSurfaceError(
+                f"Could not read/parse Hermes config at {hermes_path}: {exc}"
+            ) from exc
+        apply_hermes_mcp(
+            data,
+            shared_mcp,
+            hermes_cfg.get("name_map") or {},
+            hermes_cfg.get("overrides") or {},
+        )
+        buffer = io.StringIO()
+        yaml_rt.dump(data, buffer)
+        message, changed = check_or_write_text(
+            hermes_path, buffer.getvalue(), check=check, dry_run=dry_run
+        )
+        results.append(message)
+        drift_found = drift_found or changed
+
     if DEFAULT_AI_ROSTER_MANIFEST_PATH.exists():
         roster_results, roster_drift = materialize_ai_roster_surface(
             workspace_root=workspace_root,
@@ -1164,6 +2060,7 @@ def materialize(
             output_dir=workspace_root / ".agent-surface" / "hooks",
             check=check,
             dry_run=dry_run,
+            include_user_scope=include_user_scope,
         )
         results.extend(hook_results)
         drift_found = drift_found or hook_drift
@@ -1175,6 +2072,12 @@ def materialize(
             output_dir=workspace_root / ".agent-surface" / "skills",
             check=check,
             dry_run=dry_run,
+            # Forwarded, as it already is to the hook materializer six lines
+            # above. Without it --include-user-scope updated the user-scoped MCP
+            # and hook targets, silently skipped the manifest's user-scoped Codex
+            # and Hermes SKILL directories, and exited successfully -- so the
+            # command reported doing something it had only partly done.
+            include_user_scope=include_user_scope,
         )
         results.extend(skill_results)
         drift_found = drift_found or skill_drift
@@ -1213,6 +2116,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Read-only status report for shared surfaces, harness roster, agentmemory, heartbeat, and provenance",
     )
+    parser.add_argument(
+        "--include-user-scope",
+        action="store_true",
+        help=(
+            "Also materialize user-scope targets (e.g. ~/.codex/config.toml, "
+            "%%LOCALAPPDATA%%/hermes/config.yaml) that affect this machine "
+            "beyond this repo. Repo-scope targets always run."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1229,9 +2141,19 @@ def main() -> int:
         manifest_path,
         check=args.check,
         dry_run=args.dry_run,
+        include_user_scope=args.include_user_scope,
     )
     for line in results:
         print(line)
+    # A refused write (currently only a live-gateway-blocked Hermes target)
+    # is a failure to converge, not routine drift -- it must exit non-zero
+    # regardless of --check/--dry-run, since orchestrators such as
+    # refresh_agent_surfaces.py key their "ok"/"fail" summary off the
+    # process exit code, not per-line text. Checked before the --check
+    # drift branch below, and independent of it.
+    refused = [line for line in results if line.startswith("REFUSED")]
+    if refused:
+        return 1
     if args.check and drift_found:
         return 1
     return 0

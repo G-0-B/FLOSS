@@ -21,7 +21,7 @@ If missing, use the Manual probe ladder in `SKILL.md`.
 | `.agent-surface/context/CONTEXT_L0.md`                                  | Distilled re-orientation context; hand-curated           | Every cold start where present                |
 | `INDEX.md`                                                              | Repo-root map                                            | When `L0` is absent or lists you to `INDEX`   |
 | `FLOSS/CLAUDE.md`                                                       | Agent operating notes for this workspace                 | Every cold start                              |
-| `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md`                  | Governing principles kernel                              | Only when task touches P1–P5 or invariants    |
+| `FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md`                  | Governing principles kernel                              | Only when task touches P1–P5 or invariants    |
 
 ## T1.5 — Routing
 

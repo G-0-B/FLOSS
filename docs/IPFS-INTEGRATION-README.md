@@ -6,7 +6,7 @@
 
 **Ready to build?** Jump to [Week 1 Guide](Week-1-Quick-Start-Guide.md) (Day-by-day instructions)
 
-**Need the full spec?** Read the [Complete ADR](ADR-N-IPFS-Integration-VVS.md) (30 min read)
+**Need the full spec?** Read the [Complete ADR](ADR-11-ipfs-large-file-integration.md) (30 min read)
 
 ---
 
@@ -16,7 +16,7 @@
 |---|----------|---------|-----------|--------------|
 | **0** | **[README.md](README.md)** | This file - start here | 2 min | Always first |
 | **1** | **[EXECUTIVE-SUMMARY-AND-ACTION-PLAN.md](EXECUTIVE-SUMMARY-AND-ACTION-PLAN.md)** | Complete overview + decision guide | 15 min | Before starting |
-| **2** | **[ADR-N-IPFS-Integration-VVS.md](ADR-N-IPFS-Integration-VVS.md)** | Full technical specification | 30 min | For implementation |
+| **2** | **[ADR-11-ipfs-large-file-integration.md](ADR-11-ipfs-large-file-integration.md)** | Full technical specification | 30 min | For implementation |
 | **3** | **[Week-1-Quick-Start-Guide.md](Week-1-Quick-Start-Guide.md)** | Day-by-day implementation | 20 min | Week 1 of build |
 | **4** | **[AD4M-hREA-Integration-Analysis.md](AD4M-hREA-Integration-Analysis.md)** | Semantic + economic layers | 25 min | Planning Phase 5 |
 | **5** | **[Fractal-Coordination-Patterns.md](Fractal-Coordination-Patterns.md)** | Visual composability guide | 20 min | Understanding fractals |

@@ -248,5 +248,5 @@ drift toward patterns the literature has already shown are dead ends.
 - Related: `docs/research/cross-ai-orchestration-synthesis-2026-03-25.md`
 - Related: `docs/research/Perplexity-Source-Agent-Orchestration-March2026.md`
 - Related: `docs/research/4-4-26-FLOSSI0ULLK-Four-System-Integration-Analysis.md`
-- Local agent node: `packages/metacoordinator_mcp/`, `docs/adr/ADR-MCP-ORCHESTRATOR.md`
+- Local agent node: `packages/metacoordinator_mcp/`, `docs/adr/ADR-10-local-agent-node.md`
 - Phase 0 status: `FLOSS/CLAUDE.md` §"Current Phase"

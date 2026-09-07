@@ -136,3 +136,89 @@ def test_materializes_registry_shared_index_and_claude_projection(tmp_path):
     assert "feedback-pressure-helps" in (
         workspace / ".claude" / "projects" / "C---shit" / "memory" / "MEMORY.md"
     ).read_text(encoding="utf-8")
+
+
+def test_index_gists_are_complete_sentences():
+    """The index line must not stop where the source file happened to wrap.
+
+    Canonical memory files are hard-wrapped at ~80 columns and the index used to
+    take the first physical LINE, so entries ended mid-sentence -- "does not gate
+    on the full pytest suite," -- which reads as the whole rule while dropping
+    the half that carries the reason.
+    """
+    module = load_memory_module()
+
+    body = (
+        "`.github/workflows/python-ci.yml` (PR #44) does not gate on the full\n"
+        "pytest suite, because the full suite is red and gating on red produces\n"
+        "a required check everyone learns to ignore.\n"
+        "\nA second paragraph that must not appear.\n"
+    )
+    gist = module.first_sentence(body)
+
+    assert gist.endswith("learns to ignore.")
+    assert "second paragraph" not in gist
+    assert "\n" not in gist
+
+
+def test_index_gists_skip_headings_and_blank_leaders():
+    module = load_memory_module()
+    body = "\n# A heading\n\nThe first real sentence. And a second one.\n"
+    assert module.first_sentence(body) == "The first real sentence."
+
+
+def test_a_very_long_single_sentence_is_capped_with_an_ellipsis():
+    """An ellipsis must mean 'genuinely longer', never 'the author wrapped here'."""
+    module = load_memory_module()
+    body = "word " * 200
+    gist = module.first_sentence(body)
+
+    assert len(gist) <= module._INDEX_GIST_MAX_CHARS + 1
+    assert gist.endswith("…")
+
+
+def test_an_empty_body_produces_no_gist():
+    module = load_memory_module()
+    assert module.first_sentence("") == ""
+    assert module.first_sentence("\n\n# only a heading\n") == ""
+
+
+def test_every_canonical_memory_note_parses():
+    """One note without frontmatter takes the whole agent surface down.
+
+    `commitment-built-witness-improvised.md` landed in 726d568 with a `#`
+    heading where its siblings carry a YAML block. split_frontmatter refuses a
+    file without one, and it raises inside the walk, so
+    `materialize_shared_agent_surface.py --check` failed before doing any work
+    at all -- from a docs-only commit, for four days, while the green set stayed
+    green. Nothing here read the real tree.
+
+    The glob mirrors the materializer's own `canonical_root.glob("*/*.md")`
+    exactly: top-level files such as MEMORY.md are indexes it never reads, and
+    a test with a wider glob would fail on files the tool does not care about.
+    """
+    memory = load_memory_module()
+    canonical_root = FLOSS_ROOT / "docs" / "agent-memory"
+    notes = sorted(canonical_root.glob("*/*.md"))
+    assert notes, "no canonical memory notes found -- the glob is wrong"
+
+    unparseable = []
+    for path in notes:
+        try:
+            metadata, _ = memory.split_frontmatter(
+                path.read_text(encoding="utf-8"), path
+            )
+        except Exception as exc:  # noqa: BLE001 -- the point is to name them all
+            unparseable.append(f"{path.relative_to(FLOSS_ROOT).as_posix()}: {exc}")
+            continue
+        if not metadata.get("id"):
+            unparseable.append(
+                f"{path.relative_to(FLOSS_ROOT).as_posix()}: frontmatter has no `id`"
+            )
+
+    newline = chr(10)
+    assert unparseable == [], (
+        "memory notes the materializer cannot read:"
+        + newline
+        + newline.join(unparseable)
+    )

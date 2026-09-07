@@ -15,7 +15,7 @@
 | `KnowledgeEdge` | `from: ActionHash`, `to: ActionHash`, `relationship: String`, `confidence: f32` | Directed, weighted, typed edge between two `RoseNode`s. |
 | `KnowledgeTriple` | `subject`, `predicate`, `object: String`; `confidence: f32`; `source: AgentPubKey`; `created_at: Timestamp` | Atomic subject–predicate–object fact with mandatory provenance. Core unit of symbolic-first knowledge per [`SYMBOLIC_FIRST_CORE.md`](../../../../ARF/SYMBOLIC_FIRST_CORE.md). |
 | `BudgetEntry` | `agent: AgentPubKey`, `remaining_ru: f32`, `window_start: Timestamp` | Tracks an agent's autonomy budget (Resource Units / 24h windows). Prevents single-agent resource monopolization. |
-| `ThoughtCredential` | (in coordinator-adjacent module) connotation + ternary attestation | Ternary connotation attestation (Yumeichan framework integration). |
+| `ThoughtCredential` | (in coordinator-adjacent module) connotation + analog attestation | Analog connotation attestation [-1.0, +1.0] (Yumeichan framework integration, supersedes ternary). |
 
 ## Link types (4)
 
@@ -37,7 +37,7 @@
 ### `KnowledgeTriple` (`validate_knowledge_triple`)
 
 1. **Non-empty.** `subject`, `predicate`, `object` each non-empty.
-2. **Confidence range.** `confidence ∈ [-1.0, +1.0]` (signed gradient — negative = movement away from truth, aligns with ternary `-1/0/+1` per Yumeichan).
+2. **Confidence range.** `confidence ∈ [-1.0, +1.0]` (signed gradient — negative = movement away from truth, mapping Yumeichan watch telemetry onto the continuous analog spectrum).
 3. **Predicate whitelist.** Predicate must be in the registered ontology namespace: `is_a`, `part_of`, `related_to`, `has_property`, `trained_on`, `improves_upon`, `capable_of`, `evaluated_on`, `relates_to`, `supports`, `contradicts`, `heals`, `releases`, `neutralizes`, `recalibrates`. Else `E_TRIPLE_PREDICATE_UNKNOWN`.
 
 ### `KnowledgeEdge` (`validate_knowledge_edge`)

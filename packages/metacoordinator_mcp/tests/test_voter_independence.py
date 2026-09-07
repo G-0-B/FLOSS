@@ -1,0 +1,388 @@
+"""Enforce the voter registry's own independence rule.
+
+Work board row 0.6: "independence is policy, not enforcement". The registry
+states a rule -- nontrivial polls need >=3 provider surfaces and >=4 model
+families, and same-family endpoints on different surfaces do not count as
+independent -- and nothing checked it. PR41 review then found two profiles
+governed by that rule sitting below its bar:
+
+  reuse-review  3 surfaces / 3 families  (ADR-18 reuse decisions are nontrivial)
+  yumeichan     3 surfaces / 3 families
+
+Both had been voting normally. The failure mode this guards against is the one
+the registry itself records: the default `balanced` profile once degraded to two
+voters *both on groq* after cerebras died, silently failing its own bar while
+continuing to return confident consensus.
+
+Profiles deliberately below the bar must say so in EXEMPT_PROFILES with a
+reason. An exemption is a decision someone made on purpose; silence is not.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+REGISTRY_PATH = Path(__file__).resolve().parents[1] / "voter_registry.json"
+
+MIN_SURFACES = 3
+MIN_FAMILIES = 4
+
+# Profiles that are intentionally narrow. Each needs a reason, because the whole
+# point of this test is that being under the bar has to be a stated choice.
+EXEMPT_PROFILES = {
+    "fast": "Latency-first smoke path; explicitly not for nontrivial decisions.",
+    "mistral": "Single-vendor probe profile, used to test one surface in isolation.",
+    "local": "Offline/no-network fallback -- one local Ollama model is all there is.",
+}
+
+
+@pytest.fixture(scope="module")
+def registry() -> dict:
+    return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def model_index(registry) -> dict:
+    index = registry["_probe"]["verified_working"]
+    assert all(isinstance(v, dict) for v in index.values()), (
+        "verified_working must be structured objects, not free text -- the rule "
+        "cannot be enforced against prose"
+    )
+    return index
+
+
+def test_every_profile_model_is_a_probed_model(registry, model_index):
+    """A profile must not reference a model nobody confirmed answers.
+
+    Exempt profiles are excluded because they may be probed by another route.
+    `local` names ollama/gemma3:12b-it-qat, which is healthy but was confirmed
+    directly against localhost:11434 rather than through OmniRoute -- see
+    `_probe.local_profile_note`. Pointing it at a hosted model to make a check
+    pass would make the profile name a lie, which the registry says explicitly.
+    """
+    unknown = {
+        (profile, model)
+        for profile, entries in registry["profiles"].items()
+        if profile not in EXEMPT_PROFILES
+        for model in entries.values()
+        if model not in model_index
+    }
+    assert not unknown, f"profiles reference unprobed models: {sorted(unknown)}"
+
+
+def test_local_profile_note_still_explains_its_unprobed_model(registry, model_index):
+    """If `local` stops being the documented exception, stop exempting it."""
+    local_models = list(registry["profiles"]["local"].values())
+    if all(m in model_index for m in local_models):
+        pytest.skip("local profile now uses probed models; exemption can be revisited")
+    note = registry["_probe"].get("local_profile_note", "")
+    assert (
+        note.strip()
+    ), "the local profile names an unprobed model and no longer says why"
+
+
+@pytest.mark.parametrize("profile_name", sorted(EXEMPT_PROFILES))
+def test_exempt_profiles_are_still_declared_in_the_registry(profile_name, registry):
+    """An exemption for a profile that no longer exists is stale bookkeeping."""
+    assert (
+        profile_name in registry["profiles"]
+    ), f"{profile_name!r} is exempted here but absent from the registry"
+
+
+def test_nontrivial_profiles_meet_the_independence_rule(registry, model_index):
+    violations = []
+    for profile_name, entries in registry["profiles"].items():
+        if profile_name in EXEMPT_PROFILES:
+            continue
+        models = list(entries.values())
+        families = {model_index[m]["family"] for m in models if m in model_index}
+        surfaces = {model_index[m]["surface"] for m in models if m in model_index}
+        if len(surfaces) < MIN_SURFACES or len(families) < MIN_FAMILIES:
+            violations.append(
+                f"{profile_name}: {len(surfaces)} surface(s) "
+                f"{sorted(surfaces)}, {len(families)} family/families "
+                f"{sorted(families)}"
+            )
+
+    assert not violations, (
+        "profiles below the registry's own independence_rule "
+        f"(>= {MIN_SURFACES} surfaces, >= {MIN_FAMILIES} families):\n  "
+        + "\n  ".join(violations)
+        + "\n\nEither widen the profile or add it to EXEMPT_PROFILES with a reason."
+    )
+
+
+def test_same_family_on_two_surfaces_does_not_count_as_independent(model_index):
+    """The rule's own worked example must hold in the data.
+
+    groq/qwen/qwen3.6-27b and huggingface/Qwen/Qwen3.6-27B are two surfaces but
+    one family. If they ever get recorded as different families, the counting
+    above silently becomes permissive.
+    """
+    groq_qwen = model_index.get("groq/qwen/qwen3.6-27b")
+    hf_qwen = model_index.get("huggingface/Qwen/Qwen3.6-27B")
+    if groq_qwen is None or hf_qwen is None:
+        pytest.skip("the worked-example models are no longer in the registry")
+
+    assert groq_qwen["family"] == hf_qwen["family"]
+    assert groq_qwen["surface"] != hf_qwen["surface"]
+
+
+# ---------------------------------------------------------------------------
+# Runtime rosters. The tests above check the registry FILE; these check the
+# roster that actually votes, which is what credential filtering can degrade.
+# ---------------------------------------------------------------------------
+
+
+def _voters_module():
+    import importlib
+    import sys
+
+    sys.path.insert(0, str(REGISTRY_PATH.parents[2]))
+    return importlib.import_module("packages.metacoordinator_mcp.voters")
+
+
+DEGRADED = {
+    "groq-gpt-oss-120b": "groq/openai/gpt-oss-120b",
+    "groq-qwen3-27b": "groq/qwen/qwen3.6-27b",
+}
+
+
+def test_a_degraded_runtime_roster_is_refused(monkeypatch):
+    """One surface must not be able to return a confident tally.
+
+    `resolve_default_voter_specs(include_unavailable=False)` drops voters whose
+    credentials are missing, so a compliant profile can arrive at voting time as
+    two voters on a single surface. That exact shape -- `balanced` reduced to
+    two groq voters after cerebras died -- polled normally and nothing caught it.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", DEGRADED)
+
+
+def test_the_refusal_names_what_was_missing(monkeypatch):
+    """An operator has to be able to act on it without reading the source."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        voters.assert_roster_is_independent("balanced", DEGRADED)
+
+    message = str(excinfo.value)
+    assert "groq" in message, "the surfaces actually present must be named"
+    assert voters.ALLOW_DEGRADED_ENV in message, "the escape hatch must be named"
+
+
+def test_a_deliberate_override_is_honoured(monkeypatch):
+    """Proceeding anyway is allowed -- deliberately, never by default."""
+    voters = _voters_module()
+    monkeypatch.setenv(voters.ALLOW_DEGRADED_ENV, "1")
+    voters.assert_roster_is_independent("balanced", DEGRADED)
+
+
+@pytest.mark.parametrize("profile_name", sorted(EXEMPT_PROFILES))
+def test_exempt_profiles_are_not_refused_at_runtime(profile_name, monkeypatch):
+    """The runtime exemptions must match the registry-file exemptions."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    assert profile_name in voters.DEGRADED_OK_PROFILES
+    voters.assert_roster_is_independent(profile_name, DEGRADED)
+
+
+def test_the_full_balanced_profile_passes_at_runtime(monkeypatch):
+    """The guard must not reject a healthy roster."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    _aliases, profiles = voters._load_builtin_registry()
+    voters.assert_roster_is_independent("balanced", dict(profiles["balanced"]))
+
+
+# A roster nobody has probed. Four providers, four vendors, none of them in the
+# registry's `_probe.verified_working` index -- which is the shape an operator
+# gets the moment they use the documented FLOSS_VOTER_ROSTER override with
+# anything other than the registry's own hardcoded ids.
+CUSTOM_WIDE = {
+    "a": "openrouter/meta-llama/llama-4-70b",
+    "b": "together/deepseek-ai/deepseek-v4",
+    "c": "fireworks/mistralai/mixtral-8x22b",
+    "d": "anyscale/google/gemma-3-27b",
+}
+
+CUSTOM_NARROW = {
+    "a": "openrouter/meta-llama/llama-4-70b",
+    "b": "openrouter/deepseek-ai/deepseek-v4",
+    "c": "openrouter/mistralai/mixtral-8x22b",
+    "d": "openrouter/google/gemma-3-27b",
+}
+
+
+def test_a_custom_roster_of_unprobed_models_is_not_refused(monkeypatch):
+    """The documented override must work with models the registry never listed.
+
+    Filtering unknown models out of the accounting counted this roster as zero
+    surfaces and zero families, so `build_default_voters()` refused a perfectly
+    wide four-provider roster and the override was usable only with the
+    registry's hardcoded ids.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    voters.assert_roster_is_independent("balanced", CUSTOM_WIDE)
+
+
+def test_a_custom_roster_on_one_surface_is_still_refused(monkeypatch):
+    """Counting unknown models must not become a way to launder a narrow roster.
+
+    Same four vendors as above, all routed through one provider. The surface bar
+    is derivable without the probe index, so this still fails.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", CUSTOM_NARROW)
+
+
+def test_unprobed_models_are_reported_as_unverified(monkeypatch, capsys):
+    """A weaker guarantee has to be visible, not silent.
+
+    An unprobed model counts as its own family because nothing can parse lineage
+    out of an id. Two ids could be one model behind two vendors, so the operator
+    is told which models were counted that way.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    voters.assert_roster_is_independent("balanced", CUSTOM_WIDE)
+
+    warning = capsys.readouterr().err
+    assert "absent from the registry probe index" in warning
+    for model in CUSTOM_WIDE.values():
+        assert model in warning, "every unverified model must be named"
+
+
+def test_the_refusal_names_the_unverified_models(monkeypatch):
+    """The refusal message must say which models it could not classify."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError) as excinfo:
+        voters.assert_roster_is_independent("balanced", CUSTOM_NARROW)
+
+    message = str(excinfo.value)
+    assert "openrouter" in message, "the single surface must be named"
+    assert "unverified" in message
+
+
+# One model behind four vendors is one family, not four.
+SAME_LINEAGE_FOUR_SURFACES = {
+    "a": "groq/openai/gpt-oss-120b",
+    "b": "nvidia/openai/gpt-oss-120b",
+    "c": "openrouter/openai/gpt-oss-120b",
+    "d": "huggingface/openai/gpt-oss-120b",
+}
+
+
+def test_one_unprobed_model_behind_four_vendors_is_not_four_families(monkeypatch):
+    """Keying an unverified family on the FULL route made this roster clear the
+    four-family bar while being one model, and the gateway reported it as
+    independent consensus. Four provider surfaces is true here; four families
+    is not, and only the second one is a claim about disagreement.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="below its own independence rule"):
+        voters.assert_roster_is_independent("balanced", SAME_LINEAGE_FOUR_SURFACES)
+
+
+def test_the_same_lineage_refusal_says_it_grouped_them(monkeypatch):
+    """An operator staring at four different-looking ids needs to be told why
+    they counted as one."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    problem = voters.roster_independence_problem("balanced", SAME_LINEAGE_FOUR_SURFACES)
+
+    assert problem is not None
+    # ONE family, not two: `groq/openai/gpt-oss-120b` IS in the probe index, so
+    # its three unprobed twins inherit its probed family rather than adding an
+    # `unverified:` one beside it. Counting them separately would let three
+    # probed families plus one unprobed twin reach the bar.
+    assert "1 model family" in problem, problem
+    assert "gpt-oss-120b" in problem
+
+
+def test_different_unprobed_models_on_one_surface_are_still_one_surface(monkeypatch):
+    """The surface half must not be collapsed with the family half: surfaces
+    ARE derivable from the route without a probe, so they keep counting
+    per-model."""
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+
+    problem = voters.roster_independence_problem("balanced", CUSTOM_NARROW)
+
+    assert problem is not None
+    assert "1 provider surface(s)" in problem
+
+
+def test_unverified_family_keys_drop_only_the_provider():
+    """The mirror of _derive_surface. Asserted directly because the whole
+    finding turns on which half of the route is the lineage."""
+    voters = _voters_module()
+
+    assert (
+        voters._unverified_family("groq/openai/gpt-oss-120b")
+        == "unverified:openai/gpt-oss-120b"
+    )
+    assert voters._unverified_family(
+        "nvidia/openai/gpt-oss-120b"
+    ) == voters._unverified_family("groq/openai/gpt-oss-120b")
+    assert voters._unverified_family(
+        "openrouter/meta-llama/llama-4-70b"
+    ) != voters._unverified_family("together/deepseek-ai/deepseek-v4")
+    # A bare local tag has no provider to drop.
+    assert (
+        voters._unverified_family("phi4-mini:latest") == "unverified:phi4-mini:latest"
+    )
+
+
+def test_a_registry_that_disagrees_with_itself_is_not_resolved_silently(
+    monkeypatch, capsys
+):
+    """Two probed routes sharing a lineage must agree on its family. Building
+    the lookup with a dict comprehension resolved a disagreement by iteration
+    order, so an unprobed twin inherited whichever side happened to be later --
+    a wrong family, chosen nondeterministically, inside the check that decides
+    whether a poll counts as independent.
+    """
+    voters = _voters_module()
+    monkeypatch.delenv(voters.ALLOW_DEGRADED_ENV, raising=False)
+    monkeypatch.setattr(
+        voters,
+        "_model_index",
+        lambda: {
+            "groq/openai/x": {"family": "OpenAI", "surface": "groq"},
+            "nvidia/openai/x": {"family": "SomethingElse", "surface": "nvidia"},
+        },
+    )
+
+    problem = voters.roster_independence_problem(
+        "balanced",
+        {
+            "a": "openrouter/openai/x",
+            "b": "huggingface/openai/x",
+            "c": "together/openai/x",
+        },
+    )
+
+    err = capsys.readouterr().err
+    assert "registry conflict" in err
+    assert "unverified:openai/x" in err
+    # The conflicted lineage must NOT be inherited: the unprobed twins fall
+    # back to the unverified key, so this stays one family and is refused.
+    assert problem is not None
+    assert "1 model family" in problem, problem

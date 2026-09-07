@@ -7,7 +7,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skill-corpus" / "flossi0ullk-orient" / "SKILL.md"
 CHANGELOG = ROOT / "skill-corpus" / "flossi0ullk-orient" / "CHANGELOG.md"
-EXPECTED_SHA256 = "491A2B37B9CF73A3FCDF7FCA5D9CEF0B0E81D8B62A10DA40238E0EF695B266EE"
+# Pin on the reviewed evidence copy of the orient skill. It exists so the skill
+# cannot drift silently -- an edit here has to be a deliberate act with a new pin,
+# not a side effect of some sweep passing through.
+#
+# Re-pinned 2026-08-21. The previous value (491A2B37...) was the copy promoted in
+# 5de8bb0 "feat: promote orient skill v0.3.4". e648c7a "docs: rename the canonical
+# kernel to match its version (v1.3.1 -> v1.4.0)" then swept two lines of this file
+# without updating the pin, so the contract has been red ever since. The diff is
+# exactly those two kernel-filename references and nothing else; every content
+# assertion below still passes, and FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md
+# is the file that actually exists. The rename was right; the pin was stale.
+#
+# To re-pin deliberately:
+#   python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path(
+#     'skill-corpus/flossi0ullk-orient/SKILL.md').read_bytes()).hexdigest().upper())"
+EXPECTED_SHA256 = "363D9523AF91361739D4E30E19C5E5C8CB15C3D05287B591D54EC3E5D3C5EAF3"
 
 
 def test_canonical_orient_skill_is_the_reviewed_v034_evidence_copy() -> None:
