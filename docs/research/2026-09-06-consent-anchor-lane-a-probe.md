@@ -33,6 +33,46 @@ proposal/decision through the intended substrate to a real committed decision
 action whose hash can be consumed by the governed provenance/claim path.
 ```
 
+## 1a. Operator correction, 2026-09-06 — read this before §2
+
+After this probe was written, the operator stated the intent behind the
+file-based chain:
+
+> the file chain was in use **because the Holochain substrate is not implemented
+> yet**, as a deliberate temporary offline stand-in, with intent to port.
+
+That is not what this record originally assumed, and the difference matters. The
+findings below are unchanged — the digest still is not an `ActionHash`, no layer
+still constrains the field, the docstring still was false — but their
+**interpretation** changes:
+
+- §3.1 is **not** evidence of substrate confusion or a shortcut. It is a known
+  interim substrate being used as designed. The 2026-09-01 packet is an honest
+  artifact of that arrangement.
+- §3.2 stands as a defect, but a narrower one. The problem was never that the
+  stand-in exists; it is that the docstring described the migration as free
+  (*"zero rework"*) when the identifier is exactly the part that does not carry
+  across. Corrected on the truth line in `aee4745`.
+- §2's "ambiguous" verdict holds, but the ambiguity is now located precisely: it
+  is not that nobody knows which substrate is meant, it is that **the packet
+  format cannot say which one a given anchor came from**, and the interim status
+  is recorded nowhere a validator or a future reader can see it.
+- §6's recommendation is unchanged in order but changes in emphasis. Step 3 is no
+  longer "decide which substrate" — the operator has decided, and the answer is
+  *file chain now, Holochain later*. It becomes: make the interim status
+  legible, and plan the remap.
+
+**The consequence that survives, and is the real finding:** every
+`consent_ref.decision_action_hash` written while the stand-in is in use is a
+64-hex file-chain digest that will not exist as an identifier after the port.
+Those references need a migration path — either a recorded mapping from
+stand-in digest to real action hash, or a discriminator in the packet saying
+which substrate an anchor belongs to so both can be resolved. One packet carries
+such a reference today, so the cost of solving it now is one row. It will not
+stay one row.
+
+---
+
 ## 2. Verdict
 
 **The claim as written cannot be evaluated, because "the intended substrate" is
@@ -259,17 +299,28 @@ Three steps, cheapest first:
    no behaviour change, and it removes the standing licence to conflate the two
    substrates. Whether `append_entry` should also enforce its declared type list
    is a separate question.
-3. **Then decide what `decision_action_hash` anchors to.** That is ADR-12 design
-   work and it is now a genuine fork with a live artifact on each side, not an
-   abstraction:
-   - *Holochain action* — matches the spec as written; blocked until the
-     substrate runs somewhere reproducible; makes the 2026-09-01 packet invalid.
-   - *File-chain entry* — already works, already has an operator-signed decision;
-     requires amending the spec and admitting the anchor proves consent was
-     *recorded locally*, not consented *on a shared substrate*.
-   - *Either, explicitly typed* — add a discriminator so a packet says which
-     substrate it means, and let `entry_has_consent()` resolve accordingly. Keeps
-     the 2026-09-01 work, keeps the Holochain target, costs a schema change.
+3. **Make the interim status legible, and plan the remap.** Superseding the
+   original "decide what it anchors to" — per §1a the operator has decided:
+   file chain now, Holochain after the port. What is undecided is how a reader,
+   a validator, or the migration itself tells the two apart. The third option
+   below is now the recommended one rather than one of three equals:
+   - *Holochain action only* — matches the spec as written, and is unreachable
+     until the substrate exists. Rejected by the operator's sequencing, not on
+     merit.
+   - *File-chain entry only* — already works, already has an operator-signed
+     decision, and would require the spec to admit the anchor proves consent was
+     *recorded locally*. Leaves nothing to remap against after the port.
+   - *Explicitly typed, either substrate* — **recommended.** Add a discriminator
+     so a packet states which substrate its anchor came from, and let
+     `entry_has_consent()` resolve accordingly. Costs a schema change and a
+     resolver per substrate. In exchange the interim anchors stay valid, become
+     self-describing, and the port becomes a mapping exercise instead of an
+     archaeology one. Doing it while exactly one packet carries a `consent_ref`
+     is as cheap as this ever gets.
+
+   Whichever is chosen, the migration owes a recorded mapping from stand-in
+   digest to real action hash. Without it the port silently orphans every
+   interim anchor, and nothing in the current validator would notice.
 
 On the CCP staging question this probe was nominally testing: **Stage 0 held.**
 The existing per-iteration engineering contract carried this investigation
