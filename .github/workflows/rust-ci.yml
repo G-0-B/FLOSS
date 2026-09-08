@@ -239,13 +239,41 @@ jobs:
 
   sweettest:
     name: Sweettest (weekly/manual, advisory)
-    # The full two-conductor suite takes about 30 minutes. Keep it out of
-    # required checks and run only on explicit dispatch or the weekly cron.
+    # Keep it out of required checks and run only on explicit dispatch or the
+    # weekly cron.
+    #
+    # Timeout raised 60 -> 120 on 2026-09-07, and caching added, because the
+    # first dispatch this job ever received (run 34164674347) was killed at
+    # exactly 60 minutes with the suite step still running. The old comment
+    # said "about 30 minutes", which is the two-conductor TEST phase only; the
+    # step ahead of it does a cold `cargo build --workspace --release --target
+    # wasm32-unknown-unknown` over the Holochain crate tree, then `hc dna pack`,
+    # then compiles the sweettest crate against `holochain` as a library. This
+    # job had no cache of any kind while the `clippy` job below it caches
+    # cargo, so every run paid full cold cost and could not finish. That is why
+    # the suite has never produced a result -- the trigger gating was only half
+    # the reason.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * 1' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+
+      # Two target directories, because there are two Cargo workspaces: the ARF
+      # workspace builds the zome WASMs, and ARF/tests/sweettest is a separate
+      # manifest that links the Holochain conductor as a library. Locally that
+      # second target directory measures 21 GB, so omitting it would leave the
+      # dominant cost uncached.
+      - name: Cache cargo registry + both build trees
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ARF/target
+            ARF/tests/sweettest/target
+          key: ${{ runner.os }}-sweettest-${{ hashFiles('ARF/Cargo.lock', 'ARF/tests/sweettest/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-sweettest-
 
       - name: Install Nix
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31 tag target, resolved 2026-09-01
