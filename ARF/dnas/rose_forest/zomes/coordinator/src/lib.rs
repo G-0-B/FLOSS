@@ -5,7 +5,7 @@ mod budget;
 mod ontology;
 mod vector_ops;
 
-use budget::{consume_budget, get_budget_state, BudgetEngine, BudgetState};
+use budget::{consume_budget, get_budget_state, BudgetState};
 use budget::{
     COST_ADD_KNOWLEDGE, COST_CREATE_THOUGHT_CREDENTIAL, COST_LINK_EDGE, COST_VALIDATE_TRIPLE,
 };
