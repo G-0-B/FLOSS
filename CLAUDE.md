@@ -199,6 +199,39 @@ ruff check .
 
 `.mcp.json` and `.claude/settings.json` live at both the workspace root (`C:\~shit\`) and at this `FLOSS/` level so sessions launched from either location pick them up automatically. The MCP configuration exposes the passive-router consensus gateway (`packages/metacoordinator_mcp/server.py`) as a tool surface for multi-model Claim/Vote collaboration, and the coordination room (`packages/coordination_room/`, `flossiullk-coordination-room` on `127.0.0.1:7334`) for file-path claims so agents do not use the human as the write bus. How-to: `docs/agent-memory/project/coordination-room-v0.md`.
 
+## Shared Agent Surface — the materializers
+
+Full description in `C:\~shit\CLAUDE.md`. The short version, because it decides
+whether an edit of yours survives:
+
+**`.claude/settings.json`, `.codex/hooks.json`, `.gemini/settings.json` and
+`.agent-surface/hooks/` are generated.** Canonical policy is the in-repo
+manifest — for hooks, `shared-hook-surface.json` at this directory's root — and
+`scripts/refresh_agent_surfaces.py` projects it into each harness's native
+format across six steps (`agent-surface`, `context`, `skill`, `agent-memory`,
+`hook`, `ai-roster`). Edit the manifest, then regenerate. An edit made directly
+to a projection is reverted by the next run and leaves no trace of why.
+
+```bash
+python scripts/materialize_shared_hook_surface.py --check   # drift report, writes nothing
+python scripts/materialize_shared_hook_surface.py           # repo scope only
+python scripts/refresh_agent_surfaces.py                    # all six
+```
+
+User-scope targets (`claude_user`, `hermes_user`) write machine-wide files
+outside this repository and are skipped without `--include-user-scope`. That
+flag is an operator decision.
+
+**Hooks in this directory.** `hooks/hook_pre_write.py` and `hooks/hook_post_write.py`
+carry the provenance path — checkpoint, hashline verification, packet, Claim.
+`hooks/session_start_inject.py` injects the startup contract.
+`hooks/hook_rust_lint.py` is an advisory `cargo clippy` gate on `Stop`: it exits
+in milliseconds when no `.rs` changed, lints only the Cargo workspace whose files
+actually changed, matches the CI invocation flag-for-flag, and never blocks.
+
+`FLOSS/hooks` is a `spec_gate` gated surface — a new hook needs a registry entry
+and, at tier 1 or 2, a reuse block. `python scripts/spec_gate.py --check`.
+
 ## Historical Reference
 
 The previous comprehensive `FLOSS/CLAUDE.md` (dated 2025-11-16, v2.0, 38 KB) is preserved at `archive/claude-md-versions/2025-11-16_v2.md`. It predates `packages/`, `docs/superpowers/`, the local agent node, the intake-mouth concept, the Kitsune2 Holochain reliability landing, and the spine v0.5 governance framework. It remains valuable as a snapshot of the v2.0 framing and the 13-section operating-instructions taxonomy. Consult it for historical context, not current state.

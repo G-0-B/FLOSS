@@ -762,6 +762,65 @@
       "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file",
       "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
     },
+    "FLOSS/hooks/hook_rust_lint.py": {
+      "spec": "Advisory cargo clippy gate on Stop: lints only the Cargo workspace whose files changed, matches the CI invocation, never blocks",
+      "tier": 1,
+      "reuse": {
+        "capability": "Catch Rust lint regressions at the point of authorship instead of only on a manually dispatched CI job",
+        "search_date": "2026-09-09",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "the existing FLOSS/hooks family + shared-hook-surface materializer",
+            "version": "repo at head",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "Extended directly: same AGENT_DIR/hook.log, same ${PYTHON}/${FLOSS_HOOKS} variable indirection, same --stdout-json additionalContext convention, projected by the same materializer to claude_user and codex. Verified by running scripts/materialize_shared_hook_surface.py --check and then applying repo scope.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "cargo clippy itself",
+            "version": "0.1.89 local, 1.98.0 in CI",
+            "license": "MIT/Apache-2.0",
+            "maintenance": "upstream Rust",
+            "platform_fit": "native",
+            "probe": "Run locally 2026-09-07: reproduced the exact two CI failures, then exited 0 after the fix. Also measured -p rose_forest_integrity at 11.55s warm, which is why this fires on Stop and not PostToolUse.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "pre-commit framework",
+            "version": "4.x",
+            "license": "MIT",
+            "maintenance": "active",
+            "platform_fit": "adds a Python dep and a second hook system",
+            "probe": "not_probed: rejected on duplication, not quality. This repo already has a hook system with a materializer that projects to six harnesses; pre-commit would bind to git only, reaching neither Codex nor the desktop app, and would leave two places to look when a hook misfires.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "cargo-husky",
+            "version": "1.5",
+            "license": "MIT",
+            "maintenance": "low",
+            "platform_fit": "git hooks only",
+            "probe": "not_probed: same duplication objection as pre-commit, with a narrower blast radius and less maintenance.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "leave it to CI",
+            "probe": "not_probed: this is the status quo that failed. The clippy job is workflow_dispatch-only, so nothing reached it for months; and CI stops at the first failing crate, so the one dispatch that did run reported 2 errors where local reported 5.",
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "~180 lines in one new hook script. No new dependency, no new hook system, no new config surface — two Stop entries in the existing manifest.",
+        "rejected_because": [
+          "pre-commit / cargo-husky: a second hook system bound to git only, when the existing one already projects to six harnesses (Specified)"
+        ],
+        "reviewer": "pending; attribution logic covered by an inline test that caught a real defect before landing",
+        "expiry_or_retest_date": "2027-01-07"
+      }
+    },
     "FLOSS/hooks/session_start_inject.py": {
       "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart",
       "tier_exempt": "2026-09-02 R2 sweep - tier never assessed. This records that no reuse review was done, NOT that none is needed. Replace with a tier when the entry is next touched."
