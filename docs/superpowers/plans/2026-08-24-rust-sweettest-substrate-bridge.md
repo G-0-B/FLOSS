@@ -440,6 +440,33 @@ git diff --name-only origin/main...HEAD
 
 Expected changed paths: design/plan docs, `ARF/.cargo/config.toml`, and `ARF/tests/sweettest/**`. The parent workspace manifest and lock remain unchanged by the child workspace. The packed `.dna` artifact should not be committed unless it was already tracked and changed by the required pack; if changed, report it separately and leave it unstaged pending operator direction.
 
+**Amended 2026-09-09, operator-authorized, two paths added.** CodeRabbit correctly
+flagged that the diff had grown beyond this list and that the Global Constraint
+above forbids integrity changes. Recording the exception rather than reverting,
+because the changes were requested:
+
+- `.github/workflows/rust-ci.yml` — the Sweettest job could not finish. It was
+  killed at its 60-minute timeout on the first dispatch it ever received (run
+  `34164674347`) with the suite still running, and it had no cache while the
+  clippy job beside it cached cargo. Timeout raised to 120, both Cargo target
+  trees cached, and `persist-credentials: false` added after CodeRabbit's
+  CWE-522 finding on a job that executes the checked-out tree. The subsequent
+  run `34255571655` took **94 minutes** and passed — consent 2/2, substrate 7/7 —
+  so the raise was necessary, not padding.
+- `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs` — two `manual_range_contains`
+  lints, rewritten as `!(32..=4096).contains(&dim)`. Behaviour-identical, bounds
+  unchanged on both ends. This is a real exception to the Global Constraint on
+  Layer 0 surfaces and is logged as one. It was taken because that dispatch was
+  the first time `cargo clippy` had ever run on this repository's Rust — the job
+  is `workflow_dispatch`-only — and these two lints were the entire reason it
+  failed. Verified locally before and after: the failure reproduced exactly, and
+  `cargo clippy -p rose_forest_integrity --all-targets --all-features -- -D
+  warnings` now exits 0.
+
+Coordinator-zome behaviour, ADRs, canonical status and consensus-gateway logic
+remain untouched. The coordinator changes in this range are a `///` → `//!`
+module-doc correction and one unused import; neither alters behaviour.
+
 - [ ] **Step 6: Commit final generated resolution if needed**
 
 If `ARF/tests/sweettest/Cargo.lock` changed after the last feature commit:

@@ -257,7 +257,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+      # persist-credentials: false because this job EXECUTES the checked-out
+      # tree -- `nix develop --command ./tests/sweettest/run.sh`. By default
+      # actions/checkout leaves the repository token available to later git
+      # commands in the job, so a manually dispatched run from an untrusted
+      # branch could read it from the code it is running. The job needs no git
+      # authentication after checkout. Raised by CodeRabbit on this PR, CWE-522.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Two target directories, because there are two Cargo workspaces: the ARF
       # workspace builds the zome WASMs, and ARF/tests/sweettest is a separate
