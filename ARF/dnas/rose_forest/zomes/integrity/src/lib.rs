@@ -149,7 +149,7 @@ fn validate_thought_credential(
         ));
     }
     let dim = credential.content.len();
-    if dim < 32 || dim > 4096 {
+    if !(32..=4096).contains(&dim) {
         return Ok(ValidateCallbackResult::Invalid(format!(
             "E_THOUGHT_CONTENT_DIM: {} out of [32,4096]",
             dim
@@ -182,7 +182,7 @@ fn validate_rose_node(node: &RoseNode) -> ExternResult<ValidateCallbackResult> {
         )));
     }
     let dim = node.embedding.len();
-    if dim < 32 || dim > 4096 {
+    if !(32..=4096).contains(&dim) {
         return Ok(ValidateCallbackResult::Invalid(format!(
             "E_EMBED_DIM: {} out of [32,4096]",
             dim
