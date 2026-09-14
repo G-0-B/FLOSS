@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+
+[package]
+name = "rose_forest_sweettest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+holochain = { git = "https://github.com/holochain/holochain", rev = "b1d40b24ab19d81f7563b0cf66b933a138f556a0", features = ["sweettest"] }
+holochain_serialized_bytes = "=0.0.57"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
