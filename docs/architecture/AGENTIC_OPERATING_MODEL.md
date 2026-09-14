@@ -16,7 +16,7 @@ evidence_sources:
   - "packages/source_chain/cell.py"
   - "packages/metacoordinator_mcp/voters.py"
   - "packages/metacoordinator_mcp/hashline.py"
-  - "scripts/hook_post_write.py"
+  - "hooks/hook_post_write.py"
 ```
 
 ## Purpose

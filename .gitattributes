@@ -34,3 +34,12 @@
 # Cryptographic identity / source-chain material — binary regardless of name.
 **/identity/** binary
 *.chain.json binary
+
+# Review and provenance EVIDENCE — byte-preserved, never transformed.
+# `*.json text eol=lf` above rewrote a committed review synthesis from 200,104
+# CRLF bytes to 193,821 LF bytes, so the sha256 published alongside it as its
+# integrity claim did not match what a clone would receive. An evidence record
+# whose hash only verifies on the machine that wrote it is not evidence.
+docs/reviews/**/*.json -text
+.agent-surface/provenance/**/*.json -text
+docs/reviews/**/*.txt -text

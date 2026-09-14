@@ -2,11 +2,20 @@
 
 When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load documents in this order:
 
-## 1. Kernel v1.3.1 (Mandatory Rules)
+## 1. Kernel v1.4.0 (Mandatory Rules)
 
-**File:** `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` (root level)
+**File:** `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` (root level)
 **Purpose:** Always-on coordination rules. Non-negotiable constraints.
 **Key content:** Identity, prime directive, response modes, evidence gate (Now/Later/Never), symbolic-first validation, provenance packet schema.
+
+## 1b. UOP v2.1 (Execution Gate Loop)
+
+**File:** `uop-v2.1.md`
+**Purpose:** How work actually gets executed. The kernel says what is mandatory; the UOP says which gate you are in and what enforces it.
+**Key content:** The nine-gate loop (ORIENT → RECALL → REUSE GATE → PLAN → CLASSIFY → CONSENSUS → EXECUTE → VERIFY → TRACE), each with an enforcement mechanism rather than intent alone; the claim truth model with scope-stated negatives; the cross-verification protocol requiring every "not found" to state what was searched.
+**Prime rule:** *No claim, no artifact, no action survives compaction unless it is written to a file that outlives the context window.*
+
+Landed 2026-08-10 from workspace-root intake. Status: Specified.
 
 ## 2. Context Compression Packet v1.1 (Rationale)
 
@@ -20,11 +29,14 @@ When onboarding a new agent (human or AI) to the FLOSSIOULLK project, load docum
 **Purpose:** Invariants, truth labels, upgrade mechanics, enforcement expectations.
 **Key content:** Canonical source precedence, prime directive, upgrade-everything policy, claim truth model (labels), two-plane architecture, voluntary convergence, provenance packets, substrate-first gating, agent orchestration.
 
-## 4. Canonical Build Spine v0.2 (Current Execution Synthesis)
+## 4. Canonical Build Spine v0.3 (Current Execution Synthesis)
 
-**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.2.md`
-**Purpose:** Current build order and contradiction-resolving execution spine. This document does not override the Kernel, Spine, or SDD spec; it translates them into the present repo state.
-**Key content:** Source register, evidence classes, current reality check, contradiction log, phase gates, NOW/LATER/NEVER backlog, issue backlog draft.
+**File:** `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.3.md`
+**Purpose:** Current build order and contradiction-resolving execution spine — what is being built next and which conflicts between documents have been resolved which way. Does not override the Kernel, Spine, or SDD spec; it translates them into the present repo state.
+**Key content:** 10 tracked issues with phase gates, source register, evidence classes, contradiction log, NOW/LATER/NEVER backlog.
+**Status:** **Proposed**, not Accepted. Landed 2026-08-10 from workspace-root intake; promotion is a separate decision.
+
+> `FLOSSI0ULLK_CANONICAL_BUILD_SPINE_v0.2.md` is retained in this directory but **superseded** — v0.3 declares supersession of v0.2 and of two prior "merged upgradeable artifact" documents. Read v0.3; consult v0.2 only for historical contradiction-log context.
 
 ## 5. Relevant ADRs (Decisions)
 

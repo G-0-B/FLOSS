@@ -2,7 +2,7 @@
   "manifest_version": "0.1.0",
   "workspace_id": "flossi0ullk",
   "workspace_name": "FLOSSI0ULLK",
-  "updated": "2026-05-25",
+  "updated": "2026-07-16",
   "outputs": {
     "registry": ".agent-surface/harness/ai-roster.json",
     "markdown": ".agent-surface/harness/AI_ROSTER.md",
@@ -25,47 +25,77 @@
     {
       "id": "openai",
       "label": "OpenAI / ChatGPT",
-      "patterns": ["openai/", "gpt-", "/o1", "/o3", "/o4"]
+      "patterns": [
+        "openai/",
+        "gpt-",
+        "/o1",
+        "/o3",
+        "/o4"
+      ]
     },
     {
       "id": "claude",
       "label": "Claude / Anthropic",
-      "patterns": ["anthropic/", "claude"]
+      "patterns": [
+        "anthropic/",
+        "claude"
+      ]
     },
     {
       "id": "gemini",
       "label": "Gemini / Google",
-      "patterns": ["google/gemini", "gemini"]
+      "patterns": [
+        "google/gemini",
+        "gemini"
+      ]
     },
     {
       "id": "kimi",
       "label": "Kimi / Moonshot",
-      "patterns": ["moonshotai/", "kimi"]
+      "patterns": [
+        "moonshotai/",
+        "kimi"
+      ]
     },
     {
       "id": "grok",
       "label": "Grok / x.ai",
-      "patterns": ["xai/", "grok"]
+      "patterns": [
+        "xai/",
+        "grok"
+      ]
     },
     {
       "id": "mistral",
       "label": "Mistral",
-      "patterns": ["mistral", "codestral", "devstral", "magistral"]
+      "patterns": [
+        "mistral",
+        "codestral",
+        "devstral",
+        "magistral"
+      ]
     },
     {
       "id": "groq",
       "label": "Groq-hosted",
-      "patterns": ["groq/"]
+      "patterns": [
+        "groq/"
+      ]
     },
     {
       "id": "deepseek",
       "label": "DeepSeek",
-      "patterns": ["deepseek"]
+      "patterns": [
+        "deepseek"
+      ]
     },
     {
       "id": "qwen",
       "label": "Qwen / Alibaba",
-      "patterns": ["qwen", "alibaba/"]
+      "patterns": [
+        "qwen",
+        "alibaba/"
+      ]
     }
   ],
   "mcp_sources": [
@@ -84,12 +114,16 @@
     {
       "id": "root-openwork-provider-import",
       "kind": "opencode",
-      "path": "opencode.jsonc"
+      "path": "opencode.jsonc",
+      "optional": true,
+      "note": "Third-party openwork config; wiped and rebuilt out of band. Absent is tolerated, malformed is not."
     },
     {
       "id": "opworkers-openwork-cloud-import",
       "kind": "openwork_cloud",
-      "path": "opworkers/.opencode/openwork.json"
+      "path": "opworkers/.opencode/openwork.json",
+      "optional": true,
+      "note": "Third-party openwork config; wiped and rebuilt out of band. Absent is tolerated, malformed is not."
     }
   ],
   "instruction_surfaces": [
@@ -104,6 +138,10 @@
     {
       "id": "workspace-gemini",
       "path": "GEMINI.md"
+    },
+    {
+      "id": "antigravity-harness-gates",
+      "path": ".agent/rules/floss-harness-gates.md"
     },
     {
       "id": "agentmemory-operator",
@@ -125,7 +163,9 @@
   "agent_sources": [
     {
       "id": "opencode-openwork-agent",
-      "path": "opworkers/.opencode/agents/openwork.md"
+      "path": "opworkers/.opencode/agents/openwork.md",
+      "optional": true,
+      "note": "Third-party openwork config; wiped and rebuilt out of band. Absent is tolerated, malformed is not."
     },
     {
       "id": "opencode-skills",

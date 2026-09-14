@@ -590,7 +590,7 @@ curl -I https://dweb.link/ipfs/$CID
 
 - [IPFS Documentation](https://docs.ipfs.io)
 - [Holochain Developer Portal](https://developer.holochain.org)
-- [Final ADR Document](/mnt/user-data/outputs/ADR-N-IPFS-Integration-VVS.md)
+- [Final ADR Document](/mnt/user-data/outputs/ADR-11-ipfs-large-file-integration.md)
 - [Evolution Summary](/mnt/user-data/outputs/IPFS-Integration-Evolution-Summary.md)
 
 ---

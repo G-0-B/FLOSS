@@ -1,0 +1,1345 @@
+=== COMMIT 2a55711: fix: six PR41 backlog findings, and one the tests refused
+
+
+diff --git a/hooks/hook_post_write.py b/hooks/hook_post_write.py
+index 93f6031..e4beb71 100644
+--- a/hooks/hook_post_write.py
++++ b/hooks/hook_post_write.py
+@@ -298,6 +298,22 @@ def infer_surface(tool_name: str, hook_event_name: str) -> str:
+     event_name = (hook_event_name or "").strip()
+     if tn in {"write", "edit", "multiedit"}:
+         return "claude-code"
++    # HERMES BEFORE GEMINI, BECAUSE THEY SHARE A TOOL NAME.
++    #
++    # There was no Hermes case at all, so every Hermes edit was misattributed:
++    # `write_file` matched the gemini-cli branch below and `patch` fell through
++    # to the generic `agent-tool`. That label reaches the Claim, the signed
++    # packet's `source_systems`, the summary and the background memory, so the
++    # provenance this hook exists to record named the wrong harness for every
++    # edit on the surface it was just extended to cover.
++    #
++    # `write_file` is Gemini's name AND Hermes's, so the tool name alone cannot
++    # separate them -- the event does. Hermes's manifest event_map emits
++    # pre_tool_call/post_tool_call; Gemini emits AfterTool. `patch` is Hermes
++    # only. Ordered first because the overlapping name would otherwise be
++    # claimed by the branch below.
++    if event_name in {"pre_tool_call", "post_tool_call"} or tn == "patch":
++        return "hermes"
+     if tn in {"write_file", "replace"} or event_name == "AfterTool":
+         return "gemini-cli"
+     return "agent-tool"
+diff --git a/packages/metacoordinator_mcp/voters.py b/packages/metacoordinator_mcp/voters.py
+index c799ff7..0249a65 100644
+--- a/packages/metacoordinator_mcp/voters.py
++++ b/packages/metacoordinator_mcp/voters.py
+@@ -954,6 +954,25 @@ def _derive_surface(model: str) -> str:
+     return model.strip().lower().split("/", 1)[0] or model.strip().lower()
+ 
+ 
++def _unverified_family(model: str) -> str:
++    """Lineage key for a model the probe index has never seen.
++
++    The mirror of `_derive_surface`: that keeps the provider prefix and drops
++    the rest, this drops the prefix and keeps the rest. `groq/openai/x` and
++    `nvidia/openai/x` are the same weights behind two vendors, so they are ONE
++    unverified family -- counting the full route made four such routes clear a
++    four-family independence bar.
++
++    Named `unverified:` because it remains a claim: two providers can also
++    publish the same model under different suffixes, which this cannot see. It
++    is the conservative direction for the case that actually occurs.
++    """
++
++    text = model.strip().lower()
++    provider, _, rest = text.partition("/")
++    return f"unverified:{rest or provider}"
++
++
+ def _model_index() -> dict[str, dict[str, str]]:
+     """Model id -> {family, surface} from the registry's probe record."""
+     try:
+@@ -1008,20 +1027,50 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
+         index[model]["surface"] if model in index else _derive_surface(model)
+         for model in models
+     }
+-    # Family is a claim about the model's lineage and cannot be parsed out of an
+-    # id, so an unclassified model counts as its own family and is named as
+-    # unverified. That is weaker than a probed family -- two ids could be the
+-    # same model behind two vendors -- which is exactly why the warning below
+-    # exists and why the refusal message lists them.
++    # LINEAGE IS THE ROUTE MINUS ITS PROVIDER, NOT THE WHOLE ROUTE.
++    #
++    # An unclassified model used to count as its own family keyed on the FULL
++    # route, so `groq/openai/x`, `nvidia/openai/x`, `openrouter/openai/x` and
++    # `huggingface/openai/x` -- one model behind four vendors -- cleared a
++    # four-family bar and the gateway reported it as independent consensus.
++    #
++    # Collapsing every unclassified model into one bucket fixes that case and
++    # breaks the one this accounting exists for: a custom FLOSS_VOTER_ROSTER of
++    # four genuinely different models across four providers would be refused,
++    # which is the exact regression the unclassified branch was added to undo.
++    # Both cases are real, and they differ in the SUFFIX, not the count.
++    #
++    # So the unverified family key is the route with its provider prefix
++    # stripped -- the mirror of _derive_surface, which keeps the prefix and
++    # discards the rest. Four routes to `openai/x` are one family; four routes
++    # to four different models are four. Still a claim rather than a probe --
++    # two vendors can rename the same weights -- which is why these stay named
++    # `unverified:` and why the warning below names every one of them.
++    # AN UNPROBED TWIN OF A PROBED MODEL INHERITS ITS FAMILY.
++    #
++    # Otherwise `groq/openai/x` (probed) and `nvidia/openai/x` (not) count as
++    # two families for one model, so three probed families plus one unprobed
++    # twin of any of them reaches four and passes -- the same false claim this
++    # fix is closing, one step further along. The probe index is keyed by full
++    # route, so the lineage suffix is what joins them.
++    probed_by_lineage = {
++        _unverified_family(known): meta["family"] for known, meta in index.items()
++    }
+     families = {index[model]["family"] for model in models if model in index}
+-    families |= {f"unverified:{model}" for model in unclassified}
++    for model in unclassified:
++        lineage = _unverified_family(model)
++        families.add(probed_by_lineage.get(lineage, lineage))
+ 
+     if unclassified:
++        grouped = sorted({_unverified_family(m) for m in unclassified})
+         print(
+             f"[voters] independence check: {len(unclassified)} model(s) absent "
+-            f"from the registry probe index, counted as distinct unverified "
+-            f"families: {', '.join(unclassified)}. Probe them into "
+-            f"{VOTER_REGISTRY_PATH.name} to have their real family counted.",
++            f"from the registry probe index: {', '.join(unclassified)}. "
++            f"Counted as {len(grouped)} unverified lineage(s) keyed on the "
++            f"route minus its provider ({', '.join(grouped)}); routes to the "
++            f"same model through different providers are ONE family. Probe "
++            f"them into {VOTER_REGISTRY_PATH.name} to have their real "
++            f"families counted.",
+             file=sys.stderr,
+         )
+ 
+@@ -1038,7 +1087,8 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
+         f"bar of >={MIN_INDEPENDENT_SURFACES} surfaces and "
+         f">={MIN_INDEPENDENT_FAMILIES} families. Voters resolved: "
+         f"{sorted(resolved)}. Models absent from the probe index, counted as "
+-        f"unverified families: {unclassified or 'none'}. "
++        f"unverified lineages keyed on the route minus its provider: "
++        f"{unclassified or 'none'}. "
+         f"Load the missing provider credentials, choose a "
+         f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
+         "accept that the result is not independent consensus."
+diff --git a/packages/reasoning_ensemble/transport.py b/packages/reasoning_ensemble/transport.py
+index b6847ef..762d542 100644
+--- a/packages/reasoning_ensemble/transport.py
++++ b/packages/reasoning_ensemble/transport.py
+@@ -172,8 +172,13 @@ def active_online_profile(profile: str | None = None) -> str:
+         return raw
+ 
+ 
+-def _online_pool(profile: str | None) -> list[dict]:
+-    """Resolve the online voter pool from the gateway roster (credential-gated)."""
++def _online_pool(profile: str | None, *, check_independence: bool = True) -> list[dict]:
++    """Resolve the online voter pool from the gateway roster (credential-gated).
++
++    `check_independence=False` is for mixed mode ONLY, which appends the local
++    pool afterwards and judges the combined roster. Checking here as well would
++    refuse a pool that is independent once the local voters are added.
++    """
+     prof = active_online_profile(profile)
+     specs = resolve_default_voter_specs(profile=prof, include_unavailable=False)
+     # The same independence bar the consensus path enforces, on the same roster
+@@ -183,7 +188,8 @@ def _online_pool(profile: str | None) -> list[dict]:
+     # ensemble result that assert_roster_is_independent() would have refused --
+     # two views of one roster disagreeing about whether it counts as
+     # independent. Honours FLOSS_ALLOW_DEGRADED_ROSTER like the consensus path.
+-    assert_roster_is_independent(prof, specs)
++    if check_independence:
++        assert_roster_is_independent(prof, specs)
+     pool: list[dict] = []
+     for voter_id, model in specs.items():
+         transport = _transport_for_model(model)
+@@ -200,6 +206,32 @@ def _online_pool(profile: str | None) -> list[dict]:
+     return pool
+ 
+ 
++def _independence_route(voter: dict) -> str:
++    """A route the independence check can read the surface out of.
++
++    _online_pool strips the `ollama/` prefix so the tag matches what Ollama
++    expects, and LOCAL_VOTER_POOL carries bare tags for the same reason. Handed
++    to the independence check as-is, `_derive_surface("phi4-mini:latest")`
++    returns the whole tag, so four local voters read as FOUR provider surfaces
++    and a mixed roster of nothing but local models would clear the surface bar
++    on its own. Put the transport back on when the id has no route in it.
++    """
++
++    # TRANSPORT IS THE AUTHORITY, NEVER THE ID.
++    #
++    # The first version of this keyed on "does the id contain a slash", which
++    # is the identical mistake generate() documents sixty lines above: the
++    # retained local pool's fourth entry is
++    # `hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16`, an OLLAMA tag
++    # with two slashes in it, so the heuristic read `hf.co` as a provider
++    # surface and turned four local voters into two. The `transport` field
++    # exists precisely because the wire is not derivable from the model id.
++    model = voter["model"]
++    if (voter.get("transport") or "ollama") == "ollama":
++        return f"ollama/{model}"
++    return model
++
++
+ def resolve_voter_pool(
+     mode: str | None = None, online_profile: str | None = None
+ ) -> tuple[list[dict], str]:
+@@ -208,7 +240,26 @@ def resolve_voter_pool(
+     if resolved_mode == "local":
+         return list(LOCAL_VOTER_POOL), resolved_mode
+     if resolved_mode == "mixed":
+-        return _online_pool(online_profile) + list(LOCAL_VOTER_POOL), resolved_mode
++        # JUDGE THE POOL THAT ACTUALLY VOTES.
++        #
++        # _online_pool() raised before the local voters were appended, so a
++        # credential-filtered online subset that is narrow ON ITS OWN refused
++        # the run -- even though the same subset plus the four Ollama voters is
++        # three surfaces and seven families, comfortably independent. Mixed
++        # mode existed precisely to make that combination available, and the
++        # only way to get it was the degraded-roster override, which says the
++        # opposite of what is true about that roster.
++        #
++        # The check moves to the combined pool. Nothing is skipped: this is the
++        # same bar on a strictly larger roster.
++        combined = _online_pool(online_profile, check_independence=False) + list(
++            LOCAL_VOTER_POOL
++        )
++        assert_roster_is_independent(
++            active_online_profile(online_profile),
++            {voter["voter_id"]: _independence_route(voter) for voter in combined},
++        )
++        return combined, resolved_mode
+     if resolved_mode in {"", "online"}:
+         return _online_pool(online_profile), "online"
+     # An unknown mode is a configuration error, not a request for the default.
+diff --git a/scripts/autonomous_synthesis_loop.py b/scripts/autonomous_synthesis_loop.py
+index 5a6d875..4eb10ed 100644
+--- a/scripts/autonomous_synthesis_loop.py
++++ b/scripts/autonomous_synthesis_loop.py
+@@ -53,6 +53,15 @@ DEFER_SCAN_FACTOR = 5
+ 
+ DEFERRED_PREFIX = "DEFERRED::"
+ 
++# A source we could not READ is not a source we processed. This used to return
++# a plain "Error reading file: ..." string, which contains neither the deferral
++# prefix nor "LLM Extraction Failed", so the caller's two guards both missed it
++# and stage_draft() recorded the error text as the file's extracted semantics.
++# A later --commit then wrote a completed knowledge_distillation whose entire
++# content was an I/O error, and the file was thereafter treated as processed.
++# Invalid UTF-8, a permissions change or a transient network share is enough.
++UNREADABLE_PREFIX = "UNREADABLE::"
++
+ 
+ if str(REPO_ROOT) not in sys.path:
+     sys.path.insert(0, str(REPO_ROOT))
+@@ -100,8 +109,8 @@ def extract_semantics(file_path: Path, model: str, force_full: bool = False) ->
+     """
+     try:
+         content = file_path.read_text(encoding="utf-8")
+-    except Exception as e:
+-        return f"Error reading file: {e}"
++    except Exception as e:  # noqa: BLE001 -- any read failure is the same verdict
++        return f"{UNREADABLE_PREFIX} {type(e).__name__}: {e}"
+ 
+     chunk_size = 12000
+     chunks = [content[i : i + chunk_size] for i in range(0, len(content), chunk_size)]
+@@ -442,6 +451,10 @@ def main() -> int:
+     # dropped -- reporting them is the whole point of deferring instead of
+     # staging a skip marker.
+     deferred: list[Path] = []
++    # Reported separately from deferrals: a deferral is "too big, re-run with
++    # --force-full", an unreadable file is "this did not open", and telling an
++    # operator the wrong one sends them to the wrong fix.
++    unreadable: list[Path] = []
+     completed = 0
+     attempted = 0
+ 
+@@ -466,6 +479,18 @@ def main() -> int:
+ 
+         insights = extract_semantics(file_path, args.model, force_full=args.force_full)
+ 
++        if insights.startswith(UNREADABLE_PREFIX):
++            # Unreadable is NOT completion either, and for a harder reason than
++            # a deferral: there is no content to extract, so anything staged
++            # here is fabricated. Left pending and reported, exactly like a
++            # deferral, because the next run may well read it fine.
++            unreadable.append(file_path)
++            print(
++                f"  UNREADABLE (still pending): "
++                f"{insights[len(UNREADABLE_PREFIX):].strip()}"
++            )
++            continue
++
+         if insights.startswith(DEFERRED_PREFIX):
+             # Deferral is NOT completion. Staging this would exclude the file
+             # from later pending runs and let --commit record it as a finished
+@@ -517,6 +542,15 @@ def main() -> int:
+         else:
+             time.sleep(3)
+ 
++    if unreadable:
++        print(f"\n{len(unreadable)} file(s) COULD NOT BE READ and stay pending:")
++        for file_path in unreadable:
++            print(f"  - {file_path.name}")
++        print(
++            "Check encoding and permissions. Nothing was staged for these: "
++            "an I/O error is not a distillation."
++        )
++
+     if deferred:
+         print(f"\n{len(deferred)} file(s) DEFERRED and still pending:")
+         for file_path in deferred:
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index a820725..aaad2f3 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -433,7 +433,19 @@ def convert_mcp_server_to_opencode(name: str, server: dict[str, Any]) -> dict[st
+     transport, spec = classify_transport(name, server)
+ 
+     if transport == "http":
+-        return {"type": "remote", "url": spec["url"]}
++        # HEADERS ARE CREDENTIALS, AND DROPPING THEM IS SILENT.
++        #
++        # classify_transport() validates and returns the header map; this
++        # branch emitted only type and url, so an MCP whose auth lives in an
++        # Authorization header was projected as an unauthenticated server. It
++        # parses, it installs, and it fails at connect time against a config
++        # that looks correct -- there is nothing in the generated file to
++        # suggest anything was removed. OpenCode's remote MCP config supports
++        # a `headers` map, so project it.
++        remote: dict[str, Any] = {"type": "remote", "url": spec["url"]}
++        if spec.get("headers"):
++            remote["headers"] = dict(spec["headers"])
++        return remote
+ 
+     payload: dict[str, Any] = {
+         "command": [spec["command"], *spec["args"]],
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index 200a3c0..dc6254c 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -192,7 +192,7 @@ def assert_repo_scope_stays_inside(
+         raise SkillSurfaceError(
+             f"Target {target_name!r} declares scope 'repo' but its install_path "
+             f"resolves to {resolved}, outside {root}. Writing outside the "
+-            "repository is user scope: declare `\"scope\": \"user\"` and pass "
++            'repository is user scope: declare `"scope": "user"` and pass '
+             "--include-user-scope."
+         ) from None
+ 
+@@ -409,6 +409,55 @@ def remove_path(path: Path) -> None:
+     path.unlink()
+ 
+ 
++def prune_stale_projections(
++    target_name: str,
++    target_root: Path,
++    expected: set[str],
++    *,
++    check: bool,
++    dry_run: bool,
++) -> tuple[list[str], bool]:
++    """Remove managed projections whose skill has left the manifest.
++
++    The materializer only ever visited skills still IN the registry, so a
++    withdrawn or renamed skill kept its installed directory forever and
++    `--check` reported no drift -- the one signal an operator would act on said
++    the surface matched the manifest while agents went on discovering and
++    executing instructions that had been deliberately retracted. Renames were
++    the worst shape: the new name installs beside the old one and both are
++    live.
++
++    ONLY directories carrying MANAGED_MARKER are touched. Everything else under
++    the target root belongs to the operator or another tool, and this
++    materializer has no business deleting it -- the marker is what makes the
++    removal safe, and it is why enumerating here is possible at all.
++    """
++
++    results: list[str] = []
++    drift_found = False
++    if not target_root.exists():
++        return results, drift_found
++
++    for child in sorted(target_root.iterdir()):
++        if not child.is_dir() or child.name in expected:
++            continue
++        if not (child / MANAGED_MARKER).is_file():
++            # Unmanaged. Not ours, and silence is the correct behaviour.
++            continue
++        drift_found = True
++        if check:
++            results.append(
++                f"DRIFT {target_name}: {child.name} is an installed managed "
++                f"projection with no skill in the manifest (withdrawn or renamed)"
++            )
++        elif dry_run:
++            results.append(f"would remove {target_name}: {child.name} (stale)")
++        else:
++            remove_path(child)
++            results.append(f"removed {target_name}: {child.name} (stale)")
++    return results, drift_found
++
++
+ def install_skill_projection(
+     target_name: str,
+     skill: dict[str, Any],
+@@ -491,8 +540,17 @@ def materialize(
+     results.append(message)
+     drift_found = drift_found or changed
+ 
++    expected_names = {skill["skill_name"] for skill in registry["skills"]}
+     for target_name, root in writable.items():
+         target_root = Path(root)
++        # Prune BEFORE installing. A rename drops the old name and adds the new
++        # one in the same manifest edit, and pruning afterwards would be racing
++        # a directory this run has just written.
++        messages, changed = prune_stale_projections(
++            target_name, target_root, expected_names, check=check, dry_run=dry_run
++        )
++        results.extend(messages)
++        drift_found = drift_found or changed
+         for skill in registry["skills"]:
+             messages, changed = install_skill_projection(
+                 target_name,
+@@ -521,7 +579,7 @@ def parse_args() -> argparse.Namespace:
+         "--include-user-scope",
+         action="store_true",
+         help=(
+-            "also write targets declaring `\"scope\": \"user\"`, which live "
++            'also write targets declaring `"scope": "user"`, which live '
+             "outside the repository (e.g. ~/.codex/skills)"
+         ),
+     )
+=== COMMIT 29feb91: fix: three defects the pre-push review found in the previous commit
+
+
+diff --git a/packages/metacoordinator_mcp/voters.py b/packages/metacoordinator_mcp/voters.py
+index 0249a65..5bc7aa5 100644
+--- a/packages/metacoordinator_mcp/voters.py
++++ b/packages/metacoordinator_mcp/voters.py
+@@ -1053,13 +1053,39 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
+     # twin of any of them reaches four and passes -- the same false claim this
+     # fix is closing, one step further along. The probe index is keyed by full
+     # route, so the lineage suffix is what joins them.
+-    probed_by_lineage = {
+-        _unverified_family(known): meta["family"] for known, meta in index.items()
+-    }
++    # A DICT COMPREHENSION HERE WOULD RESOLVE A DISAGREEMENT SILENTLY.
++    #
++    # Two probed routes that share a lineage should agree on its family, and in
++    # the current registry all of them do. If a future probe records different
++    # families for the same lineage, last-write-wins by iteration order would
++    # hand an unprobed twin whichever one happened to be later -- a wrong
++    # family, chosen nondeterministically, inside the check that decides
++    # whether a poll counts as independent. The registry is the thing to fix,
++    # so say so instead of picking.
++    probed_by_lineage: dict[str, str] = {}
++    for known, meta in index.items():
++        lineage = _unverified_family(known)
++        previous = probed_by_lineage.setdefault(lineage, meta["family"])
++        if previous != meta["family"]:
++            print(
++                f"[voters] registry conflict: routes sharing lineage "
++                f"{lineage!r} are probed with different families "
++                f"({previous!r} and {meta['family']!r}). Unprobed twins of this "
++                f"lineage are counted as unverified until "
++                f"{VOTER_REGISTRY_PATH.name} agrees with itself.",
++                file=sys.stderr,
++            )
++            probed_by_lineage[lineage] = ""
++
++    def _family_for_unclassified(model: str) -> str:
++        lineage = _unverified_family(model)
++        # "" is the conflict marker written above: fall back to the unverified
++        # lineage rather than inheriting an arbitrary side of a disagreement.
++        return probed_by_lineage.get(lineage) or lineage
++
+     families = {index[model]["family"] for model in models if model in index}
+     for model in unclassified:
+-        lineage = _unverified_family(model)
+-        families.add(probed_by_lineage.get(lineage, lineage))
++        families.add(_family_for_unclassified(model))
+ 
+     if unclassified:
+         grouped = sorted({_unverified_family(m) for m in unclassified})
+diff --git a/packages/reasoning_ensemble/transport.py b/packages/reasoning_ensemble/transport.py
+index 762d542..cc17171 100644
+--- a/packages/reasoning_ensemble/transport.py
++++ b/packages/reasoning_ensemble/transport.py
+@@ -255,10 +255,31 @@ def resolve_voter_pool(
+         combined = _online_pool(online_profile, check_independence=False) + list(
+             LOCAL_VOTER_POOL
+         )
+-        assert_roster_is_independent(
+-            active_online_profile(online_profile),
+-            {voter["voter_id"]: _independence_route(voter) for voter in combined},
+-        )
++        # THE ROSTER JUDGED MUST BE THE ROSTER THAT VOTES.
++        #
++        # assert_roster_is_independent takes a dict keyed by voter_id, and a
++        # collision between an online voter_id and a LOCAL_VOTER_POOL one would
++        # silently drop an entry -- so the check would approve a SMALLER roster
++        # than the list returned two lines below actually votes with, and a
++        # duplicate id would vote twice. No profile collides today (online ids
++        # are provider-prefixed, local ones are bare), which is exactly what
++        # makes the failure silent if that ever stops being true.
++        judged = {voter["voter_id"]: _independence_route(voter) for voter in combined}
++        if len(judged) != len(combined):
++            seen: set[str] = set()
++            clashes = sorted(
++                {
++                    v["voter_id"]
++                    for v in combined
++                    if v["voter_id"] in seen or seen.add(v["voter_id"])
++                }
++            )
++            raise RuntimeError(
++                "mixed-mode pool has duplicate voter_id(s) "
++                f"{clashes}: the roster judged for independence would not be "
++                "the roster that votes. Rename the colliding voter(s)."
++            )
++        assert_roster_is_independent(active_online_profile(online_profile), judged)
+         return combined, resolved_mode
+     if resolved_mode in {"", "online"}:
+         return _online_pool(online_profile), "online"
+diff --git a/scripts/autonomous_synthesis_loop.py b/scripts/autonomous_synthesis_loop.py
+index 4eb10ed..13bf32c 100644
+--- a/scripts/autonomous_synthesis_loop.py
++++ b/scripts/autonomous_synthesis_loop.py
+@@ -63,6 +63,23 @@ DEFERRED_PREFIX = "DEFERRED::"
+ UNREADABLE_PREFIX = "UNREADABLE::"
+ 
+ 
++def pending_marker(insights: str) -> str | None:
++    """Which not-processed marker this extraction carries, or None.
++
++    ONE predicate, because there are two places that must apply it: the first
++    attempt and the rate-limit retry. Every time a new marker has been added,
++    the retry site was the one that did not learn about it -- the comment on
++    the retry below records that happening once already with `force_full`, and
++    UNREADABLE:: repeated it immediately. A result that carries a marker is not
++    a distillation, wherever it came from.
++    """
++
++    for marker in (UNREADABLE_PREFIX, DEFERRED_PREFIX):
++        if insights.startswith(marker):
++            return marker
++    return None
++
++
+ if str(REPO_ROOT) not in sys.path:
+     sys.path.insert(0, str(REPO_ROOT))
+ 
+@@ -516,14 +533,28 @@ def main() -> int:
+                 insights = extract_semantics(
+                     file_path, args.model, force_full=args.force_full
+                 )
+-                if insights.startswith(DEFERRED_PREFIX):
+-                    # Re-check after the retry. The pre-retry deferral check
+-                    # above has already been passed at this point, so without
+-                    # this the marker reaches staging.
+-                    deferred.append(file_path)
++                # EVERY marker, not just the deferral. The pre-retry checks
++                # have already been passed at this point, so any marker the
++                # retry produces reaches stage_draft unless it is caught here.
++                # This branch knew only about DEFERRED::, so a file that became
++                # unreadable between the two attempts -- a permissions change,
++                # a dropped network share -- was staged with the I/O error as
++                # its extracted semantics. Third marker to reach this site, and
++                # the second to be missed by it; hence one shared predicate.
++                retry_marker = pending_marker(insights)
++                if retry_marker is not None:
++                    bucket = (
++                        unreadable if retry_marker == UNREADABLE_PREFIX else deferred
++                    )
++                    label = (
++                        "UNREADABLE"
++                        if retry_marker == UNREADABLE_PREFIX
++                        else "DEFERRED"
++                    )
++                    bucket.append(file_path)
+                     print(
+-                        "  DEFERRED after retry (still pending): "
+-                        f"{insights[len(DEFERRED_PREFIX):].strip()}"
++                        f"  {label} after retry (still pending): "
++                        f"{insights[len(retry_marker):].strip()}"
+                     )
+                     continue
+                 if "LLM Extraction Failed" in insights:
+=== COMMIT 222d27b: fix: second review pass, including the duplicate the helper was added to remove
+
+
+diff --git a/packages/metacoordinator_mcp/voters.py b/packages/metacoordinator_mcp/voters.py
+index 5bc7aa5..03c5f21 100644
+--- a/packages/metacoordinator_mcp/voters.py
++++ b/packages/metacoordinator_mcp/voters.py
+@@ -1063,25 +1063,43 @@ def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str |
+     # whether a poll counts as independent. The registry is the thing to fix,
+     # so say so instead of picking.
+     probed_by_lineage: dict[str, str] = {}
++    conflicted: set[str] = set()
+     for known, meta in index.items():
+         lineage = _unverified_family(known)
+-        previous = probed_by_lineage.setdefault(lineage, meta["family"])
+-        if previous != meta["family"]:
++        if lineage in conflicted:
++            continue
++        family = meta["family"]
++        previous = probed_by_lineage.setdefault(lineage, family)
++        if previous != family:
++            # DROPPED, NOT OVERWRITTEN, AND REPORTED ONCE.
++            #
++            # The first version wrote "" as a conflict marker, which is
++            # indistinguishable from a registry entry whose family really is
++            # empty, and it re-reported on every later route sharing the
++            # lineage: three conflicting routes printed twice. A `conflicted`
++            # set says the same thing without inventing a sentinel that
++            # collides with real data.
++            conflicted.add(lineage)
++            probed_by_lineage.pop(lineage, None)
+             print(
+                 f"[voters] registry conflict: routes sharing lineage "
+                 f"{lineage!r} are probed with different families "
+-                f"({previous!r} and {meta['family']!r}). Unprobed twins of this "
++                f"({previous!r} and {family!r}). Unprobed twins of this "
+                 f"lineage are counted as unverified until "
+                 f"{VOTER_REGISTRY_PATH.name} agrees with itself.",
+                 file=sys.stderr,
+             )
+-            probed_by_lineage[lineage] = ""
+ 
+     def _family_for_unclassified(model: str) -> str:
++        """The probed family for this lineage, or the unverified key.
++
++        `.get(lineage, lineage)` and not `.get(lineage) or lineage`: the second
++        form treats a legitimately empty family string as absent, which is the
++        same conflation the "" conflict marker had.
++        """
++
+         lineage = _unverified_family(model)
+-        # "" is the conflict marker written above: fall back to the unverified
+-        # lineage rather than inheriting an arbitrary side of a disagreement.
+-        return probed_by_lineage.get(lineage) or lineage
++        return probed_by_lineage.get(lineage, lineage)
+ 
+     families = {index[model]["family"] for model in models if model in index}
+     for model in unclassified:
+diff --git a/packages/reasoning_ensemble/transport.py b/packages/reasoning_ensemble/transport.py
+index cc17171..73d9963 100644
+--- a/packages/reasoning_ensemble/transport.py
++++ b/packages/reasoning_ensemble/transport.py
+@@ -37,6 +37,7 @@ from __future__ import annotations
+ import json
+ import os
+ import sys
++from collections import Counter
+ from pathlib import Path
+ 
+ _THIS_DIR = Path(__file__).resolve().parent
+@@ -266,14 +267,12 @@ def resolve_voter_pool(
+         # makes the failure silent if that ever stops being true.
+         judged = {voter["voter_id"]: _independence_route(voter) for voter in combined}
+         if len(judged) != len(combined):
+-            seen: set[str] = set()
+-            clashes = sorted(
+-                {
+-                    v["voter_id"]
+-                    for v in combined
+-                    if v["voter_id"] in seen or seen.add(v["voter_id"])
+-                }
+-            )
++            # Counter, not a set comprehension whose filter relies on
++            # `set.add` returning None. That version was correct and unreadable,
++            # which on this file's history means it is a defect waiting for the
++            # next edit.
++            counts = Counter(voter["voter_id"] for voter in combined)
++            clashes = sorted(vid for vid, n in counts.items() if n > 1)
+             raise RuntimeError(
+                 "mixed-mode pool has duplicate voter_id(s) "
+                 f"{clashes}: the roster judged for independence would not be "
+diff --git a/scripts/autonomous_synthesis_loop.py b/scripts/autonomous_synthesis_loop.py
+index 13bf32c..c598738 100644
+--- a/scripts/autonomous_synthesis_loop.py
++++ b/scripts/autonomous_synthesis_loop.py
+@@ -63,6 +63,32 @@ DEFERRED_PREFIX = "DEFERRED::"
+ UNREADABLE_PREFIX = "UNREADABLE::"
+ 
+ 
++PENDING_LABELS = {UNREADABLE_PREFIX: "UNREADABLE", DEFERRED_PREFIX: "DEFERRED"}
++
++
++def record_pending(
++    marker: str,
++    insights: str,
++    file_path: Path,
++    unreadable: list[Path],
++    deferred: list[Path],
++    when: str = "",
++) -> None:
++    """File a not-processed result in the right bucket and say so.
++
++    Shared by the first attempt and the retry so the two cannot drift about
++    which marker goes where -- drift between those two sites is the whole
++    history of this function.
++    """
++
++    bucket = unreadable if marker == UNREADABLE_PREFIX else deferred
++    bucket.append(file_path)
++    print(
++        f"  {PENDING_LABELS[marker]}{when} (still pending): "
++        f"{insights[len(marker):].strip()}"
++    )
++
++
+ def pending_marker(insights: str) -> str | None:
+     """Which not-processed marker this extraction carries, or None.
+ 
+@@ -496,27 +522,14 @@ def main() -> int:
+ 
+         insights = extract_semantics(file_path, args.model, force_full=args.force_full)
+ 
+-        if insights.startswith(UNREADABLE_PREFIX):
+-            # Unreadable is NOT completion either, and for a harder reason than
+-            # a deferral: there is no content to extract, so anything staged
+-            # here is fabricated. Left pending and reported, exactly like a
+-            # deferral, because the next run may well read it fine.
+-            unreadable.append(file_path)
+-            print(
+-                f"  UNREADABLE (still pending): "
+-                f"{insights[len(UNREADABLE_PREFIX):].strip()}"
+-            )
+-            continue
+-
+-        if insights.startswith(DEFERRED_PREFIX):
+-            # Deferral is NOT completion. Staging this would exclude the file
+-            # from later pending runs and let --commit record it as a finished
+-            # distillation, permanently marking it processed with nothing
+-            # extracted. Leave it pending and say so.
+-            deferred.append(file_path)
+-            print(
+-                f"  DEFERRED (still pending): {insights[len(DEFERRED_PREFIX):].strip()}"
+-            )
++        # ONE predicate, both sites. pending_marker() was added for the retry
++        # site below and this one kept its own hand-rolled pair of startswith
++        # checks -- so the duplicate the helper exists to remove survived the
++        # commit that introduced the helper. Two copies of a classification is
++        # how UNREADABLE:: came to be missing from the retry in the first place.
++        marker = pending_marker(insights)
++        if marker is not None:
++            record_pending(marker, insights, file_path, unreadable, deferred)
+             continue
+ 
+         if "LLM Extraction Failed" in insights:
+@@ -533,28 +546,22 @@ def main() -> int:
+                 insights = extract_semantics(
+                     file_path, args.model, force_full=args.force_full
+                 )
+-                # EVERY marker, not just the deferral. The pre-retry checks
+-                # have already been passed at this point, so any marker the
++                # EVERY marker, not just the deferral. The pre-retry check
++                # has already been passed at this point, so any marker the
+                 # retry produces reaches stage_draft unless it is caught here.
+                 # This branch knew only about DEFERRED::, so a file that became
+                 # unreadable between the two attempts -- a permissions change,
+                 # a dropped network share -- was staged with the I/O error as
+-                # its extracted semantics. Third marker to reach this site, and
+-                # the second to be missed by it; hence one shared predicate.
++                # its extracted semantics.
+                 retry_marker = pending_marker(insights)
+                 if retry_marker is not None:
+-                    bucket = (
+-                        unreadable if retry_marker == UNREADABLE_PREFIX else deferred
+-                    )
+-                    label = (
+-                        "UNREADABLE"
+-                        if retry_marker == UNREADABLE_PREFIX
+-                        else "DEFERRED"
+-                    )
+-                    bucket.append(file_path)
+-                    print(
+-                        f"  {label} after retry (still pending): "
+-                        f"{insights[len(retry_marker):].strip()}"
++                    record_pending(
++                        retry_marker,
++                        insights,
++                        file_path,
++                        unreadable,
++                        deferred,
++                        when=" after retry",
+                     )
+                     continue
+                 if "LLM Extraction Failed" in insights:
+=== COMMIT 05f60e0: fix(surface): headers were dropped by three projections, not one
+
+
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index aaad2f3..9b97803 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -410,6 +410,7 @@ def build_antigravity_payload(
+     for name, raw_server in shared_mcp.items():
+         transport, spec = classify_transport(name, raw_server)
+         if transport == "http":
++            reject_unsupported_headers(name, "Antigravity", spec)
+             servers[name] = {"serverUrl": spec["url"]}
+         elif transport == "stdio":
+             entry: dict[str, Any] = {
+@@ -480,7 +481,40 @@ def build_opencode_payload(
+ 
+ # Transport fields the propagator owns on a managed server. Everything else
+ # on that server (tools tables, timeouts, approval modes) is preserved.
+-MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url")
++# `http_headers` is MANAGED, not preserved: a target converted from http to
++# stdio, or to an http entry that no longer carries credentials, must not keep
++# the old header table. Same reasoning the `env` handling below already
++# documents, in the other direction.
++MANAGED_TRANSPORT_FIELDS = ("type", "command", "args", "url", "http_headers")
++
++
++def reject_unsupported_headers(name: str, target: str, spec: dict[str, Any]) -> None:
++    """Refuse to project an authenticated HTTP server onto a target that
++    cannot carry its headers.
++
++    classify_transport() validates and returns `headers`, and three of the four
++    HTTP projections discarded it -- so an MCP authenticated by header was
++    written out as an unauthenticated server: a config that parses, installs,
++    and fails at connect time with nothing in the generated file to suggest
++    anything was removed. OpenCode and Codex have documented header fields and
++    now receive them. For the rest there is no verified field name, and
++    inventing one would be the same silent failure with extra steps.
++
++    Loud refusal is the honest option: it happens at materialization, names the
++    server and the target, and leaves the operator to remove the credentials
++    from the shared entry or drop the target. One definition, three callers --
++    a per-target copy of this is how the OpenCode fix came to be applied to one
++    projection out of four.
++    """
++
++    if spec.get("headers"):
++        raise SharedSurfaceError(
++            f"Shared MCP server {name!r} is an HTTP server with `headers`, and "
++            f"the {target} projection has no field to carry them. Writing it "
++            f"anyway would emit an unauthenticated server that fails at "
++            f"connect time. Remove the headers from the shared entry, or "
++            f"exclude {name!r} from the {target} target."
++        )
+ 
+ 
+ def ensure_no_name_map_collisions(
+@@ -603,6 +637,17 @@ def apply_codex_mcp(
+                 entry["env"] = spec["env"]
+             elif preserved_env is not None:
+                 entry["env"] = preserved_env
++        elif spec.get("headers"):
++            # `http_headers`, per Codex's documented config reference: "Map of
++            # HTTP header names to static values." Written HERE and not with
++            # the managed scalars above because it is a table, and TOML
++            # re-parents every later scalar into a table that precedes them --
++            # the constraint this function's ordering already exists to honour.
++            #
++            # It is in MANAGED_TRANSPORT_FIELDS, so a stale header table from a
++            # previous configuration is dropped before this runs rather than
++            # surviving as a preserved table.
++            entry["http_headers"] = spec["headers"]
+         for key, value in preserved_tables.items():
+             entry[key] = value
+ 
+@@ -849,6 +894,7 @@ def apply_hermes_mcp(
+         entry = servers[target_name]
+ 
+         if transport == "http":
++            reject_unsupported_headers(shared_name, "Hermes", spec)
+             for key in ("command", "args", "env"):
+                 entry.pop(key, None)
+             entry["type"] = "http"
+=== COMMIT 172a70b: fix(surface): three review findings on the header projection, and one of mine
+
+
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index 9b97803..a6a66d9 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -626,8 +626,24 @@ def apply_codex_mcp(
+         for key, value in preserved_scalars.items():
+             entry[key] = value
+ 
+-        # 3. tables, or TOML re-parents every later scalar into them (see
+-        #    docstring above -- defense-in-depth, not load-bearing today).
++        # 2b. OVERRIDE SCALARS, BEFORE ANY TABLE.
++        #
++        # Overrides used to be applied wholesale at the very end, after the
++        # tables -- which contradicts the ordering rule this function exists to
++        # honour, because tomlkit can re-parent a scalar written after a table
++        # into it. That was harmless while the only table was `env` on stdio
++        # entries and overrides in practice set scalars; adding `http_headers`
++        # put a table in front of the override loop for http entries too, which
++        # is exactly the case that carries credentials. Split by shape instead:
++        # scalars here, tables after the managed and preserved ones, so
++        # overrides still beat everything of their own kind.
++        override_items = (overrides.get(shared_name) or {}).items()
++        override_scalars = {k: v for k, v in override_items if not isinstance(v, dict)}
++        override_tables = {k: v for k, v in override_items if isinstance(v, dict)}
++        for key, value in override_scalars.items():
++            entry[key] = value
++
++        # 3. tables, or TOML re-parents every later scalar into them.
+         #    `env` is managed only when the shared entry defines one, and is
+         #    only ever carried over for a stdio target: a target converted
+         #    to http must not keep a stale (possibly credential-bearing)
+@@ -639,23 +655,26 @@ def apply_codex_mcp(
+                 entry["env"] = preserved_env
+         elif spec.get("headers"):
+             # `http_headers`, per Codex's documented config reference: "Map of
+-            # HTTP header names to static values." Written HERE and not with
+-            # the managed scalars above because it is a table, and TOML
+-            # re-parents every later scalar into a table that precedes them --
+-            # the constraint this function's ordering already exists to honour.
+-            #
+-            # It is in MANAGED_TRANSPORT_FIELDS, so a stale header table from a
+-            # previous configuration is dropped before this runs rather than
+-            # surviving as a preserved table.
++            # HTTP header names to static values." A table, so it belongs here
++            # and not with the managed scalars above. It is also in
++            # MANAGED_TRANSPORT_FIELDS, so a stale header table from a previous
++            # configuration is dropped before this runs.
+             entry["http_headers"] = spec["headers"]
+         for key, value in preserved_tables.items():
+             entry[key] = value
+-
+-        # 4. manifest overrides go LAST -- overrides beat everything,
+-        #    including pre-existing file content.
+-        for key, value in (overrides.get(shared_name) or {}).items():
++        for key, value in override_tables.items():
+             entry[key] = value
+ 
++        # 5. A CREDENTIAL TABLE MUST NOT OUTLIVE ITS TRANSPORT.
++        #
++        # An override can set `type` to anything, including flipping an http
++        # entry to stdio after http_headers was written -- leaving the headers
++        # stranded on an entry that will never send them, in a file an operator
++        # reads as current. Reconciled from the FINAL type rather than from
++        # `transport`, because the override is what decides it.
++        if entry.get("type") != "streamable_http" and "http_headers" in entry:
++            del entry["http_headers"]
++
+         servers[target_name] = entry
+ 
+     return doc
+@@ -895,12 +914,15 @@ def apply_hermes_mcp(
+ 
+         if transport == "http":
+             reject_unsupported_headers(shared_name, "Hermes", spec)
+-            for key in ("command", "args", "env"):
++            # `http_headers` in both lists: Hermes never writes one, but a hand
++            # edit can, and a credential table that survives a transport change
++            # is the same stranded-secret shape the Codex path reconciles.
++            for key in ("command", "args", "env", "http_headers"):
+                 entry.pop(key, None)
+             entry["type"] = "http"
+             entry["url"] = spec["url"]
+         else:
+-            for key in ("type", "url"):
++            for key in ("type", "url", "http_headers"):
+                 entry.pop(key, None)
+             entry["command"] = spec["command"]
+             entry["args"] = spec["args"]
+=== COMMIT 216e3ff: fix: five findings, four of them defects in this session's own fixes
+
+
+diff --git a/hooks/hook_post_write.py b/hooks/hook_post_write.py
+index e4beb71..519446f 100644
+--- a/hooks/hook_post_write.py
++++ b/hooks/hook_post_write.py
+@@ -292,8 +292,53 @@ def is_mutating_tool(tool_name: str) -> bool:
+     return (tool_name or "").strip().lower() in MUTATING_TOOL_NAMES
+ 
+ 
++DECLARED_SURFACE_ENV = "FLOSS_HOOK_SURFACE"
++DECLARED_SURFACE_FLAG = "--surface"
++
++
++def declared_surface(argv: list[str] | None = None) -> str:
++    """The surface this invocation was registered as, or "".
++
++    Read from the command line first because that is how the manifest declares
++    it -- `hook_post_write.py --surface codex`. The environment variable is the
++    fallback for a launcher that cannot add arguments.
++
++    Both, and not one: the first version of this read only the environment
++    while the manifest was writing only the flag, so the declaration was
++    plumbed at one end and read at the other and nothing was declared at all.
++    """
++
++    args = list(sys.argv[1:] if argv is None else argv)
++    for index, token in enumerate(args):
++        if token == DECLARED_SURFACE_FLAG and index + 1 < len(args):
++            return args[index + 1].strip()
++        if token.startswith(DECLARED_SURFACE_FLAG + "="):
++            return token.split("=", 1)[1].strip()
++    return (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
++
++
+ def infer_surface(tool_name: str, hook_event_name: str) -> str:
+-    """Best-effort origin label for the claim proposer."""
++    """Origin label for the claim proposer: declared if possible, else inferred.
++
++    DECLARED BEATS INFERRED, because two harnesses register this hook
++    identically. `shared-hook-surface.json` gives Codex and Claude the SAME
++    matcher (`Write|Edit|MultiEdit`) and the SAME command, so the payload
++    carries nothing that separates them -- and the tool-name branch below
++    labelled every Codex edit `claude-code`. That label is persisted in the
++    Claim summary and in the signed packet's `source_systems`, so the
++    provenance record named the wrong harness for a whole managed surface.
++    No heuristic can fix that; the two events are identical by construction.
++
++    So each registration declares itself via FLOSS_HOOK_SURFACE, and the
++    inference below is what remains for an UNMANAGED install -- a hand-written
++    Claude Code settings.json predating this surface, which is exactly the case
++    the tool-name branch was originally written for.
++    """
++
++    declared = declared_surface()
++    if declared:
++        return declared
++
+     tn = (tool_name or "").strip().lower()
+     event_name = (hook_event_name or "").strip()
+     if tn in {"write", "edit", "multiedit"}:
+diff --git a/packages/mcp_daemon.py b/packages/mcp_daemon.py
+index bdfb358..3c5940d 100644
+--- a/packages/mcp_daemon.py
++++ b/packages/mcp_daemon.py
+@@ -50,6 +50,19 @@ _CLAIM_GUARD_SECONDS = 5.0
+ _RESERVATION_MARKER = "RESERVED"
+ 
+ 
++class ClaimUnavailable(RuntimeError):
++    """The slot could not be judged, as distinct from being occupied.
++
++    claim_singleton returns False for "someone else holds this", and the
++    OSError/ImportError paths returned the same False -- so a missing shared
++    helper or an unwritable agent directory was indistinguishable from a
++    healthy running daemon. run_http_daemon then printed "already running" and
++    exited 0, and the PowerShell launcher reads a clean exit as a live daemon,
++    so the startup summary reported success with the port unserved. An
++    infrastructure failure has to be able to say so.
++    """
++
++
+ def _reservation_token() -> str:
+     """A value no other reservation will carry."""
+ 
+@@ -391,10 +404,19 @@ def claim_singleton(pid_filename: str) -> bool:
+             claimed = _claim_singleton_guarded(pid_path, me)
+     except TimeoutError:
+         # Someone is mid-transition on this slot. Occupied is the conservative
+-        # reading and the one that prevents a duplicate daemon.
+-        return False
+-    except (OSError, ImportError):
++        # reading and the one that prevents a duplicate daemon, and it is a
++        # genuine occupancy answer rather than a failure to produce one.
+         return False
++    except ImportError as exc:
++        raise ClaimUnavailable(
++            f"the shared file-lock helper is unavailable ({exc}); the slot for "
++            f"{pid_path} cannot be claimed or judged"
++        ) from exc
++    except OSError as exc:
++        raise ClaimUnavailable(
++            f"the slot for {pid_path} could not be claimed "
++            f"({type(exc).__name__}: {exc})"
++        ) from exc
+     if not claimed:
+         return False
+ 
+@@ -677,7 +699,15 @@ def run_http_daemon(mcp, *, pid_filename: str, port: int) -> None:
+     port must be set on the FastMCP instance's settings before calling run().
+     This function patches ``mcp.settings.port`` in-place before serving.
+     """
+-    if not claim_singleton(pid_filename):
++    try:
++        claimed = claim_singleton(pid_filename)
++    except ClaimUnavailable as exc:
++        # NONZERO, and on stderr. Exiting 0 here told Start-Daemon that a
++        # healthy daemon already held the port, so a machine that simply could
++        # not write its agent directory reported a successful startup.
++        print(f"[FLOSS MCP] cannot claim :{port}: {exc}", file=sys.stderr)
++        sys.exit(2)
++    if not claimed:
+         print(f"[FLOSS MCP] already running on :{port}; exiting.", file=sys.stderr)
+         sys.exit(0)
+     # FastMCP stores host/port in settings; run() reads them from there.
+diff --git a/packages/reasoning_ensemble/synthesizer.py b/packages/reasoning_ensemble/synthesizer.py
+index 1ee972e..e3725f1 100644
+--- a/packages/reasoning_ensemble/synthesizer.py
++++ b/packages/reasoning_ensemble/synthesizer.py
+@@ -507,7 +507,18 @@ def _survivor_independence_problem(
+ 
+     if not embedded:
+         return None
+-    if resolved_mode in {"local", "mixed"}:
++    # LOCAL ONLY. `mixed` was exempted here alongside `local`, and that stopped
++    # being defensible the moment resolve_voter_pool() started applying
++    # assert_roster_is_independent() to the COMBINED mixed pool: the run is now
++    # admitted precisely because online and local voters together clear the
++    # bar, so an outage that kills the online half leaves a correlated subset
++    # that this exemption would report as a normal consensus tier. Two views of
++    # one roster disagreeing about whether it counts as independent is the
++    # exact defect the combined-pool check was added to remove.
++    #
++    # `local` stays exempt because it is deliberately narrow by construction --
++    # one surface, chosen on purpose -- not degraded by circumstance.
++    if resolved_mode == "local":
+         return None
+     try:
+         from packages.metacoordinator_mcp.voters import roster_independence_problem
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index a6a66d9..3244416 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -728,13 +728,44 @@ def hermes_gateway_alive(home: Path) -> int | None:
+     pid_file = home / "gateway.pid"
+     if not pid_file.exists():
+         return None
++
++    # INDETERMINATE IS NOT ABSENT.
++    #
++    # An unreadable or malformed gateway.pid returned None, and every caller
++    # reads None as "no live gateway" and rewrites config.yaml -- which a
++    # gateway that IS running then overwrites from memory on shutdown, losing
++    # exactly the MCP and hook changes this guard exists to protect. A
++    # PermissionError or a half-written file is the likeliest state during a
++    # gateway's own startup, so the failure mode is worst when it matters most.
++    #
++    # `_pid_alive` already fails closed the same way for the same reason: it
++    # returns True when liveness cannot be determined. The reader was the half
++    # that did not.
+     try:
+-        payload = json.loads(pid_file.read_text(encoding="utf-8"))
+-    except (OSError, json.JSONDecodeError):
+-        return None
++        raw = pid_file.read_text(encoding="utf-8")
++    except OSError as exc:
++        raise SharedSurfaceError(
++            f"Hermes {pid_file} exists but could not be read "
++            f"({type(exc).__name__}); refusing to write under a gateway whose "
++            "state is unknown. Stop the gateway, or remove the file if you "
++            "know it is stale."
++        ) from exc
++    try:
++        payload = json.loads(raw)
++    except json.JSONDecodeError as exc:
++        raise SharedSurfaceError(
++            f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
++            "to write under a gateway whose state is unknown. Stop the "
++            "gateway, or remove the file if you know it is stale."
++        ) from exc
+     pid = payload.get("pid")
+     if not isinstance(pid, int):
+-        return None
++        raise SharedSurfaceError(
++            f"Hermes {pid_file} carries no integer `pid` (got "
++            f"{type(pid).__name__}); refusing to write under a gateway whose "
++            "state is unknown. Stop the gateway, or remove the file if you "
++            "know it is stale."
++        )
+     return pid if _pid_alive(pid) else None
+ 
+ 
+diff --git a/scripts/start_mcp_daemons.ps1 b/scripts/start_mcp_daemons.ps1
+index a546411..e604daf 100644
+--- a/scripts/start_mcp_daemons.ps1
++++ b/scripts/start_mcp_daemons.ps1
+@@ -199,13 +199,22 @@ if ($null -ne $omniRaw) { $omniRaw = $omniRaw.Trim() }
+ # that once inodes are recycled -- so testing emptiness alone would send every
+ # new reservation down the UNVERIFIABLE path and never start OmniRoute again.
+ $omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
++# NOT A BRANCH. This was the first arm of the if/elseif/else below, which is the
++# opposite of what its own comment claimed: saying "fall through and let the
++# slot claim decide" while structurally guaranteeing that the else block --
++# where --reserve-slot lives -- could never run. So a launcher that died
++# between reserving and recording left a reservation that was recognised,
++# announced, and then never reclaimed even past its stale window; OmniRoute
++# stayed disabled until someone deleted the file by hand, and because this arm
++# added nothing to $skipped the closing summary still reported every daemon
++# started. A message is a message; it must not consume the dispatch.
++#
++# A RESERVATION is a claim whose launcher never came back, not an unverifiable
++# holder, and --reserve-slot below knows how to reclaim one past its window.
+ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
+-    # A RESERVATION is a claim whose launcher never came back, not an
+-    # unverifiable holder. --reserve-slot below reclaims one past its stale
+-    # window, so fall through and let it decide instead of rejecting here: this
+-    # branch is what kept OmniRoute disabled until someone deleted the file.
+     Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - letting the slot claim decide"
+-} elseif ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid)) {
++}
++if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not $omniIsReservation) {
+     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."
+     $skipped += "OmniRoute (:20128) - not started; existing record is unverifiable"
+ } elseif ($omniVerdict -eq 'OURS') {
+diff --git a/shared-hook-surface.json b/shared-hook-surface.json
+index 80c3832..d85d54f 100644
+--- a/shared-hook-surface.json
++++ b/shared-hook-surface.json
+@@ -132,7 +132,7 @@
+             "hooks": [
+               {
+                 "type": "command",
+-                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
++                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --surface claude-code"
+               }
+             ]
+           },
+@@ -260,7 +260,7 @@
+               {
+                 "name": "flossi0ullk-post-write",
+                 "type": "command",
+-                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --stdout-json",
++                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --stdout-json --surface gemini-cli",
+                 "timeout": 60000,
+                 "description": "Submit substantive code edits into the FLOSSI0ULLK local consensus gateway."
+               }
+@@ -302,7 +302,7 @@
+             "hooks": [
+               {
+                 "type": "command",
+-                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
++                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --surface codex"
+               }
+             ]
+           },
+@@ -373,7 +373,7 @@
+         "PreToolUse": "pre_tool_call",
+         "PostToolUse": "post_tool_call"
+       },
+-      "reason": "This is the REAL Hermes home -- where the gateway actually runs and where Hermes reads its config -- not `.toilet/hermes/`, which is the operator's scratch document dump (gitignored) and was never the live gateway. The former `hermes_workspace` target (pointing at `.toilet/hermes/config.yaml`) has been removed entirely; this manifest no longer manages anything under `.toilet`. SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`. This hook block matches, byte-for-byte, the hooks already present and allowlisted (`hermes hooks list` reports both \u2713 allowed) in the live AppData config -- adopted as-is, not rewritten. NOTE (2026-08-18): agentmemory's 12 events are deliberately NOT registered here for the same reason SessionStart is not -- the event_map exposes only pre_tool_call/post_tool_call, and any manifest event absent from the map is dropped rather than emitted, so registering them would be silently inert. agentmemory ships no hermes hook variant as of 0.9.29.",
++      "reason": "This is the REAL Hermes home -- where the gateway actually runs and where Hermes reads its config -- not `.toilet/hermes/`, which is the operator's scratch document dump (gitignored) and was never the live gateway. The former `hermes_workspace` target (pointing at `.toilet/hermes/config.yaml`) has been removed entirely; this manifest no longer manages anything under `.toilet`. SessionStart is intentionally omitted -- it has no clean Hermes equivalent, so it is left unmapped rather than inventing one; the event_map mechanism drops any manifest event absent from it. `entry_shape: \"flat\"` is required because Hermes's own `agent/shell_hooks.py::_parse_single_entry` expects one flat `{matcher?, command}` mapping per hook, not the Claude-Code-nested `{matcher, hooks: [{type, command}]}` shape the other targets use -- the nested shape parsed to zero hooks (warn-and-skip on the missing `command` field) until this was fixed. The matcher is `write_file|patch` (Hermes's actual file-editing tool names -- confirmed against `tools/file_tools.py`), not `Write|Edit|MultiEdit`, which is Claude/Codex vocabulary Hermes tools never emit; `ShellHookSpec.matches_tool` fullmatches this as a regex against `tool_name`. This hook block matches, byte-for-byte, the hooks already present and allowlisted (`hermes hooks list` reports both ✓ allowed) in the live AppData config -- adopted as-is, not rewritten. NOTE (2026-08-18): agentmemory's 12 events are deliberately NOT registered here for the same reason SessionStart is not -- the event_map exposes only pre_tool_call/post_tool_call, and any manifest event absent from the map is dropped rather than emitted, so registering them would be silently inert. agentmemory ships no hermes hook variant as of 0.9.29.",
+       "hooks": {
+         "PreToolUse": [
+           {
+@@ -392,7 +392,7 @@
+             "hooks": [
+               {
+                 "type": "command",
+-                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\""
++                "command": "\"${PYTHON}\" \"${FLOSS_HOOKS}/hook_post_write.py\" --surface hermes"
+               }
+             ]
+           }
+=== COMMIT 303b1f9: fix: the review pass on the five fixes, and one finding I disagreed with
+
+
+diff --git a/hooks/hook_post_write.py b/hooks/hook_post_write.py
+index 519446f..6f868aa 100644
+--- a/hooks/hook_post_write.py
++++ b/hooks/hook_post_write.py
+@@ -295,6 +295,15 @@ def is_mutating_tool(tool_name: str) -> bool:
+ DECLARED_SURFACE_ENV = "FLOSS_HOOK_SURFACE"
+ DECLARED_SURFACE_FLAG = "--surface"
+ 
++# The labels this hook may stamp on a Claim. Closed on purpose: the value ends
++# up in the Claim summary and in the signed packet's `source_systems`, so a
++# manifest typo would write `--surface codexx` into permanent provenance with
++# nothing to notice it. Adding a harness already means editing infer_surface's
++# fallback branches, so an enum costs nothing that was free before.
++KNOWN_SURFACES = frozenset(
++    {"claude-code", "codex", "gemini-cli", "hermes", "agent-tool"}
++)
++
+ 
+ def declared_surface(argv: list[str] | None = None) -> str:
+     """The surface this invocation was registered as, or "".
+@@ -309,12 +318,31 @@ def declared_surface(argv: list[str] | None = None) -> str:
+     """
+ 
+     args = list(sys.argv[1:] if argv is None else argv)
++    declared = ""
+     for index, token in enumerate(args):
+         if token == DECLARED_SURFACE_FLAG and index + 1 < len(args):
+-            return args[index + 1].strip()
++            declared = args[index + 1].strip()
++            break
+         if token.startswith(DECLARED_SURFACE_FLAG + "="):
+-            return token.split("=", 1)[1].strip()
+-    return (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
++            declared = token.split("=", 1)[1].strip()
++            break
++    else:
++        declared = (os.environ.get(DECLARED_SURFACE_ENV) or "").strip()
++
++    if declared and declared not in KNOWN_SURFACES:
++        # Loud, and NOT honoured. Falling back to inference is the lesser
++        # wrong: an inferred label may be imprecise, but an unrecognised one
++        # is a value nothing downstream can interpret, written into a signed
++        # record. The manifest guard in the tests is the real fix -- this is
++        # the runtime half, for a hand-edited target config.
++        print(
++            f"[hook_post_write] unrecognised --surface {declared!r}; "
++            f"expected one of {sorted(KNOWN_SURFACES)}. Falling back to "
++            "inference so provenance is not stamped with an unknown label.",
++            file=sys.stderr,
++        )
++        return ""
++    return declared
+ 
+ 
+ def infer_surface(tool_name: str, hook_event_name: str) -> str:
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index 3244416..ea93d0b 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -1961,7 +1961,22 @@ def materialize(
+         if not hermes_path.exists():
+             results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
+             continue
+-        live_pid = hermes_gateway_alive(hermes_path.parent)
++        # A REFUSAL IS A RESULT, NOT A TRACEBACK.
++        #
++        # hermes_gateway_alive now raises rather than reporting an unreadable
++        # gateway.pid as "no gateway" -- correct, because the caller writes on
++        # that answer. But letting it escape here breaks the rule the block
++        # below states in its own comment: an unusable file must become one
++        # actionable line naming the path, not a raw traceback that discards
++        # every result gathered so far and skips the downstream
++        # sub-materializers. It also crashed `--check`, which must be
++        # read-only and must survive anything it finds on disk.
++        try:
++            live_pid = hermes_gateway_alive(hermes_path.parent)
++        except SharedSurfaceError as exc:
++            results.append(f"REFUSED {hermes_key}: {exc}")
++            drift_found = True
++            continue
+         if live_pid is not None:
+             results.append(
+                 f"REFUSED {hermes_key}: gateway PID {live_pid} is live; "
+diff --git a/scripts/start_mcp_daemons.ps1 b/scripts/start_mcp_daemons.ps1
+index e604daf..3e3f492 100644
+--- a/scripts/start_mcp_daemons.ps1
++++ b/scripts/start_mcp_daemons.ps1
+@@ -209,10 +209,17 @@ $omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
+ # added nothing to $skipped the closing summary still reported every daemon
+ # started. A message is a message; it must not consume the dispatch.
+ #
++# Two lines now print for this case, and that is deliberate: this one is
++# the DIAGNOSIS (what was found on disk) and the slot claim below emits the
++# OUTCOME (what was done about it). A fresh reservation still ends in
++# "already claimed by another launcher", which is true -- a launcher is
++# mid-flight -- and now also lands in $skipped, which is the half that was
++# missing. A stale one is reclaimed and OmniRoute starts.
++#
+ # A RESERVATION is a claim whose launcher never came back, not an unverifiable
+ # holder, and --reserve-slot below knows how to reclaim one past its window.
+ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
+-    Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - letting the slot claim decide"
++    Write-Host "[FLOSS MCP] OmniRoute record is an incomplete reservation - handing it to the slot claim, which reclaims it only past its stale window"
+ }
+ if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and -not $omniIsReservation) {
+     Write-Host "[FLOSS MCP] OmniRoute record exists but identity is UNVERIFIABLE - not starting a duplicate. Delete $omniPid if you know it is stale."

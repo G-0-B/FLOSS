@@ -1,0 +1,160 @@
+{
+ "reviewer": {
+  "model_selected": "perplexity-gemini-3-7-thinking-all-tools",
+  "harness": "perplexity",
+  "model_vendor_states": null,
+  "model_self_reported": "claude-sonnet-4-5",
+  "self_reported_harness": "Perplexity MCP + github_mcp_direct + execute_code",
+  "tools_used": [
+   "github",
+   "execution"
+  ],
+  "saw_prior_reviews": false
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "claim": "ANCHOR_STALE is returned — with the comment 'Growth only, nothing anchored has gone' — even when an interior packet has been deleted, provided net packet count still shows growth.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:302-305",
+   "evidence": [
+    "anchor.py:302-305: `elif len(leaves) > (anchor.get('packet_count') or 0): result['status'] = ANCHOR_STALE`",
+    "The ANCHOR_STALE branch executes after checking vanished identities, head regressions, and missing head SAIDs — none of which fire for an interior deletion. If an interior packet is deleted and two new packets are added, len(leaves) exceeds packet_count, no head is missing, and the branch returns ANCHOR_STALE.",
+    "The spec outcome table (docs/specs/provenance-anchor.spec.md, Outcomes section): 'ANCHOR_STALE | 1 | Store is a strict superset; nothing anchored has gone.' That claim is provably false in this scenario.",
+    "test_anchor.py has no test covering: interior deletion + larger growth → expected outcome. test_interior_deletion_is_reported_without_claiming_truncation (line 119) tests deletion alone, not deletion masked by growth.",
+    "ANCHOR_MISMATCH is only reachable when len(leaves) <= packet_count (anchor.py:309 else branch), so the interior-deletion case with net growth is structurally unreachable from that status."
+   ],
+   "falsifier": "Show that the ANCHOR_STALE branch re-checks whether anchored interior packet SAIDs are still present in current_saids before returning STALE. No such check exists in the file as retrieved.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F2",
+   "claim": "The spec requires walking the prev_root chain backwards during verify, but verify_anchor does not implement this walk, so a silently replaced anchor series passes as VERIFIED.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:270-290 vs docs/specs/provenance-anchor.spec.md Verify step 2",
+   "evidence": [
+    "spec Verify step 2: 'Walk `prev_root` backwards and confirm the series is unbroken.'",
+    "anchor.py:270-290 (full verify_anchor function): after signature verification, the function calls scan_packets, computes current_root, and if `current_root == anchored_root` immediately returns `{status: VERIFIED}`. There is no loop, no recursive load of previous anchors, no linkage check.",
+    "Consequence: operator publishes anchor A (prev_root=null), deletes it, publishes anchor B over a truncated store with prev_root=A's root. A verifier comparing the current store against B sees VERIFIED if the store matches B. The dropped A is invisible to the code.",
+    "The test suite (test_anchor.py) has no test for anchor chain continuity or gap detection."
+   ],
+   "falsifier": "Show any code path in verify_anchor that loads, follows, or validates prev_root against a stored prior anchor file. None exists in the retrieved file.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F3",
+   "claim": "The --expect-signer flag defaults to None, making key-rotation-based rewrite undetected by default, contradicting the spec's statement that pinning is 'the actual root of trust'.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py:104",
+   "evidence": [
+    "scripts/provenance_anchor.py:104: `parser.add_argument('--expect-signer', default=None, ...)`",
+    "anchor.py:237-244: `if expected_signer is not None and signer != expected_signer: return ...` — the pinning check is guarded by `is not None`.",
+    "With no flag: operator rotates signing key, signs a new anchor over a truncated store, verify runs without --expect-signer → signature validates against the new key → VERIFIED.",
+    "spec Limits section: 'Pinning the public key beforehand is the actual root of trust, not the signature.' But the CLI makes unpinned verify the default invocation with no warning emitted.",
+    "spec verify step 1: 'Verify sig against the pinned key.' The word 'pinned' implies pinning is mandatory, but the code makes it opt-in."
+   ],
+   "falsifier": "Show that the CLI emits a warning when --expect-signer is absent, or that the verify path refuses to proceed without it. No such guard exists in the retrieved file.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F4",
+   "claim": "The 'unreadable[]' list is recorded in the signed anchor but verify_anchor never compares the current unreadable list against the anchored one, creating a silent path to expunge a packet from the commitment by making it temporarily malformed.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:283, 321-332",
+   "evidence": [
+    "anchor.py:283: `result['unreadable_now'] = unreadable` — the current unreadable list is placed in the result dict.",
+    "anchor.py:321-332 (full findings block): `findings` contains vanished_identities, head_regressions, missing_anchored_heads, packet_delta. No field compares anchored['unreadable'] against current unreadable.",
+    "Attack path: operator corrupts a target packet file (makes it malformed JSON), runs anchor — the packet enters unreadable[], disappearing from the Merkle leaf set. Operator publishes this anchor. Later fixes the file. Result: the packet re-enters the leaf set, root no longer matches the malformed-era anchor → ANCHOR_MISMATCH, but a NEW anchor over the 'fixed' store passes as a fresh start with no explanation of the gap.",
+    "The signed anchor contains `unreadable[]` (anchor.py build_anchor returns it), so the list IS covered by the signature — but verify_anchor never uses it for comparison."
+   ],
+   "falsifier": "Show that verify_anchor checks whether any SAID in anchored['unreadable'] has since become readable and entered the leaf set, or flags if anchored['unreadable'] and current unreadable differ materially.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F5",
+   "claim": "There is no maximum staleness threshold or liveness alarm, so an operator who stops publishing anchors indefinitely produces perpetual ANCHOR_STALE — which the spec calls 'not a pass' but which carries no alert, no escalation path, and the same exit code (1) regardless of anchor age.",
+   "severity": "minor",
+   "location": "docs/specs/provenance-anchor.spec.md Outcomes table; packages/activity_log/anchor.py EXIT_CODES",
+   "evidence": [
+    "anchor.py EXIT_CODES: `ANCHOR_STALE: 1`. No age field is checked.",
+    "verify_anchor result for STALE: `result['status'] = ANCHOR_STALE` with `packet_delta` and findings. No `anchored_age_seconds` or staleness warning field.",
+    "spec Limits section does not list 'indefinite non-publication is undetectable' as a stated limit.",
+    "The spec's 'The anchor period is the exposure window' (Limits, bullet 2) addresses the intra-run window but not the case where runs stop entirely."
+   ],
+   "falsifier": "Show a staleness check in verify_anchor comparing generated_at against a configurable maximum age, or a CI/CD integration that fails on anchor age.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F6",
+   "claim": "The spec's Verify step 4 requires cross-checking against 'a third-party mirror of the event stream with that mirror's ingest timestamp', but the only practical archive (GH Archive) requires a paid BigQuery query — it is not a free, operationally accessible external witness.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md Verify step 4",
+   "evidence": [
+    "spec Verify step 4: 'Cross-check the root against the tag name, the commit message, and — the load-bearing step — a third-party mirror of the event stream, with that mirror's ingest timestamp.'",
+    "GH Archive (gharchive.org) is the primary long-term archive of GitHub public events. Data is stored in Google BigQuery; querying it requires a Google Cloud account and incurs per-query costs. There is no free real-time query API.",
+    "GitHub's own public events API retains approximately 90 days of events (documented behaviour). For long-term verification, GH Archive is the only practical option — and it is not free to query.",
+    "The spec acknowledges '⚠️ Specified, not ✅ Verified' for mirror retention (Limits, last bullet) but does not disclose the operational inaccessibility of the primary archive for routine verification.",
+    "OpenTimestamps (opentimestamps.org) would provide a free, permanently verifiable, Bitcoin-blockchain-anchored timestamp requiring only a Bitcoin node for independent verification — no paid service, no expiry. It would satisfy 'externally witnessed by construction' for the timestamp component at no additional dependency cost (pure HTTP at publish time)."
+   ],
+   "falsifier": "Identify a free, programmatically accessible, non-operator-controlled archive of GitHub CreateEvents that retains data beyond 90 days and is queryable without a paid account.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F7",
+   "claim": "The no-network-egress argument against adopting Sigstore Rekor is a design preference misframed as a principled constraint, and it may constitute an ADR-18 ladder violation.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md Composition section; scripts/provenance_anchor.py module docstring lines 17-23",
+   "evidence": [
+    "spec Composition: 'Rekor becomes a hashed-rekord over the same root, at which point a non-operator-controlled Merkle log anchors ours and real inclusion proofs exist.'",
+    "scripts/provenance_anchor.py docstring: 'Building a small Merkle commitment on existing dependencies (BLAKE3, jcs, PyNaCl — all already required) was preferred to adopting a transparency-log service because it adds no dependency and no network egress.'",
+    "The 'no egress' constraint applies to the verify path (offline verifier needs no network) but NOT to the publish path. Publishing to Rekor at anchor-publish time is a one-time HTTP POST per anchor run. Verifying can then be done offline against a cached inclusion proof.",
+    "ADR-18 requires 'adopt before extend before compose before build'. A custom Merkle tree is a 'build' artifact. Rekor provides the same external commitment with a non-operator-controlled log and real inclusion proofs — it is an adoptable prior art. The survey covers Rekor but concludes against adoption on egress grounds without naming what is technically lost.",
+    "What is actually lost by adopting Rekor: zero cryptographic properties. What is gained: a non-operator-controlled log, auditable by third parties, with inclusion proofs. The no-egress preference is real but does not rise to the level of a technical disqualifier under ADR-18."
+   ],
+   "falsifier": "Show that Rekor is technically incapable of providing what this artifact provides, beyond the egress constraint. Alternatively, show that ADR-18 permits 'build' when adoption has any operational friction at all.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F8",
+   "claim": "The spec uses 'inclusion proof' language that implies Merkle path proofs exist, but no such proofs are generated or verifiable; a future implementer following the spec will build proof-path infrastructure against a tree whose odd-node promotion makes those paths non-standard.",
+   "severity": "minor",
+   "location": "docs/specs/provenance-anchor.spec.md Leaf section; packages/activity_log/anchor.py:leaf_preimage docstring",
+   "evidence": [
+    "spec Leaf section: 'including identity and sequence makes an inclusion proof a statement about chain position'",
+    "anchor.py leaf_preimage docstring: 'Including `i` and `s` makes an inclusion proof a statement about CHAIN POSITION'",
+    "No inclusion proof generation or verification function exists anywhere in the four reviewed files. The term 'inclusion proof' refers here to a property of the leaf preimage design, not to a feature.",
+    "The odd-node promotion scheme (RFC 6962 shape) produces non-standard proof paths: a promoted node carries no node-tag at its promoted position, requiring explicit path-position metadata in any future proof implementation. The spec does not document this constraint.",
+    "Concrete risk: a future implementer building proof-path verification will either (a) produce invalid proofs for odd-positioned promoted nodes, or (b) must reverse-engineer the promotion rule from the tree implementation."
+   ],
+   "falsifier": "Show that 'inclusion proof' in the spec is used consistently only in the sense of 'the preimage binds position' and never implies verifiable Merkle path proofs exist or will exist.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F9",
+   "claim": "anchor.json is written with write_bytes() (non-atomic), leaving a corrupt file if the process dies mid-write; on a concurrent second publish, load_anchor returns None (JSONDecodeError → None) and the new anchor chains to prev_root=None, silently breaking the anchor series.",
+   "severity": "minor",
+   "location": "scripts/provenance_anchor.py:82-86",
+   "evidence": [
+    "scripts/provenance_anchor.py:82-86: `args.anchor.parent.mkdir(parents=True, exist_ok=True)` then `args.anchor.write_bytes(...)`",
+    "packages/activity_log/anchor.py load_anchor: `except (OSError, json.JSONDecodeError): return None`",
+    "_publish (scripts/provenance_anchor.py:69): `previous = anchor_lib.load_anchor(args.anchor)` — if the file is corrupt, previous=None, so `build_anchor(root, None)` sets prev_root=null, treating the run as a genesis anchor.",
+    "No tmp-then-rename (atomic write) pattern used. On POSIX os.rename is atomic; on Windows os.replace is atomic within a volume. Neither is used here.",
+    "Result: a process crash or concurrent invocation during write produces a genesis-appearing anchor that silently drops the entire prior chain."
+   ],
+   "falsifier": "Show that a write-to-tmp-then-atomic-rename pattern is used, or that concurrent publish is structurally impossible in the deployment model.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  }
+ ],
+ "refutations": [],
+ "predicted_majority": "The majority of reviewers will focus on the acknowledged limits — operator control, window between runs, key pinning as opt-in, and mirror retention as unverified — and will rate the artifact as a reasonable first step that is honest about its constraints. They will likely rate the overall construction as sound and the stated limits as sufficient, recommending Rekor/SCITT as a next layer rather than a replacement.",
+ "where_you_expect_to_be_alone": "F1: the ANCHOR_STALE false-positive when interior deletion is masked by net growth. This is a logic defect in anchor.py:302-305 that produces a status whose comment and spec description ('nothing anchored has gone') are provably false in a specific, testable scenario. It is not dramatic enough to attract attention but it is the only path by which a real deletion returns a non-alarming exit code (1 vs 2), and it has no test. Other reviewers will likely note the spec/code divergence on prev_root chain walking (F2) but miss that the false-STALE path is the more operationally dangerous one because it reads as routine."
+}

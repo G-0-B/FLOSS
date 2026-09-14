@@ -29,7 +29,7 @@ CANONICAL_PATHS = [
     ".agent-surface/context/CONTEXT_L1.md",
     "INDEX.md",
     "FLOSS/CLAUDE.md",
-    "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md",
+    "FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md",
     "FLOSS/scripts/context_router.py",
     "FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md",
     "FLOSS/docs/superpowers/plans/2026-04-19-filewatch-metaharness.md",

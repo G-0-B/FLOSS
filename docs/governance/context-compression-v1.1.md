@@ -131,7 +131,7 @@ These are inherited from the Kernel v1.2 non-negotiables. This packet does not a
 | ADR-0 | Recognition Protocol (foundation) | `/mnt/project/ADR-0-recognition-protocol.md` |
 | ADR-1 | Carrier Equivalence Principle | `/mnt/project/ADR-1-Carrier-Equivalence.md` |
 | ADR-003 | Metaprompt Kernelization | `/mnt/project/ADR-003-Metaprompt-Kernelization.md` |
-| ADR-N | IPFS Large File Integration | `/mnt/project/ADR-N-IPFS-Integration-VVS.md` |
+| ADR-N | IPFS Large File Integration | `/mnt/project/ADR-11-ipfs-large-file-integration.md` |
 | VVS Spec v1.0 | Rose Forest architecture | `/mnt/project/rose_forest_virtual_verifiable_singularity_vvs_spec_v_1_0.md` |
 | Mission Manifesto | Why we build this | `/mnt/project/flossi-mission-manifesto.md` |
 

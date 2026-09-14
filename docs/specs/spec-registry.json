@@ -1,9 +1,10 @@
 {
   "version": "0.1.0",
-  "updated": "2026-07-26",
+  "updated": "2026-08-17",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
+    "FLOSS/hooks",
     "FLOSS/docs/specs",
     "FLOSS/docs/adr"
   ],
@@ -21,28 +22,120 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-1: The Carrier Equivalence Principle)",
       "grandfathered": true
     },
+    "FLOSS/docs/adr/ADR-10-local-agent-node.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (Status)",
+      "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-11-ipfs-large-file-integration.md": {
+      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
+      "grandfathered": true
+    },
     "FLOSS/docs/adr/ADR-12-consent-gate-protocol.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-12 — Consent Gate Protocol)",
       "grandfathered": true
     },
     "FLOSS/docs/adr/ADR-13-yumeichan-watch-architecture.md": {
-      "spec": "ADR-13: Yumeichan Watch architecture"
+      "spec": "ADR-13: Yumeichan Watch Architecture (Affective Edge Node)"
     },
     "FLOSS/docs/adr/ADR-14-objectgraph-projection.md": {
-      "spec": "ADR-14: Objectgraph projection"
+      "spec": "ADR-14: ObjectGraph Projection over Corpus"
     },
     "FLOSS/docs/adr/ADR-15-provenance-validation-enforcement.md": {
-      "spec": "ADR-15: Provenance validation enforcement"
+      "spec": "ADR-15: Enforce Author-Provenance Binding in Integrity Zome"
     },
     "FLOSS/docs/adr/ADR-16-omnigent-execution-surface.md": {
-      "spec": "ADR-16: Omnigent execution surface"
+      "spec": "ADR-16: Omnigent as Execution/Governance Surface"
     },
     "FLOSS/docs/adr/ADR-17-knowledge-triple-contract-reconciliation.md": {
       "spec": "ADR-17: KnowledgeTriple contract reconciliation"
     },
+    "FLOSS/docs/adr/ADR-18-prior-art-reuse-gate.md": {
+      "spec": "ADR-18: enforce adopt/extend/compose/build evidence via spec_gate + reuse-review voters",
+      "spec_ref": "docs/specs/reuse-gate.spec.md"
+    },
+    "FLOSS/docs/adr/ADR-19-omniroute-inference-plane.md": {
+      "spec": "ADR-19: OmniRoute as the inference-routing plane",
+      "spec_ref": "docs/adr/ADR-19-omniroute-inference-plane.md"
+    },
     "FLOSS/docs/adr/ADR-2-holochain-substrate.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-2: Holochain as Runtime Substrate)",
       "grandfathered": true
+    },
+    "FLOSS/docs/adr/ADR-20-provenance-validator-reconciliation.md": {
+      "spec": "Provenance validator reconciliation: evidence-type allow-list drift (D-A1), unimplemented audit supersession view (D-B1), and p-ancestor over-validation (D-B3)",
+      "tier": 1,
+      "spec_ref": "docs/specs/provenance-packet.spec.md",
+      "reuse": {
+        "capability": "Correct the Plane A provenance validator so signed packets can pass submit_claim: one evidence-type authority, spec-scoped p-ancestor validation, and the audit supersession view the spec already defines",
+        "search_date": "2026-08-23",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "packages/orchestrator/claim_schema.EVIDENCE_TYPES",
+            "version": "repo 2026-08-10 (v1.5 D3 applied)",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23: carries all ten D3 values with rationale comment citing ADR-19; already enforced at claim-construction time. Adopt as the single authority for D-A1.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "docs/specs/provenance-packet.spec.md §Audit Disposition",
+            "version": "v1.4 + v1.5 D2/D3",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23: already specifies valid/superseded/invalid and the two supersession conditions. D-B1 implements an existing spec section rather than designing a new policy.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "existing _is_ancestor downgrade in provenance.py:756-761",
+            "version": "repo at head",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "read at head 2026-08-23; artifact_ref -> _resolve_workspace_ref -> sha256_file round-trip executed live against packages/mcp_daemon.py, hashes agree, workspace roots agree. Mechanism confirmed: ancestor MISSING warns, ancestor MISMATCH is fatal.",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "in-toto / sigstore attestation as replacement spine",
+            "version": "docs 2024-12",
+            "license": "Apache-2.0",
+            "maintenance": "CNCF active",
+            "platform_fit": "adds runtime deps",
+            "probe": "not_probed: rejected on the same grounds ADR-18 rejected it as a gate mechanism — dependency weight for a defect that is four lines of allow-list drift plus a scope mismatch against an existing spec.",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "content-addressed artifact snapshots (store the bytes, not just the hash)",
+            "probe": "not_probed: would make ancestor artifact hashes verifiable-in-place and dissolve the staleness problem entirely, at the cost of a blob store. Deferred, not rejected — revisit if Open Question 2 finds a real consumer of ancestor artifact refs.",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "No new surface. D-A1 replaces a six-value literal with an import. D-B3 narrows an existing ancestor validation branch to existence/signature/continuity. D-B1 is the only additive piece and implements a spec section verbatim; it gets its own tier-2 registration when built.",
+        "rejected_because": [
+          "in-toto/sigstore: dependency weight disproportionate to a constant-drift plus scope-mismatch defect (Specified)"
+        ],
+        "reviewer": {
+          "surfaces": [
+            "huggingface",
+            "mistral",
+            "nvidia",
+            "openrouter"
+          ],
+          "families": [
+            "deepseek",
+            "mistral",
+            "llama",
+            "gpt"
+          ],
+          "record": "docs/reviews/2026-08-24-adr20-adversarial-audit/synthesis.json",
+          "outcome": "ADVERSARIAL AUDIT, NOT A CONSENSUS-GATE DECISION. Overturned the proposed D-B2 in favour of D-B3 and forced the blast-radius reclassification System -> Substrate. The synthesis file's own tier1 / 100% / 'unanimous' labels are FALSE and must not be cited; see the review README and ADR-20 'Correction to the Q1 tally (2026-08-26)'. 2 of the 6 dispatched voters produced no position and are excluded from the surfaces and families above.",
+          "date": "2026-08-24"
+        },
+        "expiry_or_retest_date": "2026-12-21"
+      }
     },
     "FLOSS/docs/adr/ADR-3-metaprompt-kernelization.md": {
       "spec": "GRANDFATHERED 2026-06-12 (ADR-003: Metaprompt Kernelization)",
@@ -72,14 +165,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (ADR-9: Self-Perceptual Evolution (n+1))",
       "grandfathered": true
     },
-    "FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (Status)",
-      "grandfathered": true
-    },
-    "FLOSS/docs/adr/ADR-N-IPFS-Integration-VVS.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (ADR-N: IPFS Large File Integration for VVS-Compliant Git Repositories)",
-      "grandfathered": true
-    },
     "FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md": {
       "spec": "GRANDFATHERED 2026-06-12 (FLOSSI0ULLK / ARF — Upgraded ADR Suite v2.0)",
       "grandfathered": true
@@ -95,6 +180,97 @@
     "FLOSS/docs/specs/budget-entry.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (BudgetEntry Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/computer-use-gateway.schema.json": {
+      "spec": "JSON Schema for surface lease tickets",
+      "spec_ref": "docs/specs/computer-use-gateway.spec.md",
+      "tier": 1,
+      "reuse": {
+        "capability": "Lease ticket JSON shape for acquire_lease",
+        "search_date": "2026-08-25",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "existing spec-registry JSON Schema style",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": {
+              "status": "passed",
+              "detail": "matches computer-use-gateway.schema.json required keys",
+              "date": "2026-08-25"
+            },
+            "truth_status": "Verified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Four fields: lease_id, agent_id, surface, mode. No new schema language."
+      }
+    },
+    "FLOSS/docs/specs/computer-use-gateway.spec.md": {
+      "spec": "Workstation surface lease: router not controller, SendInput default-deny",
+      "spec_ref": "docs/specs/computer-use-gateway.schema.json",
+      "tier": 1,
+      "reuse": {
+        "capability": "Local workstation surface lease so many MCP hosts share one Windows desktop without racing SendInput",
+        "search_date": "2026-08-25",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "Cua cua-driver (trycua/cua)",
+            "version": "0.22.0 docs 2026-08-25",
+            "license": "MIT",
+            "maintenance": "active",
+            "platform_fit": "Windows background input; a11y tree shallow",
+            "probe": "not_probed: binary not on PATH this session",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "Playwright MCP",
+            "version": "@playwright/mcp latest 2026-08-25",
+            "license": "Apache-2.0",
+            "maintenance": "active",
+            "platform_fit": "web a11y snapshots, not OS GUI",
+            "probe": {
+              "status": "passed",
+              "detail": "npx @playwright/mcp@latest --help exit 0",
+              "date": "2026-08-25"
+            },
+            "truth_status": "Verified"
+          },
+          {
+            "name": "microsoft/UFO2 hybrid UIA+API",
+            "version": "v3.0.7 2026-06-12",
+            "license": "MIT",
+            "maintenance": "LTS",
+            "platform_fit": "Windows AgentOS; HostAgent is a controller",
+            "probe": "not_probed: steal action layer later, not HostAgent",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "CursorTouch Windows-MCP",
+            "license": "MIT",
+            "maintenance": "active",
+            "platform_fit": "UIA+SendInput; per-host spawn races",
+            "probe": "not_probed: not wired; SendInput default-deny here",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "Omnigent execution surface",
+            "license": "Apache-2.0",
+            "maintenance": "alpha",
+            "platform_fit": "ADR-16 Proposed; MCP seam unbuilt",
+            "probe": "not_probed: seam still open",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "compose",
+        "irreducible_delta": "Exclusive surface lease, human-priority freeze, default-deny SendInput/screenshot, single-process router in front of actuators. No new AgentOS.",
+        "rejected_because": [
+          "Pixel CUA on live desktop: focus steal + screenshot exfil",
+          "Per-host Windows-MCP spawn: input races"
+        ]
+      }
     },
     "FLOSS/docs/specs/consensus-gate.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (consensus-gate.schema)",
@@ -124,9 +300,6 @@
       "spec": "GRANDFATHERED 2026-06-12 (Heartbeat Runtime Budget Spec)",
       "grandfathered": true
     },
-    "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
-      "spec": "Specified integrity-zome provenance and authorization validation rules"
-    },
     "FLOSS/docs/specs/intake-event.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (intake-event.schema)",
       "grandfathered": true
@@ -134,6 +307,10 @@
     "FLOSS/docs/specs/intake-event.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Intake Event Specification)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/integrity-provenance-validation.spec.md": {
+      "spec": "Author-provenance binding enforcement in integrity zome",
+      "spec_ref": "docs/adr/ADR-15-provenance-validation-enforcement.md"
     },
     "FLOSS/docs/specs/knowledge-edge.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (knowledge-edge.schema)",
@@ -152,11 +329,69 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/openhuman-bridge-experiment.spec.md": {
-      "spec": "OpenHuman bridge experiment specification"
+      "spec": "OpenHuman bridge experiment spec (stub registered 2026-07-16 — needs owner review)"
     },
     "FLOSS/docs/specs/phase0-substrate-bridge.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Phase 0: Substrate Bridge Validation Spec)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/provenance-anchor.spec.md": {
+      "spec": "Merkle set-commitment over the packet store; defeats head truncation, which per-chain sequence gaps cannot see",
+      "tier": 2,
+      "reuse": {
+        "capability": "external, non-operator-controlled witness that a provenance packet set existed at a point in time",
+        "search_date": "2026-08-29",
+        "candidates": [
+          {
+            "name": "OpenTimestamps (opentimestamps 0.4.5)",
+            "truth_status": "Verified",
+            "probe": {
+              "status": "passed",
+              "detail": "Installed in an isolated venv and RUN against the real genesis anchor: 235-byte proof, genuine 5-step sha256 Merkle path, PendingAttestation from bob.btc.calendar.opentimestamps.org; library upgrade path reachable and correctly reports 'Pending confirmation in Bitcoin blockchain'. Minimal deps are opentimestamps + pycryptodomex + python-bitcoinlib. TWO PLATFORM DEFECTS FOUND BY RUNNING IT: every `ots` CLI subcommand dies on Windows/Py3.13 at bitcoin.core.key (OpenSSL DLL lookup), so only the library API is usable; and 2 of 3 default calendars had EXPIRED TLS certificates at probe time. Full record: docs/reviews/2026-08-29-model-identity-anomoly/PROBE-opentimestamps.md",
+              "date": "2026-08-29"
+            }
+          },
+          {
+            "name": "Git tag name + commit message in a public repo (what was built)",
+            "truth_status": "Verified",
+            "probe": {
+              "status": "failed",
+              "detail": "Probed against the live GitHub API on this repository's own pushes. PushEvent payload keys are [before, head, push_id, ref, repository_id] -- no commits key, removed by GitHub 2025-10-07 -- so the commit-message carrier reaches nobody. CreateEvent still carries the tag ref, so that carrier survives, but no tag has ever been created. Events API retention was also cut 90 days to 30 on 2025-01-30, so the surviving carrier has a hard expiry.",
+              "date": "2026-08-29"
+            }
+          },
+          {
+            "name": "Sigstore Rekor / SCITT / Trillian transparency logs",
+            "truth_status": "Specified",
+            "probe": "probed: not installed or run. Named by 5 reviewers as the adopt-rung answer; correct hardening layer, but each is a hosted service and none was exercised. Recorded as unprobed rather than dismissed."
+          }
+        ],
+        "verdict": "build",
+        "irreducible_delta": "The set commitment over (identity, sequence, SAID) leaves is irreducible -- no surveyed candidate provides one; OpenTimestamps and Rekor attest a digest and cannot commit to a packet set. But the WITNESS half was not irreducible and should have been composed rather than built: the probe shows OpenTimestamps supplies exactly it, with no operator-controlled ref in the trust path and no 30-day expiry. The ladder verdict for the publication mechanism is compose, and the artifact as shipped is build. That is the review's core finding and it stands against this entry.",
+        "reviewer": {
+          "surfaces": [
+            "antigravity",
+            "deepseek",
+            "gemini",
+            "glm",
+            "grok",
+            "meta",
+            "perplexity"
+          ],
+          "families": [
+            "gemini",
+            "deepseek",
+            "glm",
+            "grok",
+            "muse-spark",
+            "gpt"
+          ],
+          "record": "docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md",
+          "outcome": "REVISION REQUIRED -- NOT approved. 9 distinct reviewers, 68 findings, 31 after merge. Confirmed by reproduction: ANCHOR_STALE is a count comparison not a subset check (G4, 4 reviewers); the prev_root walk is specified and unimplemented (G5, 4 reviewers). Confirmed against live APIs: the commit-message witness carrier does not work (G6b) and Events retention is 30 days (G21). Unfixed: signer excluded from signed bytes (G1, 4 reviewers), key auto-mint with pinning off by default (G9). Against the design: the ladder was not satisfied for witnessing (G2, 6 reviewers) and the headline claim 'silent wholesale truncation impossible' is false once the operator republishes over a truncated store (G12). One reviewer (GROK/F11) concluded it should not ship in this form; that position is not yet refuted.",
+          "date": "2026-08-29",
+          "record_sha256": "0c9c8a08f492f62e32deaaa210afe3848d74cbff6e3b0ff0a8af97dcc9ef89de"
+        }
+      }
     },
     "FLOSS/docs/specs/provenance-packet.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (provenance-packet.schema)",
@@ -177,6 +412,57 @@
     "FLOSS/docs/specs/reasoning-ensemble-synthesizer.spec.md": {
       "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
       "grandfathered": true
+    },
+    "FLOSS/docs/specs/reuse-gate.schema.json": {
+      "spec": "JSON Schema for ADR-18 reuse blocks in spec-registry entries",
+      "spec_ref": "docs/specs/reuse-gate.spec.md"
+    },
+    "FLOSS/docs/specs/reuse-gate.spec.md": {
+      "spec": "Prior-Art and Reuse Gate spec: tiers, review profile, guideline loop, risk register, PR38 retrospective audit",
+      "spec_ref": "docs/adr/ADR-18-prior-art-reuse-gate.md",
+      "tier": 2,
+      "reuse": {
+        "capability": "Enforceable prior-art/reuse evidence (adopt/extend/compose/build) before infrastructure implementation",
+        "search_date": "2026-07-16",
+        "evidence_window_days": 120,
+        "candidates": [
+          {
+            "name": "spec_gate.py (D7) + spec-registry",
+            "version": "repo 2026-06-12",
+            "license": "project",
+            "maintenance": "active",
+            "platform_fit": "native",
+            "probe": "spec_gate.py --check executed live 2026-07-16; fail-closed path verified",
+            "truth_status": "Verified"
+          },
+          {
+            "name": "documentation checklist only",
+            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "in-toto layouts as gate mechanism",
+            "version": "docs 2024-12",
+            "license": "Apache-2.0",
+            "maintenance": "CNCF active",
+            "platform_fit": "adds runtime deps",
+            "probe": "not_probed: heavier than needed for registry-level gating; adopted conceptually for PR38 attestations instead",
+            "truth_status": "Specified"
+          },
+          {
+            "name": "CI gates (SDD constitutional)",
+            "probe": "not_probed: no CI substrate running yet; deferred, not rejected",
+            "truth_status": "Specified"
+          }
+        ],
+        "verdict": "extend",
+        "irreducible_delta": "Reuse-evidence validation (~90 lines) added to existing spec_gate; one voter-registry profile. No other custom surface.",
+        "rejected_because": [
+          "checklist-only: gameable (Specified); in-toto-as-gate: dependency weight for registry-level need (Specified)"
+        ],
+        "reviewer": "pending first reuse-review poll (profile: reuse-review)",
+        "expiry_or_retest_date": "2026-11-13"
+      }
     },
     "FLOSS/docs/specs/rose-node.schema.json": {
       "spec": "GRANDFATHERED 2026-06-12 (rose-node.schema)",
@@ -214,10 +500,30 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/yumeichan-watch-architecture.spec.md": {
-      "spec": "Yumeichan Watch architecture specification"
+      "spec": "Yumeichan affective edge-node watch architecture",
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
     },
     "FLOSS/docs/specs/yumeichan-watch-capabilities.schema.json": {
-      "spec": "Yumeichan Watch capability-token schema and proof shape"
+      "spec": "Capability schema for Yumeichan watch node",
+      "spec_ref": "docs/adr/ADR-13-yumeichan-watch-architecture.md"
+    },
+    "FLOSS/hooks/README.md": {
+      "spec": "Operator note describing what each hook fires on and how to disable one"
+    },
+    "FLOSS/hooks/agentmemory_client.py": {
+      "spec": "Thin REST client the hooks use to read/write the local agentmemory service"
+    },
+    "FLOSS/hooks/hook_bg_round.py": {
+      "spec": "Detached background consensus-round runner spawned by hook_post_write"
+    },
+    "FLOSS/hooks/hook_post_write.py": {
+      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
+    },
+    "FLOSS/hooks/hook_pre_write.py": {
+      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    },
+    "FLOSS/hooks/session_start_inject.py": {
+      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/artifact_actions.py": {
       "spec": "Allowlisted action runner for Cowork live-artifact GUI buttons"
@@ -254,20 +560,11 @@
       "spec": "Dynamic candidate-slate generator for high-ROI action polling",
       "spec_ref": "FLOSS/docs/specs/heartbeat-runtime-budget.spec.md"
     },
-    "FLOSS/scripts/hook_bg_round.py": {
-      "spec": "Detached background consensus-round runner spawned by hook_post_write"
-    },
-    "FLOSS/scripts/hook_post_write.py": {
-      "spec": "Post-write hook: substantive edits -> Claims + detached round + spec-gate advisory"
-    },
-    "FLOSS/scripts/hook_pre_write.py": {
-      "spec": "Pre-write hook: deterministic checkpoint before a tool mutates a file"
+    "FLOSS/scripts/major_consolidation_sweep.py": {
+      "spec": "Consolidation sweep utility (registered 2026-07-16 during ADR-18 drift cleanup; stub — needs owner review)"
     },
     "FLOSS/scripts/materialize_gemini_mcp.py": {
       "spec": "Backward-compat wrapper delegating to materialize_shared_agent_surface"
-    },
-    "FLOSS/scripts/major_consolidation_sweep.py": {
-      "spec": "LLM-assisted consolidation sweep over designated research sources"
     },
     "FLOSS/scripts/materialize_shared_agent_memory.py": {
       "spec": "Agent-memory canonical markdown -> registry + per-client projections"
@@ -302,11 +599,99 @@
       "spec": "Intake event consolidator over the claim-by-rename queue",
       "spec_ref": "FLOSS/docs/specs/intake-event.schema.json"
     },
+    "FLOSS/scripts/provenance_anchor.py": {
+      "spec": "CLI to publish and verify the provenance Merkle anchor; prints publish commands, runs none",
+      "tier": 2,
+      "reuse": {
+        "capability": "external, non-operator-controlled witness that a provenance packet set existed at a point in time",
+        "search_date": "2026-08-29",
+        "candidates": [
+          {
+            "name": "OpenTimestamps (opentimestamps 0.4.5)",
+            "truth_status": "Verified",
+            "probe": {
+              "status": "passed",
+              "detail": "Installed in an isolated venv and RUN against the real genesis anchor: 235-byte proof, genuine 5-step sha256 Merkle path, PendingAttestation from bob.btc.calendar.opentimestamps.org; library upgrade path reachable and correctly reports 'Pending confirmation in Bitcoin blockchain'. Minimal deps are opentimestamps + pycryptodomex + python-bitcoinlib. TWO PLATFORM DEFECTS FOUND BY RUNNING IT: every `ots` CLI subcommand dies on Windows/Py3.13 at bitcoin.core.key (OpenSSL DLL lookup), so only the library API is usable; and 2 of 3 default calendars had EXPIRED TLS certificates at probe time. Full record: docs/reviews/2026-08-29-model-identity-anomoly/PROBE-opentimestamps.md",
+              "date": "2026-08-29"
+            }
+          },
+          {
+            "name": "Git tag name + commit message in a public repo (what was built)",
+            "truth_status": "Verified",
+            "probe": {
+              "status": "failed",
+              "detail": "Probed against the live GitHub API on this repository's own pushes. PushEvent payload keys are [before, head, push_id, ref, repository_id] -- no commits key, removed by GitHub 2025-10-07 -- so the commit-message carrier reaches nobody. CreateEvent still carries the tag ref, so that carrier survives, but no tag has ever been created. Events API retention was also cut 90 days to 30 on 2025-01-30, so the surviving carrier has a hard expiry.",
+              "date": "2026-08-29"
+            }
+          },
+          {
+            "name": "Sigstore Rekor / SCITT / Trillian transparency logs",
+            "truth_status": "Specified",
+            "probe": "probed: not installed or run. Named by 5 reviewers as the adopt-rung answer; correct hardening layer, but each is a hosted service and none was exercised. Recorded as unprobed rather than dismissed."
+          }
+        ],
+        "verdict": "build",
+        "irreducible_delta": "The set commitment over (identity, sequence, SAID) leaves is irreducible -- no surveyed candidate provides one; OpenTimestamps and Rekor attest a digest and cannot commit to a packet set. But the WITNESS half was not irreducible and should have been composed rather than built: the probe shows OpenTimestamps supplies exactly it, with no operator-controlled ref in the trust path and no 30-day expiry. The ladder verdict for the publication mechanism is compose, and the artifact as shipped is build. That is the review's core finding and it stands against this entry.",
+        "reviewer": {
+          "surfaces": [
+            "antigravity",
+            "deepseek",
+            "gemini",
+            "glm",
+            "grok",
+            "meta",
+            "perplexity"
+          ],
+          "families": [
+            "gemini",
+            "deepseek",
+            "glm",
+            "grok",
+            "muse-spark",
+            "gpt"
+          ],
+          "record": "docs/reviews/2026-08-29-model-identity-anomoly/MERGE-GROUPS.md",
+          "outcome": "REVISION REQUIRED -- NOT approved. 9 distinct reviewers, 68 findings, 31 after merge. Confirmed by reproduction: ANCHOR_STALE is a count comparison not a subset check (G4, 4 reviewers); the prev_root walk is specified and unimplemented (G5, 4 reviewers). Confirmed against live APIs: the commit-message witness carrier does not work (G6b) and Events retention is 30 days (G21). Unfixed: signer excluded from signed bytes (G1, 4 reviewers), key auto-mint with pinning off by default (G9). Against the design: the ladder was not satisfied for witnessing (G2, 6 reviewers) and the headline claim 'silent wholesale truncation impossible' is false once the operator republishes over a truncated store (G12). One reviewer (GROK/F11) concluded it should not ship in this form; that position is not yet refuted.",
+          "date": "2026-08-29",
+          "record_sha256": "0c9c8a08f492f62e32deaaa210afe3848d74cbff6e3b0ff0a8af97dcc9ef89de"
+        }
+      }
+    },
+    "FLOSS/scripts/refresh_agent_surfaces.py": {
+      "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
+    },
+    "FLOSS/scripts/research_log.py": {
+      "spec": "Appends dated research-log entries to the shared research register"
+    },
+    "FLOSS/scripts/review_independence.py": {
+      "spec": "Kish n_eff over reviewer findings-overlap; measures panel redundancy without gold labels",
+      "tier": 1,
+      "reuse": {
+        "capability": "measure effective independence of a review panel without gold labels",
+        "search_date": "2026-08-26",
+        "candidates": [
+          {
+            "name": "Kish effective sample size (arXiv:2605.29800 section 3.3)",
+            "truth_status": "Verified",
+            "probe": "probed: read the method section in full; formula is n_eff = k / (1 + (k-1) * mean_phi) over binary vectors, plus an eigenvalue variant k / lambda_max. Adopted both verbatim."
+          },
+          {
+            "name": "numpy / scipy for the eigenvalue computation",
+            "truth_status": "Verified",
+            "probe": "probed: neither is declared in requirements-ci.txt or ARF/requirements.txt. Rejected -- adding a numeric stack to compute the largest eigenvalue of a matrix with k under ten would itself be a reuse-gate violation. 12-line power iteration instead."
+          },
+          {
+            "name": "krippendorff / statsmodels inter-rater agreement (alpha, Fleiss kappa)",
+            "truth_status": "Verified",
+            "probe": "probed: these measure inter-rater RELIABILITY, which is a different quantity. arXiv:2605.29800 section 3.3 rejects kappa explicitly -- it 'conflates prevalence with dependence; phi isolates the linear dependence that directly degrades majority-vote performance'. Using a kappa library would compute the wrong number."
+          }
+        ],
+        "verdict": "adopt",
+        "irreducible_delta": "The published method builds binary vectors from errors against gold labels. This project has no gold labels, so the item set is the union of findings raised and the vectors are 'did you raise this'. That measures redundancy, not accuracy, and the deviation is stated in the module docstring and the protocol doc so the number is never cited as the paper's own result."
+      }
+    },
     "FLOSS/scripts/review_queue.py": {
       "spec": "Read-only review-queue roll-up across staging surfaces + --triage classification"
-    },
-    "FLOSS/scripts/session_start_inject.py": {
-      "spec": "Inject STARTUP_CONTRACT.md at agent SessionStart"
     },
     "FLOSS/scripts/smoke_test_gateway.py": {
       "spec": "Smoke test: consensus gateway end-to-end"
@@ -320,6 +705,15 @@
     "FLOSS/scripts/spec_gate.py": {
       "spec": "Fail-closed -1-layer check: gated artifacts require a registry spec stub",
       "spec_ref": "FLOSS/docs/specs/spec-gate.spec.md"
+    },
+    "FLOSS/scripts/start_mcp_daemons.ps1": {
+      "spec": "Starts the local MCP daemon set (consensus gateway, agentmemory, reasoning ensemble)"
+    },
+    "FLOSS/scripts/stop_mcp_daemons.ps1": {
+      "spec": "Stops the local MCP daemon set started by start_mcp_daemons.ps1"
+    },
+    "FLOSS/scripts/sweep_mcp_orphans.ps1": {
+      "spec": "Reaps orphaned MCP daemon processes left by crashed or detached sessions"
     },
     "FLOSS/scripts/triage_review_queue.py": {
       "spec": "DEPRECATED shim -> review_queue.py --triage"

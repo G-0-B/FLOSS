@@ -57,7 +57,7 @@ SPECS, ADRS, AND RELATED RESEARCH (the WHY-it-works-this-way chain)
   LSM-Override — the Router implements `[auth:structural]` reasoning
   with explicit refusal handoff to Synthesizer for ensemble work)
 - Decision-grade peer:
-  `docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10, the consensus gateway
+  `docs/adr/ADR-10-local-agent-node.md` (ADR-10, the consensus gateway
   is decision-grade; this Router is reasoning-grade — different
   retention and stakes)
 - Consent enforcement (substrate-class peer):
@@ -147,7 +147,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -167,7 +167,15 @@ OLLAMA_BASE_URL = os.environ.get(
 ROUTER_MODEL = os.environ.get(
     "FLOSS_ROUTER_MODEL", "phi4-mini:latest"
 )  # 2.5GB, fits fully on 16GB VRAM alongside mxbai-embed-large; ~10s warm vs gemma3:12b's 40-50s. Equivalent classification accuracy on calibration sample. Set FLOSS_ROUTER_MODEL=gemma3:12b-it-qat to revert.
-EMBED_MODEL = os.environ.get("FLOSS_EMBED_MODEL", "mxbai-embed-large")
+# Imported, not re-derived: three copies of this lookup is how a vector came
+# to be embedded by one model and labelled with another. Same dual-path import
+# the synthesizer uses, so running this module directly still resolves.
+try:
+    from FLOSS.packages.reasoning_ensemble import transport
+except ImportError:
+    from packages.reasoning_ensemble import transport
+
+EMBED_MODEL = transport.EMBED_MODEL
 
 # Upgrade A: activity-log-similarity bias.
 # Scan the last N logged prompts; if any has a Tier-4 tag AND cosine
@@ -304,13 +312,29 @@ def _read_activity_tail(n_lines: int = ACTIVITY_LOOKBACK) -> list[dict]:
     return out
 
 
+# The embedder behind every historical Tier-4 row and behind ollama_embed().
+# Rows predating prompt_embedding_model are this model by construction.
+# The default for rows written BEFORE prompt_embedding_model existed. It is a
+# statement about history, never a label for a vector being computed now: those
+# must carry the model that actually produced them.
+LEGACY_EMBED_MODEL = "mxbai-embed-large"
+
+
 def check_tier4_similarity_bias(
     prompt_embedding: list[float],
+    embed_model: str = LEGACY_EMBED_MODEL,
 ) -> tuple[Optional[str], Optional[float]]:
     """Upgrade A: If a recent activity-log entry has a Tier-4 tag and the
     incoming prompt's embedding is similar to that entry's embedding above
     threshold, return (prior_prompt_hash, similarity_score) to trigger a
     forced ensemble bias. Otherwise return (None, None).
+
+    `embed_model` names the embedder that produced `prompt_embedding`. Rows
+    embedded by a different model are skipped: the synthesizer falls back to a
+    cloud embedder when local Ollama is down, and a cosine between two
+    different vector spaces is not a similarity -- it is a number. Rows written
+    before the model was recorded are treated as LEGACY_EMBED_MODEL, which is
+    what produced every one of them.
     """
     recent = _read_activity_tail(ACTIVITY_LOOKBACK)
     best_hash: Optional[str] = None
@@ -320,6 +344,8 @@ def check_tier4_similarity_bias(
             continue
         prior_embed = entry.get("prompt_embedding")
         if not prior_embed:
+            continue
+        if entry.get("prompt_embedding_model", LEGACY_EMBED_MODEL) != embed_model:
             continue
         sim = cosine_similarity(prompt_embedding, prior_embed)
         if sim > best_sim:
@@ -478,7 +504,15 @@ def classify(prompt: str, force_mode: Optional[str] = None) -> RouterDecision:
     similar_sim: Optional[float] = None
     try:
         prompt_embedding = ollama_embed(prompt)
-        similar_hash, similar_sim = check_tier4_similarity_bias(prompt_embedding)
+        # EMBED_MODEL, not LEGACY_EMBED_MODEL: this vector was just produced by
+        # ollama_embed(), which uses EMBED_MODEL -- and that is operator
+        # overridable via FLOSS_EMBED_MODEL. Labelling a nomic vector "mxbai"
+        # and comparing it against genuinely-mxbai rows is the cross-vector-space
+        # comparison this whole guard exists to prevent, reintroduced by a
+        # hardcoded name. The call four lines below already passed EMBED_MODEL.
+        similar_hash, similar_sim = check_tier4_similarity_bias(
+            prompt_embedding, EMBED_MODEL
+        )
         if similar_hash is not None:
             bias_applied = "tier4_similarity"
     except (
@@ -628,7 +662,7 @@ def _test_suite() -> int:
     print(f"\n{'=' * 80}")
     print(f"Score: {correct}/{len(cases)} ({100 * correct / len(cases):.0f}%)")
     print(
-        f"Note: classification is probabilistic; treat as calibration aid, not strict test."
+        "Note: classification is probabilistic; treat as calibration aid, not strict test."
     )
     return 0
 

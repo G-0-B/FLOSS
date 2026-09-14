@@ -47,6 +47,20 @@
       "items": false,
       "minItems": 2,
       "maxItems": 2
+    },
+    "valid_context": {
+      "type": "string",
+      "description": "Context in which the fact is considered valid (e.g., 'Holochain 0.6.1 testing')"
+    },
+    "known_failures": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Conditions or edge cases where the fact is known to fail"
+    },
+    "expiry_or_retest_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 date when the fact should be retested or is considered expired"
     }
   },
   "additionalProperties": false,

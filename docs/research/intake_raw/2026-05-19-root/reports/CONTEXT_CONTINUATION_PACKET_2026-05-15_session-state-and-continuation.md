@@ -67,7 +67,7 @@ These two rules together discipline every contribution. They are not slogans; th
 | Context Daemon Architecture | `FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md` | Living context infrastructure |
 | ADR Suite v2.0 | `FLOSS/docs/adr/FLOSSI0ULLK-ADR-Suite-v2.0.md` | Hand-verified ADRs (ADR-0..11, hand-verified 2026-04-26) |
 | ADR-8 Radicle Dev Substrate | `FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md` | Canonical dev-plane code substrate |
-| ADR-10 Local Agent Node (ADR-MCP-ORCHESTRATOR) | `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` | Consensus gateway |
+| ADR-10 Local Agent Node (ADR-MCP-ORCHESTRATOR) | `FLOSS/docs/adr/ADR-10-local-agent-node.md` | Consensus gateway |
 | Governance: Ancestry Sweep v1.0 | `FLOSS/docs/governance/ancestry-sweep-v1.0.md` | Pre-build check rule |
 | Governance: Spine v0.5 | `FLOSS/docs/governance/spine-v0.5.md` | Truth-status labels, Plane A/B, friction tiers |
 
