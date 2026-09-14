@@ -26,6 +26,7 @@ Current phase-status note (2026-05-18, **updated 2026-05-26**): MVP Phase 0 subs
 - ✅ **Verified (2026-05-26):** DNA + hApp compile to WASM in holonix `main-0.6` (`hc 0.6.1`); `hc dna pack` + `hc app pack` succeed; consent_integrity has 10/10 native Rust unit tests passing; rose_forest vector_ops has 8/8 native unit tests passing.
 - ⚠️ **Tryorama integration tests are NOT currently passing end-to-end.** Investigated 2026-05-26 against hc 0.6.1: no `@holochain/tryorama` version pairs cleanly with the 0.6 conductor. tryorama 0.17 expects a separate `hc-sandbox` binary; tryorama 0.18 expects `hc sandbox network webrtc` + `ConfigRootPath(...)` schema not present in 0.6; tryorama 0.19 sends a request shape conductor 0.6.1 cannot deserialize. The 0.6 line is EOL upstream (`crates.io` latest `holochain_cli` is `0.7.0-dev.26`). The earlier "Tryorama integration tests pass" claim was true against the pre-migration hc 0.4 line; it broke when the substrate bumped to `hdi 0.7.1 / hdk 0.6.1` (commit `7e6d4e5`).
 - Path forward: either (a) migrate substrate to `holonix main-0.7-dev` (where tryorama 0.18+ pairs cleanly), (b) write a custom test harness against `@holochain/client 0.19.3` directly (which does install against conductor 0.6.1), or (c) wait for an upstream tryorama-0.6 backport. Tracked as task M13.
+- **M13 resolved (recorded 2026-09-14) by a route not listed above:** Rust Sweettest, which drives the conductor as a library and needs no Tryorama at all (operator directive 2026-07-03). The JS suite was retired 2026-09-05. The harness passes on PR #61 — run `34255571655` on `de9ea44` — and is not yet merged to trunk.
 
 Do not confuse MVP Phase 0 with the separate orchestration substrate-bridge validation in `docs/specs/phase0-substrate-bridge.spec.md`, which remains Specified until publish/provenance/independent-verify/fork-visible criteria are executed and logged.
 
@@ -87,7 +88,7 @@ Success criteria:
 6. ✅ Budget system enforces 100 RU/day limit
 7. ✅ ThoughtCredential creation with ternary connotation
 8. ✅ All operations leave full provenance trail on source chain
-9. ✅ Tryorama integration tests pass for all 5 extern functions
+9. ❌ Integration tests pass for all 5 extern functions — **not on trunk.** The Tryorama pass was historical (hc 0.4 line) and that suite was retired 2026-09-05. The Rust Sweettest replacement passes on PR #61 (run `34255571655` on `de9ea44`); this item flips back to ✅ when #61 merges.
 
 **NOT in MVP**: Multi-agent coordination, LLM extraction pipeline, logical inference, KERI, AD4M, hREA, self-modification. These are LATER.
 
@@ -150,14 +151,23 @@ The retired `tests/tryorama/rose_forest.test.ts` contained **363 lines** coverin
 - BudgetEntry: initial 100 RU, consumption tracking (33 RU per node), budget exhaustion at 4th node
 - ThoughtCredential: create with valid input, reject out-of-range connotation, reject undersized embedding
 
-No new tests needed for Phase 0 — just make the existing ones pass.
+These tests no longer exist on trunk; there is nothing to "make pass". Their coverage was ported to Rust Sweettest on PR #61 (`ARF/tests/sweettest/`), which ships `consent_zome_test.rs` and `substrate_bridge_test.rs`. Phase 0 integration coverage requires **merging #61 and running its suite** — see Step 0.4.
 
 ### Step 0.4: Run integration tests
 
-Blocked on M13 (Sweettest harness). The former command
-(`cd tests/tryorama && npm install && npm test`) no longer resolves.
+No longer blocked on M13 — the Sweettest harness exists and passes. **Blocked on merging PR #61.**
 
-**Phase 0 exit criteria**: All 6+ integration tests pass. DNA compiles, installs, validates, and returns correct results.
+Once merged, from `ARF/`:
+
+```bash
+nix develop path:. --command ./tests/sweettest/run.sh
+```
+
+`run.sh` builds the four release WASMs, runs `hc dna pack`, then the suite. Allow ~95 minutes cold; CI measured 94 (run `34255571655` on `de9ea44`). Do not run bare `cargo test --manifest-path tests/sweettest/Cargo.toml` as evidence: it loads whatever `rose_forest.dna` is already on disk, and the harness currently checks only that the WASMs exist, not that the bundle was packed from them — an open review finding on #61.
+
+The former command (`cd tests/tryorama && npm install && npm test`) no longer resolves; the suite is retired.
+
+**Phase 0 exit criteria**: PR #61 merged, and the Sweettest suite passes on trunk via `run.sh` — currently 9 tests (consent 2, substrate bridge 7). DNA compiles, installs, validates, and returns correct results.
 
 **If Phase 0 fails**: Document why. Consider: (a) version bump hdi/hdk, (b) simplify zome code, (c) pivot to different Holochain version, (d) worst case: evaluate alternative substrate per ADR-2.
 
@@ -327,7 +337,9 @@ class HolochainBridge:
 
 ---
 
-## Phase 3: Multi-Agent + Tryorama Full Suite
+## Phase 3: Multi-Agent + Sweettest Full Suite
+
+> **Superseded tooling (recorded 2026-09-14).** This phase was drafted around Tryorama, which was retired 2026-09-05; the TypeScript sketch below is kept as a record of intent, not as runnable code. Its two-agent scenario is already covered in Rust by `substrate_bridge_test.rs` on PR #61. Rewrite the steps against Sweettest when this phase opens.
 
 **Goal**: Two agents coordinating knowledge through the Rose Forest DNA.
 
@@ -391,7 +403,7 @@ Alice creates a node, Bob creates a supporting edge to it.
 | **0: Substrate spike** | COMPLETE | — | 100% (done) |
 | **1: KnowledgeTriple + ontology** | 2-3 weeks | Depends on Phase 0 | 80% (spec is complete) |
 | **2: Real embeddings + bridge** | 1-2 weeks | sentence-transformers install, holochain-client API | 90% (well-understood) |
-| **3: Multi-agent tests** | 1-2 weeks | DHT sync timing in tests | 75% (Tryorama can be finicky) |
+| **3: Multi-agent tests** | 1-2 weeks | DHT sync timing in tests | 75% (two-conductor DHT convergence is slow — the Sweettest suite takes ~94 min cold in CI) |
 
 **Total to MVP**: ~5-9 weeks of focused work.
 
@@ -417,7 +429,7 @@ See `docs/research/Automated-Agent-Orchestration-Report_v2.0.0.md` for full anal
 
 **Phase 0 Substrate Bridge Validation** — `docs/specs/phase0-substrate-bridge.spec.md`
 
-Write and run a 2-agent Tryorama test that validates: publish, provenance, independent verify, discovery via query, fork visibility, and no privilege. This is the narrowest test that proves the architecture end-to-end.
+~~Write and run a 2-agent Tryorama test~~ — **already written, in Rust.** `substrate_bridge_test.rs` on PR #61 ports the six criteria (publish, provenance, independent verify, discovery via query, fork visibility, no privilege) and passes (run `34255571655` on `de9ea44`). **The immediate action is to merge #61**, then tick the Definition-of-Done boxes in `docs/specs/phase0-substrate-bridge.spec.md`, which are still unchecked. A passing branch is not a closed gate until it is on trunk and logged.
 
 That single command will tell us whether Phase 0 is a 2-hour fix or a 2-week investigation. Everything else flows from there.
 
