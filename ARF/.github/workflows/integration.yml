@@ -59,7 +59,6 @@ jobs:
         run: |
           pytest tests/ -v \
             --ignore=tests/integration/ \
-            --ignore=tests/tryorama/ \
             --cov=. \
             --cov-report=xml \
             --cov-report=term-missing

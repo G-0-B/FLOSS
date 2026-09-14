@@ -28,7 +28,7 @@ FLOSS/
 │   ├── conversation_memory.py                       # Persistent memory across sessions
 │   ├── dnas/                                        # Holochain DNA (integrity + coordinator zomes)
 │   ├── docs/arf_sdd_master_spec.md
-│   ├── tests/                                       # Tryorama tests
+│   ├── tests/                                       # Python tests (JS Tryorama suite retired 2026-09-05)
 │   └── in.finite-nrg/                               # Hardware abstraction layer
 │
 ├── packages/                                        # Local agent node (landed in 096b058)
@@ -80,7 +80,7 @@ Phase sequence: Foundation → **MVP Phase 0 (substrate viability)** → Phase 1
 
 **Terminology correction (2026-05-18):** Do not collapse two different "Phase 0" gates.
 
-1. **MVP Phase 0 / Rose Forest substrate viability**: ✅ Complete per `MVP_PLAN.md` and cross-agent synthesis in `pprevious_working_task.md`: DNA compiles to WASM, hApp/Tryorama integration tests pass, and the ontology integrity layer has 38 passing unit tests. The round-trip test timed out once, then passed on rerun.
+1. **MVP Phase 0 / Rose Forest substrate viability**: ✅ DNA compiles to WASM and the ontology integrity layer has 38 passing unit tests. ❌ **Trunk currently has no executable Holochain integration coverage.** The hApp/Tryorama integration pass recorded in `MVP_PLAN.md` and `pprevious_working_task.md` is **historical only**: it held on the pre-migration hc 0.4 line, broke at the `hdi 0.7.1 / hdk 0.6.1` bump (`7e6d4e5`) because no Tryorama version pairs with hc 0.6.1, and the suite was retired and deleted 2026-09-05. Its replacement is the Rust Sweettest harness on PR #61 (`codex/sweettest-substrate-bridge`), which ✅ passes on that branch — consent 2/2, substrate bridge 7/7, run `34255571655` on `de9ea44`, 94 min — but is not merged, so none of that coverage exists on trunk. Integration coverage returns when #61 lands.
 2. **Orchestration Phase 0 / substrate bridge validation**: ⚠️ Specified in `docs/specs/phase0-substrate-bridge.spec.md`. This is the next coordination-proof gate: publish → provenance → independent verify → query discovery → fork visibility → no privileged verifier. It is not a repeat of the MVP Tryorama gate.
 3. **ADR-2 evidence drift**: ⚠️ `FLOSSI0ULLK-ADR-Suite-v2.0.md` still contains the older "full round-trip unvalidated" note. Treat that as pending ADR evidence reconciliation, not as the current operational state.
 4. `ConversationMemory` ↔ `MultiScaleEmbedding` API reconciliation. A defensive metadata-normalization fix landed in commit `193729c` but the underlying API mismatch is a separate concern still open.
@@ -139,9 +139,12 @@ cargo test
 cargo fmt && cargo clippy
 hc dna pack workdir/dna
 
-# Holochain integration tests (TypeScript / Tryorama)
-npm install                                          # installs @holochain/tryorama
-npx ts-mocha ARF/tests/tryorama/*.test.ts
+# Holochain integration tests: the JS Tryorama suite was retired 2026-09-05
+# (deprecated per operator directive 2026-07-03; no tryorama version pairs with
+# hc 0.6.1). Rust Sweettest supersedes it: harness lives in ARF/tests/sweettest/
+# on PR #61 (branch codex/sweettest-substrate-bridge), open and not yet merged.
+# Until that lands, trunk has no executable Holochain integration coverage.
+# Recover the retired suite from tag archive/tryorama-suite-2026-09-05.
 
 # Python linting/formatting
 black .
