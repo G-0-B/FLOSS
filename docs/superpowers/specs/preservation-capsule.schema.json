@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk.local/superpowers/preservation-capsule.schema.json",
+  "title": "PR 38 Preservation Capsule Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "state_id",
+    "repository",
+    "captured_at",
+    "planes",
+    "exclusions",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "state_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "planes": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "allOf": [
+        {"contains": {"properties": {"plane_id": {"const": "remote-main"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "remote-pr"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "local-history"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "local-index"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "local-tracked"}}, "required": ["plane_id"]}},
+        {"contains": {"properties": {"plane_id": {"const": "local-untracked-ignored"}}, "required": ["plane_id"]}}
+      ],
+      "items": {
+        "$ref": "#/$defs/planeRecord"
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "$ref": "#/$defs/resultStatus"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {"const": "PASS"}
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "planes": {
+            "items": {
+              "properties": {
+                "eligibility": {"const": "eligible"},
+                "status": {"const": "PASS"}
+              },
+              "required": ["eligibility", "status"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "resultStatus": {
+      "enum": ["PASS", "FAIL", "BLOCKED", "SKIPPED"]
+    },
+    "planeRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plane_id",
+        "subject_id",
+        "digest",
+        "sensitivity",
+        "eligibility",
+        "verification",
+        "status"
+      ],
+      "properties": {
+        "plane_id": {
+          "enum": [
+            "remote-main",
+            "remote-pr",
+            "local-history",
+            "local-index",
+            "local-tracked",
+            "local-untracked-ignored"
+          ]
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sensitivity": {
+          "enum": ["ordinary", "opaque-sensitive", "redacted"]
+        },
+        "eligibility": {
+          "enum": ["eligible", "ineligible"]
+        },
+        "verification": {
+          "enum": [
+            "byte-equality",
+            "opaque-preserved",
+            "unverifiable-redacted"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/resultStatus"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "plane_id": {
+                "enum": [
+                  "remote-main",
+                  "remote-pr",
+                  "local-history",
+                  "local-index"
+                ]
+              }
+            },
+            "required": ["plane_id"]
+          },
+          "then": {
+            "properties": {
+              "sensitivity": {"const": "opaque-sensitive"},
+              "eligibility": {"const": "ineligible"},
+              "verification": {"const": "opaque-preserved"},
+              "status": {"const": "BLOCKED"}
+            }
+          },
+          "else": {
+            "oneOf": [
+              {
+                "properties": {
+                  "sensitivity": {"const": "ordinary"},
+                  "eligibility": {"const": "eligible"},
+                  "verification": {"const": "byte-equality"},
+                  "status": {"const": "PASS"}
+                }
+              },
+              {
+                "properties": {
+                  "sensitivity": {"const": "redacted"},
+                  "eligibility": {"const": "ineligible"},
+                  "verification": {"const": "unverifiable-redacted"},
+                  "status": {"const": "BLOCKED"}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
