@@ -30,6 +30,10 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-skill-surface.json"
 DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / ".agent-surface" / "skills"
 MANAGED_MARKER = ".flossi0ullk-managed.json"
+# Written into every marker and checked before any removal. One constant for
+# both, because the pruner deciding ownership by comparing against a second
+# copy of this string is how the two would drift apart.
+MANAGED_BY = "FLOSSI0ULLK shared skill surface"
 
 
 class SkillSurfaceError(Exception):
@@ -392,7 +396,7 @@ def check_or_write_json(
 
 def serialize_marker(skill: dict[str, Any], manifest_version: str) -> str:
     payload = {
-        "managed_by": "FLOSSI0ULLK shared skill surface",
+        "managed_by": MANAGED_BY,
         "manifest_version": manifest_version,
         "source_path": skill["resolved_path"],
         "skill_name": skill["skill_name"],
@@ -409,6 +413,36 @@ def remove_path(path: Path) -> None:
     path.unlink()
 
 
+def projection_owned_by(child: Path, owner_root: Path) -> bool:
+    """True only if this managed projection provably belongs to `owner_root`.
+
+    The marker records `source_path`, resolved under the workspace that
+    installed it. That is the ownership predicate, and it has to be CHECKED,
+    not assumed from the marker's existence: user-scope roots such as
+    ~/.codex/skills are shared by every checkout on the machine, so a skill
+    absent from THIS manifest may be a live skill another workspace installed.
+
+    Anything that cannot prove ownership -- unreadable, not an object, wrong
+    `managed_by`, no `source_path`, or a source outside `owner_root` -- is not
+    ours. Leaving a stale directory is recoverable; deleting a live one is not.
+    """
+
+    try:
+        marker = json.loads((child / MANAGED_MARKER).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(marker, dict) or marker.get("managed_by") != MANAGED_BY:
+        return False
+    source = marker.get("source_path")
+    if not isinstance(source, str) or not source.strip():
+        return False
+    try:
+        Path(source).resolve().relative_to(owner_root.resolve())
+    except (ValueError, OSError):
+        return False
+    return True
+
+
 def prune_stale_projections(
     target_name: str,
     target_root: Path,
@@ -416,6 +450,7 @@ def prune_stale_projections(
     *,
     check: bool,
     dry_run: bool,
+    owner_root: Path,
 ) -> tuple[list[str], bool]:
     """Remove managed projections whose skill has left the manifest.
 
@@ -443,6 +478,12 @@ def prune_stale_projections(
             continue
         if not (child / MANAGED_MARKER).is_file():
             # Unmanaged. Not ours, and silence is the correct behaviour.
+            continue
+        if not projection_owned_by(child, owner_root):
+            # MANAGED, BUT NOT BY US. The first version stopped at the marker's
+            # existence, so on a shared user-scope root it planned to remove
+            # another workspace's live projection whenever this manifest
+            # happened not to list that skill. Found by the external audit.
             continue
         drift_found = True
         if check:
@@ -547,7 +588,12 @@ def materialize(
         # one in the same manifest edit, and pruning afterwards would be racing
         # a directory this run has just written.
         messages, changed = prune_stale_projections(
-            target_name, target_root, expected_names, check=check, dry_run=dry_run
+            target_name,
+            target_root,
+            expected_names,
+            check=check,
+            dry_run=dry_run,
+            owner_root=workspace_root,
         )
         results.extend(messages)
         drift_found = drift_found or changed

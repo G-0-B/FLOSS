@@ -233,10 +233,17 @@ def test_a_withdrawn_skill_projection_is_removed(tmp_path):
     stale = root / "retired-skill"
     stale.mkdir(parents=True)
     (stale / "SKILL.md").write_text("old instructions", encoding="utf-8")
-    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(tmp_path / "workspace", "retired-skill"), encoding="utf-8"
+    )
 
     messages, drift = module.prune_stale_projections(
-        "codex", root, {"still-here"}, check=False, dry_run=False
+        "codex",
+        root,
+        {"still-here"},
+        check=False,
+        dry_run=False,
+        owner_root=tmp_path / "workspace",
     )
 
     assert drift is True
@@ -256,7 +263,12 @@ def test_an_unmanaged_directory_is_never_removed(tmp_path):
     (theirs / "SKILL.md").write_text("not ours", encoding="utf-8")
 
     messages, drift = module.prune_stale_projections(
-        "codex", root, {"still-here"}, check=False, dry_run=False
+        "codex",
+        root,
+        {"still-here"},
+        check=False,
+        dry_run=False,
+        owner_root=tmp_path / "workspace",
     )
 
     assert drift is False
@@ -272,12 +284,139 @@ def test_check_reports_a_stale_projection_as_drift(tmp_path):
     root = tmp_path / "skills"
     stale = root / "retired-skill"
     stale.mkdir(parents=True)
-    (stale / module.MANAGED_MARKER).write_text("{}", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(tmp_path / "workspace", "retired-skill"), encoding="utf-8"
+    )
 
     messages, drift = module.prune_stale_projections(
-        "codex", root, set(), check=True, dry_run=False
+        "codex",
+        root,
+        set(),
+        check=True,
+        dry_run=False,
+        owner_root=tmp_path / "workspace",
     )
 
     assert drift is True
     assert stale.exists(), "--check must not mutate"
     assert any("DRIFT" in m for m in messages)
+
+
+def _owned_marker(workspace: Path, skill_name: str) -> str:
+    """A marker as serialize_marker writes it, with its source in `workspace`."""
+    return json.dumps(
+        {
+            "managed_by": "FLOSSI0ULLK shared skill surface",
+            "manifest_version": "test",
+            "source_path": str((workspace / "skills" / skill_name).resolve()),
+            "skill_name": skill_name,
+        }
+    )
+
+
+def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
+    """External audit residual. The pruner checked that a marker EXISTED, not
+    whose it was. On a shared user-scope root such as ~/.codex/skills, two
+    checkouts install side by side, and a skill absent from THIS manifest was
+    selected for removal even when another workspace had installed it -- so
+    refreshing one workspace could delete another's live instructions.
+
+    The marker already records `source_path`, resolved under the installing
+    workspace. That is the ownership predicate: a projection is ours to remove
+    only if its source lives under our root."""
+    module = load_module()
+
+    root = tmp_path / "skills"
+    theirs = root / "their-skill"
+    theirs.mkdir(parents=True)
+    (theirs / module.MANAGED_MARKER).write_text(
+        _owned_marker(tmp_path / "other-workspace", "their-skill"), encoding="utf-8"
+    )
+
+    for check, dry_run in ((True, False), (False, True), (False, False)):
+        messages, drift = module.prune_stale_projections(
+            "codex",
+            root,
+            set(),
+            check=check,
+            dry_run=dry_run,
+            owner_root=tmp_path / "this-workspace",
+        )
+        assert (
+            theirs.exists()
+        ), f"another workspace's projection was removed ({check=}, {dry_run=})"
+        assert drift is False, "someone else's projection is not this workspace's drift"
+        assert not any(
+            "would remove" in m or "removed" in m for m in messages
+        ), messages
+
+
+def test_a_marker_that_cannot_prove_ownership_is_left_alone(tmp_path):
+    """Unparseable, empty, or missing source_path: none of those prove the
+    projection is ours, and deleting on an unproven claim is the failure this
+    guards. Leaving a stale directory is recoverable; deleting a live one is
+    not."""
+    module = load_module()
+
+    root = tmp_path / "skills"
+    for name, marker in (
+        ("unparseable", "not json{"),
+        ("empty-object", "{}"),
+        ("no-source", json.dumps({"managed_by": "FLOSSI0ULLK shared skill surface"})),
+        (
+            "wrong-owner",
+            json.dumps({"managed_by": "someone else", "source_path": str(tmp_path)}),
+        ),
+    ):
+        victim = root / name
+        victim.mkdir(parents=True)
+        (victim / module.MANAGED_MARKER).write_text(marker, encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=tmp_path
+    )
+
+    assert drift is False
+    assert sorted(p.name for p in root.iterdir()) == sorted(
+        ["unparseable", "empty-object", "no-source", "wrong-owner"]
+    )
+
+
+def test_the_materializer_passes_its_own_workspace_as_owner():
+    """A pruner that requires an owner is only as good as the owner it is
+    given. The one production caller must pass the workspace it materializes,
+    not a constant and not the target root."""
+    import inspect
+
+    module = load_module()
+    source = inspect.getsource(module.materialize)
+    call = source.split("prune_stale_projections(", 1)[1].split(")", 1)[0]
+    assert "owner_root=workspace_root" in call, call
+
+
+def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_path):
+    """The join between the writer and the reader of the ownership claim.
+
+    Three defects on this PR were a manifest and its reader disagreeing about
+    what one end wrote. If serialize_marker and projection_owned_by ever
+    diverge -- a renamed key, a changed managed_by string, an unresolved path
+    -- every projection this workspace installed would silently become
+    unprunable, and the withdrawal fix would stop working without a failure.
+    """
+    module = load_module()
+
+    workspace = tmp_path / "workspace"
+    source = workspace / "skills" / "real-skill"
+    source.mkdir(parents=True)
+    projection = tmp_path / "installed" / "real-skill"
+    projection.mkdir(parents=True)
+    (projection / module.MANAGED_MARKER).write_text(
+        module.serialize_marker(
+            {"skill_name": "real-skill", "resolved_path": str(source.resolve())},
+            "test",
+        ),
+        encoding="utf-8",
+    )
+
+    assert module.projection_owned_by(projection, workspace)
+    assert not module.projection_owned_by(projection, tmp_path / "elsewhere")

@@ -523,9 +523,26 @@ def _survivor_independence_problem(
     try:
         from packages.metacoordinator_mcp.voters import roster_independence_problem
 
+        # THE SAME ROUTES ADMISSION JUDGED, NOT THE RAW MODEL IDS.
+        #
+        # Admission builds its roster through transport._independence_route,
+        # which puts `ollama/` back on a local voter's bare tag so the surface
+        # is read from the TRANSPORT. This passed `r.model` instead, so the
+        # shipped local pool -- `phi4-mini:latest`, `llama3.2:...`,
+        # `granite-code:...` and the slashed `hf.co/...` tag -- read as four
+        # provider surfaces, and a mixed run that lost its whole online half
+        # still cleared the bar. Removing the mixed-mode exemption switched
+        # this check on without making its inputs match admission's: two views
+        # of one roster, disagreeing about the roster itself. The response
+        # already carries transport_name; this is the one place it was unread.
         return roster_independence_problem(
             transport.active_online_profile(),
-            {r.voter_id: r.model for r in embedded},
+            {
+                r.voter_id: transport._independence_route(
+                    {"model": r.model, "transport": r.transport_name}
+                )
+                for r in embedded
+            },
         )
     except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
         return None

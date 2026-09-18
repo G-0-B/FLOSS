@@ -394,3 +394,118 @@ def test_a_duplicate_voter_id_in_the_mixed_pool_is_refused(monkeypatch):
 
     with pytest.raises(RuntimeError, match="duplicate voter_id"):
         transport.resolve_voter_pool()
+
+
+# ---------------------------------------------------------------------------
+# Admission and survival must read one roster the same way.
+# ---------------------------------------------------------------------------
+
+
+def _local_survivors():
+    """The shipped local pool, as responses carrying their real transport."""
+    from packages.reasoning_ensemble import transport
+
+    return [
+        synthesizer.VoterResponse(
+            voter_id=v["voter_id"],
+            model=v["model"],
+            family=v["family"],
+            response="A substantive response. Supporting reasoning.",
+            response_hash="h",
+            response_embedding=[1.0, 0.0],
+            duration_seconds=0.1,
+            transport_name=v["transport"],
+        )
+        for v in transport.LOCAL_VOTER_POOL
+    ]
+
+
+def test_local_survivors_of_a_mixed_run_are_one_surface(monkeypatch):
+    """External audit F1. Admission counts the local pool as ONE surface by
+    rebuilding `ollama/<tag>` from the transport; the survivor check passed the
+    raw model id, so `phi4-mini:latest`, `llama3.2:...`, `granite-code:...`
+    and `hf.co` read as four providers and cleared the surface bar. Un-exempting
+    mixed mode switched this check on without making its inputs match."""
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+
+    problem = synthesizer._survivor_independence_problem(_local_survivors(), "mixed")
+
+    assert problem is not None, "four local voters on one surface were accepted"
+    assert "1 provider surface" in problem, problem
+
+
+def test_admission_and_survival_agree_about_the_same_roster(monkeypatch):
+    """The property, not the instance: one roster, two views, one verdict."""
+    from packages.metacoordinator_mcp import voters
+    from packages.reasoning_ensemble import transport
+
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+
+    admitted = voters.roster_independence_problem(
+        "diverse",
+        {
+            v["voter_id"]: transport._independence_route(v)
+            for v in transport.LOCAL_VOTER_POOL
+        },
+    )
+    survived = synthesizer._survivor_independence_problem(_local_survivors(), "mixed")
+
+    assert (admitted is None) == (survived is None), (admitted, survived)
+
+
+def test_a_mixed_run_that_loses_its_online_half_is_degraded(monkeypatch):
+    """End to end, through synthesize(), as the audit reproduced it: two online
+    voters admitted with the local pool, both fail, four local survivors with
+    distinct embeddings remain. That is one surface, and the run must say so --
+    degraded, with an unsuccessful audit record -- rather than reporting a
+    normal consensus tier over a correlated subset."""
+    from unittest.mock import patch
+
+    from packages.reasoning_ensemble import transport
+
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+    monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
+
+    survivors = _local_survivors()
+    for response, vector in zip(
+        survivors, ([1, 0], [0.99, 0.01], [0.97, 0.03], [-1, 0])
+    ):
+        response.response_embedding = vector
+    online = {
+        "audit-groq": "groq/openai/gpt-oss-120b",
+        "audit-mistral": "mistral/mistral-large-latest",
+    }
+    failed = [
+        synthesizer.VoterResponse(
+            voter_id=name,
+            model=model,
+            family=transport.family_from_model(model),
+            response="",
+            response_hash="",
+            response_embedding=None,
+            duration_seconds=0.1,
+            error="simulated outage",
+            transport_name="litellm",
+        )
+        for name, model in online.items()
+    ]
+
+    with patch.object(
+        transport, "resolve_default_voter_specs", return_value=online
+    ), patch.object(
+        transport, "resolve_embedder", return_value=("t", lambda _: [1, 0])
+    ), patch.object(
+        synthesizer, "dispatch_parallel", return_value=failed + survivors
+    ), patch.object(
+        synthesizer, "_log_synthesis_action"
+    ) as log:
+        result = synthesizer.synthesize("mixed outage", stage_artifact=False)
+
+    assert result.tier_classification.tier == "degraded"
+    assert log.call_args.kwargs["success"] is False
+    assert len(result.voter_responses) == len(failed) + len(
+        survivors
+    ), "responses must be retained on a degraded run"

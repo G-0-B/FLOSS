@@ -1326,32 +1326,131 @@ def test_a_scalar_override_renders_outside_the_header_table():
     assert result["mcp_servers"]["srv"]["startup_timeout_sec"] == 45
 
 
-def test_a_corrupt_pid_file_is_reported_not_raised_through_materialize(tmp_path):
-    """A refusal is a result, not a traceback.
+# ---------------------------------------------------------------------------
+# External audit F2: a partial function's contract has to reach every caller.
+# ---------------------------------------------------------------------------
 
-    hermes_gateway_alive raising is right -- the caller writes on its answer --
-    but letting it escape breaks the rule the surrounding block states in its
-    own comment: an unusable file must become one actionable line naming the
-    path, not a traceback that discards every result gathered so far and skips
-    the downstream sub-materializers. It also crashed `--check`, which has to
-    be read-only and has to survive whatever it finds on disk.
-    """
-    home = tmp_path / "hermes"
+
+def _corrupt_hermes_home(root: Path) -> Path:
+    home = root / "hermes"
     home.mkdir()
+    (home / "config.yaml").write_text("mcp_servers: {}\nhooks: {}\n", encoding="utf-8")
     (home / "gateway.pid").write_text("not json{", encoding="utf-8")
-    (home / "config.yaml").write_text("mcp_servers: {}\n", encoding="utf-8")
+    return home
 
-    source = (
-        Path(__file__).resolve().parents[1]
-        / "scripts"
-        / "materialize_shared_agent_surface.py"
-    ).read_text(encoding="utf-8")
 
-    call = source.split("live_pid = hermes_gateway_alive(", 1)[0]
-    assert call.rstrip().endswith("try:"), (
-        "hermes_gateway_alive is called outside a try; a corrupt gateway.pid "
-        "would abort materialize() instead of being reported"
+def _two_target_hook_manifest(root: Path) -> Path:
+    path = root / "hook-manifest.json"
+    path.write_text(
+        json.dumps(
+            {
+                "rules": [],
+                "targets": {
+                    "hermes": {
+                        "enabled": True,
+                        "scope": "repo",
+                        "format": "yaml",
+                        "settings_path": "hermes/config.yaml",
+                        "hooks": {},
+                    },
+                    "later-target": {
+                        "enabled": True,
+                        "scope": "repo",
+                        "settings_path": "later.json",
+                        "hooks": {},
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
     )
-    tail = source.split("live_pid = hermes_gateway_alive(", 1)[1]
-    assert "except SharedSurfaceError as exc:" in tail.split("if live_pid", 1)[0]
-    assert "REFUSED" in tail.split("if live_pid", 1)[0]
+    return path
+
+
+def test_the_yaml_hook_target_reports_a_corrupt_gateway_pid(tmp_path):
+    """hermes_gateway_alive now raises for an unreadable gateway.pid, and the
+    MCP materializer was adapted -- but the hook materializer reaches the same
+    helper through hermes_gateway_alive_for, and apply_yaml_target was not. So
+    the refusal escaped as an exception there instead of a REFUSED line."""
+    import materialize_shared_hook_surface as mhs
+
+    home = _corrupt_hermes_home(tmp_path)
+    before = (home / "config.yaml").read_bytes()
+
+    message, drift = mhs.apply_yaml_target(
+        home / "config.yaml", {"format": "yaml", "hooks": {}}, check=True, dry_run=False
+    )
+
+    assert message.startswith("REFUSED"), message
+    assert drift is True
+    assert (home / "config.yaml").read_bytes() == before, "a refusal wrote anyway"
+
+
+def test_a_corrupt_gateway_pid_does_not_abort_the_hook_materializer(tmp_path):
+    """The audit's reproduction: the standalone hook materializer, --check, two
+    targets. It raised, returned nothing, and never reached the later target."""
+    import materialize_shared_hook_surface as mhs
+
+    _corrupt_hermes_home(tmp_path)
+    manifest = _two_target_hook_manifest(tmp_path)
+
+    results, drift = mhs.materialize(
+        tmp_path, manifest, tmp_path / "output", check=True, dry_run=False
+    )
+
+    assert drift is True
+    assert any(r.startswith("REFUSED") for r in results), results
+    assert any(
+        "later" in r for r in results
+    ), f"the target after the refusal was never processed: {results}"
+
+
+def test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer(
+    tmp_path, monkeypatch
+):
+    """Replaces a test that only grepped this file for a `try` and an `except`
+    around one call site. It could not see the SECOND caller -- the hook
+    sub-materializer the parent invokes later -- which is where the audit
+    reproduced the abort. Every downstream manifest is stubbed except the hook
+    one, so the parent genuinely runs the chain that failed."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    _corrupt_hermes_home(tmp_path)
+    monkeypatch.setattr(
+        mas, "DEFAULT_HOOK_MANIFEST_PATH", _two_target_hook_manifest(tmp_path)
+    )
+    manifest_path = _write_synthetic_manifest(
+        tmp_path,
+        {
+            "hermes_workspace": {
+                "scope": "repo",
+                "config_path": "hermes/config.yaml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    results, drift = mas.materialize(tmp_path, manifest_path, check=True, dry_run=False)
+
+    refused = [r for r in results if r.startswith("REFUSED")]
+    assert drift is True
+    assert len(refused) >= 2, (
+        "both the MCP block and the hook sub-materializer must report the "
+        f"refusal rather than one of them raising: {refused}"
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+    ids=["list", "null", "string", "number", "invalid-utf8"],
+)
+def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+    """The commit that introduced this refusal claimed --check survives
+    anything on disk. The audit showed it does not: `[]` and `null` raised
+    AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+    neither is the handled type, so both still escaped every caller."""
+    (tmp_path / "gateway.pid").write_bytes(payload)
+
+    with pytest.raises(mas.SharedSurfaceError):
+        mas.hermes_gateway_alive(tmp_path)

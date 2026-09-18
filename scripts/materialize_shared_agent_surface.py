@@ -743,7 +743,10 @@ def hermes_gateway_alive(home: Path) -> int | None:
     # that did not.
     try:
         raw = pid_file.read_text(encoding="utf-8")
-    except OSError as exc:
+    # UnicodeDecodeError is a ValueError, not an OSError, so invalid UTF-8
+    # used to escape as an unhandled type -- one of the shapes the external
+    # audit reproduced against the claim that --check survives anything.
+    except (OSError, UnicodeDecodeError) as exc:
         raise SharedSurfaceError(
             f"Hermes {pid_file} exists but could not be read "
             f"({type(exc).__name__}); refusing to write under a gateway whose "
@@ -758,8 +761,18 @@ def hermes_gateway_alive(home: Path) -> int | None:
             "to write under a gateway whose state is unknown. Stop the "
             "gateway, or remove the file if you know it is stale."
         ) from exc
+    # `[]`, `null`, a bare string or a number all parse as JSON and then have
+    # no `.get` -- they raised AttributeError, again not the handled type.
+    if not isinstance(payload, dict):
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} is JSON but not an object (got "
+            f"{type(payload).__name__}); refusing to write under a gateway "
+            "whose state is unknown. Stop the gateway, or remove the file if "
+            "you know it is stale."
+        )
     pid = payload.get("pid")
-    if not isinstance(pid, int):
+    # bool is an int subclass, and `true` is not a PID.
+    if not isinstance(pid, int) or isinstance(pid, bool):
         raise SharedSurfaceError(
             f"Hermes {pid_file} carries no integer `pid` (got "
             f"{type(pid).__name__}); refusing to write under a gateway whose "

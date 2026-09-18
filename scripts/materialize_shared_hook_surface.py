@@ -31,6 +31,17 @@ class HookSurfaceError(Exception):
     """Raised for manifest, target, or projection errors."""
 
 
+class GatewayStateUnknown(HookSurfaceError):
+    """A Hermes gateway.pid exists but cannot tell us whether a gateway is live.
+
+    Raised by hermes_gateway_alive_for so apply_yaml_target can catch a LOCAL
+    type. The underlying helper raises the agent-surface module's
+    SharedSurfaceError, which this module only imports lazily -- so without a
+    translation here the refusal had no type the caller could name, and it
+    escaped as an exception instead of becoming a REFUSED line.
+    """
+
+
 def require_module(module_name: str, target: str) -> Any:
     """Import a round-trip serializer, failing loudly for one target only.
 
@@ -234,7 +245,9 @@ def resolve_variables(
     workspace_token = str(workspace_root) if workspace_root is not None else None
     raw = manifest.get("variables", {})
     if not isinstance(raw, dict):
-        raise HookSurfaceError("Manifest `variables` field must be an object if present")
+        raise HookSurfaceError(
+            "Manifest `variables` field must be an object if present"
+        )
 
     resolved: dict[str, str] = {}
     for name, spec in raw.items():
@@ -293,6 +306,7 @@ def expand_template(value: str, variables: dict[str, str], context: str) -> str:
     literal `${AGENTMEMORY_PLUGIN_ROOT}` would be written into a real harness
     config and fail at hook-fire time, far from the edit that caused it.
     """
+
     def replace(match: re.Match[str]) -> str:
         name = match.group(1)
         if name not in variables:
@@ -334,7 +348,9 @@ def expand_hook_commands(
             if isinstance(inner_hooks, list):
                 new_inner: list[Any] = []
                 for inner in inner_hooks:
-                    if isinstance(inner, dict) and isinstance(inner.get("command"), str):
+                    if isinstance(inner, dict) and isinstance(
+                        inner.get("command"), str
+                    ):
                         inner = dict(inner)
                         inner["command"] = expand_template(
                             inner["command"],
@@ -623,9 +639,15 @@ def hermes_gateway_alive_for(target_path: Path) -> int | None:
         sys.path.insert(0, str(scripts_dir))
     # Same deliberate cycle-break as resolve_target_path above; additionally
     # keeps a JSON-only run from importing the much larger agent-surface module.
-    from materialize_shared_agent_surface import hermes_gateway_alive
+    from materialize_shared_agent_surface import (
+        SharedSurfaceError,
+        hermes_gateway_alive,
+    )
 
-    return hermes_gateway_alive(target_path.parent)
+    try:
+        return hermes_gateway_alive(target_path.parent)
+    except SharedSurfaceError as exc:
+        raise GatewayStateUnknown(str(exc)) from exc
 
 
 def merge_hook_payload_into_yaml_doc(
@@ -723,7 +745,20 @@ def apply_yaml_target(
     if not target_path.exists():
         return (f"SKIP  {target_path} (no config at {target_path})", False)
 
-    live_pid = hermes_gateway_alive_for(target_path)
+    # A PARTIAL FUNCTION'S CONTRACT HAS TO REACH EVERY CALLER.
+    #
+    # hermes_gateway_alive began raising for an unreadable gateway.pid instead
+    # of reporting it as "no gateway", and the MCP materializer was adapted --
+    # but this module reaches the same helper through hermes_gateway_alive_for,
+    # and this call site was not. The parent materializer runs this one AFTER
+    # the MCP block, so handling the first caller did not protect the run:
+    # --check still aborted here, discarding every result and skipping every
+    # later target. Found by an external audit, not by the review that shipped
+    # the first half.
+    try:
+        live_pid = hermes_gateway_alive_for(target_path)
+    except GatewayStateUnknown as exc:
+        return (f"REFUSED {target_path} ({exc})", True)
     if live_pid is not None:
         return (
             f"REFUSED {target_path} (gateway PID {live_pid} is live; "
@@ -799,7 +834,7 @@ def assert_repo_scope_stays_inside(
         f"Target {target_name!r} declares scope 'repo' but its settings_path "
         f"resolves to {resolved_target}, outside the workspace "
         f"{resolved_root}. Writing outside the repository is user scope: "
-        "declare `\"scope\": \"user\"` and pass --include-user-scope."
+        'declare `"scope": "user"` and pass --include-user-scope.'
     )
 
 
@@ -1020,7 +1055,9 @@ def materialize(
                 f"Enabled target {target_name!r} must define `settings_path`"
             )
         target_path = resolve_target_path(workspace_root, settings_path)
-        assert_repo_scope_stays_inside(target_name, target_cfg, target_path, workspace_root)
+        assert_repo_scope_stays_inside(
+            target_name, target_cfg, target_path, workspace_root
+        )
 
         target_format = target_cfg.get("format", "json")
         if target_format not in ("json", "yaml"):
