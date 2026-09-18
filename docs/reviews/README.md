@@ -95,3 +95,26 @@ Four things, all of them learned by their absence:
    another author or another session, they are named and excluded. Handing
    someone else's work to a reviewer as your own wastes the review and
    misattributes the result.
+
+### After the review comes back
+
+Learned on the first round-trip:
+
+- **The packet is not edited after it is sent.** It is the record of what the
+  reviewer was given. Where the review shows a packet claim was wrong, the
+  correction goes in `RESULT.md` beside it, naming the claim. Rewriting the
+  packet would erase exactly the evidence of what the author believed.
+- **Carry the reviewer's evidence into the directory**, content-identical,
+  and check it for credentials first. Not byte-identical: the repository's
+  line-ending rules normalize text files on commit, so say "content-identical"
+  and keep the originals where byte equality might matter. A review whose evidence lives only on the
+  reviewer's disk is not resolvable by anyone else — the same rule this README
+  opens with. Large reproduction artefacts (exported snapshots, dependency
+  caches) can stay behind; they reproduce the evidence rather than being it.
+- **`RESULT.md` records the author's dispositions, and leaves the operator's
+  decision as an explicit PENDING** until the operator writes it. The author
+  answering their own review is not a decision.
+- **Report lint counts over code paths only**
+  (`ruff check packages scripts tests hooks`). The repository has no ruff
+  configuration and CI does not lint, so a repo-wide `ruff check .` also counts
+  any reviewer scripts carried into `docs/reviews/`.

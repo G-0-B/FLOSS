@@ -1,0 +1,13 @@
+UNKNOWN present=False reservation=False => SLOT
+UNKNOWN present=False reservation=True => SLOT
+UNKNOWN present=True reservation=False => REFUSED
+UNKNOWN present=True reservation=True => SLOT
+OURS present=False reservation=False => OURS
+OURS present=False reservation=True => OURS
+OURS present=True reservation=False => OURS
+OURS present=True reservation=True => OURS
+FOREIGN present=False reservation=False => SLOT
+FOREIGN present=False reservation=True => SLOT
+FOREIGN present=True reservation=False => SLOT
+FOREIGN present=True reservation=True => SLOT
+PASS 12 dispatch combinations; no process launched

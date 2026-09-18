@@ -1,0 +1,104 @@
+[
+  {
+    "path": "hooks/hook_post_write.py",
+    "sha256": "731b7f95e86d61c1f0c723032c7cdce6ba885ab891e1fb76fde8a58d7509e784",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/mcp_daemon.py",
+    "sha256": "28ff4a3d049aa148babf1c8175a4fe4423ca851d5a0a532f3e6c7fd7a03b202a",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/metacoordinator_mcp/tests/test_voter_independence.py",
+    "sha256": "59d782745da5b867cdc7ec3d6cbbb1ffc3efa02a66926262c74d09ef930640f2",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/metacoordinator_mcp/voters.py",
+    "sha256": "9418c25977f8f6694438d5034c891299e52259641b9c110e06303c8b78d65403",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/reasoning_ensemble/synthesizer.py",
+    "sha256": "93b25369796d28da2ba2a1786c2836fb603a3e336d67e471f68cc976a972844d",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/reasoning_ensemble/tests/test_survivor_independence.py",
+    "sha256": "8bfb07f06d914f182cdb022eafec6b6e64d02ed6d94e56d6434fd44594d3ea0a",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/reasoning_ensemble/transport.py",
+    "sha256": "c4a661cfef53b2617334c314c3ffbe6a8c0aaf12156154593241dbc4ef2047f7",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "packages/tests/test_mcp_daemon.py",
+    "sha256": "8c7c7b2458483937288f3d045f11653122f1bb36a3d58d649b69f9ef3715f265",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/autonomous_synthesis_loop.py",
+    "sha256": "38b48c6b158eebad93144c86b205c0dd2db01fe0e5e3043f747cbb0b5c01e81e",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/materialize_shared_agent_surface.py",
+    "sha256": "ebb8523b719a0ce9eeae6ca0707342bf1be0f5ad0727325759c103f3f722770e",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/materialize_shared_skill_surface.py",
+    "sha256": "8aacfac0886daeb2d6845fe3898731f9b33886bf696a46843c530da85d0cfd8a",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/start_mcp_daemons.ps1",
+    "sha256": "e67df6d66dcb8723c0b1d5b8e5976b13db25dc001139be899e8da33f6200a219",
+    "blob_bytes_equal": false,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/tests/test_autonomous_synthesis_deferral.py",
+    "sha256": "2d27a5e2ef6fdaf08cee7aa88a40b9cc651621deb83d6701fdc05358838dba5c",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "scripts/tests/test_shared_skill_surface_scope.py",
+    "sha256": "d60132e445a9f511ce245d0e8b28e63b0e735cf277e90172561635340d279677",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "shared-hook-surface.json",
+    "sha256": "2078a6f44e373ee5ec463bceb546c6f68f0723294f1272ec30127094b37f0444",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "tests/test_hook_surface_attribution.py",
+    "sha256": "8fab8e136e02d9a6136216442853aaa38c7506ab821fef1c9f79b8a1d08f09f7",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  },
+  {
+    "path": "tests/test_shared_agent_surface_mcp.py",
+    "sha256": "ac3b0a19bc95afb99fc3d9d797f433946658ce621d61fa0c72d194f5908c4ece",
+    "blob_bytes_equal": true,
+    "lf_normalized_equal": true
+  }
+]
