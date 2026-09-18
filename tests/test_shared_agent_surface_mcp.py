@@ -1458,8 +1458,8 @@ def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payloa
 
 @pytest.mark.parametrize(
     "pid",
-    [0, -1, -12345, 2**32, 2**40],
-    ids=["zero", "minus-one", "negative", "2^32", "2^40"],
+    [0, -1, -12345, 2**31, 2**32, 2**40],
+    ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
 )
 def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
     """Safe, but untrue. _pid_alive fails closed, so every one of these already
@@ -1486,3 +1486,23 @@ def test_a_plausible_pid_still_reaches_the_liveness_check(tmp_path, monkeypatch)
 
     assert mas.hermes_gateway_alive(tmp_path) is None
     assert seen == [12345]
+
+
+def test_pid_alive_fails_closed_when_the_os_rejects_the_id(monkeypatch):
+    """The POSIX branch caught ProcessLookupError and OSError. os.kill raises
+    OverflowError for an id past pid_t -- signed 32-bit -- and that is neither,
+    so it escaped _pid_alive, then hermes_gateway_alive, then the wrapper that
+    only translates SharedSurfaceError, and aborted the materializer. The
+    0 < pid < 2**32 bound in 26c4ff8 let 2**31..2**32-1 through to exactly this
+    call: it was set for Windows' unsigned DWORD and forgot POSIX's signed type.
+
+    Simulated rather than run: on Windows os.kill(pid, 0) is TerminateProcess.
+    """
+
+    def _overflow(pid, sig):
+        raise OverflowError("signed integer is greater than maximum")
+
+    monkeypatch.setattr(mas.os, "name", "posix")
+    monkeypatch.setattr(mas.os, "kill", _overflow)
+
+    assert mas._pid_alive(3_000_000_000) is True, "an unjudgeable id must fail closed"

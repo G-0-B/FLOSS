@@ -715,6 +715,13 @@ def _pid_alive(pid: int) -> bool:
         return False
     except OSError:
         return True  # e.g. PermissionError -- process exists, fail closed
+    except (OverflowError, ValueError):
+        # The OS could not even represent this id. Not "no such process" --
+        # "cannot judge" -- so fail closed like every other unjudgeable case
+        # here, rather than escaping as a type no caller handles. Callers
+        # bound the id first; this is the guard for the next caller that
+        # does not.
+        return True
     return True
 
 
@@ -785,7 +792,13 @@ def hermes_gateway_alive(home: Path) -> int | None:
     # stop it and re-run", which is false for every one of them, and for 0
     # (or 4 on Windows, the System process) directs an operator to kill a
     # system process. The state is unknown, and the refusal should say so.
-    if not 0 < pid < 2**32:
+    #
+    # 2**31, not 2**32. The first version of this bound was set for Windows'
+    # unsigned DWORD and forgot that POSIX pid_t is SIGNED 32-bit: ids from
+    # 2**31 to 2**32-1 passed the bound and reached os.kill, which raises
+    # OverflowError for them -- not an OSError, so it escaped every handler
+    # above it. No real Windows process id reaches 2**31 either.
+    if not 0 < pid < 2**31:
         raise SharedSurfaceError(
             f"Hermes {pid_file} names pid {pid}, which is not a possible "
             "process id; refusing to write under a gateway whose state is "

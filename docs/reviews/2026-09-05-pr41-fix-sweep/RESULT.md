@@ -61,6 +61,26 @@ tokens, and Hermes' pid file carries none. Recorded as open.
 
 The prompting rule this taught is in [`../README.md`](../README.md).
 
+### The re-review, unfiltered
+
+Re-run on `e747a75` and `26c4ff8` with the three-bucket prompt. The filtered
+prompt on the same commit had returned "No issues"; this one returned two
+defect-section items, five observations and seven checked-and-clean lines.
+
+| Item | Reviewer | Disposition |
+|---|---|---|
+| Survivor check treats a crashing checker as independent | defect, pre-existing | Already deferred above as an operator policy question. |
+| `projection_owned_by` resolves twice | nit | No action; negligible and safe. |
+| The `synthesize()` regression mocks dispatch, so nothing checks a *real* dispatch stamps `transport_name` the way survival reads it | observation | Guard added: every voter shape is dispatched through the real `_dispatch_voter` with only the network stubbed, and its survivor route must equal its admission route. It passes before and after `e747a75` — a guard on the join, not a regression test. |
+| The `0 < pid < 2**32` bound is "conservative on Linux" | observation | **Inverted, and a real defect.** The bound was too *permissive* for POSIX: `pid_t` is signed 32-bit, so ids from `2**31` to `2**32-1` reached `os.kill`, which raises `OverflowError` — not an `OSError`, so it escaped every handler above it. Bound tightened to `2**31`; `_pid_alive` now also fails closed on `OverflowError`/`ValueError`. |
+| `GatewayStateUnknown` only wraps `SharedSurfaceError`, "safe given the implementation" | observation | This is where the overflow escaped. It was not safe; fixed as above. |
+| Pathological `source_path` values | observation | Reviewer concluded safe; agreed. |
+| A marker from an earlier version might not be recognised | observation | No action: the constant replaced a literal with the same value and the keys are unchanged, and reinstalling rewrites the marker. |
+
+The real defect this round came out of the observations bucket, and the
+reviewer rated it safe. The three-bucket prompt surfaced the lead, but someone
+still has to judge it. The filtered prompt would have hidden it entirely.
+
 ## Where the audit corrected the packet
 
 The packet made claims the audit tested. Four did not hold as stated:

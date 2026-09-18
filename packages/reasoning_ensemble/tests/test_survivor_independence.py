@@ -509,3 +509,34 @@ def test_a_mixed_run_that_loses_its_online_half_is_degraded(monkeypatch):
     assert len(result.voter_responses) == len(failed) + len(
         survivors
     ), "responses must be retained on a degraded run"
+
+
+def test_a_dispatched_response_routes_exactly_as_its_voter_was_admitted(monkeypatch):
+    """The join the synthesize() regression cannot see, because it mocks
+    dispatch_parallel and hand-builds its responses. The survivor check now
+    depends on every response carrying an accurate transport_name; if
+    _dispatch_voter ever stamped a different wire than admission read, the two
+    views of the roster would disagree again, silently. So: dispatch each real
+    voter shape through the real _dispatch_voter, with only the network
+    stubbed, and require the survivor-side route to equal the admission route.
+    """
+    from packages.reasoning_ensemble import transport
+
+    monkeypatch.setattr(transport, "generate", lambda *a, **k: "substantive text")
+
+    voters = list(transport.LOCAL_VOTER_POOL) + [
+        {
+            "voter_id": "online",
+            "model": "groq/openai/gpt-oss-120b",
+            "family": "openai",
+            "transport": "litellm",
+        },
+        {"voter_id": "legacy", "model": "phi4-mini:latest", "family": "phi"},
+    ]
+    for voter in voters:
+        response = synthesizer._dispatch_voter(voter, "p", embed_fn=lambda t: [0.1])
+        survived = transport._independence_route(
+            {"model": response.model, "transport": response.transport_name}
+        )
+        admitted = transport._independence_route(voter)
+        assert survived == admitted, (voter["voter_id"], survived, admitted)
