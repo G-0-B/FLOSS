@@ -1454,3 +1454,35 @@ def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payloa
 
     with pytest.raises(mas.SharedSurfaceError):
         mas.hermes_gateway_alive(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "pid",
+    [0, -1, -12345, 2**32, 2**40],
+    ids=["zero", "minus-one", "negative", "2^32", "2^40"],
+)
+def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+    """Safe, but untrue. _pid_alive fails closed, so every one of these already
+    refused the write -- the reviewer who found them was right about that. But
+    each produced "gateway PID <n> is live; stop it and re-run", which is
+    false, and for 0 (and 4 on Windows, the System process) it directs an
+    operator to kill a system process. No process has one of these ids, so the
+    honest verdict is that the gateway's state is unknown.
+
+    Surfaced by an internal reviewer and then dropped, because the prompt asked
+    only for defects the commit had introduced. It had not introduced this one.
+    """
+    (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+
+    with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+        mas.hermes_gateway_alive(tmp_path)
+
+
+def test_a_plausible_pid_still_reaches_the_liveness_check(tmp_path, monkeypatch):
+    """The bound must not swallow the ordinary case."""
+    seen = []
+    monkeypatch.setattr(mas, "_pid_alive", lambda pid: seen.append(pid) or False)
+    (tmp_path / "gateway.pid").write_text(json.dumps({"pid": 12345}), encoding="utf-8")
+
+    assert mas.hermes_gateway_alive(tmp_path) is None
+    assert seen == [12345]

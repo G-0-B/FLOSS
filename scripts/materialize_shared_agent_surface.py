@@ -779,6 +779,19 @@ def hermes_gateway_alive(home: Path) -> int | None:
             "state is unknown. Stop the gateway, or remove the file if you "
             "know it is stale."
         )
+    # NO PROCESS HAS THIS ID. Zero, negatives and anything past 32 bits all
+    # reached _pid_alive, which fails closed -- so the write was already
+    # refused, safely. But the caller then reported "gateway PID <n> is live;
+    # stop it and re-run", which is false for every one of them, and for 0
+    # (or 4 on Windows, the System process) directs an operator to kill a
+    # system process. The state is unknown, and the refusal should say so.
+    if not 0 < pid < 2**32:
+        raise SharedSurfaceError(
+            f"Hermes {pid_file} names pid {pid}, which is not a possible "
+            "process id; refusing to write under a gateway whose state is "
+            "unknown. Stop the gateway, or remove the file if you know it is "
+            "stale."
+        )
     return pid if _pid_alive(pid) else None
 
 

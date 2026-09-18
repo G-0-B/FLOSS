@@ -118,3 +118,28 @@ Learned on the first round-trip:
   (`ruff check packages scripts tests hooks`). The repository has no ruff
   configuration and CI does not lint, so a repo-wide `ruff check .` also counts
   any reviewer scripts carried into `docs/reviews/`.
+
+### Prompting a reviewer
+
+Learned from a reviewer that found a real problem and did not report it.
+
+The prompt for the internal review of `e747a75` said, in effect, *every fix on
+this PR has introduced a defect; find the one this commit introduced.* The
+reviewer checked zero, negative and out-of-range PIDs exactly as asked, found
+they produce a false "gateway PID 0 is live" message, reasoned that this was
+safe and not *introduced* by the commit, weighed whether to mention it — and
+followed the prompt. It returned a bare "No issues." The observation existed
+only in its reasoning.
+
+- **A prior is a direction to look, not a filter on what to report.** "Find
+  the defect this fix introduced" is a good hypothesis to aim with. As a
+  reporting rule it silently discards everything else the reviewer notices,
+  and the reviewer is the only one who noticed it.
+- **Ask for three buckets, every time.** (1) Defects. (2) Observations below
+  that bar — pre-existing issues, risks, untested cases, anything misleading
+  even if safe. (3) What was checked and found clean, with the evidence. The
+  operator decides scope after seeing all three; the reviewer's judgment about
+  scope must never be the filter.
+- **A bare "no issues" is not a result.** It collapses bucket 3, which is the
+  only thing that distinguishes a thorough review from a skipped one. Ask
+  again for the structured report before treating it as clean.

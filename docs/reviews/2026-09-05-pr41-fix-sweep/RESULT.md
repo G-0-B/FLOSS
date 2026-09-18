@@ -42,6 +42,25 @@ the workspace. It fails loudly — every skill becomes unresolvable before any
 pruning — so it cannot cause a silent deletion, but it means the skill
 materializer should be run from the main checkout.
 
+### What that review found and did not report
+
+After the above was written, the reviewer's reasoning showed it *had* examined
+the PID shapes the prompt listed: zero and negative ids reach `_pid_alive`,
+which fails closed, so the write is refused — but the refusal then reads
+"gateway PID 0 is live; stop it and re-run", which is false, and for 0 (or 4
+on Windows, the System process) directs an operator to kill a system process.
+It judged this safe and not introduced by the commit, and so did not report it,
+because the prompt asked only for introduced defects. The fault is the prompt.
+
+Fixed in the commit after this file first landed: any id outside
+`0 < pid < 2**32` is now reported as an unknown gateway state. **Not fixed:**
+a *possible* PID that belongs to some other process — 4 on Windows, or any
+reused id from a stale `gateway.pid` — still reads as a live gateway.
+Existence is not identity; the daemon side solved that with process-start
+tokens, and Hermes' pid file carries none. Recorded as open.
+
+The prompting rule this taught is in [`../README.md`](../README.md).
+
 ## Where the audit corrected the packet
 
 The packet made claims the audit tested. Four did not hold as stated:
