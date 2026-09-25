@@ -19,6 +19,7 @@ from packages.preservation_spine.restore import (
 from packages.preservation_spine.seal import (
     CapsuleVerificationError,
     _assert_path_matches_identity,
+    _atomic_write_fixed,
     _validated_directory_state,
     seal_capsule,
     verify_checksums,
@@ -45,6 +46,22 @@ def test_assert_path_matches_identity_detects_directory_swap(tmp_path: Path) -> 
     _assert_path_matches_identity(original, retained)
     with pytest.raises(CapsuleVerificationError, match="retained identity"):
         _assert_path_matches_identity(replacement, retained)
+
+
+def test_atomic_write_rejects_mismatched_retained_identity(tmp_path: Path) -> None:
+    capsule = tmp_path / "capsule"
+    capsule.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    with pytest.raises(CapsuleVerificationError, match="retained identity"):
+        _atomic_write_fixed(
+            capsule,
+            "verification.json",
+            b"{}",
+            retained_identity=_validated_directory_state(other),
+        )
+    assert not (capsule / "verification.json").exists()
+    assert not any(capsule.iterdir())
 
 
 def _make_junction(link: Path, target: Path) -> None:
@@ -153,6 +170,29 @@ def captured_capsule(
             PlaneId.LOCAL_HISTORY: local_sha,
         },
     )
+
+
+def test_restore_round_trip_preserves_stash(tmp_path: Path) -> None:
+    """A source stash must survive capture → seal → restore, not only bundle list-heads."""
+    _supports_object_format(tmp_path, "sha1")
+    repo = tmp_path / "repo-sha1"
+    git(tmp_path, "init", "--object-format=sha1", str(repo))
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "Test")
+    main_sha = _write_and_commit(repo, "main.txt", b"main\n", "main")
+    pr_sha = _write_and_commit(repo, "pr.txt", b"pr\n", "pr")
+    (repo / "wip.txt").write_bytes(b"stashed\n")
+    git(repo, "stash", "push", "-u", "-m", "wip")
+    stash = git(repo, "rev-parse", "refs/stash").stdout.strip().decode("ascii")
+    capsule = tmp_path / "capsule-sha1"
+    capture_planes(repo, main_sha, pr_sha, capsule, SecretPolicy.default())
+    refs_txt = (capsule / "local-history" / "refs.txt").read_bytes()
+    assert f"{stash} refs/stash\n".encode("ascii") in refs_txt
+    seal_capsule(capsule)
+    restore_and_verify(capsule, tmp_path / "restore", forbidden_roots={repo})
+    restored = tmp_path / "restore" / "local-history" / "repository.git"
+    listed = git(restored, "show-ref").stdout
+    assert f"{stash} refs/stash".encode("ascii") in listed
 
 
 def artifact_tree(root: Path, *, exclude_seal: bool = False) -> dict[str, bytes]:

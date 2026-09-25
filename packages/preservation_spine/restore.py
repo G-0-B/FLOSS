@@ -261,6 +261,54 @@ def _list_bundle_heads(bundle: Path) -> tuple[tuple[str, str], ...]:
     return tuple(heads)
 
 
+_ALLOWED_EXTRA_HISTORY_REFS = frozenset({"refs/stash"})
+_HEX_DIGITS = "0123456789abcdef"
+
+
+def _is_hex_object_id(value: str, object_format: str) -> bool:
+    expected = {"sha1": 40, "sha256": 64}.get(object_format, 0)
+    return len(value) == expected and all(character in _HEX_DIGITS for character in value)
+
+
+def _parse_history_refs(
+    refs_bytes: bytes,
+    *,
+    subject_id: str,
+    bundle_ref: str,
+    object_format: str,
+) -> tuple[tuple[str, str], ...]:
+    """Parse refs.txt: primary subject line, then allowlisted extras only."""
+    if not refs_bytes.endswith(b"\n") or b"\r" in refs_bytes:
+        raise CapsuleVerificationError("history refs metadata does not match identity")
+    try:
+        lines = refs_bytes.decode("ascii").splitlines()
+    except UnicodeDecodeError as exc:
+        raise CapsuleVerificationError(
+            "history refs metadata does not match identity"
+        ) from exc
+    if not lines:
+        raise CapsuleVerificationError("history refs metadata does not match identity")
+    parsed: list[tuple[str, str]] = []
+    seen_refs: set[str] = set()
+    for line in lines:
+        fields = line.split(" ", 1)
+        if len(fields) != 2:
+            raise CapsuleVerificationError("history refs metadata does not match identity")
+        sha, ref = fields
+        if not _is_hex_object_id(sha, object_format) or not ref or " " in ref:
+            raise CapsuleVerificationError("history refs metadata does not match identity")
+        if ref in seen_refs:
+            raise CapsuleVerificationError("history refs metadata does not match identity")
+        seen_refs.add(ref)
+        parsed.append((sha, ref))
+    if parsed[0] != (subject_id, bundle_ref):
+        raise CapsuleVerificationError("history refs metadata does not match identity")
+    for _sha, ref in parsed[1:]:
+        if ref not in _ALLOWED_EXTRA_HISTORY_REFS:
+            raise CapsuleVerificationError("history refs metadata does not match identity")
+    return tuple(parsed)
+
+
 def _parse_tree(tree_bytes: bytes) -> tuple[tuple[str, str, str, bytes], ...]:
     entries: list[tuple[str, str, str, bytes]] = []
     for item in tree_bytes.split(b"\0"):
@@ -351,11 +399,13 @@ def _restore_repository_evidence(
     object_format: str,
     subject_id: str,
     bundle_ref: str,
+    extra_heads: tuple[tuple[str, str], ...] = (),
 ) -> tuple[str, str, str, tuple[str, ...]]:
     _initialize_bare(repository, object_format)
     _verify_repository_layout(repository)
+    expected_heads = ((subject_id, bundle_ref), *extra_heads)
     heads = _list_bundle_heads(bundle)
-    if heads != ((subject_id, bundle_ref),):
+    if frozenset(heads) != frozenset(expected_heads) or len(heads) != len(expected_heads):
         raise CapsuleVerificationError("history bundle subject does not match identity")
     _run_git(repository, "bundle", "verify", str(bundle))
     try:
@@ -391,8 +441,41 @@ def _restore_repository_evidence(
     ).strip()
     if restored_format.decode("ascii") != object_format:
         raise CapsuleVerificationError("restored history object format does not match")
+    for extra_sha, extra_ref in extra_heads:
+        try:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "-c",
+                    "protocol.file.allow=always",
+                    "fetch",
+                    "--no-write-fetch-head",
+                    "--no-tags",
+                    str(bundle),
+                    f"{extra_ref}:{extra_ref}",
+                ],
+                check=True,
+                capture_output=True,
+                env=_git_environment(),
+                shell=False,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise CapsuleVerificationError("history bundle restore failed") from exc
+        restored_extra = _run_git(repository, "rev-parse", extra_ref).strip()
+        if restored_extra.decode("ascii") != extra_sha:
+            raise CapsuleVerificationError(
+                "restored history subject does not match identity"
+            )
     refs = _run_git(repository, "show-ref").splitlines()
-    if refs != [f"{subject_id} refs/heads/master".encode("ascii")]:
+    expected_refs = frozenset(
+        (
+            f"{subject_id} refs/heads/master".encode("ascii"),
+            *(f"{sha} {ref}".encode("ascii") for sha, ref in extra_heads),
+        )
+    )
+    if frozenset(refs) != expected_refs or len(refs) != len(expected_refs):
         raise CapsuleVerificationError("restored history has unexpected refs")
     _run_git(repository, "fsck", "--strict", "--no-reflogs")
     unreachable = _run_git_all_output(
@@ -455,8 +538,13 @@ def _restore_history_plane(
         refs_bytes = _read_regular_bytes(plane_root / "refs.txt")
     except CapsuleVerificationError as exc:
         raise CapsuleVerificationError("history refs metadata is missing") from exc
-    if refs_bytes != f"{subject_id} {bundle_ref}\n".encode("ascii"):
-        raise CapsuleVerificationError("history refs metadata does not match identity")
+    history_refs = _parse_history_refs(
+        refs_bytes,
+        subject_id=subject_id,
+        bundle_ref=bundle_ref,
+        object_format=object_format,
+    )
+    extra_heads = history_refs[1:]
     evidence_digest = _plane_evidence_digest(plane_root)
     disposition = _disposition_record(plane_id, subject_id, evidence_digest, identity)
     bundle = plane_root / "repository.bundle"
@@ -473,6 +561,7 @@ def _restore_history_plane(
                     object_format=object_format,
                     subject_id=subject_id,
                     bundle_ref=bundle_ref,
+                    extra_heads=extra_heads,
                 )
             )
     plane_blockers = {"opaque-preservation-ineligible", *blockers}
@@ -896,7 +985,12 @@ def _perform_retained_restore(
     _assert_path_matches_identity(capsule, capsule_identity)
     if provenance_root(capsule) != local_root:
         raise CapsuleVerificationError("capsule root changed during verification")
-    _atomic_write_fixed(capsule, "verification.json", canonical_json_bytes(record))
+    _atomic_write_fixed(
+        capsule,
+        "verification.json",
+        canonical_json_bytes(record),
+        retained_identity=capsule_identity,
+    )
     return record
 
 

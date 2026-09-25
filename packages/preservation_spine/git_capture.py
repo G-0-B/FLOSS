@@ -754,9 +754,20 @@ def _write_history_plane(
     plane_root.mkdir()
     bundle_source = plane_root / "source.git"
     captured_ref = "refs/heads/master"
+    expected_id_length = {"sha1": 40, "sha256": 64}.get(object_format, 0)
+    hex_digits = "0123456789abcdef"
+    for dest_ref, source_id in extra_refs:
+        if dest_ref != "refs/stash":
+            raise CaptureEvidenceError("history extra ref is not allowlisted")
+        if len(source_id) != expected_id_length or any(
+            character not in hex_digits for character in source_id
+        ):
+            raise CaptureEvidenceError("history extra ref object id is malformed")
     subprocess.run(
         [
             "git",
+            "-c",
+            "core.fsmonitor=",
             "init",
             "--bare",
             f"--object-format={object_format}",
@@ -819,6 +830,8 @@ def _write_history_plane(
             "git",
             "-C",
             str(bundle_source),
+            "-c",
+            "core.fsmonitor=",
             "bundle",
             "create",
             str(plane_root / "repository.bundle"),
@@ -969,6 +982,13 @@ def capture_planes(
             PlaneId.REMOTE_PR,
             PlaneId.LOCAL_HISTORY,
         }:
+            extra_refs: tuple[tuple[str, str], ...] = ()
+            if plane_id is PlaneId.LOCAL_HISTORY and before.stash:
+                try:
+                    stash_id = before.stash.strip().decode("ascii")
+                except UnicodeDecodeError as exc:
+                    raise CaptureEvidenceError("stash object id is not ASCII") from exc
+                extra_refs = (("refs/stash", stash_id),)
             _write_history_plane(
                 repo,
                 plane_root,
@@ -976,11 +996,7 @@ def capture_planes(
                 subjects[plane_id],
                 object_format,
                 dispositions[plane_id],
-                extra_refs=(
-                    (("refs/stash", before.stash.strip().decode("ascii")),)
-                    if plane_id is PlaneId.LOCAL_HISTORY and before.stash
-                    else ()
-                ),
+                extra_refs=extra_refs,
             )
         elif plane_id is PlaneId.LOCAL_INDEX:
             plane_root.mkdir()

@@ -398,11 +398,19 @@ def _validate_fixed_output(root: Path, name: str) -> os.stat_result | None:
     return metadata
 
 
-def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
+def _atomic_write_fixed(
+    root: Path,
+    name: str,
+    content: bytes,
+    *,
+    retained_identity: os.stat_result | None = None,
+) -> None:
     """Atomically replace a validated fixed output; failed pending files remain."""
 
     capsule = _capsule_root(root)
     with _locked_directory(capsule) as retained_capsule:
+        if retained_identity is not None:
+            _assert_path_matches_identity(capsule, retained_identity)
         root_before = capsule.lstat()
         existing = _validate_fixed_output(retained_capsule, name)
         pending = retained_capsule / f".{name}.pending-{secrets.token_hex(16)}"
@@ -434,6 +442,8 @@ def _atomic_write_fixed(root: Path, name: str, content: bytes) -> None:
             and _file_identity(existing) != _file_identity(current)
         ):
             raise CapsuleVerificationError("fixed output changed before replacement")
+        if retained_identity is not None:
+            _assert_path_matches_identity(capsule, retained_identity)
         try:
             os.replace(pending, retained_capsule / name)
         except OSError as exc:
