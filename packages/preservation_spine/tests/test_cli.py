@@ -479,6 +479,82 @@ def test_reverification_dedupes_completed_actions(
     assert "manifest-inventoried" not in actions
 
 
+def test_fresh_verification_drops_stale_github_projection_action(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Fresh verification changes verification_digest and must drop
+    github-projection-rendered along with manifest-inventoried."""
+    from packages.preservation_spine.checkpoint import load_latest_checkpoint
+
+    repo, main_sha, pr_sha = _build_repo(tmp_path)
+    state_dir = tmp_path / "capsule-state-proj"
+    assert (
+        main(
+            [
+                "capture",
+                "--repo",
+                str(repo),
+                "--remote-main-sha",
+                main_sha,
+                "--pr-head-sha",
+                pr_sha,
+                "--output",
+                str(state_dir),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "restore-one"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert main(["inventory", "--capsule", str(state_dir)]) == 0
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "render-github",
+                "--capsule",
+                str(state_dir),
+                "--output",
+                str(tmp_path / "projection"),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    (state_dir / "capsule" / "verification.json").unlink()
+    assert (
+        main(
+            [
+                "verify",
+                "--capsule",
+                str(state_dir),
+                "--restore",
+                str(tmp_path / "restore-two"),
+                "--forbid-root",
+                str(repo),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    actions = load_latest_checkpoint(state_dir / "checkpoints.jsonl").completed_actions
+    assert "github-projection-rendered" not in actions
+
+
 def test_blocked_verification_is_repeatable_without_rewriting_evidence(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

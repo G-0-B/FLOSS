@@ -301,10 +301,11 @@ def _handle_verify(args: argparse.Namespace) -> int:
         verification_digest=verification_digest,
         completed_actions=(
             *_without_action(
-                _without_action(latest.completed_actions, "restore-verified"),
-                # A fresh verification digest invalidates any earlier
-                # inventory binding, so the stale entry must not survive.
-                "manifest-inventoried",
+                _without_action(
+                    _without_action(latest.completed_actions, "restore-verified"),
+                    "manifest-inventoried",
+                ),
+                "github-projection-rendered",
             ),
             "restore-verified",
         ),

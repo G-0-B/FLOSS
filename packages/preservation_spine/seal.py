@@ -221,6 +221,21 @@ def _validated_directory_state(path: Path) -> os.stat_result:
     return metadata
 
 
+def _assert_path_matches_identity(path: Path, retained: os.stat_result) -> None:
+    """Fail closed if *path* no longer names the directory we locked.
+
+    `_locked_directory` retains an fd (POSIX) or handle (Windows) but
+    restoration still talks through the pathname. A rename/replace of that
+    pathname during verification would authenticate a different capsule
+    while recording the original provenance_root.
+    """
+    current = _validated_directory_state(path)
+    if _node_identity(current) != _node_identity(retained):
+        raise CapsuleVerificationError(
+            "directory path no longer refers to the retained identity"
+        )
+
+
 @contextmanager
 def _locked_directory(path: Path) -> Iterator[Path]:
     """Retain directory identity; Windows additionally blocks path replacement."""
@@ -265,6 +280,7 @@ def _locked_directory(path: Path) -> Iterator[Path]:
                     "directory changed while acquiring containment"
                 )
             yield directory
+            _assert_path_matches_identity(directory, after)
         finally:
             close_handle(handle)
         return
@@ -286,6 +302,7 @@ def _locked_directory(path: Path) -> Iterator[Path]:
                 "directory changed while acquiring containment"
             )
         yield directory
+        _assert_path_matches_identity(directory, handle_state)
     finally:
         os.close(descriptor)
 
