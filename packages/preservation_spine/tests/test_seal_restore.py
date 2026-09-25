@@ -18,6 +18,8 @@ from packages.preservation_spine.restore import (
 )
 from packages.preservation_spine.seal import (
     CapsuleVerificationError,
+    _assert_path_matches_identity,
+    _validated_directory_state,
     seal_capsule,
     verify_checksums,
 )
@@ -32,6 +34,17 @@ def git(
         capture_output=True,
         shell=False,
     )
+
+
+def test_assert_path_matches_identity_detects_directory_swap(tmp_path: Path) -> None:
+    original = tmp_path / "original"
+    original.mkdir()
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    retained = _validated_directory_state(original)
+    _assert_path_matches_identity(original, retained)
+    with pytest.raises(CapsuleVerificationError, match="retained identity"):
+        _assert_path_matches_identity(replacement, retained)
 
 
 def _make_junction(link: Path, target: Path) -> None:

@@ -22,10 +22,12 @@ from .models import (
 )
 from .seal import (
     CapsuleVerificationError,
+    _assert_path_matches_identity,
     _atomic_write_fixed,
     _hash_regular_file,
     _locked_directory,
     _read_regular_bytes,
+    _validated_directory_state,
     _walk_regular_files,
     provenance_root,
     verify_checksums,
@@ -850,6 +852,7 @@ def _perform_retained_restore(
     destination: Path,
     resolved_forbidden: tuple[Path, ...],
     local_root: str,
+    capsule_identity: os.stat_result,
 ) -> VerificationRecord:
     results: list[PlaneRestoreResult] = []
     for plane_id in _HISTORY_PLANES:
@@ -890,6 +893,9 @@ def _perform_retained_restore(
         blockers=blockers,
     )
     verify_checksums(capsule)
+    _assert_path_matches_identity(capsule, capsule_identity)
+    if provenance_root(capsule) != local_root:
+        raise CapsuleVerificationError("capsule root changed during verification")
     _atomic_write_fixed(capsule, "verification.json", canonical_json_bytes(record))
     return record
 
@@ -906,6 +912,7 @@ def restore_and_verify(
     verify_checksums(capsule_path)
     capsule = capsule_path.resolve(strict=True)
     with _locked_directory(capsule):
+        capsule_identity = _validated_directory_state(capsule)
         destination, resolved_forbidden = _validate_restore_destination(
             capsule, temp_root, forbidden_roots
         )
@@ -926,4 +933,5 @@ def restore_and_verify(
                     retained_restore,
                     resolved_forbidden,
                     local_root,
+                    capsule_identity,
                 )

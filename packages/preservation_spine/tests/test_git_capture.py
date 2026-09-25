@@ -1209,6 +1209,37 @@ def test_capture_ignores_ambient_git_routing(
     assert snapshot.head != intruder_head
 
 
+def test_capture_disables_configured_fsmonitor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A core.fsmonitor hook must not run during capture queries.
+
+    Git documents that a pathname/command value is executed for status
+    and similar; a dishonest hook can write outside the worktree or lie
+    about state. Capture overrides core.fsmonitor to empty for its queries
+    (the string "false" is a Git-for-Windows ``false.exe`` pathname).
+    """
+    repo = initialized_repo(tmp_path)
+    marker = tmp_path / "fsmonitor-ran.txt"
+    hook = tmp_path / "fsmonitor-hook.py"
+    hook.write_text(
+        "import os, pathlib\n"
+        "pathlib.Path(os.environ['FSMON_MARK']).write_text('ran')\n",
+        encoding="utf-8",
+    )
+    git(
+        repo,
+        "config",
+        "core.fsmonitor",
+        f"C:/Python313/python.exe {hook.as_posix()}",
+    )
+    monkeypatch.setenv("FSMON_MARK", str(marker))
+
+    snapshot_subject(repo)
+
+    assert not marker.exists(), "fsmonitor hook ran during capture"
+
+
 def test_staged_diff_ignores_textconv_helpers(tmp_path: Path) -> None:
     """A configured diff.<driver>.textconv helper must not rewrite captured
     diff bytes.  --no-ext-diff does NOT disable textconv: without
@@ -1287,6 +1318,24 @@ def test_split_index_with_unpreservable_backing_file_fails_closed(
 
     with pytest.raises(CaptureDrift):
         capture_planes(repo, "HEAD", "HEAD", tmp_path / "capsule", SecretPolicy.default())
+
+
+def test_local_history_bundle_includes_stash(tmp_path: Path) -> None:
+    """refs/stash is not reachable from HEAD.  If the source has a stash,
+    the local-history bundle must include it so later source cleanup does
+    not lose state the capsule claims to protect."""
+    repo = initialized_repo(tmp_path)
+    (repo / "a.txt").write_text("stashed\n", encoding="utf-8")
+    git(repo, "stash", "push", "-u", "-m", "wip")
+    stash = git(repo, "rev-parse", "refs/stash").stdout.strip()
+    assert stash
+
+    dest = tmp_path / "capsule"
+    capture_planes(repo, "HEAD", "HEAD", dest, SecretPolicy.default())
+    bundle = dest / "local-history" / "repository.bundle"
+    listed = git(tmp_path, "bundle", "list-heads", str(bundle)).stdout
+    assert b"refs/stash" in listed
+    assert stash in listed
 
 
 def test_surrogate_path_is_unpreservable() -> None:

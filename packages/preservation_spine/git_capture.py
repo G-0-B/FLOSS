@@ -220,7 +220,7 @@ def run_git(repo: Path, *args: str) -> bytes:
     """Run a read-only Git query and return its standard output unchanged."""
 
     completed = subprocess.run(
-        ["git", "-C", str(repo), *args],
+        ["git", "-C", str(repo), "-c", "core.fsmonitor=", *args],
         check=True,
         capture_output=True,
         shell=False,
@@ -231,7 +231,7 @@ def run_git(repo: Path, *args: str) -> bytes:
 
 def _optional_stash(repo: Path) -> bytes | None:
     completed = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "--verify", "refs/stash"],
+        ["git", "-C", str(repo), "-c", "core.fsmonitor=", "rev-parse", "--verify", "refs/stash"],
         check=False,
         capture_output=True,
         shell=False,
@@ -749,6 +749,7 @@ def _write_history_plane(
     subject_id: str,
     object_format: str,
     disposition: _PlaneDisposition,
+    extra_refs: tuple[tuple[str, str], ...] = (),
 ) -> None:
     plane_root.mkdir()
     bundle_source = plane_root / "source.git"
@@ -774,6 +775,8 @@ def _write_history_plane(
             "-C",
             str(bundle_source),
             "-c",
+            "core.fsmonitor=",
+            "-c",
             "protocol.file.allow=always",
             "fetch",
             "--no-write-fetch-head",
@@ -786,6 +789,31 @@ def _write_history_plane(
         shell=False,
         env=_git_environment(),
     )
+    extra_names: list[str] = []
+    extra_lines: list[str] = []
+    for dest_ref, source_id in extra_refs:
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(bundle_source),
+                "-c",
+                "core.fsmonitor=",
+                "-c",
+                "protocol.file.allow=always",
+                "fetch",
+                "--no-write-fetch-head",
+                "--no-tags",
+                str(repo),
+                f"{source_id}:{dest_ref}",
+            ],
+            check=True,
+            capture_output=True,
+            shell=False,
+            env=_git_environment(),
+        )
+        extra_names.append(dest_ref)
+        extra_lines.append(f"{source_id} {dest_ref}")
     subprocess.run(
         [
             "git",
@@ -795,6 +823,7 @@ def _write_history_plane(
             "create",
             str(plane_root / "repository.bundle"),
             captured_ref,
+            *extra_names,
         ],
         check=True,
         capture_output=True,
@@ -802,7 +831,7 @@ def _write_history_plane(
         env=_git_environment(),
     )
     (plane_root / "refs.txt").write_bytes(
-        f"{subject_id} {captured_ref}\n".encode("utf-8")
+        ("\n".join([f"{subject_id} {captured_ref}", *extra_lines]) + "\n").encode("utf-8")
     )
 
     # Remove the temporary bare repository; the bundle is the sealed artifact.
@@ -947,6 +976,11 @@ def capture_planes(
                 subjects[plane_id],
                 object_format,
                 dispositions[plane_id],
+                extra_refs=(
+                    (("refs/stash", before.stash.strip().decode("ascii")),)
+                    if plane_id is PlaneId.LOCAL_HISTORY and before.stash
+                    else ()
+                ),
             )
         elif plane_id is PlaneId.LOCAL_INDEX:
             plane_root.mkdir()
