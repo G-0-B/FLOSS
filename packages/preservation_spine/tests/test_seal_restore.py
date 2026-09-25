@@ -195,6 +195,36 @@ def test_restore_round_trip_preserves_stash(tmp_path: Path) -> None:
     assert f"{stash} refs/stash".encode("ascii") in listed
 
 
+def test_restore_rejects_unallowlisted_history_extra_ref(tmp_path: Path) -> None:
+    capsule, repo, _ = captured_capsule(tmp_path)
+    refs = capsule / "local-history" / "refs.txt"
+    refs.write_bytes(refs.read_bytes() + b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/heads/evil\n")
+    seal_capsule(capsule)
+    with pytest.raises(
+        CapsuleVerificationError, match="history refs metadata does not match identity"
+    ):
+        restore_and_verify(capsule, tmp_path / "restore", forbidden_roots={repo})
+
+
+def test_restore_binds_retained_identity_on_verification_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import packages.preservation_spine.restore as restore_mod
+
+    seen: dict[str, object] = {}
+    real = restore_mod._atomic_write_fixed
+
+    def wrapper(*args: object, **kwargs: object) -> None:
+        seen["retained_identity"] = kwargs.get("retained_identity")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(restore_mod, "_atomic_write_fixed", wrapper)
+    capsule, repo, _ = captured_capsule(tmp_path)
+    seal_capsule(capsule)
+    restore_and_verify(capsule, tmp_path / "restore", forbidden_roots={repo})
+    assert seen.get("retained_identity") is not None
+
+
 def artifact_tree(root: Path, *, exclude_seal: bool = False) -> dict[str, bytes]:
     excluded = {"checksums.sha256", "provenance-root.json", "verification.json"}
     return {
@@ -590,6 +620,10 @@ def test_clean_room_restore_is_exact_for_each_history_plane(
             .decode("ascii")
             == object_format
         )
+        show = git(restored_repo, "show-ref").stdout.splitlines()
+        assert show == [f"{subject_id} refs/heads/master".encode("ascii")]
+        heads = _list_bundle_heads(capsule / plane_id.value / "repository.bundle")
+        assert heads == ((subject_id, "refs/heads/master"),)
     ordered_history = list(expected.items())
     for index, (plane_id, _) in enumerate(ordered_history):
         restored_repo = (
