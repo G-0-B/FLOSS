@@ -312,6 +312,33 @@ function's name, and include the function you are editing in that sweep. Then
 ask the second question: if the new state carries a capability, who has to
 receive it? A marker nobody can present is a label, not a proof.
 
+### FM-18 — Deferring a fix as a trade that does not exist
+
+*Added 2026-09-27, from the PR41 fix-sweep review.* The survivor independence
+check caught every exception and returned `None`, the value a *passing* check
+returns. So a checker that crashed vouched for the roster, and the run went on
+to report a consensus tier. The external audit flagged it, and so did the
+unfiltered re-review, which called it a defect. The author deferred it anyway:
+changing it "trades availability for correctness and is a policy choice". The
+operator rejected that framing. The degraded path already returned every
+response, wrote them into the synthesis and staged the draft. The only thing
+it withheld was the tier. Nobody's availability was at stake.
+
+It was also §5's pattern again: two paths, one boundary. Admission called the
+same checker uncaught and failed closed on the same crash. Survival failed
+open. Two views of one roster disagreed about what a crash means.
+
+**Rule.** When a check cannot answer, *what the caller gets back* and *what the
+caller is told* are two separate decisions. "Fail open or fail closed" is a
+false binary whenever a degraded channel exists. Return the output, withhold
+the claim, and label the verdict *unknown*, which is distinct from *failed*,
+because "failed" sends an operator to fix something that may be fine. Before
+deferring a fix as a trade-off, check whether the degraded path already
+provides the thing you think you are protecting. And treat a sentinel that
+shares its value with success (`None`, `0`, `""`) as the defect shape. Make
+"unknown" a value that a caller unaware of it treats as a problem, not as a
+pass.
+
 ---
 
 ## 3. Tests that could not fail

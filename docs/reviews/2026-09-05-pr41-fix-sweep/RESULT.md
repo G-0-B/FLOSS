@@ -4,14 +4,15 @@
 **External review:** independent audit, 2026-09-18 —
 [`external-audit-2026-09-18/REVIEW.md`](external-audit-2026-09-18/REVIEW.md)
 **Audit recommendation:** request changes, on two reproduced findings
-**Author response:** `e747a75` — both findings fixed, two residuals fixed, one deferred
+**Author response:** `e747a75` — both findings fixed, two residuals fixed, one deferred.
+The deferred one was fixed in `65d040e` after the operator challenged how it was framed.
 
 ## Operator decision
 
 **PENDING.** This file records the author's dispositions. It is not the
 operator's decision, and the audit states explicitly that it is not one either.
-Whether the range is accepted, and whether the deferred item below is accepted
-as deferred, is for the operator to write here.
+Whether the range is accepted is for the operator to write here. The one item
+deferred to the operator has since been fixed; see the dispositions below.
 
 ## Dispositions
 
@@ -21,7 +22,7 @@ as deferred, is for the operator to write here.
 | **F2** — `hermes_gateway_alive` raising reached one caller of two | P2, reproduced | **Fixed** in `e747a75`. The hook materializer's path translates the refusal to a local `GatewayStateUnknown` and reports `REFUSED`. Tested through the YAML target, the standalone hook materializer, and the parent `materialize()` running the real hook sub-step. |
 | Malformed `gateway.pid` shapes (`[]`, `null`, invalid UTF-8) escaped as unhandled types | residual, reproduced | **Fixed** in `e747a75`. All shapes, plus bare strings, numbers and `true`, now raise the handled type. |
 | Stale-skill pruner checked a marker's existence, not its owner | residual, dry-run reproduced | **Fixed** in `e747a75`. Removal requires the marker's `source_path` to resolve under this workspace; anything that cannot prove ownership is left alone. A join test ties the marker writer to the reader. |
-| Survivor helper treats an exception from the independence checker as `None` | residual, pre-existing | **Deferred — needs an operator decision.** It predates this range and a test pins it deliberately: a checker that cannot run currently must not abort a run. Changing that trades availability for correctness and is a policy choice, not a defect fix. |
+| Survivor helper treats an exception from the independence checker as `None` | residual, pre-existing | **Fixed** in `65d040e`. First deferred as an operator decision, on the grounds that changing it "trades availability for correctness". The operator rejected that framing, and the code supports them. Not aborting a run and not vouching for its roster are separate decisions, and `None` made both at once. The degraded path already returns every response, writes them into the synthesis and stages the draft, so availability was never at stake. A crash now returns `IndependenceUnknown`: the run is degraded, keeps its responses, and says independence is *unknown*, not *failed*. Admission already failed closed on the same crash, so survival now agrees with it. |
 | Linux behaviour, installed Antigravity/Hermes header support, real harness invocation, authenticated MCP delivery, daemon readiness | unverified | **Remain unverified.** Nothing in this sweep closes them. |
 
 ## Internal review of the response
@@ -69,7 +70,7 @@ defect-section items, five observations and seven checked-and-clean lines.
 
 | Item | Reviewer | Disposition |
 |---|---|---|
-| Survivor check treats a crashing checker as independent | defect, pre-existing | Already deferred above as an operator policy question. |
+| Survivor check treats a crashing checker as independent | defect, pre-existing | Fixed in `65d040e`; see the dispositions table. The reviewer called it a defect, while the author had called it a policy question. The reviewer was right. |
 | `projection_owned_by` resolves twice | nit | No action; negligible and safe. |
 | The `synthesize()` regression mocks dispatch, so nothing checks a *real* dispatch stamps `transport_name` the way survival reads it | observation | Guard added: every voter shape is dispatched through the real `_dispatch_voter` with only the network stubbed, and its survivor route must equal its admission route. It passes before and after `e747a75` — a guard on the join, not a regression test. |
 | The `0 < pid < 2**32` bound is "conservative on Linux" | observation | **Inverted, and a real defect.** The bound was too *permissive* for POSIX: `pid_t` is signed 32-bit, so ids from `2**31` to `2**32-1` reached `os.kill`, which raises `OverflowError` — not an `OSError`, so it escaped every handler above it. Bound tightened to `2**31`; `_pid_alive` now also fails closed on `OverflowError`/`ValueError`. |
