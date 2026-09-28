@@ -485,12 +485,29 @@ def _degraded_reason(
             f"Fewer than {MIN_VOTERS} voters produced embeddings "
             f"({len(embedded)}/{len(responses)})."
         )
-    if independence is not None:
+    if isinstance(independence, IndependenceUnknown):
+        reasons.append(
+            f"Whether the voters that survived are independent is unknown: "
+            f"{independence}"
+        )
+    elif independence is not None:
         reasons.append(
             f"The voters that survived do not meet the independence bar: "
             f"{independence}"
         )
     return " ".join(reasons) or "Degraded run."
+
+
+class IndependenceUnknown(str):
+    """The survivor check could not run: no verdict in either direction.
+
+    A str, so a caller that only asks `is not None` treats it as a problem and
+    degrades the run. One that has not learned this third state therefore
+    withholds the tier rather than vouching for the roster. Callers that word
+    the outcome check for it and say "unknown" instead of "not independent",
+    because an operator told the roster failed goes to fix a roster that may be
+    fine.
+    """
 
 
 def _survivor_independence_problem(
@@ -501,8 +518,11 @@ def _survivor_independence_problem(
     Reuses `voters.roster_independence_problem` rather than counting families
     here: a second implementation of "is this roster independent" is how the
     pool-side and poll-side answers drift apart, which is the defect this
-    guards against. Local and mixed runs are exempt the same way the pool-side
-    check exempts them, through the same DEGRADED_OK_PROFILES list.
+    guards against. Local runs are exempt (see below); profile exemptions
+    through DEGRADED_OK_PROFILES apply inside that shared function.
+
+    Returns None when the survivors are independent or exempt, a description
+    when they are not, and an IndependenceUnknown when the check could not run.
     """
 
     if not embedded:
@@ -544,8 +564,15 @@ def _survivor_independence_problem(
                 for r in embedded
             },
         )
-    except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
-        return None
+    except Exception as exc:  # noqa: BLE001 -- a check that cannot run must not abort a run
+        # ...nor vouch for it. This returned None, the value a PASSING check
+        # returns, so a crash was recorded as an independent roster. Not
+        # aborting and not vouching are separate decisions: the degraded path
+        # already returns every response, so the only thing a check that never
+        # ran costs the run is a consensus tier nobody verified.
+        return IndependenceUnknown(
+            f"the survivor check could not run ({type(exc).__name__}: {exc})"
+        )
 
 
 def _provider_label(response: "VoterResponse") -> str:
@@ -1359,17 +1386,19 @@ def synthesize(
                 embedded,
                 result.final_synthesis,
             )
+        if independence is None:
+            error = f"insufficient_voters: {len(embedded)}/{len(responses)}"
+        elif isinstance(independence, IndependenceUnknown):
+            error = f"independence_unknown: {independence}"
+        else:
+            error = f"roster_not_independent: {independence}"
         _log_synthesis_action(
             result,
             prompt,
             p_hash,
             started_iso,
             success=False,
-            error=(
-                f"insufficient_voters: {len(embedded)}/{len(responses)}"
-                if independence is None
-                else f"roster_not_independent: {independence}"
-            ),
+            error=error,
             embed_fn=embed_fn,
             embed_name=embed_name,
         )

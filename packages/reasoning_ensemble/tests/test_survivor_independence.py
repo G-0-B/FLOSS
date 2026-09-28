@@ -122,16 +122,92 @@ def test_the_raising_and_reporting_forms_share_one_definition(monkeypatch):
         raise AssertionError("assert_roster_is_independent did not raise")
 
 
-def test_a_check_that_cannot_run_does_not_abort_the_deliberation(monkeypatch):
-    """A broken registry must degrade the CHECK, never the run."""
-
+def _break_the_checker(monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("registry unreadable")
 
     monkeypatch.setattr(voters_lib, "roster_independence_problem", boom)
+
+
+def test_a_check_that_cannot_run_does_not_abort_the_deliberation(monkeypatch):
+    """A broken checker must not abort the run -- and must not vouch for it.
+
+    This returned None, the value a PASSING check returns, so a crash was
+    recorded as an independent roster. Not aborting the run and not vouching
+    for its roster are two separate decisions; returning None made both at
+    once. The deferral that kept it framed the choice as availability against
+    correctness, but the degraded path already keeps every response: the only
+    thing a crashed check should cost the run is a claim it never earned.
+    """
+    _break_the_checker(monkeypatch)
     survivors = [_r("a", "groq/llama-3.1-8b-instant", "llama")]
 
-    assert synthesizer._survivor_independence_problem(survivors, "online") is None
+    problem = synthesizer._survivor_independence_problem(survivors, "online")
+
+    assert problem is not None, "a check that never ran vouched for the roster"
+    assert "registry unreadable" in problem
+
+
+def _synthesize_with_a_broken_checker(monkeypatch):
+    """A four-provider online roster whose survivor check raises.
+
+    Admission is stubbed out rather than broken too: the case under test is a
+    check that fails at SURVIVAL, after a roster was admitted.
+    """
+    from unittest.mock import patch
+
+    from packages.reasoning_ensemble import transport
+
+    _break_the_checker(monkeypatch)
+    survivors = [
+        _r("a", "groq/llama-3.3-70b-versatile", "llama"),
+        _r("b", "mistral/mistral-large-latest", "mistral"),
+        _r("c", "cerebras/qwen-3-32b", "qwen"),
+        _r("d", "gemini/gemini-2.5-flash", "gemini"),
+    ]
+    for response in survivors:
+        response.response = f"the answer from voter {response.voter_id}"
+    pool = [
+        {"voter_id": r.voter_id, "model": r.model, "family": r.family}
+        for r in survivors
+    ]
+
+    with patch.object(
+        transport, "resolve_voter_pool", return_value=(pool, "online")
+    ), patch.object(
+        transport, "resolve_embedder", return_value=("t", lambda _: [0.1])
+    ), patch.object(
+        synthesizer, "dispatch_parallel", return_value=survivors
+    ), patch.object(
+        synthesizer, "_log_synthesis_action"
+    ) as log:
+        result = synthesizer.synthesize("broken checker", stage_artifact=False)
+    return result, log
+
+
+def test_a_run_whose_check_crashed_is_degraded_and_keeps_its_responses(monkeypatch):
+    """Availability survives: every response comes back, in the result and in
+    the writeup. What does not survive is a consensus tier nobody verified."""
+    result, log = _synthesize_with_a_broken_checker(monkeypatch)
+
+    assert result.tier_classification.tier == "degraded"
+    assert log.call_args.kwargs["success"] is False
+    assert len(result.voter_responses) == 4
+    for response in result.voter_responses:
+        assert response.response in result.final_synthesis
+
+
+def test_a_crashed_check_reports_independence_unknown_not_failed(monkeypatch):
+    """The checker did not find the roster dependent either. 'Do not meet the
+    independence bar' would send an operator to fix a roster that may be fine;
+    the record has to say the question went unanswered, and why."""
+    result, log = _synthesize_with_a_broken_checker(monkeypatch)
+
+    error = log.call_args.kwargs["error"]
+    assert error.startswith("independence_unknown:"), error
+    assert "registry unreadable" in error
+    assert "do not meet the independence bar" not in result.final_synthesis
+    assert "unknown" in result.final_synthesis
 
 
 # ---------------------------------------------------------------------------
