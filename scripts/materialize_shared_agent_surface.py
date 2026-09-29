@@ -97,7 +97,10 @@ def load_json(path: Path) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise SharedSurfaceError(f"Missing file: {path}") from exc
-    except json.JSONDecodeError as exc:
+    # ValueError, not only JSONDecodeError: invalid UTF-8 and an integer past
+    # the digit limit raise other ValueErrors, and deep nesting raises
+    # RecursionError. The same gap as hermes_gateway_alive's, at every loader.
+    except (ValueError, RecursionError) as exc:
         raise SharedSurfaceError(f"Invalid JSON in {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise SharedSurfaceError(f"Expected JSON object in {path}")
@@ -155,9 +158,11 @@ def load_jsonc(path: Path) -> dict[str, Any]:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
         raise SharedSurfaceError(f"Missing file: {path}") from exc
+    except UnicodeDecodeError as exc:
+        raise SharedSurfaceError(f"Invalid JSONC in {path}: {exc}") from exc
     try:
         data = json.loads(strip_jsonc_comments(text))
-    except json.JSONDecodeError as exc:
+    except (ValueError, RecursionError) as exc:
         raise SharedSurfaceError(f"Invalid JSONC in {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise SharedSurfaceError(f"Expected JSON object in {path}")
@@ -1597,8 +1602,14 @@ def fetch_agentmemory_status(
     try:
         with request.urlopen(url, timeout=2) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+    # A local service's reply, not a repo file: invalid UTF-8, an oversized
+    # integer and deep nesting all fail with something other than
+    # JSONDecodeError, and a probe must report a bad reply, not raise.
+    except (OSError, error.URLError, TimeoutError, ValueError, RecursionError) as exc:
         return f"error:{type(exc).__name__}"
+    if not isinstance(payload, dict):
+        # `[]` and `null` parse, then have no `.get`.
+        return f"error:{type(payload).__name__}-reply"
     status = payload.get("status")
     if isinstance(status, str) and status.strip():
         return status

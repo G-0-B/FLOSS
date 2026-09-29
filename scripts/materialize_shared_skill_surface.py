@@ -46,7 +46,9 @@ def load_manifest(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise SkillSurfaceError(f"Missing manifest: {path}") from exc
-    except json.JSONDecodeError as exc:
+    # ValueError covers JSONDecodeError, invalid UTF-8 and an integer past the
+    # digit limit; deep nesting raises RecursionError.
+    except (ValueError, RecursionError) as exc:
         raise SkillSurfaceError(f"Invalid JSON in {path}: {exc}") from exc
 
     if not isinstance(payload, dict):

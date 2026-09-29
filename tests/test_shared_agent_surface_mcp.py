@@ -1527,3 +1527,76 @@ def test_pid_alive_fails_closed_when_the_os_rejects_the_id(monkeypatch):
     monkeypatch.setattr(mas.os, "kill", _overflow)
 
     assert mas._pid_alive(3_000_000_000) is True, "an unjudgeable id must fail closed"
+
+
+# ---------------------------------------------------------------------------
+# The gateway.pid fix widened ONE json.loads handler. The internal review of
+# that fix found the same narrow `except json.JSONDecodeError` at every other
+# loader in this module: invalid UTF-8, an integer past the digit limit and
+# nesting past the recursion limit all still escaped as unhandled types.
+# ---------------------------------------------------------------------------
+
+_UNREADABLE_JSON = [
+    b"\xff\xfe not utf-8",
+    b'{"n": ' + b"9" * 5000 + b"}",
+    b"[" * 100_000 + b"]" * 100_000,
+]
+_UNREADABLE_IDS = [
+    "invalid-utf8",
+    "integer-past-the-digit-limit",
+    "nesting-past-the-recursion-limit",
+]
+
+
+@pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+@pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+    tmp_path, loader, payload
+):
+    path = tmp_path / "manifest.json"
+    path.write_bytes(payload)
+
+    with pytest.raises(mas.SharedSurfaceError):
+        getattr(mas, loader)(path)
+
+
+def test_an_unreadable_roster_does_not_crash_the_doctor_summary(tmp_path):
+    """The consequence, not just the type: read_roster_summary exists to
+    swallow a bad roster and catches SharedSurfaceError to do it, so a raw
+    UnicodeDecodeError from load_json went straight through the doctor."""
+    roster = tmp_path / ".agent-surface" / "harness" / "ai-roster.json"
+    roster.parent.mkdir(parents=True)
+    roster.write_bytes(b"\xff\xfe not utf-8")
+
+    assert mas.read_roster_summary(tmp_path) == {}
+
+
+class _Reply:
+    def __init__(self, body: bytes):
+        self._body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self) -> bytes:
+        return self._body
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"[]", b"null", *_UNREADABLE_JSON],
+    ids=["list", "null", *_UNREADABLE_IDS],
+)
+def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+    """This one parses a local HTTP service's reply, so its input is not even
+    repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+    shape the gateway.pid fix closed -- and the other three escaped json.loads.
+    The status probe must report a bad reply, not take the doctor down."""
+    monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+
+    status = mas.fetch_agentmemory_status()
+
+    assert status.startswith("error:"), status

@@ -562,3 +562,23 @@ def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_pat
     assert not module.projection_owned_by(projection, tmp_path / "elsewhere")
     # The parent contains the source too; containment is not installation.
     assert not module.projection_owned_by(projection, workspace.parent)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\xff\xfe not utf-8",
+        b'{"skills": ' + b"9" * 5000 + b"}",
+        b"[" * 100_000 + b"]" * 100_000,
+    ],
+    ids=["invalid-utf8", "integer-past-the-digit-limit", "nesting-past-the-recursion-limit"],
+)
+def test_an_unreadable_manifest_is_a_skill_surface_error(tmp_path, payload):
+    """The same narrow `except json.JSONDecodeError` the gateway.pid fix
+    widened, in this module's own manifest loader."""
+    module = load_module()
+    path = tmp_path / "manifest.json"
+    path.write_bytes(payload)
+
+    with pytest.raises(module.SkillSurfaceError):
+        module.load_manifest(path)
