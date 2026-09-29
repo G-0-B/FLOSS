@@ -68,6 +68,9 @@ the same naming scheme:
 | `RESULT.md` | Dispositions and the operator's decision |
 
 First instance: [`2026-09-05-pr41-fix-sweep/`](2026-09-05-pr41-fix-sweep/).
+A later round that responds to an audit is a new packet, so it gets its own
+directory rather than editing the first one's `PACKET.md`:
+[`2026-09-29-pr41-audit-response/`](2026-09-29-pr41-audit-response/).
 
 ### Why the two patches are split
 
