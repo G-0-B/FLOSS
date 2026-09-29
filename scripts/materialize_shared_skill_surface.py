@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -394,12 +395,18 @@ def check_or_write_json(
     return check_or_write(path, content, check=check, dry_run=dry_run)
 
 
-def serialize_marker(skill: dict[str, Any], manifest_version: str) -> str:
+def serialize_marker(
+    skill: dict[str, Any], manifest_version: str, workspace_root: Path
+) -> str:
     payload = {
         "managed_by": MANAGED_BY,
         "manifest_version": manifest_version,
         "source_path": skill["resolved_path"],
         "skill_name": skill["skill_name"],
+        # WHO INSTALLED THIS, recorded rather than inferred. See
+        # projection_owned_by: source ancestry cannot tell a workspace from one
+        # nested inside it.
+        "workspace_root": str(workspace_root.resolve()),
     }
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
@@ -413,34 +420,51 @@ def remove_path(path: Path) -> None:
     path.unlink()
 
 
-def projection_owned_by(child: Path, owner_root: Path) -> bool:
-    """True only if this managed projection provably belongs to `owner_root`.
-
-    The marker records `source_path`, resolved under the workspace that
-    installed it. That is the ownership predicate, and it has to be CHECKED,
-    not assumed from the marker's existence: user-scope roots such as
-    ~/.codex/skills are shared by every checkout on the machine, so a skill
-    absent from THIS manifest may be a live skill another workspace installed.
-
-    Anything that cannot prove ownership -- unreadable, not an object, wrong
-    `managed_by`, no `source_path`, or a source outside `owner_root` -- is not
-    ours. Leaving a stale directory is recoverable; deleting a live one is not.
-    """
+def read_managed_marker(child: Path) -> dict[str, Any] | None:
+    """The marker, if it is one this materializer wrote; otherwise None."""
 
     try:
         marker = json.loads((child / MANAGED_MARKER).read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return False
+    except (OSError, ValueError, RecursionError):
+        return None
     if not isinstance(marker, dict) or marker.get("managed_by") != MANAGED_BY:
+        return None
+    return marker
+
+
+def projection_owned_by(child: Path, owner_root: Path) -> bool:
+    """True only if the marker names `owner_root` as the installing workspace.
+
+    Ownership has to be CHECKED, not assumed from the marker's existence:
+    user-scope roots such as ~/.codex/skills are shared by every checkout on
+    the machine, so a skill absent from THIS manifest may be a live skill
+    another workspace installed.
+
+    It used to be checked by source ANCESTRY -- ours if `source_path` resolved
+    under `owner_root`. That separates sibling workspaces and nothing else: a
+    checkout nested inside another workspace has every source under the outer
+    root, so refreshing the outer workspace claimed and pruned the nested one's
+    live projections. Containment is not installation. The marker now records
+    the installing workspace's root, and only an exact match is ours.
+
+    Anything that cannot prove ownership -- unreadable, not an object, wrong
+    `managed_by`, no `workspace_root`, or a relative one, which would resolve
+    against whatever directory the run started in -- is not ours. Leaving a
+    stale directory is recoverable; deleting a live one is not.
+    """
+
+    marker = read_managed_marker(child)
+    if marker is None:
         return False
-    source = marker.get("source_path")
-    if not isinstance(source, str) or not source.strip():
+    recorded = marker.get("workspace_root")
+    if not isinstance(recorded, str) or not Path(recorded).is_absolute():
         return False
     try:
-        Path(source).resolve().relative_to(owner_root.resolve())
-    except (ValueError, OSError):
+        return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(
+            str(owner_root.resolve())
+        )
+    except OSError:
         return False
-    return True
 
 
 def prune_stale_projections(
@@ -484,6 +508,18 @@ def prune_stale_projections(
             # existence, so on a shared user-scope root it planned to remove
             # another workspace's live projection whenever this manifest
             # happened not to list that skill. Found by the external audit.
+            marker = read_managed_marker(child)
+            if marker is not None and "workspace_root" not in marker:
+                # Written before markers recorded who installed them, so no
+                # workspace can prove it owns this. Never removed -- but said
+                # out loud, because a withdrawn skill lingering in silence is
+                # the defect this pruner exists for, and one of these may be
+                # this workspace's own.
+                results.append(
+                    f"KEEP  {target_name}: {child.name} has a managed marker with "
+                    f"no installing-workspace identity; ownership unknown, not "
+                    f"removed (delete it by hand if it is stale)"
+                )
             continue
         drift_found = True
         if check:
@@ -507,13 +543,16 @@ def install_skill_projection(
     *,
     check: bool,
     dry_run: bool,
+    workspace_root: Path,
 ) -> tuple[list[str], bool]:
     target_dir = target_root / skill["skill_name"]
     source_dir = Path(skill["resolved_path"])
     results: list[str] = []
     drift_found = False
     expected_snapshot = dict(skill["files"])
-    expected_snapshot[MANAGED_MARKER] = serialize_marker(skill, manifest_version)
+    expected_snapshot[MANAGED_MARKER] = serialize_marker(
+        skill, manifest_version, workspace_root
+    )
 
     actual_snapshot: dict[str, str] = {}
     if target_dir.exists():
@@ -605,6 +644,7 @@ def materialize(
                 registry["manifest_version"],
                 check=check,
                 dry_run=dry_run,
+                workspace_root=workspace_root,
             )
             results.extend(messages)
             drift_found = drift_found or changed

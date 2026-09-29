@@ -303,13 +303,14 @@ def test_check_reports_a_stale_projection_as_drift(tmp_path):
 
 
 def _owned_marker(workspace: Path, skill_name: str) -> str:
-    """A marker as serialize_marker writes it, with its source in `workspace`."""
+    """A marker as serialize_marker writes it, installed by `workspace`."""
     return json.dumps(
         {
             "managed_by": "FLOSSI0ULLK shared skill surface",
             "manifest_version": "test",
             "source_path": str((workspace / "skills" / skill_name).resolve()),
             "skill_name": skill_name,
+            "workspace_root": str(workspace.resolve()),
         }
     )
 
@@ -321,9 +322,8 @@ def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
     selected for removal even when another workspace had installed it -- so
     refreshing one workspace could delete another's live instructions.
 
-    The marker already records `source_path`, resolved under the installing
-    workspace. That is the ownership predicate: a projection is ours to remove
-    only if its source lives under our root."""
+    A projection is ours to remove only if its marker names this workspace as
+    the one that installed it."""
     module = load_module()
 
     root = tmp_path / "skills"
@@ -382,16 +382,155 @@ def test_a_marker_that_cannot_prove_ownership_is_left_alone(tmp_path):
     )
 
 
-def test_the_materializer_passes_its_own_workspace_as_owner():
-    """A pruner that requires an owner is only as good as the owner it is
-    given. The one production caller must pass the workspace it materializes,
-    not a constant and not the target root."""
-    import inspect
+def _workspace_with_skills(root: Path, names: list[str]) -> Path:
+    for name in names:
+        skill = root / "skills" / name
+        skill.mkdir(parents=True, exist_ok=True)
+        (skill / "SKILL.md").write_text(
+            f"---\nname: {name}\ndescription: a test skill\n---\nbody\n",
+            encoding="utf-8",
+        )
+    return root
 
+
+def _refresh(module, workspace: Path, listed: list[str], shared: Path) -> list[str]:
+    """One real materialize() run of `workspace` into a shared user-scope root."""
+    manifest = workspace / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": "test",
+                "targets": {
+                    "shared": {
+                        "enabled": True,
+                        "install_path": str(shared),
+                        "scope": "user",
+                    }
+                },
+                "skills": [{"path": f"skills/{name}"} for name in listed],
+            }
+        ),
+        encoding="utf-8",
+    )
+    messages, _drift = module.materialize(
+        workspace,
+        manifest,
+        workspace / "out",
+        check=False,
+        dry_run=False,
+        include_user_scope=True,
+    )
+    return messages
+
+
+def test_refreshing_either_of_two_nested_workspaces_keeps_the_others_projections(
+    tmp_path,
+):
+    """Second external audit, F3. Ownership was source ANCESTRY: a projection
+    was ours if its source lived anywhere under our root. That protects
+    sibling workspaces but not nested ones -- a checkout inside another
+    workspace has every source under the outer root, so refreshing the outer
+    workspace selected the nested one's live projections for removal whenever
+    its own manifest did not list them.
+
+    Driven through materialize(), with markers written by the real
+    serializer, into one shared user-scope root."""
     module = load_module()
-    source = inspect.getsource(module.materialize)
-    call = source.split("prune_stale_projections(", 1)[1].split(")", 1)[0]
-    assert "owner_root=workspace_root" in call, call
+    outer = _workspace_with_skills(tmp_path / "outer", ["outer-skill"])
+    nested = _workspace_with_skills(outer / "checkouts" / "nested", ["nested-skill"])
+    shared = tmp_path / "shared-user-skills"
+
+    _refresh(module, outer, ["outer-skill"], shared)
+    _refresh(module, nested, ["nested-skill"], shared)
+    assert (shared / "outer-skill").is_dir()
+    assert (shared / "nested-skill").is_dir()
+
+    _refresh(module, nested, ["nested-skill"], shared)
+    assert (shared / "outer-skill").is_dir(), "nested refresh removed its parent's"
+
+    _refresh(module, outer, ["outer-skill"], shared)
+    assert (shared / "nested-skill").is_dir(), "outer refresh removed a nested one's"
+
+
+def test_a_workspace_still_prunes_its_own_withdrawn_projection(tmp_path):
+    """Replaces a test that read materialize()'s SOURCE for the text
+    `owner_root=workspace_root`, which could not see whether the owner passed
+    was one the markers would match. This drives the real caller: install two
+    skills, withdraw one, refresh. A guard on the join between the caller, the
+    writer and the reader -- it passes before and after the identity fix."""
+    module = load_module()
+    workspace = _workspace_with_skills(tmp_path / "workspace", ["kept", "withdrawn"])
+    shared = tmp_path / "shared-user-skills"
+
+    _refresh(module, workspace, ["kept", "withdrawn"], shared)
+    _refresh(module, workspace, ["kept"], shared)
+
+    assert not (shared / "withdrawn").exists()
+    assert (shared / "kept").is_dir()
+
+
+def test_a_relative_workspace_identity_proves_nothing(tmp_path, monkeypatch):
+    """A relative path resolves against the current directory, so ownership
+    would depend on where the materializer happened to be run from. The audit
+    showed `source_path: "."` claimed by any owner containing the cwd."""
+    module = load_module()
+    owner = tmp_path / "workspace"
+    owner.mkdir()
+    projection = tmp_path / "installed" / "relative-marker"
+    projection.mkdir(parents=True)
+    (projection / module.MANAGED_MARKER).write_text(
+        json.dumps(
+            {
+                "managed_by": module.MANAGED_BY,
+                "source_path": ".",
+                "workspace_root": ".",
+                "skill_name": "relative-marker",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(owner)
+
+    assert not module.projection_owned_by(projection, owner)
+
+
+def test_a_marker_without_workspace_identity_is_kept_and_reported(tmp_path):
+    """Markers written before the identity field existed cannot say who
+    installed them, so they are never removed. They ARE reported: the defect
+    this pruner exists for was a withdrawn skill lingering silently, and a
+    legacy marker from this workspace's own withdrawn skill is exactly that.
+    Not drift, because this workspace cannot resolve it without a human."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    legacy = root / "legacy-skill"
+    legacy.mkdir(parents=True)
+    (legacy / module.MANAGED_MARKER).write_text(
+        json.dumps(
+            {
+                "managed_by": module.MANAGED_BY,
+                "manifest_version": "old",
+                "source_path": str((workspace / "skills" / "legacy-skill").resolve()),
+                "skill_name": "legacy-skill",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    for check, dry_run in ((True, False), (False, True), (False, False)):
+        messages, drift = module.prune_stale_projections(
+            "codex",
+            root,
+            set(),
+            check=check,
+            dry_run=dry_run,
+            owner_root=workspace,
+        )
+        assert legacy.exists(), f"a legacy marker was removed ({check=}, {dry_run=})"
+        assert drift is False
+        assert any(
+            "legacy-skill" in m and "identity" in m for m in messages
+        ), messages
 
 
 def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_path):
@@ -414,9 +553,12 @@ def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_pat
         module.serialize_marker(
             {"skill_name": "real-skill", "resolved_path": str(source.resolve())},
             "test",
+            workspace,
         ),
         encoding="utf-8",
     )
 
     assert module.projection_owned_by(projection, workspace)
     assert not module.projection_owned_by(projection, tmp_path / "elsewhere")
+    # The parent contains the source too; containment is not installation.
+    assert not module.projection_owned_by(projection, workspace.parent)
