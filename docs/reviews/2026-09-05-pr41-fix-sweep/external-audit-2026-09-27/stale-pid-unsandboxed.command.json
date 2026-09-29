@@ -1,0 +1,22 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-response-20260927\\pytest-stale-pid-unsandboxed",
+    "scripts/tests/test_shared_hook_surface.py::test_yaml_target_writes_when_gateway_pid_is_stale"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-response-20260927\\snapshot-5a1a2b1",
+  "exit_code": 0,
+  "env_overrides": {
+    "PYTHONPATH": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TEMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "TMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8"
+  }
+}

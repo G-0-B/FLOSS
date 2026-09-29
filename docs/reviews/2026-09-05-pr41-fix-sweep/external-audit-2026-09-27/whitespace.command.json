@@ -1,0 +1,16 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "C:\\~shit\\_audit\\pr41-response-20260927\\whitespace_check.py"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-response-20260927\\snapshot-5a1a2b1",
+  "exit_code": 0,
+  "env_overrides": {
+    "PYTHONPATH": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TEMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "TMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8"
+  }
+}

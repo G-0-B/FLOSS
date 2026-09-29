@@ -1,0 +1,5 @@
+........................                                                 [100%][voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+
+24 passed in 0.15s
+SUPPLEMENT_SURVIVOR_SUITE_EXIT 0
+SUPPLEMENT_REAL_DISPATCH {"tier": "degraded", "success": false, "error": "independence_unknown: the survivor check could not run (RuntimeError: independent audit checker failure)", "responses_retained": 6, "answers_in_writeup": true}

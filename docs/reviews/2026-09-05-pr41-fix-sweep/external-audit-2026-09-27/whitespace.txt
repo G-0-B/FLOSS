@@ -1,0 +1,2 @@
+all exit 2 diagnostics 1564 files 16
+code exit 0 diagnostics 0 files 0

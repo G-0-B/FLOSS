@@ -64,6 +64,7 @@ the same naming scheme:
 | `source-changes.patch` | Production changes only, one section per commit |
 | `test-changes.patch` | Test changes only, same commits |
 | `<reviewer>.md` / `.json` | External reviewer outputs, as they arrive |
+| `internal-reviews.md` | Every internal review of the author's responses: prompt and return, verbatim |
 | `RESULT.md` | Dispositions and the operator's decision |
 
 First instance: [`2026-09-05-pr41-fix-sweep/`](2026-09-05-pr41-fix-sweep/).
@@ -118,6 +119,14 @@ Learned on the first round-trip:
   (`ruff check packages scripts tests hooks`). The repository has no ruff
   configuration and CI does not lint, so a repo-wide `ruff check .` also counts
   any reviewer scripts carried into `docs/reviews/`.
+- **Carry internal reviews verbatim, in `internal-reviews.md`:** the prompt as
+  sent and the return as received, nothing edited but the harness's wrapper.
+  A `RESULT.md` that only summarizes them asks the next reviewer to trust the
+  author's reading of them. The second audit of the first packet said exactly
+  that: summaries cannot be certified.
+- **Recount before correcting a count.** A correction is a claim too. The
+  first `RESULT.md` said four evidence files were normalized on commit; a byte
+  comparison of the committed blobs showed two.
 
 ### Prompting a reviewer
 

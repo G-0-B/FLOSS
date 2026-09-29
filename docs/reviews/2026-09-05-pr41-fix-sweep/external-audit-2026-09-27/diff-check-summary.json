@@ -1,0 +1,52 @@
+[
+  {
+    "scope": "all",
+    "command": [
+      "git",
+      "-C",
+      "C:\\~shit\\FLOSS\\.worktrees\\pr41-salvage",
+      "diff",
+      "--check",
+      "aee4745..5a1a2b1"
+    ],
+    "exit_code": 2,
+    "diagnostics": 1564,
+    "files": [
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/audited-files.json",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-passing-complements.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-tests-final.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-tests-final.xml",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/codex-header-readback.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/environment.json",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/full-suite-final.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/full-suite-final.xml",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/new-test-nodes.json",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/patch-fidelity.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/powershell-results.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/probe-results.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/process-check.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/ruff-baseline.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/ruff.txt",
+      "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/spec-gate.txt"
+    ]
+  },
+  {
+    "scope": "code",
+    "command": [
+      "git",
+      "-C",
+      "C:\\~shit\\FLOSS\\.worktrees\\pr41-salvage",
+      "diff",
+      "--check",
+      "aee4745..5a1a2b1",
+      "--",
+      "packages",
+      "scripts",
+      "tests",
+      "hooks"
+    ],
+    "exit_code": 0,
+    "diagnostics": 0,
+    "files": []
+  }
+]
