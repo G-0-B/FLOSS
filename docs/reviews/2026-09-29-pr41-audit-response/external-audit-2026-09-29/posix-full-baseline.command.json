@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "/mnt/c/~shit/_audit/pr41-response-20260927/snapshot-5a1a2b1/scripts/materialize_shared_skill_surface.py",
+    "--workspace-root",
+    "/mnt/c/~shit/_audit/pr41-round3-20260929/posix-full-fixture/workspace",
+    "--manifest",
+    "/mnt/c/~shit/_audit/pr41-round3-20260929/posix-full-fixture/workspace/manifest.json",
+    "--output-dir",
+    "/mnt/c/~shit/_audit/pr41-round3-20260929/posix-full-fixture/workspace/out",
+    "--check"
+  ],
+  "exit_code": 1
+}

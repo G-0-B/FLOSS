@@ -1,0 +1,11 @@
+{
+  "command": [
+    "wsl.exe",
+    "-d",
+    "Ubuntu",
+    "--exec",
+    "python3",
+    "/mnt/c/~shit/_audit/pr41-round3-20260929/posix_probe.py"
+  ],
+  "exit_code": 0
+}

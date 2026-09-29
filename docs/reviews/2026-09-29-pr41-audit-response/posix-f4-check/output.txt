@@ -1,0 +1,6 @@
+skill_before RAISED ValueError: embedded null byte
+    File "<frozen posixpath>", line 432, in realpath
+skill_after OK drift=True
+    KEEP  posix: a-bad-identity has a managed marker with no usable installing-workspace identity (missing or invalid); ownership unknown, left in place (delete it by hand if it is stale)
+    DRIFT posix: b-own-withdrawn is an installed managed projection with no skill in the manifest (withdrawn or renamed)
+linux 3.12.3

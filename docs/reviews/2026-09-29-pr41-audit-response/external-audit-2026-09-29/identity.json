@@ -1,0 +1,412 @@
+{
+  "base": "5a1a2b1655274d4d37bba9e27a3bb2d11f2e35f6",
+  "endpoint": "42e4d05d1ddfcc696e19c5b91a08e5e7d48f618c",
+  "live_head": "17948dca9d20c34c0b5fd4af859d52c88dd6ce6a",
+  "live_status": "",
+  "files": [
+    {
+      "path": "docs/research/2026-08-31-review-loop-session-learnings.md",
+      "sha256": "6ba161aaaf36d04be94a5c8f9febeb38f6a9d10dcd36f04ffa66f1aef6e9fdb7",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/RESULT.md",
+      "sha256": "b4f957d63b17dabf803a31aa387e6758b34a5184996d5beeb9aefd36f1a462de",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/REVIEW.md",
+      "sha256": "ca048199570ed78e758a306d37da18a30883b8503783fba739defd378512cb8b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/audit_probes.py",
+      "sha256": "3f71135487e9ca101c25d312d061b728d51f8b58f2ca40676f4f45f1309a5462",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/dead-pid-unsandboxed.command.json",
+      "sha256": "a3d6c9cf9549f1866d5535eff834b85d8451c46de2d4c9b7d85dfde21f14cff5",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/dead-pid-unsandboxed.txt",
+      "sha256": "4b5c292f1c5d1b8a55b35a5cbaf582ec92c0a4dbb4679f6aa1d8ced87ffd132d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/delta-baseline.command.json",
+      "sha256": "8d80eb7cea598e9502e6946e6f083fcc16b4b9f649060e364253758788f89a64",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/delta-baseline.txt",
+      "sha256": "e1e6e961dd9c5ebd0677618594fd6488bcd116b57732d4986f38c4fb5d3432ea",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/delta-baseline.xml",
+      "sha256": "e2991d9a0b13cda5fdf392a52e4ffd3e1fc6f1f73658193a542b03071ed8067a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/delta_tests.py",
+      "sha256": "e027f03e4bccc9e9694516e9c00ec26ec2f3e82e08423b9beacd739359864c00",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/diff-check-all.txt",
+      "sha256": "8ff62d55e0e1682d1f6fcdea53e803c78c95e1a54a800209204c07c12c9f877b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/diff-check-code.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/diff-check-summary.json",
+      "sha256": "80c4fa9145d9157f552d3d4cebd8e3d1ab4ddbd9ef40a42fb4d515d735a94412",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/environment.json",
+      "sha256": "f69df43cb848f65988b88245c4a61119543c25795af01356ebf5be233f084fde",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/evidence-fidelity.json",
+      "sha256": "ca201eb828dbe7c6e40c6e830a0fb803f3f73dd7fc338034ef2590633e04cd56",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/final-checks.command.json",
+      "sha256": "2287365463b66cc60db1709436d10957330132d18a2ef68507c1058bd3b46ebf",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/final-checks.txt",
+      "sha256": "6d4d9b5f9f6597d54e7961c34e6a994d01b6e51e15179c886dc37c5eabcb61b0",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/final_checks.py",
+      "sha256": "ffab2e76226fd1bf0ded30e0ea56904353dba4210cd1cc7520071b5469d99047",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/focused.command.json",
+      "sha256": "18459359f507d4bfbeba6ce7c06691019b6e645e7277a6da120af54ad622f9b9",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/focused.txt",
+      "sha256": "cfeea7f9b9455dca35113308b9d6d8cedf67ef59e47d316aee0e7dd76e94a793",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/focused.xml",
+      "sha256": "ba17ea92d3dcdae3cbb204f54bb681006fd98e78a8c428fb740772035a1b7b7a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/full-suite.command.json",
+      "sha256": "d6e4e465a281c670eabd1dbd3a82cf8be5a8e43705990c0067165320e5970125",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/full-suite.txt",
+      "sha256": "37f08ec273506f554dc6c5d2e17abb4720571b81706d8af202c8c091ce65526d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/full-suite.xml",
+      "sha256": "4ab8e67bcdfb67c2ec2b1df95ca8bfcff6b111d0b92d7bd1ac23f761a654d7e2",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/identity.json",
+      "sha256": "87da5961161968f82b67d47140b59d4b92b6f16e61a8108645a08d6261867936",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/lint.command.json",
+      "sha256": "6bda852f47ec54b83083f440bb594974623075c69bb99e53158cdf88ca02e932",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/lint.txt",
+      "sha256": "ea144460ef757a971eb618fd6e06cc3fc1ba9df38031d6ca2551140617b91c30",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/new-tests.json",
+      "sha256": "6d38db9355ed59003220c6f2c72b25a3441e7e6cd312f4a1554e42eae80846d0",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/prepare.py",
+      "sha256": "7376a0a8c0f02328bc9399b12a2aec7aa0d112568789e8094e3ce68ad27a237a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/probes.command.json",
+      "sha256": "fb0e2415f5339dc31be13dbefaa93681cea7a63348bd33ed16b22cc2a52698b7",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/probes.txt",
+      "sha256": "bc01db28871f312207bdac4409d21040b1963f60f27abc82a47bbe2c10253eed",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/report-readback.json",
+      "sha256": "09cad79e52d7b55c6cba4a4225b8ec26d1f5b4bee0e792dd26eacad0c870d827",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/run_check.py",
+      "sha256": "db85a011484288c869fe1d1ae0afda6c799ebf87147e14e2b3ad3cf7776c56b1",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/source-diff.patch",
+      "sha256": "934da64dec02f8e9c2923ad9085b85dbc255ab6055dea8fe4476a12de19a909d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/spec-gate.command.json",
+      "sha256": "49ad02c92c4b12cba898b2e77fc04af0730971d828f0c0fb1a5e23c33ad0a828",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/spec-gate.txt",
+      "sha256": "b47113a00f596e2e512d9f87b5471c4260668e63f27d0b954f4432c914459b64",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/stale-pid-unsandboxed.command.json",
+      "sha256": "8a86be27cd494c79b3315cd8407f23405ccad740bda7d833704cab3ccbd3adba",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/stale-pid-unsandboxed.txt",
+      "sha256": "49a2111f8aec1fcae2c70cc8ef16ce196aec6259ac5eec52f5926f4e41ac8aea",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/supplement-identity.json",
+      "sha256": "c36ec6c6ea6132add71692fe8494d38fc1fd288265a4d45593b7b315a3c2e9a6",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/supplement.command.json",
+      "sha256": "446fbbd2d8851bb9f657d0622c2719064b6b932941e6264a3648f5567f231562",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/supplement.txt",
+      "sha256": "7f0229f214f00fefb9b57353c735eac3461e865b7eedb9fb4c01b3862de98f5e",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/supplement.xml",
+      "sha256": "f044ab8b0183bca3704502085796905528cb0a83fa6b41508eea28b684e85cc2",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/supplemental_check.py",
+      "sha256": "3dcc7e206acee0c1dc7dc2ba197d41a4b0c0989feb393806241c9506ae116043",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/verify_evidence.py",
+      "sha256": "8ce7a4455917d8ea4ed0db64c10e8a3a63f66168dfeaab51f9fb4bacf4c8f909",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/verify_report.py",
+      "sha256": "ee4da484e8ea568a243de01dba6048981c093300a93390351dfa27782b87970f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/whitespace.command.json",
+      "sha256": "3ef1ad94ccd66fb7bff7f04bf7447ac539f50fc29949cb5e5519a60d29dc6305",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/whitespace.txt",
+      "sha256": "6326e6d46f0232bc1f827e4d04b57233f96dc605b71be73b25b1e326a8bb950a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-27/whitespace_check.py",
+      "sha256": "3e6f7c86976604bde1e1e2a1937517232f1bfc0566cd6257ff6390121f34ca8c",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/internal-reviews.md",
+      "sha256": "a2ef1de9e2a69b22f4335ff893271420e2dadc0b6293a5d33d83151180724997",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/README.md",
+      "sha256": "cef33e79dea28a5137628c0dfc52e4aa87b885ae8d05516d3da0ae4be217576a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "packages/reasoning_ensemble/synthesizer.py",
+      "sha256": "39061a93688fa218791e5592656461450477f842144f541f0261e5541301b4ab",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "packages/reasoning_ensemble/tests/test_survivor_independence.py",
+      "sha256": "0e8ab63d4a47220bb88ea70b72372c42cc47733a594072a3bec9d2aa53dfc42f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_agent_surface.py",
+      "sha256": "b3b49657f0274bdbc282a8c6ffb9bbf159a7b92380151cafaee5be029d8a5fff",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_skill_surface.py",
+      "sha256": "2b62ef3fa31a39523a05d40363a604777794c87f5d93e405bd167d60558eafa4",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/tests/test_shared_skill_surface_scope.py",
+      "sha256": "45320ecc49b96d016f13b37c63784a02c5082ef005a7da9a6d5d5016d51f955c",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "tests/test_shared_agent_surface_mcp.py",
+      "sha256": "f8331aafdccfa5ed49c34472d171ef1d0f7d062a526aa93126eda04b0edfcc8a",
+      "exact": true,
+      "same_lf": true
+    }
+  ],
+  "patch_fidelity": [
+    {
+      "packet": "source-changes.patch",
+      "commit": "65d040e",
+      "files": [
+        "packages/reasoning_ensemble/synthesizer.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "source-changes.patch",
+      "commit": "1f42f7d",
+      "files": [
+        "scripts/materialize_shared_agent_surface.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "source-changes.patch",
+      "commit": "0980176",
+      "files": [
+        "scripts/materialize_shared_skill_surface.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "source-changes.patch",
+      "commit": "5df214c",
+      "files": [
+        "scripts/materialize_shared_agent_surface.py",
+        "scripts/materialize_shared_skill_surface.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "65d040e",
+      "files": [
+        "packages/reasoning_ensemble/tests/test_survivor_independence.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "1f42f7d",
+      "files": [
+        "tests/test_shared_agent_surface_mcp.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "0980176",
+      "files": [
+        "scripts/tests/test_shared_skill_surface_scope.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "5df214c",
+      "files": [
+        "scripts/tests/test_shared_skill_surface_scope.py",
+        "tests/test_shared_agent_surface_mcp.py"
+      ],
+      "matches": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-baseline",
+    "--junitxml=C:\\~shit\\_audit\\pr41-round3-20260929\\baseline.xml",
+    "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_check_that_cannot_run_does_not_abort_the_deliberation",
+    "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_run_whose_check_crashed_is_degraded_and_keeps_its_responses",
+    "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_crashed_check_reports_independence_unknown_not_failed",
+    "tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[integer-past-the-digit-limit]",
+    "tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[nesting-past-the-recursion-limit]",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_refreshing_either_of_two_nested_workspaces_keeps_the_others_projections",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_relative_workspace_identity_proves_nothing",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_without_workspace_identity_is_kept_and_reported",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_workspace_still_prunes_its_own_withdrawn_projection",
+    "tests/test_shared_agent_surface_mcp.py::test_every_json_loader_reports_unreadable_input_as_its_own_error",
+    "tests/test_shared_agent_surface_mcp.py::test_an_unreadable_roster_does_not_crash_the_doctor_summary",
+    "tests/test_shared_agent_surface_mcp.py::test_a_malformed_agentmemory_reply_is_reported_not_raised",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_an_unreadable_manifest_is_a_skill_surface_error"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round3-20260929\\baseline-code",
+  "exit_code": 1
+}

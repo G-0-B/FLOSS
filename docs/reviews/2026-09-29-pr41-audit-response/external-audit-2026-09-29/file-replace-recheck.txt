@@ -1,0 +1,51 @@
+F.                                                                       [100%]
+================================== FAILURES ===================================
+________ test_prior_chain_longer_than_recursion_limit_still_validates _________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-replace-recheck/test_prior_chain_longer_than_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000027D0C2A1F30>
+
+    def test_prior_chain_longer_than_recursion_limit_still_validates(tmp_path, monkeypatch):
+        """A chain longer than Python's recursion limit must validate, not crash.
+    
+        The prior walk deliberately does not increment `_depth` (max_depth bounds
+        the evidence DAG, not a linear chain), which left the chain bounded only by
+        the interpreter stack: measured ~1.1 frames per link, so a ~900-link chain
+        exhausted the default 1000 limit and a 1000-link honest chain raised
+        RecursionError instead of returning a PacketValidation. Provenance
+        validation gates substrate claims, so past that length the gate stopped
+        producing verdicts at all rather than producing a negative one.
+        """
+        from packages.activity_log import provenance
+    
+        monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+        limit = sys.getrecursionlimit()
+>       packet_path = _build_chain(provenance, tmp_path, limit + 200)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages\activity_log\tests\test_provenance.py:1254: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+packages\activity_log\tests\test_provenance.py:1216: in _build_chain
+    _packet, packet_path = provenance.create_packet(
+packages\activity_log\provenance.py:343: in create_packet
+    _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
+packages\activity_log\provenance.py:234: in _commit_sequence_head_locked
+    _write_state(path, state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-replace-recheck/test_prior_chain_longer_than_r0/identity/DQK730pL9VRZxlVWi4ynpSGzkjd2O_0MTG73Q8yTPmBY.chain.json')
+state = {'next_sequence': 948, 'head': 'EbZIgkw1vEt7gebljOqx9rRtoqbxuxoIdzQDlKbTTyqo'}
+
+    def _write_state(path: Path, state: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
+        )
+>       os.replace(tmp, path)
+E       PermissionError: [WinError 5] Access is denied: 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-replace-recheck\\test_prior_chain_longer_than_r0\\identity\\DQK730pL9VRZxlVWi4ynpSGzkjd2O_0MTG73Q8yTPmBY.chain.json.tmp' -> 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-replace-recheck\\test_prior_chain_longer_than_r0\\identity\\DQK730pL9VRZxlVWi4ynpSGzkjd2O_0MTG73Q8yTPmBY.chain.json'
+
+packages\activity_log\provenance.py:192: PermissionError
+=========================== short test summary info ===========================
+FAILED packages/activity_log/tests/test_provenance.py::test_prior_chain_longer_than_recursion_limit_still_validates
+1 failed, 1 passed in 10.55s
