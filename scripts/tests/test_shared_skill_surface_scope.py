@@ -1257,3 +1257,186 @@ def test_a_linked_skill_directory_is_never_written_through(tmp_path):
     assert not (elsewhere / module.MANAGED_MARKER).exists()
     assert drift is False
     assert any(m.startswith("KEEP") and "LINKED" in m for m in lines), lines
+
+
+# --- Found by the reviews of b011298 -----------------------------------------
+
+
+def test_caches_a_harness_generates_by_running_a_skill_are_not_a_change(tmp_path):
+    """Running a skill's Python script writes __pycache__ into the installed
+    copy. Counted as payload, that marked the skill EVOLVED for ever and
+    blocked every update from the shared base, though nothing was learned."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    (installed / "scripts" / "__pycache__").mkdir(parents=True)
+    (installed / "scripts" / "__pycache__" / "run.cpython-313.pyc").write_bytes(b"\x00")
+    (installed / ".DS_Store").write_bytes(b"\x00")
+    skill = _set_source(module, workspace, _V2)
+
+    lines, _drift = _run(module, skill, target_root, workspace)
+
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V2, lines
+
+
+@pytest.mark.parametrize("action", ["install", "update"])
+def test_a_copy_that_fails_midway_leaves_nothing_half_installed(
+    tmp_path, monkeypatch, action
+):
+    """A partial copy has no marker, so every later run would read it as
+    UNMANAGED and never repair it. What this run copied is exactly the shared
+    base, so removing it loses nothing and the next run installs it again."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    target_root.mkdir()
+    if action == "update":
+        _install_as(target_root, source, _marker_for(workspace, source, source))
+        skill = _set_source(module, workspace, _V2)
+    real_copytree = shutil.copytree
+
+    def fails_midway(src, dst, *args, **kwargs):
+        Path(dst).mkdir()
+        (Path(dst) / "SKILL.md").write_text("half", encoding="utf-8")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(module.shutil, "copytree", fails_midway)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+    monkeypatch.setattr(module.shutil, "copytree", real_copytree)
+    after_lines, after_drift = _run(module, skill, target_root, workspace, check=True)
+
+    assert not (target_root / "s").exists(), "a partial copy was left behind"
+    assert drift is True and any(m.startswith("FAILED") for m in lines), lines
+    assert after_drift is True and "INSTALL" in after_lines[0], after_lines
+
+
+def test_a_directory_that_appears_mid_install_is_not_removed(tmp_path, monkeypatch):
+    """copytree refuses an existing destination before creating anything, so
+    a directory that appeared between the check and the copy belongs to
+    someone else, and the failure cleanup must not delete it."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    target_root.mkdir()
+
+    def someone_else_got_there(src, dst, *args, **kwargs):
+        Path(dst).mkdir()
+        (Path(dst) / "SKILL.md").write_text("theirs\n", encoding="utf-8")
+        raise FileExistsError(dst)
+
+    monkeypatch.setattr(module.shutil, "copytree", someone_else_got_there)
+
+    lines, _drift = _run(module, skill, target_root, workspace)
+
+    assert (target_root / "s" / "SKILL.md").read_text(encoding="utf-8") == "theirs\n"
+    assert any(m.startswith("KEEP") for m in lines), lines
+
+
+def test_a_marker_that_vanishes_during_pruning_does_not_crash_it(tmp_path, monkeypatch):
+    """The pruner judged ownership with one read of the marker and fetched the
+    baseline with a second; a marker changed in between made the second read
+    None and raised AttributeError, aborting the refresh."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill", installed=stale), encoding="utf-8"
+    )
+    real = module.read_managed_marker
+    reads = {"n": 0}
+
+    def vanishing(child):
+        reads["n"] += 1
+        return real(child) if reads["n"] == 1 else None
+
+    monkeypatch.setattr(module, "read_managed_marker", vanishing)
+
+    _messages, _drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert stale.is_dir(), "removed on the strength of a marker that was gone"
+
+
+def test_a_link_inside_a_skill_is_recorded_as_a_link_not_followed(tmp_path):
+    """Following links read files outside the skill, and a directory loop a
+    harness left inside one could hang or raise on Python 3.12. A link is
+    part of the payload as a link: its target text is recorded, and nothing
+    is read through it."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    outside = tmp_path / "outside.md"
+    outside.write_text("not part of the skill\n", encoding="utf-8")
+    _symlink_or_skip(outside, installed / "notes.md")
+    _symlink_or_skip(installed / "loop-b", installed / "loop-a", directory=True)
+    _symlink_or_skip(installed / "loop-a", installed / "loop-b", directory=True)
+
+    digests = module.payload_digests(installed)
+    lines, drift = _run(module, skill, target_root, workspace, check=True)
+
+    assert digests["notes.md"].startswith("link:"), digests
+    assert digests["loop-a"].startswith("link:"), digests
+    assert drift is False
+    assert any(m.startswith("KEEP") and "EVOLVED" in m for m in lines), lines
+
+
+def test_an_unreadable_directory_is_not_silently_left_out(tmp_path, monkeypatch):
+    """A directory walk that skips what it cannot list returns a partial
+    digest, which can compare equal to the baseline and license a removal of
+    content it never saw. Unreadable is reported, and nothing is touched."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    (installed / "private").mkdir()
+    (installed / "private" / "lesson.md").write_text("learned\n", encoding="utf-8")
+    real_scandir = os.scandir
+
+    def scandir(path="."):
+        # Python 3.12 on POSIX may pass a directory file descriptor, not a path.
+        if isinstance(path, (str, bytes, os.PathLike)) and os.fsdecode(path).endswith(
+            "private"
+        ):
+            raise PermissionError(13, "Permission denied", os.fsdecode(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    skill = _set_source(module, workspace, _V2)
+
+    lines, _drift = _run(module, skill, target_root, workspace)
+
+    monkeypatch.setattr(os, "scandir", real_scandir)
+    assert (installed / "private" / "lesson.md").exists(), "removed unseen content"
+    assert any(m.startswith("KEEP") and "UNREADABLE" in m for m in lines), lines
+
+
+@pytest.mark.skipif(
+    os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    reason="needs POSIX permissions and a non-root user",
+)
+def test_a_really_unreadable_directory_is_not_silently_left_out(tmp_path):
+    """The same, with a real permission failure rather than a simulated one."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    private = installed / "private"
+    private.mkdir()
+    (private / "lesson.md").write_text("learned\n", encoding="utf-8")
+    skill = _set_source(module, workspace, _V2)
+    private.chmod(0)
+    try:
+        lines, _drift = _run(module, skill, target_root, workspace)
+    finally:
+        private.chmod(0o755)
+
+    assert (private / "lesson.md").exists(), "removed unseen content"
+    assert any(m.startswith("KEEP") and "UNREADABLE" in m for m in lines), lines

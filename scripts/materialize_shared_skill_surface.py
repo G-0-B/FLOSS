@@ -41,6 +41,13 @@ MANAGED_BY = "FLOSSI0ULLK shared skill surface"
 # A marker being published is first written under this prefix and then swapped
 # into place; it is never part of a skill's payload.
 MARKER_TEMP_PREFIX = ".flossi0ullk-marker-"
+# Files that USING a skill generates rather than changing it: running a skill's
+# Python script writes __pycache__ into the installed copy, and desktop shells
+# drop folder metadata. Counted as payload, they marked a skill EVOLVED for
+# ever and blocked every update from the shared base.
+GENERATED_DIRS = frozenset({"__pycache__"})
+GENERATED_FILES = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
+GENERATED_SUFFIXES = (".pyc", ".pyo")
 
 
 class SkillSurfaceError(Exception):
@@ -438,15 +445,62 @@ def payload_digests(directory: Path) -> dict[str, str]:
     marker, and a marker being published, are not payload.
     """
 
+    def refuse(error: OSError) -> None:
+        # os.walk's default is to skip what it cannot list. A partial digest
+        # can compare equal to a baseline and license removing content it
+        # never saw, so an unreadable directory is an error, not a gap.
+        raise error
+
     digests: dict[str, str] = {}
-    for path in sorted(directory.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(directory).as_posix()
-        if rel == MANAGED_MARKER or rel.startswith(MARKER_TEMP_PREFIX):
-            continue
-        digests[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return digests
+    for root, dirnames, filenames in os.walk(directory, onerror=refuse):
+        base = Path(root)
+        for dirname in list(dirnames):
+            full = base / dirname
+            rel = full.relative_to(directory).as_posix()
+            if dirname in GENERATED_DIRS:
+                dirnames.remove(dirname)
+            elif _is_link(full):
+                # A link is payload AS a link. Following one read files
+                # outside the skill, and a loop a harness left inside one could
+                # hang or raise on Python 3.12. Its target text is recorded
+                # and nothing is read through it.
+                digests[rel] = "link:" + os.readlink(full)
+                dirnames.remove(dirname)
+        for filename in filenames:
+            full = base / filename
+            rel = full.relative_to(directory).as_posix()
+            if rel == MANAGED_MARKER or rel.startswith(MARKER_TEMP_PREFIX):
+                continue
+            if _is_generated(rel):
+                continue
+            if full.is_symlink():
+                digests[rel] = "link:" + os.readlink(full)
+            else:
+                digests[rel] = hashlib.sha256(full.read_bytes()).hexdigest()
+    return dict(sorted(digests.items()))
+
+
+def _is_generated(rel: str) -> bool:
+    parts = rel.split("/")
+    return (
+        any(part in GENERATED_DIRS for part in parts[:-1])
+        or parts[-1] in GENERATED_FILES
+        or parts[-1].endswith(GENERATED_SUFFIXES)
+    )
+
+
+def _copy_payload(source_dir: Path, target_dir: Path) -> None:
+    # symlinks=True: a link is copied as a link, matching how payload_digests
+    # records it. Copying the target's content instead would make every
+    # install with a link compare different from its source for ever.
+    shutil.copytree(
+        source_dir,
+        target_dir,
+        symlinks=True,
+        ignore=shutil.ignore_patterns(
+            *GENERATED_DIRS, *GENERATED_FILES, *(f"*{s}" for s in GENERATED_SUFFIXES)
+        ),
+    )
 
 
 def publish_marker(target_dir: Path, content: str) -> None:
@@ -660,7 +714,11 @@ def prune_stale_projections(
         # operator's rule (2026-09-29) is that such changes are kept and
         # propagated, never destroyed. Without a baseline nothing proves it
         # unmodified, so that is kept too.
-        baseline = _valid_baseline(read_managed_marker(child).get("installed_files"))
+        # Read again, and treat a marker that vanished or changed since the
+        # ownership check as no baseline: never remove on the strength of a
+        # marker that is gone.
+        owned_marker = read_managed_marker(child) or {}
+        baseline = _valid_baseline(owned_marker.get("installed_files"))
         try:
             installed = payload_digests(child)
         except OSError as exc:
@@ -867,13 +925,30 @@ def install_skill_projection(
         # so nothing learned is lost. The shared base's history holds it.
         remove_path(target_dir)
 
-    shutil.copytree(source_dir, target_dir)
+    try:
+        _copy_payload(source_dir, target_dir)
+    except FileExistsError:
+        # copytree refuses an existing destination before creating anything,
+        # so whatever is there appeared since the check and is not ours.
+        return keep(
+            "APPEARED",
+            "a directory with this name appeared during the refresh; left in place",
+        )
+    except OSError as exc:
+        # Everything under target_dir was created by this copy and is exactly
+        # the shared base; a partial copy has no marker, would read as
+        # UNMANAGED on every later run and never be repaired. Remove it, and
+        # the next run installs again.
+        remove_path(target_dir)
+        return (
+            [f"FAILED {target_name}: {name} not installed ({exc}); nothing left behind"],
+            True,
+        )
     try:
         publish_marker(target_dir, expected)
     except OSError as exc:
-        # A fresh copy without a marker would read as UNMANAGED next time and
-        # never be adopted. It is exactly the shared base, so removing it
-        # loses nothing, and the next run installs it again.
+        # The same reasoning: a fresh copy without a marker would never be
+        # adopted, and removing it loses nothing.
         remove_path(target_dir)
         return (
             [f"FAILED {target_name}: {name} not installed ({exc}); nothing left behind"],
