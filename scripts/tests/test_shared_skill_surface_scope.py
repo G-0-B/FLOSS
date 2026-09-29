@@ -17,6 +17,7 @@ Regression cover for three PR41 review findings against this materializer:
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -235,7 +236,8 @@ def test_a_withdrawn_skill_projection_is_removed(tmp_path):
     stale.mkdir(parents=True)
     (stale / "SKILL.md").write_text("old instructions", encoding="utf-8")
     (stale / module.MANAGED_MARKER).write_text(
-        _owned_marker(tmp_path / "workspace", "retired-skill"), encoding="utf-8"
+        _owned_marker(tmp_path / "workspace", "retired-skill", installed=stale),
+        encoding="utf-8",
     )
 
     messages, drift = module.prune_stale_projections(
@@ -286,7 +288,8 @@ def test_check_reports_a_stale_projection_as_drift(tmp_path):
     stale = root / "retired-skill"
     stale.mkdir(parents=True)
     (stale / module.MANAGED_MARKER).write_text(
-        _owned_marker(tmp_path / "workspace", "retired-skill"), encoding="utf-8"
+        _owned_marker(tmp_path / "workspace", "retired-skill", installed=stale),
+        encoding="utf-8",
     )
 
     messages, drift = module.prune_stale_projections(
@@ -303,17 +306,38 @@ def test_check_reports_a_stale_projection_as_drift(tmp_path):
     assert any("DRIFT" in m for m in messages)
 
 
-def _owned_marker(workspace: Path, skill_name: str) -> str:
-    """A marker as serialize_marker writes it, installed by `workspace`."""
-    return json.dumps(
-        {
-            "managed_by": "FLOSSI0ULLK shared skill surface",
-            "manifest_version": "test",
-            "source_path": str((workspace / "skills" / skill_name).resolve()),
-            "skill_name": skill_name,
-            "workspace_root": str(workspace.resolve()),
-        }
-    )
+def _digests(directory: Path) -> dict[str, str]:
+    """sha256 of every payload file's bytes, the marker excluded.
+
+    Written here rather than imported, so the tests check the materializer's
+    baseline against an independent reading of the same bytes.
+    """
+    return {
+        p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(directory.rglob("*"))
+        if p.is_file() and p.relative_to(directory).as_posix() != ".flossi0ullk-managed.json"
+    }
+
+
+def _owned_marker(
+    workspace: Path, skill_name: str, installed: Path | None = None
+) -> str:
+    """A marker as serialize_marker writes it, installed by `workspace`.
+
+    With `installed`, the marker also carries the baseline -- the digests of
+    that directory's payload as it stands -- which is what lets a withdrawn
+    projection be proven unmodified and so removable.
+    """
+    payload = {
+        "managed_by": "FLOSSI0ULLK shared skill surface",
+        "manifest_version": "test",
+        "source_path": str((workspace / "skills" / skill_name).resolve()),
+        "skill_name": skill_name,
+        "workspace_root": str(workspace.resolve()),
+    }
+    if installed is not None:
+        payload["installed_files"] = _digests(installed)
+    return json.dumps(payload)
 
 
 def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
@@ -557,6 +581,7 @@ def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_pat
             {"skill_name": "real-skill", "resolved_path": str(source.resolve())},
             "test",
             workspace,
+            installed_files={},
         ),
         encoding="utf-8",
     )
@@ -738,7 +763,9 @@ def test_a_marker_only_change_never_takes_the_installed_skill_away(
     target_root = tmp_path / "installed"
     installed = target_root / "steady"
     shutil.copytree(skill["resolved_path"], installed)
-    legacy = json.loads(module.serialize_marker(skill, "test", workspace))
+    legacy = json.loads(
+        module.serialize_marker(skill, "test", workspace, installed_files={})
+    )
     del legacy["workspace_root"]
     (installed / module.MANAGED_MARKER).write_text(json.dumps(legacy), encoding="utf-8")
 
@@ -764,3 +791,469 @@ def test_a_marker_only_change_never_takes_the_installed_skill_away(
     assert (installed / "SKILL.md").read_text(encoding="utf-8") == (
         Path(skill["resolved_path"]) / "SKILL.md"
     ).read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Fourth external audit (F5, F6, F7), under the operator's requirement of
+# 2026-09-29: never overwrite a skill that has changed where it is installed;
+# surface the change instead, and let --check pass.
+# ---------------------------------------------------------------------------
+
+_V1 = "---\nname: s\ndescription: a test skill\n---\nversion one\n"
+_V2 = "---\nname: s\ndescription: a test skill\n---\nversion two\n"
+
+
+def _one_skill(module, tmp_path, body: str = _V1):
+    """A workspace with one skill `s`, resolved, plus an empty target root."""
+    workspace = tmp_path / "workspace"
+    source = workspace / "skills" / "s"
+    source.mkdir(parents=True)
+    (source / "SKILL.md").write_text(body, encoding="utf-8", newline="\n")
+    skill = module.resolve_skill_entry(workspace, {"path": "skills/s"})
+    return workspace, source, skill, tmp_path / "installed"
+
+
+def _set_source(module, workspace: Path, body: str):
+    (workspace / "skills" / "s" / "SKILL.md").write_text(
+        body, encoding="utf-8", newline="\n"
+    )
+    return module.resolve_skill_entry(workspace, {"path": "skills/s"})
+
+
+def _install_as(target_root: Path, source: Path, marker: dict) -> Path:
+    installed = target_root / "s"
+    shutil.copytree(source, installed)
+    (installed / ".flossi0ullk-managed.json").write_text(
+        json.dumps(marker), encoding="utf-8"
+    )
+    return installed
+
+
+def _marker_for(workspace: Path, source: Path, baseline: Path | None) -> dict:
+    marker = {
+        "managed_by": "FLOSSI0ULLK shared skill surface",
+        "manifest_version": "test",
+        "source_path": str(source.resolve()),
+        "skill_name": "s",
+        "workspace_root": str(workspace.resolve()),
+    }
+    if baseline is not None:
+        marker["installed_files"] = _digests(baseline)
+    return marker
+
+
+def _run(module, skill, target_root, workspace, *, check=False, dry_run=False):
+    return module.install_skill_projection(
+        "t",
+        skill,
+        target_root,
+        "test",
+        check=check,
+        dry_run=dry_run,
+        workspace_root=workspace,
+    )
+
+
+def _read_marker(installed: Path) -> dict:
+    marker = installed / ".flossi0ullk-managed.json"
+    return json.loads(marker.read_text(encoding="utf-8"))
+
+
+def _refuse_replacement(module, monkeypatch):
+    def refuse(*args, **kwargs):
+        raise AssertionError("an installed skill was taken down")
+
+    monkeypatch.setattr(module, "remove_path", refuse)
+    monkeypatch.setattr(module.shutil, "copytree", refuse)
+
+
+def _symlink_or_skip(target: Path, link: Path, *, directory: bool = False) -> None:
+    try:
+        os.symlink(target, link, target_is_directory=directory)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform or account cannot create symlinks")
+
+
+# --- F5: the marker is published as a new file, never through a link -------
+
+
+def test_a_marker_rewrite_never_writes_through_a_hardlink(tmp_path):
+    """Fourth audit, F5. The marker-only path opened the existing marker in
+    place, so a marker hard-linked to a file elsewhere had that file
+    rewritten: another projection's marker, or anything else."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = target_root / "s"
+    shutil.copytree(source, installed)
+    # A valid legacy marker living elsewhere -- another projection's, say --
+    # so the materializer reaches the marker rewrite rather than refusing an
+    # unreadable marker outright.
+    legacy = _marker_for(workspace, source, None)
+    del legacy["workspace_root"]
+    external = tmp_path / "elsewhere.json"
+    external.write_text(json.dumps(legacy), encoding="utf-8")
+    os.link(external, installed / module.MANAGED_MARKER)
+    before = external.read_bytes()
+
+    _run(module, skill, target_root, workspace)
+
+    assert external.read_bytes() == before, "the write went through the hardlink"
+    assert _read_marker(installed)["workspace_root"] == str(workspace.resolve())
+
+
+def test_a_marker_rewrite_never_writes_through_a_symlink(tmp_path):
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = target_root / "s"
+    shutil.copytree(source, installed)
+    # A valid legacy marker living elsewhere -- another projection's, say --
+    # so the materializer reaches the marker rewrite rather than refusing an
+    # unreadable marker outright.
+    legacy = _marker_for(workspace, source, None)
+    del legacy["workspace_root"]
+    external = tmp_path / "elsewhere.json"
+    external.write_text(json.dumps(legacy), encoding="utf-8")
+    _symlink_or_skip(external, installed / module.MANAGED_MARKER)
+    before = external.read_bytes()
+
+    _run(module, skill, target_root, workspace)
+
+    assert external.read_bytes() == before, "the write went through the symlink"
+    assert not (installed / module.MANAGED_MARKER).is_symlink()
+
+
+# --- F6: a symlink loop is unknown ownership, not a crash -------------------
+
+
+def test_a_symlink_loop_identity_is_unknown_not_a_crash(tmp_path, monkeypatch):
+    """Fourth audit, F6. Python 3.12's resolve() raises RuntimeError on a
+    symlink loop, which the OSError/ValueError guard missed: one such marker
+    aborted the whole refresh, --check included. Simulated here on every
+    platform; the next test uses a real loop where the platform allows it."""
+    real = os.path.realpath
+
+    def realpath(path, *args, **kwargs):
+        if "symlink-loop" in os.fspath(path):
+            raise RuntimeError(f"Symlink loop from {os.fspath(path)!r}")
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(os.path, "realpath", realpath)
+    module = load_module()
+    workspace = _workspace_with_skills(tmp_path / "workspace", ["kept", "withdrawn"])
+    shared = tmp_path / "shared-user-skills"
+    _refresh(module, workspace, ["kept", "withdrawn"], shared)
+    bad = shared / "a-looped-identity"
+    bad.mkdir()
+    (bad / module.MANAGED_MARKER).write_text(
+        _marker_with_identity(
+            module, "a-looped-identity", str(tmp_path / "symlink-loop")
+        ),
+        encoding="utf-8",
+    )
+
+    messages = _refresh(module, workspace, ["kept"], shared)
+
+    assert bad.is_dir()
+    assert not (shared / "withdrawn").exists(), "processing stopped at the loop"
+    assert any("a-looped-identity" in m and m.startswith("KEEP") for m in messages)
+
+
+def test_a_real_symlink_loop_identity_does_not_stop_the_refresh(tmp_path):
+    module = load_module()
+    loop_a, loop_b = tmp_path / "loop-a", tmp_path / "loop-b"
+    _symlink_or_skip(loop_b, loop_a)
+    _symlink_or_skip(loop_a, loop_b)
+    workspace = _workspace_with_skills(tmp_path / "workspace", ["kept", "withdrawn"])
+    shared = tmp_path / "shared-user-skills"
+    _refresh(module, workspace, ["kept", "withdrawn"], shared)
+    bad = shared / "a-looped-identity"
+    bad.mkdir()
+    (bad / module.MANAGED_MARKER).write_text(
+        _marker_with_identity(module, "a-looped-identity", str(loop_a / "owner")),
+        encoding="utf-8",
+    )
+
+    _refresh(module, workspace, ["kept"], shared)
+
+    assert bad.is_dir()
+    assert not (shared / "withdrawn").exists(), "processing stopped at the loop"
+
+
+# --- F7: bytes decide, and changed bytes are kept and surfaced --------------
+
+
+def test_a_byte_only_difference_is_surfaced_not_blessed(tmp_path):
+    """Fourth audit, F7. Text read in universal-newline mode made a CRLF
+    script equal to its LF source, so a differing marker sent it down the
+    marker-only path: the broken installed copy was blessed with a fresh
+    marker and --check reported OK. Bytes decide now; a difference with no
+    baseline to explain it is kept and surfaced, never blessed."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    (source / "run.sh").write_bytes(b"exit 0\n")
+    skill = module.resolve_skill_entry(workspace, {"path": "skills/s"})
+    legacy = _marker_for(workspace, source, None)
+    del legacy["workspace_root"]
+    installed = _install_as(target_root, source, legacy)
+    (installed / "run.sh").write_bytes(b"exit 0\r\n")
+    marker_before = (installed / module.MANAGED_MARKER).read_bytes()
+
+    check_lines, check_drift = _run(module, skill, target_root, workspace, check=True)
+    _run(module, skill, target_root, workspace)
+
+    assert (installed / "run.sh").read_bytes() == b"exit 0\r\n"
+    assert (installed / module.MANAGED_MARKER).read_bytes() == marker_before, "blessed"
+    assert check_drift is False
+    assert any(
+        m.startswith("KEEP") and "DIVERGED" in m for m in check_lines
+    ), check_lines
+
+
+def test_a_binary_file_in_an_installed_skill_does_not_crash_the_refresh(tmp_path):
+    """The snapshot decoded every installed file as UTF-8, so a harness that
+    added an image to a skill made the refresh raise, --check included."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    (installed / "learned.png").write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe")
+
+    lines, drift = _run(module, skill, target_root, workspace, check=True)
+
+    assert drift is False
+    assert any(m.startswith("KEEP") and "EVOLVED" in m for m in lines), lines
+
+
+def test_an_evolved_skill_is_kept_and_surfaced_not_overwritten(tmp_path):
+    """The operator's requirement. The installed copy changed and the shared
+    base did not: that is a learning, not drift. Keep it, name what changed,
+    and let --check pass."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    learned = _V1 + "a lesson learned in use\n"
+    (installed / "SKILL.md").write_text(learned, encoding="utf-8", newline="\n")
+
+    check_lines, check_drift = _run(module, skill, target_root, workspace, check=True)
+    _run(module, skill, target_root, workspace)
+
+    assert check_drift is False
+    assert any(
+        m.startswith("KEEP") and "EVOLVED" in m and "SKILL.md" in m
+        for m in check_lines
+    ), check_lines
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == learned
+
+
+def test_a_source_update_reaches_an_unmodified_install(tmp_path):
+    """Guard on the other half: when only the shared base moved, the install
+    is still updated, and its baseline follows. Without this, preservation
+    would freeze every install at its first version."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    skill = _set_source(module, workspace, _V2)
+
+    _run(module, skill, target_root, workspace)
+
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V2
+    assert _read_marker(installed)["installed_files"] == _digests(source)
+
+
+def test_a_conflict_is_kept_and_surfaced(tmp_path):
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    learned = _V1 + "a lesson learned in use\n"
+    (installed / "SKILL.md").write_text(learned, encoding="utf-8", newline="\n")
+    skill = _set_source(module, workspace, _V2)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert drift is False
+    assert any(m.startswith("KEEP") and "CONFLICT" in m for m in lines), lines
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == learned
+
+
+def test_a_converged_install_is_rebaselined_without_touching_the_payload(
+    tmp_path, monkeypatch
+):
+    """Fourth audit, design point 2: when the installed copy and the shared
+    base changed to the same bytes, they have converged, because the
+    improvement was propagated. Only the baseline moves."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    (installed / "SKILL.md").write_text(_V2, encoding="utf-8", newline="\n")
+    skill = _set_source(module, workspace, _V2)
+    _refuse_replacement(module, monkeypatch)
+
+    _lines, drift = _run(module, skill, target_root, workspace)
+
+    assert drift is True
+    assert _read_marker(installed)["installed_files"] == _digests(source)
+
+
+def test_an_owned_install_without_a_baseline_that_differs_is_kept(tmp_path):
+    """Nothing says which side changed, so nothing is overwritten."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(target_root, source, _marker_for(workspace, source, None))
+    (installed / "SKILL.md").write_text(_V2, encoding="utf-8", newline="\n")
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert drift is False
+    assert any(m.startswith("KEEP") and "DIVERGED" in m for m in lines), lines
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V2
+
+
+@pytest.mark.parametrize("same_content", [False, True], ids=["differs", "identical"])
+def test_a_foreign_install_of_the_same_name_is_never_replaced(tmp_path, same_content):
+    """Third audit O2, and the fourth audit's design point 1: a matching name,
+    or even matching content, does not authorise taking over another
+    workspace's installation, neither its files nor its marker."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    other = tmp_path / "other-workspace"
+    other.mkdir()
+    installed = _install_as(target_root, source, _marker_for(other, source, source))
+    if not same_content:
+        (installed / "SKILL.md").write_text(_V2, encoding="utf-8", newline="\n")
+    files_before = _digests(installed)
+    marker_before = (installed / module.MANAGED_MARKER).read_bytes()
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert drift is False
+    assert any(m.startswith("KEEP") and "FOREIGN" in m for m in lines), lines
+    assert _digests(installed) == files_before
+    assert (installed / module.MANAGED_MARKER).read_bytes() == marker_before
+
+
+def test_an_unmanaged_directory_with_a_listed_name_is_never_replaced(tmp_path):
+    """Fourth audit O2: install deleted an unmanaged directory that happened to
+    share a listed skill's name (a harness's own skill, say) and copied the
+    shared base over it."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    theirs = target_root / "s"
+    theirs.mkdir(parents=True)
+    (theirs / "SKILL.md").write_text("a harness's own skill\n", encoding="utf-8")
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert drift is False
+    assert any(m.startswith("KEEP") and "UNMANAGED" in m for m in lines), lines
+    assert (theirs / "SKILL.md").read_text(encoding="utf-8") == (
+        "a harness's own skill\n"
+    )
+    assert not (theirs / module.MANAGED_MARKER).exists(), "adopted without a policy"
+
+
+def test_an_update_is_abandoned_if_the_install_changes_during_the_refresh(
+    tmp_path, monkeypatch
+):
+    """Fourth audit, design point 4: an edit landing between the comparison
+    and the replacement must not be lost. The installed copy is read again
+    immediately before anything is removed."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    skill = _set_source(module, workspace, _V2)
+    real = module.payload_digests
+    reads = {"n": 0}
+
+    def racing(directory):
+        result = real(directory)
+        if Path(directory) == installed:
+            reads["n"] += 1
+            if reads["n"] == 2:
+                result = {**result, "SKILL.md": "0" * 64}
+        return result
+
+    monkeypatch.setattr(module, "payload_digests", racing)
+
+    lines, _drift = _run(module, skill, target_root, workspace)
+
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V1
+    assert any(m.startswith("KEEP") for m in lines), lines
+
+
+def test_a_withdrawn_skill_with_local_changes_is_kept_and_surfaced(tmp_path):
+    """Learnings in a retracted skill are still learnings. The pruner removes
+    only what it can prove is exactly what was installed."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill", installed=stale), encoding="utf-8"
+    )
+    (stale / "SKILL.md").write_text("as installed\nplus a lesson\n", encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert stale.is_dir()
+    assert drift is False
+    assert any(
+        "retired-skill" in m and m.startswith("KEEP") for m in messages
+    ), messages
+
+
+def test_a_withdrawn_skill_without_a_baseline_is_kept(tmp_path):
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("no baseline recorded\n", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill"), encoding="utf-8"
+    )
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert stale.is_dir()
+    assert drift is False
+    assert any(
+        "retired-skill" in m and m.startswith("KEEP") for m in messages
+    ), messages
+
+
+def test_a_linked_skill_directory_is_never_written_through(tmp_path):
+    """Claude Code documents symlinked skill folders as supported. Replacing
+    one would delete the link, and writing into one would write wherever it
+    points."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    elsewhere = tmp_path / "someone-elses-skill"
+    elsewhere.mkdir()
+    (elsewhere / "SKILL.md").write_text("theirs\n", encoding="utf-8")
+    target_root.mkdir()
+    _symlink_or_skip(elsewhere, target_root / "s", directory=True)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert (target_root / "s").is_symlink()
+    assert (elsewhere / "SKILL.md").read_text(encoding="utf-8") == "theirs\n"
+    assert not (elsewhere / module.MANAGED_MARKER).exists()
+    assert drift is False
+    assert any(m.startswith("KEEP") and "LINKED" in m for m in lines), lines

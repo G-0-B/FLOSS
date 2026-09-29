@@ -17,10 +17,13 @@ Generated artifacts:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import hashlib
 import json
 import os
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +38,9 @@ MANAGED_MARKER = ".flossi0ullk-managed.json"
 # both, because the pruner deciding ownership by comparing against a second
 # copy of this string is how the two would drift apart.
 MANAGED_BY = "FLOSSI0ULLK shared skill surface"
+# A marker being published is first written under this prefix and then swapped
+# into place; it is never part of a skill's payload.
+MARKER_TEMP_PREFIX = ".flossi0ullk-marker-"
 
 
 class SkillSurfaceError(Exception):
@@ -398,7 +404,11 @@ def check_or_write_json(
 
 
 def serialize_marker(
-    skill: dict[str, Any], manifest_version: str, workspace_root: Path
+    skill: dict[str, Any],
+    manifest_version: str,
+    workspace_root: Path,
+    *,
+    installed_files: dict[str, str],
 ) -> str:
     payload = {
         "managed_by": MANAGED_BY,
@@ -409,8 +419,83 @@ def serialize_marker(
         # projection_owned_by: source ancestry cannot tell a workspace from one
         # nested inside it.
         "workspace_root": str(workspace_root.resolve()),
+        # WHAT WAS INSTALLED: the digest of every payload file's bytes. The
+        # baseline that tells a change in the shared base (safe to apply) from
+        # a change made where the skill is installed (a harness's learning,
+        # never overwritten). See install_skill_projection.
+        "installed_files": dict(sorted(installed_files.items())),
     }
     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+
+
+def payload_digests(directory: Path) -> dict[str, str]:
+    """sha256 of every payload file's BYTES under `directory`, by relative path.
+
+    Bytes, not text. The snapshot this replaces read files in universal-newline
+    mode, so a CRLF script compared equal to its LF source and a broken copy was
+    blessed as current (fourth external audit, F7); and it decoded every file as
+    UTF-8, so a harness that added an image to a skill crashed the refresh. The
+    marker, and a marker being published, are not payload.
+    """
+
+    digests: dict[str, str] = {}
+    for path in sorted(directory.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(directory).as_posix()
+        if rel == MANAGED_MARKER or rel.startswith(MARKER_TEMP_PREFIX):
+            continue
+        digests[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return digests
+
+
+def publish_marker(target_dir: Path, content: str) -> None:
+    """Publish a marker as a NEW file swapped into place, never through a link.
+
+    Writing the existing marker in place followed it: a marker that was a
+    symlink wrote its target, and one that was a hard link rewrote every name
+    for that file -- possibly another projection's marker (fourth external
+    audit, F5). The temporary file is created exclusively, and os.replace swaps
+    the directory entry, replacing a link rather than following it. On any
+    failure the previous marker is left exactly as it was.
+    """
+
+    if _is_link(target_dir) or not target_dir.is_dir():
+        raise OSError(f"{target_dir} is not a plain directory; marker not written")
+    handle, temporary = tempfile.mkstemp(
+        dir=target_dir, prefix=MARKER_TEMP_PREFIX, suffix=".tmp"
+    )
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(content)
+        os.replace(temporary, target_dir / MANAGED_MARKER)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+
+
+def _is_link(path: Path) -> bool:
+    """A symlink, or on Windows a junction. Neither is ever written through."""
+
+    isjunction = getattr(os.path, "isjunction", None)
+    return path.is_symlink() or bool(isjunction and isjunction(path))
+
+
+def _valid_baseline(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    if not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        return None
+    return value
+
+
+def _describe_changes(now: dict[str, str], before: dict[str, str]) -> str:
+    changed = sorted(
+        rel for rel in set(now) | set(before) if now.get(rel) != before.get(rel)
+    )
+    shown = ", ".join(changed[:5])
+    return shown + (f" and {len(changed) - 5} more" if len(changed) > 5 else "")
 
 
 def remove_path(path: Path) -> None:
@@ -462,9 +547,13 @@ def projection_owned_by(child: Path, owner_root: Path) -> bool:
     recorded = recorded_workspace(marker)
     if recorded is None:
         return False
+    return _same_workspace(recorded, owner_root)
+
+
+def _same_workspace(recorded: Path, workspace_root: Path) -> bool:
     try:
-        owner = owner_root.resolve()
-    except (OSError, ValueError):
+        owner = workspace_root.resolve()
+    except (OSError, ValueError, RuntimeError):
         return False
     return os.path.normcase(str(recorded)) == os.path.normcase(str(owner))
 
@@ -472,11 +561,12 @@ def projection_owned_by(child: Path, owner_root: Path) -> bool:
 def recorded_workspace(marker: dict[str, Any]) -> Path | None:
     """The installing workspace a marker names, resolved; None if unusable.
 
-    ValueError as well as OSError: on POSIX an absolute identity containing a
-    NUL raises ValueError from resolve(), and catching only OSError let one
-    such marker abort the pruner and the materializer around it, `--check`
-    included. Windows resolves the same string without raising, which is why
-    the Windows suite never saw it. Found by the third external audit (F4).
+    Three exception types, each found by an audit on a platform the author's
+    suite never ran on. On POSIX an absolute identity containing a NUL raises
+    ValueError from resolve() (third external audit, F4), and on Python 3.12 a
+    symlink loop raises RuntimeError (fourth, F6); catching only OSError let
+    either abort the pruner and the materializer around it, `--check` included.
+    Windows resolves both without raising.
     """
 
     recorded = marker.get("workspace_root")
@@ -484,7 +574,7 @@ def recorded_workspace(marker: dict[str, Any]) -> Path | None:
         return None
     try:
         return Path(recorded).resolve()
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return None
 
 
@@ -519,7 +609,9 @@ def prune_stale_projections(
         return results, drift_found
 
     for child in sorted(target_root.iterdir()):
-        if not child.is_dir() or child.name in expected:
+        # A link is never ours to remove: Claude Code documents symlinked
+        # skill folders as a supported way to install a skill.
+        if _is_link(child) or not child.is_dir() or child.name in expected:
             continue
         if not (child / MANAGED_MARKER).is_file():
             # Unmanaged. Not ours, and silence is the correct behaviour.
@@ -563,6 +655,31 @@ def prune_stale_projections(
                         f"hand only once that workspace is known to be gone"
                     )
             continue
+        # OURS, AND WITHDRAWN -- but removed only if it is provably exactly
+        # what was installed. A harness may have learned in it since, and the
+        # operator's rule (2026-09-29) is that such changes are kept and
+        # propagated, never destroyed. Without a baseline nothing proves it
+        # unmodified, so that is kept too.
+        baseline = _valid_baseline(read_managed_marker(child).get("installed_files"))
+        try:
+            installed = payload_digests(child)
+        except OSError as exc:
+            results.append(
+                f"KEEP  {target_name}: {child.name} is withdrawn from the manifest "
+                f"but could not be read ({exc}); kept for review"
+            )
+            continue
+        if baseline is None or installed != baseline:
+            why = (
+                "no baseline was recorded to prove it unmodified"
+                if baseline is None
+                else f"it changed where installed ({_describe_changes(installed, baseline)})"
+            )
+            results.append(
+                f"KEEP  {target_name}: {child.name} is withdrawn from the manifest, "
+                f"but {why}; kept for review rather than deleted"
+            )
+            continue
         drift_found = True
         if check:
             results.append(
@@ -587,62 +704,182 @@ def install_skill_projection(
     dry_run: bool,
     workspace_root: Path,
 ) -> tuple[list[str], bool]:
-    target_dir = target_root / skill["skill_name"]
+    """Install, update, or leave alone one skill's projection.
+
+    THE OPERATOR'S RULE, 2026-09-29: a skill that has changed where it is
+    installed is never overwritten. Harnesses -- Hermes especially, Codex too
+    -- evolve their skills from use, and those changes are to be propagated
+    back into the shared base, not replaced by it. So this never replaces,
+    removes or adopts anything it cannot prove is exactly what this workspace
+    installed. Everything else is left in place and SURFACED as a `KEEP` line,
+    and -- same decision -- `--check` passes on it. `--check` fails only for
+    what a write run would actually change.
+
+    The proof is a baseline: the marker records the digest of every payload
+    file's bytes as installed. With it the cases separate:
+
+        installed == source               nothing to do, or re-baseline a stale marker
+        installed == baseline != source   only the shared base moved: UPDATE
+        source == baseline != installed   the harness changed it: EVOLVED, kept
+        all three differ                  CONFLICT, kept
+        no baseline, and they differ      DIVERGED, kept: nothing says which side moved
+
+    Ownership is settled first, because a matching name or even matching
+    content does not authorise taking over someone else's installation. Only
+    a projection whose marker names this workspace is ever written. A legacy
+    marker, from before markers recorded an owner, is ADOPTED only when its
+    payload equals the shared base byte for byte: that is the migration that
+    gives it an owner and a baseline. Another workspace's projection, an
+    unmanaged directory with the same name, an unreadable marker and a linked
+    directory are all kept and surfaced, never taken over.
+    """
+
+    name = skill["skill_name"]
+    target_dir = target_root / name
     source_dir = Path(skill["resolved_path"])
-    results: list[str] = []
-    drift_found = False
-    expected_snapshot = dict(skill["files"])
-    expected_snapshot[MANAGED_MARKER] = serialize_marker(
-        skill, manifest_version, workspace_root
+    source = payload_digests(source_dir)
+    expected = serialize_marker(
+        skill, manifest_version, workspace_root, installed_files=source
     )
 
-    actual_snapshot: dict[str, str] = {}
-    if target_dir.exists():
-        for path in sorted(target_dir.rglob("*")):
-            if path.is_dir():
-                continue
-            rel = path.relative_to(target_dir).as_posix()
-            actual_snapshot[rel] = path.read_text(encoding="utf-8")
+    def keep(status: str, why: str) -> tuple[list[str], bool]:
+        return ([f"KEEP  {target_name}: {name} {status}: {why}"], False)
 
-    changed = actual_snapshot != expected_snapshot
-    if check:
-        return ([f"CHECK {'DRIFT' if changed else 'OK'} {target_dir}"], changed)
-    if dry_run:
-        return (
-            [f"PLAN  {'WRITE' if changed else 'KEEP'} {target_name}:{target_dir}"],
-            changed,
+    baseline: dict[str, str] | None = None
+    action: str | None
+    if _is_link(target_dir):
+        return keep(
+            "LINKED",
+            "the installed skill directory is a link; nothing is written through it",
         )
-    if not changed:
+    if not target_dir.exists():
+        action = "INSTALL"
+    elif not target_dir.is_dir():
+        return keep("NOT_A_DIRECTORY", f"{target_dir} is not a directory; left in place")
+    else:
+        try:
+            installed = payload_digests(target_dir)
+        except OSError as exc:
+            return keep("UNREADABLE", f"the installed copy could not be read ({exc})")
+        marker_path = target_dir / MANAGED_MARKER
+        marker = read_managed_marker(target_dir)
+        if marker is None:
+            if marker_path.exists() or marker_path.is_symlink():
+                return keep(
+                    "UNKNOWN_MARKER",
+                    "its marker is unreadable or was not written by this "
+                    "materializer; left in place",
+                )
+            relation = "identical to" if installed == source else "different from"
+            return keep(
+                "UNMANAGED",
+                f"an unmanaged directory with this name is installed, {relation} "
+                f"the shared base; not adopted or replaced",
+            )
+        if "workspace_root" not in marker:
+            if installed != source:
+                return keep(
+                    "DIVERGED",
+                    f"a legacy marker with no baseline, and the installed copy "
+                    f"differs from the shared base "
+                    f"({_describe_changes(installed, source)}); kept for "
+                    f"reconciliation",
+                )
+            action = "ADOPT"
+        else:
+            recorded = recorded_workspace(marker)
+            if recorded is None:
+                return keep(
+                    "UNKNOWN_OWNER",
+                    "its marker's recorded owner is unusable; left in place",
+                )
+            if not _same_workspace(recorded, workspace_root):
+                return keep(
+                    "FOREIGN", f"installed by {recorded}; not replaced or taken over"
+                )
+            baseline = _valid_baseline(marker.get("installed_files"))
+            if installed == source:
+                action = None if marker == json.loads(expected) else "REBASELINE"
+            elif baseline is None:
+                return keep(
+                    "DIVERGED",
+                    f"no baseline was recorded, and the installed copy differs "
+                    f"from the shared base ({_describe_changes(installed, source)}); "
+                    f"kept for reconciliation",
+                )
+            elif installed == baseline:
+                action = "UPDATE"
+            elif source == baseline:
+                return keep(
+                    "EVOLVED",
+                    f"changed where installed "
+                    f"({_describe_changes(installed, baseline)}); kept for "
+                    f"reconciliation with the shared base",
+                )
+            else:
+                return keep(
+                    "CONFLICT",
+                    f"changed where installed "
+                    f"({_describe_changes(installed, baseline)}) and in the shared "
+                    f"base ({_describe_changes(source, baseline)}); kept for "
+                    f"reconciliation",
+                )
+
+    if action is None:
+        if check:
+            return ([f"CHECK OK {target_dir}"], False)
+        if dry_run:
+            return ([f"PLAN  KEEP {target_name}:{target_dir}"], False)
         return ([f"OK    {target_dir}"], False)
+    if check:
+        return ([f"CHECK DRIFT {target_dir} ({action})"], True)
+    if dry_run:
+        return ([f"PLAN  WRITE {target_name}:{target_dir} ({action})"], True)
 
-    def without_marker(snapshot: dict[str, str]) -> dict[str, str]:
-        return {rel: text for rel, text in snapshot.items() if rel != MANAGED_MARKER}
+    if action in {"ADOPT", "REBASELINE"}:
+        # Only the marker changes; the skill is never taken down for it.
+        try:
+            publish_marker(target_dir, expected)
+        except OSError as exc:
+            return (
+                [
+                    f"FAILED {target_name}: {name} marker not published ({exc}); "
+                    f"the previous marker is untouched"
+                ],
+                True,
+            )
+        return ([f"WROTE {target_dir} (marker only: {action})"], True)
 
-    if without_marker(actual_snapshot) == without_marker(expected_snapshot):
-        # ONLY THE MARKER DIFFERS: rewrite it in place, never take the skill
-        # away. The path below deletes the projection before copying the source
-        # back, so a run interrupted between the two leaves the skill missing
-        # until the next one. That ordering predates the `workspace_root`
-        # field, but adding the field changed every installed marker and so
-        # put every unchanged skill through that window once. Found by the
-        # third external audit (O1). A plain write, not a temp-and-replace:
-        # a marker torn mid-write reads as unowned, which is safe, and the
-        # next run rewrites it.
-        (target_dir / MANAGED_MARKER).write_text(
-            expected_snapshot[MANAGED_MARKER],
-            encoding="utf-8",
+    if action == "UPDATE":
+        # Read again immediately before anything is removed: an edit that
+        # lands between the comparison and the replacement must not be lost.
+        try:
+            unchanged = payload_digests(target_dir) == baseline
+        except OSError:
+            unchanged = False
+        if not unchanged:
+            return keep(
+                "EVOLVED",
+                "changed during this refresh; the update was abandoned and the "
+                "installed copy kept",
+            )
+        # Safe to remove: it is byte for byte what this workspace installed,
+        # so nothing learned is lost. The shared base's history holds it.
+        remove_path(target_dir)
+
+    shutil.copytree(source_dir, target_dir)
+    try:
+        publish_marker(target_dir, expected)
+    except OSError as exc:
+        # A fresh copy without a marker would read as UNMANAGED next time and
+        # never be adopted. It is exactly the shared base, so removing it
+        # loses nothing, and the next run installs it again.
+        remove_path(target_dir)
+        return (
+            [f"FAILED {target_name}: {name} not installed ({exc}); nothing left behind"],
+            True,
         )
-        return ([f"WROTE {target_dir} (marker only)"], True)
-
-    remove_path(target_dir)
-    shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
-    (target_dir / MANAGED_MARKER).write_text(
-        expected_snapshot[MANAGED_MARKER],
-        encoding="utf-8",
-    )
-    results.append(f"WROTE {target_dir}")
-    drift_found = True
-    return results, drift_found
+    return ([f"WROTE {target_dir} ({action})"], True)
 
 
 def materialize(
