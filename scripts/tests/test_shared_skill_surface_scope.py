@@ -695,7 +695,11 @@ def test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported(
 ):
     """Third audit, O4. A moved or deleted workspace leaves markers that name
     a root nobody can refresh from, so no run will ever prune them. They are
-    kept, as any foreign projection is, but said out loud."""
+    kept, as any foreign projection is, but said out loud.
+
+    Said carefully: os.path.exists is also False for an unmounted drive or an
+    unreachable network path, so the line must not tell an operator the
+    workspace is gone, nor invite them to delete a live workspace's skill."""
     module = load_module()
     root = tmp_path / "skills"
     orphan = root / "orphan"
@@ -711,7 +715,11 @@ def test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported(
     assert orphan.exists()
     assert drift is False
     assert any(
-        "orphan" in m and m.startswith("KEEP") and "no longer exists" in m
+        "orphan" in m
+        and m.startswith("KEEP")
+        and "cannot be found" in m
+        and "not mounted" in m
+        and "delete it by hand" not in m
         for m in messages
     ), messages
 

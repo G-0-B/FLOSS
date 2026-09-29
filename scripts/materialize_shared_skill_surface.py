@@ -552,10 +552,15 @@ def prune_stale_projections(
                         f"it by hand if it is stale)"
                     )
                 elif not os.path.exists(recorded):
+                    # "Cannot be found", not "no longer exists": exists() is
+                    # also False for an unmounted drive or an unreachable
+                    # network path, and a line inviting deletion would then
+                    # point an operator at a live workspace's skill.
                     results.append(
                         f"KEEP  {target_name}: {child.name} was installed by "
-                        f"{recorded}, which no longer exists; left in place "
-                        f"(delete it by hand if it is stale)"
+                        f"{recorded}, which cannot be found from here (moved, "
+                        f"deleted, or not mounted); left in place. Remove it by "
+                        f"hand only once that workspace is known to be gone"
                     )
             continue
         drift_found = True
