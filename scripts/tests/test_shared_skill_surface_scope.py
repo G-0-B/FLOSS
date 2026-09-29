@@ -20,6 +20,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -329,6 +330,10 @@ def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
     root = tmp_path / "skills"
     theirs = root / "their-skill"
     theirs.mkdir(parents=True)
+    # A LIVE other workspace: one that exists. A marker naming a workspace
+    # that is gone is reported (see the moved-workspace test); a live one is
+    # simply someone else's, and silence is right.
+    (tmp_path / "other-workspace").mkdir()
     (theirs / module.MANAGED_MARKER).write_text(
         _owned_marker(tmp_path / "other-workspace", "their-skill"), encoding="utf-8"
     )
@@ -346,9 +351,7 @@ def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
             theirs.exists()
         ), f"another workspace's projection was removed ({check=}, {dry_run=})"
         assert drift is False, "someone else's projection is not this workspace's drift"
-        assert not any(
-            "would remove" in m or "removed" in m for m in messages
-        ), messages
+        assert messages == [], messages
 
 
 def test_a_marker_that_cannot_prove_ownership_is_left_alone(tmp_path):
@@ -582,3 +585,174 @@ def test_an_unreadable_manifest_is_a_skill_surface_error(tmp_path, payload):
 
     with pytest.raises(module.SkillSurfaceError):
         module.load_manifest(path)
+
+
+# ---------------------------------------------------------------------------
+# Third external audit: F4, O1 and O4.
+# ---------------------------------------------------------------------------
+
+
+def _posix_realpath(monkeypatch):
+    """Make path resolution reject an embedded NUL the way POSIX does.
+
+    On POSIX, os.path.realpath reaches os.lstat, which raises ValueError
+    ("embedded null byte"). Windows resolution does not raise, which is why
+    the Windows suite never saw F4. This reproduces the POSIX behaviour on
+    every platform, and changes nothing where it already holds.
+    """
+    real = os.path.realpath
+
+    def realpath(path, *args, **kwargs):
+        if "\x00" in os.fspath(path):
+            raise ValueError("embedded null byte")
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(os.path, "realpath", realpath)
+
+
+def _marker_with_identity(module, name: str, identity) -> str:
+    return json.dumps(
+        {"managed_by": module.MANAGED_BY, "skill_name": name, "workspace_root": identity}
+    )
+
+
+def test_an_identity_the_os_cannot_resolve_is_unknown_not_a_crash(
+    tmp_path, monkeypatch
+):
+    """Third audit, F4. The comparison caught only OSError, and on POSIX an
+    absolute identity containing a NUL raises ValueError from resolve(). One
+    such marker aborted the pruner and the materializer around it, even in
+    --check. Unreadable ownership is not ownership, and that has to hold in
+    the path normalisation too."""
+    _posix_realpath(monkeypatch)
+    module = load_module()
+    projection = tmp_path / "installed" / "bad-identity"
+    projection.mkdir(parents=True)
+    (projection / module.MANAGED_MARKER).write_text(
+        _marker_with_identity(
+            module, "bad-identity", str((tmp_path / "ws").resolve()) + "\x00tail"
+        ),
+        encoding="utf-8",
+    )
+
+    assert module.projection_owned_by(projection, tmp_path / "ws") is False
+
+
+def test_a_marker_the_os_cannot_resolve_does_not_stop_the_refresh(
+    tmp_path, monkeypatch
+):
+    """The consequence, through the real caller: the bad marker sorts first,
+    and the workspace's own withdrawn projection after it must still be
+    pruned, with the bad one kept and reported."""
+    _posix_realpath(monkeypatch)
+    module = load_module()
+    workspace = _workspace_with_skills(tmp_path / "workspace", ["kept", "withdrawn"])
+    shared = tmp_path / "shared-user-skills"
+    _refresh(module, workspace, ["kept", "withdrawn"], shared)
+    bad = shared / "a-bad-identity"
+    bad.mkdir()
+    (bad / module.MANAGED_MARKER).write_text(
+        _marker_with_identity(
+            module, "a-bad-identity", str(workspace.resolve()) + "\x00tail"
+        ),
+        encoding="utf-8",
+    )
+
+    messages = _refresh(module, workspace, ["kept"], shared)
+
+    assert bad.is_dir(), "a marker nobody can resolve was removed"
+    assert not (shared / "withdrawn").exists(), "processing stopped at the bad marker"
+    assert any("a-bad-identity" in m and m.startswith("KEEP") for m in messages), messages
+
+
+@pytest.mark.parametrize(
+    "identity", [".", 42, "", None], ids=["relative", "number", "empty", "null"]
+)
+def test_a_marker_with_an_unusable_identity_is_kept_and_reported(tmp_path, identity):
+    """Third audit, O4. Only a MISSING identity produced a KEEP line; one that
+    was present but unusable was kept in silence. Both mean the same thing,
+    ownership unknown, and a stale projection nobody can prune is the defect
+    the pruner exists to surface."""
+    module = load_module()
+    root = tmp_path / "skills"
+    child = root / "unusable"
+    child.mkdir(parents=True)
+    (child / module.MANAGED_MARKER).write_text(
+        _marker_with_identity(module, "unusable", identity), encoding="utf-8"
+    )
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=tmp_path / "ws"
+    )
+
+    assert child.exists()
+    assert drift is False
+    assert any("unusable" in m and m.startswith("KEEP") for m in messages), messages
+
+
+def test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported(
+    tmp_path,
+):
+    """Third audit, O4. A moved or deleted workspace leaves markers that name
+    a root nobody can refresh from, so no run will ever prune them. They are
+    kept, as any foreign projection is, but said out loud."""
+    module = load_module()
+    root = tmp_path / "skills"
+    orphan = root / "orphan"
+    orphan.mkdir(parents=True)
+    (orphan / module.MANAGED_MARKER).write_text(
+        _owned_marker(tmp_path / "moved-away", "orphan"), encoding="utf-8"
+    )
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=tmp_path / "ws"
+    )
+
+    assert orphan.exists()
+    assert drift is False
+    assert any(
+        "orphan" in m and m.startswith("KEEP") and "no longer exists" in m
+        for m in messages
+    ), messages
+
+
+def test_a_marker_only_change_never_takes_the_installed_skill_away(
+    tmp_path, monkeypatch
+):
+    """Third audit, O1. Adding `workspace_root` changed every installed
+    marker, and install replaced a projection by deleting it and copying the
+    source back. So the migration put every unchanged skill through a window
+    in which an interrupted run left it missing until the next one. When only
+    the marker differs, only the marker is rewritten."""
+    module = load_module()
+    workspace = _workspace_with_skills(tmp_path / "workspace", ["steady"])
+    skill = module.resolve_skill_entry(workspace, {"path": "skills/steady"})
+    target_root = tmp_path / "installed"
+    installed = target_root / "steady"
+    shutil.copytree(skill["resolved_path"], installed)
+    legacy = json.loads(module.serialize_marker(skill, "test", workspace))
+    del legacy["workspace_root"]
+    (installed / module.MANAGED_MARKER).write_text(json.dumps(legacy), encoding="utf-8")
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the installed skill was taken down for a marker change")
+
+    monkeypatch.setattr(module, "remove_path", refuse)
+    monkeypatch.setattr(module.shutil, "copytree", refuse)
+
+    _messages, changed = module.install_skill_projection(
+        "codex",
+        skill,
+        target_root,
+        "test",
+        check=False,
+        dry_run=False,
+        workspace_root=workspace,
+    )
+
+    assert changed is True
+    marker = json.loads((installed / module.MANAGED_MARKER).read_text(encoding="utf-8"))
+    assert marker["workspace_root"] == str(workspace.resolve())
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == (
+        Path(skill["resolved_path"]) / "SKILL.md"
+    ).read_text(encoding="utf-8")
