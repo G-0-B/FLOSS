@@ -762,9 +762,13 @@ def hermes_gateway_alive(home: Path) -> int | None:
         ) from exc
     try:
         payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+    # Not just JSONDecodeError. Syntactically valid JSON can still fail inside
+    # json.loads: an integer past CPython's digit limit raises a plain
+    # ValueError, and nesting past the recursion limit raises RecursionError.
+    # Both escaped every caller as unhandled types.
+    except (ValueError, RecursionError) as exc:
         raise SharedSurfaceError(
-            f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+            f"Hermes {pid_file} exists but is not readable JSON ({exc}); refusing "
             "to write under a gateway whose state is unknown. Stop the "
             "gateway, or remove the file if you know it is stale."
         ) from exc

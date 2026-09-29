@@ -497,7 +497,7 @@ def test_a_corrupt_hermes_pid_file_refuses_the_write(tmp_path):
     """
     (tmp_path / "gateway.pid").write_text("not json{", encoding="utf-8")
 
-    with pytest.raises(mas.SharedSurfaceError, match="not valid JSON"):
+    with pytest.raises(mas.SharedSurfaceError, match="not readable JSON"):
         mas.hermes_gateway_alive(tmp_path)
 
 
@@ -1442,14 +1442,35 @@ def test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer(
 
 @pytest.mark.parametrize(
     "payload",
-    [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
-    ids=["list", "null", "string", "number", "invalid-utf8"],
+    [
+        b"[]",
+        b"null",
+        b'"a string"',
+        b"42",
+        b"\xff\xfe not utf-8",
+        b'{"pid": ' + b"9" * 5000 + b"}",
+        b"[" * 100_000 + b"]" * 100_000,
+    ],
+    ids=[
+        "list",
+        "null",
+        "string",
+        "number",
+        "invalid-utf8",
+        "integer-past-the-digit-limit",
+        "nesting-past-the-recursion-limit",
+    ],
 )
 def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
     """The commit that introduced this refusal claimed --check survives
     anything on disk. The audit showed it does not: `[]` and `null` raised
     AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
-    neither is the handled type, so both still escaped every caller."""
+    neither is the handled type, so both still escaped every caller.
+
+    The second audit found two more that are valid JSON syntax but still fail
+    inside json.loads with something other than JSONDecodeError: an integer
+    longer than CPython's digit limit raises a plain ValueError, and nesting
+    deeper than the interpreter's recursion limit raises RecursionError."""
     (tmp_path / "gateway.pid").write_bytes(payload)
 
     with pytest.raises(mas.SharedSurfaceError):
