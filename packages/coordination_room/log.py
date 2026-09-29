@@ -23,7 +23,9 @@ class EventLog:
         if not self._path.exists():
             return []
         events: list[dict[str, Any]] = []
-        for line in self._path.read_text(encoding="utf-8").splitlines():
+        # Split on "\n" only: str.splitlines() also breaks on U+2028, U+2029
+        # and U+0085, which append() writes raw inside string values.
+        for line in self._path.read_text(encoding="utf-8").split("\n"):
             if not line.strip():
                 continue
             events.append(json.loads(line))
