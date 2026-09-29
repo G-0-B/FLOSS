@@ -26,6 +26,36 @@ the operator's to make, and it is marked as such.
 
 ## O2: same-name collisions, the operator's call
 
+**Operator decision, 2026-09-29.** The operator set the requirement rather
+than choosing one of the three options below:
+
+> we do NOT want to overwrite skills if they have changed, i know hermes
+> especially evolves its skills with learnings from use, and codex has done so
+> as well. What we actually want to end up with is to propagate the
+> appropriate improvements to the our shared skills base.
+
+That supersedes the options. It also reaches further than same-name
+collisions. Install currently overwrites *any* managed projection whose
+content differs from the shared base, and prune removes a withdrawn one
+whatever it contains. Both predate this PR, and both now contradict the stated
+requirement. They are **open**. A design is proposed in the round-4 packet,
+[`../2026-09-29-pr41-round-4/PACKET.md`](../2026-09-29-pr41-round-4/PACKET.md),
+and nothing is implemented until the operator approves it.
+
+**What is on disk today, read-only.** Every managed projection matches the
+shared base in all five targets: 27 of 27 identical in each of `codex`,
+`claude`, `gemini`, `opencode` and `hermes`. None has diverged, so no evolved
+skill has been overwritten yet. The harness-evolved skills live beside them as
+**unmanaged** directories, which install and prune never touch: 33 in the
+Hermes skills root, 6 in Codex, 6 in OpenCode and 3 in Claude. They include
+Hermes's own `flossi0ullk/flossi0ullk-plan-and-ledger` and
+`flossi0ullk/flossi0ullk-mcp-infrastructure`. The inventory is in
+[`o2-skill-inventory/`](o2-skill-inventory/). No automation passes
+`--include-user-scope`, so the user-scope roots are written only by a manual
+run.
+
+*The options as first written, now superseded:*
+
 Two workspaces that both list a skill named `x` share one directory,
 `<root>/x`, in a shared user-scope root, and one directory can hold only one
 payload. Today the last workspace to refresh wins, silently. The possible
@@ -45,7 +75,7 @@ policies:
    otherwise as a workspace-qualified name. This avoids both problems, but
    harnesses then see two copies of the skill under different names.
 
-**Author's recommendation: option 1 now, option 2 if more than one workspace on
+**Author's recommendation at the time (superseded): option 1 now, option 2 if more than one workspace on
 a machine is expected to install user-scope skills.** Today every checkout on
 this machine either fails to resolve the skill paths from its default root
 (those under `FLOSS/.worktrees/`, `C:/pr38t1`, the agent-orchestrator
