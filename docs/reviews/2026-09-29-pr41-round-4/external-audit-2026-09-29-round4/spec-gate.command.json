@@ -1,0 +1,9 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "scripts/spec_gate.py",
+    "--check"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round4-20260929\\snapshot-0472ce1",
+  "exit_code": 0
+}

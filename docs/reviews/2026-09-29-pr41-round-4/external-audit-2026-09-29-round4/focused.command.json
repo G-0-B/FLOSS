@@ -1,0 +1,22 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:/~shit/_audit/pr41-round4-20260929/temp/focused",
+    "scripts/tests/test_shared_skill_surface_scope.py"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round4-20260929\\snapshot-0472ce1",
+  "exit_code": 0,
+  "env_overrides": {
+    "PYTHONPATH": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "TEMP": "C:\\~shit\\_audit\\pr41-round4-20260929\\temp",
+    "TMP": "C:\\~shit\\_audit\\pr41-round4-20260929\\temp"
+  }
+}

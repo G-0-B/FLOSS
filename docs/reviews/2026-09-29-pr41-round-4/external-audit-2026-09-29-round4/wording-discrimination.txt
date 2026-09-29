@@ -1,0 +1,46 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+__ test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round4-20260929/temp/wording/test_a_marker_from_a_workspace0')
+
+    def test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported(
+        tmp_path,
+    ):
+        """Third audit, O4. A moved or deleted workspace leaves markers that name
+        a root nobody can refresh from, so no run will ever prune them. They are
+        kept, as any foreign projection is, but said out loud.
+    
+        Said carefully: os.path.exists is also False for an unmounted drive or an
+        unreachable network path, so the line must not tell an operator the
+        workspace is gone, nor invite them to delete a live workspace's skill."""
+        module = load_module()
+        root = tmp_path / "skills"
+        orphan = root / "orphan"
+        orphan.mkdir(parents=True)
+        (orphan / module.MANAGED_MARKER).write_text(
+            _owned_marker(tmp_path / "moved-away", "orphan"), encoding="utf-8"
+        )
+    
+        messages, drift = module.prune_stale_projections(
+            "codex", root, set(), check=False, dry_run=False, owner_root=tmp_path / "ws"
+        )
+    
+        assert orphan.exists()
+        assert drift is False
+>       assert any(
+            "orphan" in m
+            and m.startswith("KEEP")
+            and "cannot be found" in m
+            and "not mounted" in m
+            and "delete it by hand" not in m
+            for m in messages
+        ), messages
+E       AssertionError: ['KEEP  codex: orphan was installed by C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\wording\\test_a_marker_from_a_workspace0\\moved-away, which no longer exists; left in place (delete it by hand if it is stale)']
+E       assert False
+E        +  where False = any(<generator object test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported.<locals>.<genexpr> at 0x000002137C3025A0>)
+
+scripts\tests\test_shared_skill_surface_scope.py:717: AssertionError
+=========================== short test summary info ===========================
+FAILED scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported
+1 failed in 0.18s

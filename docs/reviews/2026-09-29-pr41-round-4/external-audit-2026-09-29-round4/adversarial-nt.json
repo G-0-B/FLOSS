@@ -1,0 +1,47 @@
+{
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "results": [
+    {
+      "label": "base-hardlink",
+      "external_changed": false,
+      "marker_is_symlink": false,
+      "removed_via_preservation": [
+        "C:\\~shit\\_audit\\pr41-round4-20260929\\fixtures-nt\\base-hardlink\\target\\steady"
+      ],
+      "output": [
+        "WROTE C:\\~shit\\_audit\\pr41-round4-20260929\\fixtures-nt\\base-hardlink\\target\\steady"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "base-unmanaged-collision",
+      "managed_before": false,
+      "evolved_before": true,
+      "current_inventory_equal": true,
+      "evolved_original_preserved": true,
+      "output": [
+        "WROTE C:\\~shit\\_audit\\pr41-round4-20260929\\fixtures-nt\\base-unmanaged-collision\\target\\steady"
+      ]
+    },
+    {
+      "label": "endpoint-hardlink",
+      "external_changed": true,
+      "marker_is_symlink": false,
+      "removed_via_preservation": [],
+      "output": [
+        "WROTE C:\\~shit\\_audit\\pr41-round4-20260929\\fixtures-nt\\endpoint-hardlink\\target\\steady (marker only)"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "endpoint-unmanaged-collision",
+      "managed_before": false,
+      "evolved_before": true,
+      "current_inventory_equal": true,
+      "evolved_original_preserved": true,
+      "output": [
+        "WROTE C:\\~shit\\_audit\\pr41-round4-20260929\\fixtures-nt\\endpoint-unmanaged-collision\\target\\steady"
+      ]
+    }
+  ]
+}

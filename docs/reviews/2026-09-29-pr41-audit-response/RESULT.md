@@ -42,12 +42,18 @@ requirement. They are **open**. A design is proposed in the round-4 packet,
 [`../2026-09-29-pr41-round-4/PACKET.md`](../2026-09-29-pr41-round-4/PACKET.md),
 and nothing is implemented until the operator approves it.
 
-**What is on disk today, read-only.** Every managed projection matches the
-shared base in all five targets: 27 of 27 identical in each of `codex`,
-`claude`, `gemini`, `opencode` and `hermes`. None has diverged, so no evolved
-skill has been overwritten yet. The harness-evolved skills live beside them as
-**unmanaged** directories, which install and prune never touch: 33 in the
-Hermes skills root, 6 in Codex, 6 in OpenCode and 3 in Claude. They include
+**What is on disk today, read-only.** *Corrected after the fourth audit's
+O5; the original claims are quoted.* The inventory compared file **text**,
+decoded with replacement and newline-normalized. It observed no text
+difference in the 27 listed skills in each of `codex`, `claude`, `gemini`,
+`opencode` and `hermes` at collection time. It did not show that "none has
+diverged, so no evolved skill has been overwritten yet". The inventory saw
+only the current state, not history, and a byte-level check in round 4 found
+3 skills per target that differ by line endings. Nor were the unmanaged
+directories ones "which install and prune never touch": install replaced an
+unmanaged directory that shared a listed skill's name, until `b011298`. The
+counts of unmanaged directories stand: 33 in the Hermes skills root, 6 in
+Codex, 6 in OpenCode and 3 in Claude. They include
 Hermes's own `flossi0ullk/flossi0ullk-plan-and-ledger` and
 `flossi0ullk/flossi0ullk-mcp-infrastructure`. The inventory is in
 [`o2-skill-inventory/`](o2-skill-inventory/). No automation passes
