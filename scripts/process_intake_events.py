@@ -91,7 +91,7 @@ def classify_actions(event: dict[str, Any]) -> list[str]:
     abs_path = str(event.get("abs_path") or "")
 
     if domain == "root-intake":
-        actions.extend(["review_root_intake", "consider_canon_promotion"])
+        actions.extend(["review_root_intake", "digest_artifact", "consider_canon_promotion"])
     if domain == "traces":
         actions.append("review_trace_drift")
     if domain in {"canon", "shared-surface"}:
