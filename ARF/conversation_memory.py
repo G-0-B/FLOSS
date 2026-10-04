@@ -58,7 +58,7 @@ from ARF.ontology.predicates import (
 
 # Import the existing fractal embedding infrastructure
 try:
-    from embedding_frames_of_scale import MultiScaleEmbedding
+    from ARF.embedding_frames_of_scale import MultiScaleEmbedding
 
     EMBEDDINGS_AVAILABLE = True
 except ImportError:
@@ -674,7 +674,7 @@ class ConversationMemory:
             "agent_id": self.agent_id,
             "understandings": [u.to_dict() for u in self.understandings],
             "adrs": self.adrs,
-            "embedding_state": self.embeddings.to_dict() if self.embeddings else None,
+            "embedding_state": self.embeddings.to_dict() if self.embeddings is not None else None,
             "exported_at": _utc_now_iso(),
         }
 
@@ -693,9 +693,9 @@ class ConversationMemory:
                         self.adrs.append(adr)
                         break
 
-        if self.embeddings and other_memory_export["embedding_state"]:
+        if self.embeddings is not None and other_memory_export["embedding_state"]:
             try:
-                from embedding_frames_of_scale import MultiScaleEmbedding
+                from ARF.embedding_frames_of_scale import MultiScaleEmbedding
 
                 other_embeddings = MultiScaleEmbedding.from_dict(
                     other_memory_export["embedding_state"]
@@ -795,7 +795,7 @@ class ConversationMemory:
         with open(adrs_file, "w") as f:
             json.dump(self.adrs, f, indent=2)
 
-        if self.embeddings:
+        if self.embeddings is not None:
             embeddings_file = self.storage_path / "embeddings.json"
             with open(embeddings_file, "w") as f:
                 json.dump(self.embeddings.to_dict(), f, indent=2)
@@ -819,7 +819,7 @@ class ConversationMemory:
                 self.adrs = json.load(f)
             logger.info("Loaded %s ADRs from disk", len(self.adrs))
 
-        if self.embeddings:
+        if self.embeddings is not None:
             embeddings_file = self.storage_path / "embeddings.json"
             if embeddings_file.exists():
                 try:

@@ -272,7 +272,7 @@ class ConversationMemory:
 ```
 
 ### Step 2.2: Fix MultiScaleEmbedding API mismatch
-The `from_dict()` method is missing — ConversationMemory can't restore embedding state from disk.
+✅ **CLOSED 2026-10-04**: The `from_dict()` method and related truthiness checks have been implemented, and ConversationMemory now successfully restores embedding state from disk.
 
 ### Step 2.3: Holochain client bridge
 ```python

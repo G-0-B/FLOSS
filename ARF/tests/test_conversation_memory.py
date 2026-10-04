@@ -394,7 +394,7 @@ class TestOntologyValidation:
         triple = temp_memory._extract_triple(
             {"content": "Claude Sonnet 4.5 improves upon Sonnet 4"}
         )
-        assert triple[0] == "Claude"
+        assert triple[0] == "Claude Sonnet 4.5"
         assert triple[1] == "improves_upon"
 
     def test_extract_triple_improves(self, temp_memory):

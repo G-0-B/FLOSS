@@ -59,8 +59,7 @@ code/                      -- Reference documentation and knowledge bases
 **Status correction (2026-05-18):**
 1. Rose Forest MVP Phase 0 is complete: DNA compiles to WASM and Tryorama integration tests pass per `MVP_PLAN.md`.
 2. ADR-0 Test #4 (Human Coherence) passed 2026-03-20.
-3. ConversationMemory still has an API mismatch with MultiScaleEmbedding.
-4. The remaining "Phase 0" work is a separate orchestration substrate-bridge validation (`docs/specs/phase0-substrate-bridge.spec.md`), not the old Tryorama gate.
+3. The remaining "Phase 0" work is a separate orchestration substrate-bridge validation (`docs/specs/phase0-substrate-bridge.spec.md`), not the old Tryorama gate.
 
 **Phase sequence:** Foundation (docs) -> MVP Phase 0 (substrate viability) -> Phase 1 (KnowledgeTriple / MVC) + orchestration substrate bridge -> Phase 2+ (LATER)
 
