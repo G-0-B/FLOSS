@@ -1,0 +1,57 @@
+..ss.................................................................... [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 19%]
+..............ss...ss................................................... [ 25%]
+........................................................................ [ 31%]
+........................................................................ [ 38%]
+........................................................................ [ 44%]
+........................................................................ [ 50%]
+........................................................................ [ 57%]
+........................................................................ [ 63%]
+...............................................................sss...... [ 69%]
+........................................................................ [ 76%]
+........................................................................ [ 82%]
+........................................................................ [ 88%]
+........................................................................ [ 95%]
+...............................................F.......                  [100%]
+================================== FAILURES ===================================
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/a2a_mesh/tests/test_helloworld_pair.py::test_agent_card_is_served_at_well_known
+  C:\Python313\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 4 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 8 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 22 warnings
+  C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\proto_utils.py:303: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    errors = _validate_proto_required_fields_internal(msg)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 6 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 12 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 32 warnings
+  C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\proto_utils.py:263: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(val)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 2 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 4 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 10 warnings
+  C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\proto_utils.py:272: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(item)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+1 failed, 1125 passed, 9 skipped, 1 deselected, 102 warnings in 115.33s (0:01:55)

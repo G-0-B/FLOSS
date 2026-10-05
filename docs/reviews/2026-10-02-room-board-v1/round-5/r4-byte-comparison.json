@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1408
+  },
+  "rollback": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1409
+  },
+  "phase1": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1418
+  },
+  "proposal": {
+    "changed": [
+      "packages/a2a_mesh/room_bridge.py",
+      "packages/a2a_mesh/tests/test_room_bridge_pair.py",
+      "packages/a2a_mesh/tests/test_room_bridge_parse.py"
+    ],
+    "added": [],
+    "removed": [],
+    "identical": 1428
+  }
+}

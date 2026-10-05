@@ -1,0 +1,172 @@
+[
+  {
+    "case": "author-controls",
+    "command": [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\deploy_harness.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\control-0"
+    ],
+    "rc": 0,
+    "stdout": "[FLOSS MCP] WOULD_STOP coordination_room.pid (x)\n\n[FLOSS MCP] SHUTDOWN INCOMPLETE\n\n[FLOSS MCP] WOULD_STOP coordination_room.pid\n[FLOSS MCP] WOULD_STOP consensus.pid\n\nHEAD is now at 985c0c9 one\n{\n    \"success-returns-output\":  true,\n    \"failure-throws\":  true,\n    \"extra-action-throws\":  true,\n    \"free-port-passes\":  true,\n    \"holder-running\":  true,\n    \"bound-port-throws\":  true,\n    \"leftover-pid-throws\":  true,\n    \"settled-seq\":  true,\n    \"pinned-log-passes\":  true,\n    \"shadow-log-throws\":  true,\n    \"short-commit-throws\":  true,\n    \"existing-path-throws\":  true,\n    \"unknown-commit-throws\":  true,\n    \"good-checkout-passes\":  true\n}\n",
+    "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import socket, sys; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); s.close()\n                                             ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: [WinError 10048] Only one usage of each socket address (protocol/network address/port) is normally permitted\nfatal: invalid reference: 0000000000000000000000000000000000000000\nPreparing worktree (detached HEAD 985c0c9)\n"
+  },
+  {
+    "case": "missing-interpreter",
+    "command": [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter-0"
+    ],
+    "rc": 0,
+    "stdout": "PORT_CHECK_REFUSED: The term 'C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter-0\\absent-python.exe' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.\n",
+    "stderr": ""
+  },
+  {
+    "case": "missing-shell",
+    "command": [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-shell.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-shell-0"
+    ],
+    "rc": 0,
+    "stdout": "SCRIPT_CHECK_REFUSED: The term 'powershell' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.\n",
+    "stderr": ""
+  },
+  {
+    "case": "tail-shape",
+    "command": [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\tail-shape.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\tail-shape-0"
+    ],
+    "rc": 0,
+    "stdout": "TAIL_VALUE=8\nTAIL_VALUE=8\nTAIL_VALUE=0\nTAIL_VALUE=0\nTAIL_REFUSED: Cannot convert value \"2147483648\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"\n",
+    "stderr": ""
+  },
+  {
+    "case": "preview-prefix",
+    "command": [
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\preview-prefix.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\preview-prefix-0"
+    ],
+    "rc": 0,
+    "stdout": "WRONG_MODULE_PASSED\n",
+    "stderr": ""
+  },
+  {
+    "case": "author-controls",
+    "command": [
+      "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\deploy_harness.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\control-1"
+    ],
+    "rc": 0,
+    "stdout": "[FLOSS MCP] WOULD_STOP coordination_room.pid (x)\n\n[FLOSS MCP] SHUTDOWN INCOMPLETE\n\n[FLOSS MCP] WOULD_STOP coordination_room.pid\n[FLOSS MCP] WOULD_STOP consensus.pid\n\nHEAD is now at 141f70c one\n{\n  \"success-returns-output\": true,\n  \"failure-throws\": true,\n  \"extra-action-throws\": true,\n  \"free-port-passes\": true,\n  \"holder-running\": true,\n  \"bound-port-throws\": true,\n  \"leftover-pid-throws\": true,\n  \"settled-seq\": true,\n  \"pinned-log-passes\": true,\n  \"shadow-log-throws\": true,\n  \"short-commit-throws\": true,\n  \"existing-path-throws\": true,\n  \"unknown-commit-throws\": true,\n  \"good-checkout-passes\": true\n}\n",
+    "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import socket, sys; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); s.close()\n                                             ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: [WinError 10048] Only one usage of each socket address (protocol/network address/port) is normally permitted\nfatal: invalid reference: 0000000000000000000000000000000000000000\nPreparing worktree (detached HEAD 141f70c)\n"
+  },
+  {
+    "case": "missing-interpreter",
+    "command": [
+      "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter-1"
+    ],
+    "rc": 0,
+    "stdout": "PORT_CHECK_REFUSED: The term 'C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-interpreter-1\\absent-python.exe' is not recognized as a name of a cmdlet, function, script file, or executable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\n",
+    "stderr": ""
+  },
+  {
+    "case": "missing-shell",
+    "command": [
+      "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-shell.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\missing-shell-1"
+    ],
+    "rc": 0,
+    "stdout": "SCRIPT_CHECK_REFUSED: The term 'powershell' is not recognized as a name of a cmdlet, function, script file, or executable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again.\n",
+    "stderr": ""
+  },
+  {
+    "case": "tail-shape",
+    "command": [
+      "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\tail-shape.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\tail-shape-1"
+    ],
+    "rc": 0,
+    "stdout": "TAIL_VALUE=8\nTAIL_VALUE=8\nTAIL_VALUE=0\nTAIL_VALUE=0\nTAIL_REFUSED: Cannot convert value \"2147483648\" to type \"System.Int32\". Error: \"Value was either too large or too small for an Int32.\"\n",
+    "stderr": ""
+  },
+  {
+    "case": "preview-prefix",
+    "command": [
+      "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\preview-prefix.ps1",
+      "-Work",
+      "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\deployment\\preview-prefix-1"
+    ],
+    "rc": 0,
+    "stdout": "WRONG_MODULE_PASSED\n",
+    "stderr": ""
+  }
+]

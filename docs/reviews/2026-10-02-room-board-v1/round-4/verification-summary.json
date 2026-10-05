@@ -1,0 +1,123 @@
+{
+  "review_date": "2026-10-04",
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "source_plan_sha256": "7d40c37e91a1e6beb9f45a09cd9d73ca4c8b4cb32e5db7aebf6d6d9da955c6f1",
+  "snapshot_sha256": "7d40c37e91a1e6beb9f45a09cd9d73ca4c8b4cb32e5db7aebf6d6d9da955c6f1",
+  "line_count": 4123,
+  "base": "4aab13e30f3c2960da787b47c90926256b4b5b73",
+  "a2a_base": "225287c2ed310158a3f699688447db2964e425b2",
+  "stages": {
+    "baseline": {
+      "counts": {
+        "passed": 992,
+        "skipped": 7,
+        "failed": 1
+      },
+      "missing_baseline_cases": [],
+      "changed_baseline_outcomes": {},
+      "failures": [
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "room_counts": {
+        "passed": 21
+      },
+      "a2a_counts": {},
+      "scope_counts": {}
+    },
+    "phase1": {
+      "counts": {
+        "passed": 1085,
+        "skipped": 7,
+        "failed": 1
+      },
+      "missing_baseline_cases": [],
+      "changed_baseline_outcomes": {},
+      "failures": [
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "room_counts": {
+        "passed": 96
+      },
+      "a2a_counts": {},
+      "scope_counts": {
+        "passed": 18
+      }
+    },
+    "proposal": {
+      "counts": {
+        "passed": 1125,
+        "skipped": 9,
+        "failed": 1
+      },
+      "missing_baseline_cases": [],
+      "changed_baseline_outcomes": {},
+      "failures": [
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.a2a_mesh.tests.test_hermes_card_optional::test_hermes_serves_agent_card",
+        "packages.a2a_mesh.tests.test_invariants::test_root_mcp_json_has_no_a2a_server_key",
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "room_counts": {
+        "passed": 96
+      },
+      "a2a_counts": {
+        "passed": 36,
+        "skipped": 2
+      },
+      "scope_counts": {
+        "passed": 22
+      }
+    }
+  },
+  "source_drift_after_tests": {
+    "baseline": [],
+    "rollback": [],
+    "phase1": [],
+    "proposal": []
+  },
+  "independent_manifest_nul_scan": {
+    "baseline": {
+      "inspected_text_files": 1250,
+      "offenders": []
+    },
+    "rollback": {
+      "inspected_text_files": 1251,
+      "offenders": []
+    },
+    "phase1": {
+      "inspected_text_files": 1260,
+      "offenders": []
+    },
+    "proposal": {
+      "inspected_text_files": 1273,
+      "offenders": []
+    }
+  },
+  "primary_repo_head": "27445786d7aaa0e01c92b9eb726b7cb3d9da479e"
+}

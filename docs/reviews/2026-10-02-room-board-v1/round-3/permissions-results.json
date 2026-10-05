@@ -1,0 +1,12 @@
+{
+  "before": {
+    "rc": 0,
+    "stdout": "{\n  \"protected\": true,\n  \"sddl\": \"O:S-1-5-21-407167779-2108933267-3326454795-1014G:S-1-5-21-407167779-2108933267-3326454795-513D:PAI(A;;FA;;;S-1-5-21-407167779-2108933267-3326454795-1014)\",\n  \"rules\": [\n    {\n      \"identity\": \"MSI\\\\CodexSandboxOnline\",\n      \"rights\": \"FullControl\",\n      \"inherited\": false\n    }\n  ]\n}\n",
+    "stderr": ""
+  },
+  "after": {
+    "rc": 0,
+    "stdout": "{\n  \"protected\": false,\n  \"sddl\": \"O:S-1-5-21-407167779-2108933267-3326454795-1014G:S-1-5-21-407167779-2108933267-3326454795-513D:AI(A;ID;0x1301bf;;;S-1-5-21-1033637858-3217409056-3351462966-4058141042)(A;ID;0x1301bf;;;S-1-5-21-1151787395-1196307603-71659667-1034809668)(A;ID;0x1301bf;;;S-1-5-21-407167779-2108933267-3326454795-1012)(A;ID;0x1301bf;;;S-1-5-21-1586586583-2917047293-1223111077-3712148364)(A;ID;0x1301ff;;;S-1-5-21-1287421684-1416434372-895436270-1170819705)(A;ID;FA;;;SY)(A;ID;FA;;;BA)(A;ID;FA;;;S-1-5-21-407167779-2108933267-3326454795-1002)\",\n  \"rules\": [\n    {\n      \"identity\": \"S-1-5-21-1033637858-3217409056-3351462966-4058141042\",\n      \"rights\": \"Modify, Synchronize\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"S-1-5-21-1151787395-1196307603-71659667-1034809668\",\n      \"rights\": \"Modify, Synchronize\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"MSI\\\\CodexSandboxUsers\",\n      \"rights\": \"Modify, Synchronize\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"S-1-5-21-1586586583-2917047293-1223111077-3712148364\",\n      \"rights\": \"Modify, Synchronize\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"S-1-5-21-1287421684-1416434372-895436270-1170819705\",\n      \"rights\": \"DeleteSubdirectoriesAndFiles, Modify, Synchronize\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"NT AUTHORITY\\\\SYSTEM\",\n      \"rights\": \"FullControl\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"BUILTIN\\\\Administrators\",\n      \"rights\": \"FullControl\",\n      \"inherited\": true\n    },\n    {\n      \"identity\": \"MSI\\\\kalis\",\n      \"rights\": \"FullControl\",\n      \"inherited\": true\n    }\n  ]\n}\n",
+    "stderr": ""
+  }
+}

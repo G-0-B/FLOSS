@@ -1,0 +1,40 @@
+Collecting mcp==1.27.0
+  Downloading mcp-1.27.0-py3-none-any.whl.metadata (8.2 kB)
+Requirement already satisfied: anyio>=4.5 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (4.15.1)
+Collecting httpx-sse>=0.4 (from mcp==1.27.0)
+  Downloading httpx_sse-0.4.3-py3-none-any.whl.metadata (9.7 kB)
+Requirement already satisfied: httpx>=0.27.1 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (0.28.1)
+Requirement already satisfied: jsonschema>=4.20.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (4.26.0)
+Requirement already satisfied: pydantic-settings>=2.5.2 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (2.15.0)
+Requirement already satisfied: pydantic<3.0.0,>=2.11.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (2.13.5)
+Requirement already satisfied: pyjwt>=2.10.1 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from pyjwt[crypto]>=2.10.1->mcp==1.27.0) (2.15.1)
+Requirement already satisfied: python-multipart>=0.0.9 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (0.0.32)
+Requirement already satisfied: pywin32>=310 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (312)
+Requirement already satisfied: sse-starlette>=1.6.1 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (3.5.0)
+Requirement already satisfied: starlette>=0.27 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (1.7.0)
+Requirement already satisfied: typing-extensions>=4.9.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (4.16.0)
+Requirement already satisfied: typing-inspection>=0.4.1 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (0.4.4)
+Requirement already satisfied: uvicorn>=0.31.1 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from mcp==1.27.0) (0.54.0)
+Requirement already satisfied: idna>=2.8 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from anyio>=4.5->mcp==1.27.0) (3.20)
+Requirement already satisfied: certifi in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from httpx>=0.27.1->mcp==1.27.0) (2026.7.22)
+Requirement already satisfied: httpcore==1.* in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from httpx>=0.27.1->mcp==1.27.0) (1.0.9)
+Requirement already satisfied: h11>=0.16 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from httpcore==1.*->httpx>=0.27.1->mcp==1.27.0) (0.16.0)
+Requirement already satisfied: attrs>=22.2.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from jsonschema>=4.20.0->mcp==1.27.0) (26.1.0)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from jsonschema>=4.20.0->mcp==1.27.0) (2025.9.1)
+Requirement already satisfied: referencing>=0.28.4 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from jsonschema>=4.20.0->mcp==1.27.0) (0.37.0)
+Requirement already satisfied: rpds-py>=0.25.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from jsonschema>=4.20.0->mcp==1.27.0) (2026.6.3)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from pydantic<3.0.0,>=2.11.0->mcp==1.27.0) (0.8.0)
+Requirement already satisfied: pydantic-core==2.46.5 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from pydantic<3.0.0,>=2.11.0->mcp==1.27.0) (2.46.5)
+Requirement already satisfied: python-dotenv>=0.21.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from pydantic-settings>=2.5.2->mcp==1.27.0) (1.2.4)
+Requirement already satisfied: cryptography>=3.4.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from pyjwt[crypto]>=2.10.1->mcp==1.27.0) (50.0.2)
+Requirement already satisfied: click>=7.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from uvicorn>=0.31.1->mcp==1.27.0) (8.5.0)
+Requirement already satisfied: cffi>=2.0.0 in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp==1.27.0) (2.1.1)
+Requirement already satisfied: pycparser in c:\users\kalis\appdata\local\temp\codex-room-board-r3-20261002-225116\review-venv\lib\site-packages (from cffi>=2.0.0->cryptography>=3.4.0->pyjwt[crypto]>=2.10.1->mcp==1.27.0) (3.0)
+Downloading mcp-1.27.0-py3-none-any.whl (215 kB)
+Downloading httpx_sse-0.4.3-py3-none-any.whl (9.0 kB)
+Installing collected packages: httpx-sse, mcp
+  Attempting uninstall: mcp
+    Found existing installation: mcp 2.3.0
+    Uninstalling mcp-2.3.0:
+      Successfully uninstalled mcp-2.3.0
+Successfully installed httpx-sse-0.4.3 mcp-1.27.0

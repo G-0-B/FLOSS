@@ -1,0 +1,147 @@
+{
+  "old-stage-hardlink": {
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "seqs": [
+      1,
+      2
+    ],
+    "still_same_file": true
+  },
+  "late-board-hardlink": {
+    "construction_guard_refused": true,
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "seqs": [
+      1,
+      2
+    ],
+    "board_is_markdown": true
+  },
+  "open-board": {
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "seqs": [
+      1,
+      2
+    ],
+    "board_changed": false,
+    "stages": [],
+    "stderr": "[coordination_room] BOARD.md projection failed: [WinError 5] Access is denied: 'C:\\\\Users\\\\kalis\\\\AppData\\\\Local\\\\Temp\\\\codex-room-board-r3-20261002-225116\\\\adversarial-1790997098336846000\\\\open-board\\\\.BOARD.md.nxrpedrm.tmp' -> 'C:\\\\Users\\\\kalis\\\\AppData\\\\Local\\\\Temp\\\\codex-room-board-r3-20261002-225116\\\\adversarial-1790997098336846000\\\\open-board\\\\BOARD.md'\n"
+  },
+  "open-log-with-linked-board": {
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "seqs": [
+      1,
+      2
+    ],
+    "board_changed": true,
+    "stages": [],
+    "stderr": ""
+  },
+  "readonly-board": {
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "seqs": [
+      1,
+      2
+    ],
+    "board_changed": false,
+    "stages": [],
+    "stderr": "[coordination_room] BOARD.md projection failed: [WinError 5] Access is denied: 'C:\\\\Users\\\\kalis\\\\AppData\\\\Local\\\\Temp\\\\codex-room-board-r3-20261002-225116\\\\adversarial-1790997098336846000\\\\readonly-board\\\\.BOARD.md.t0e1lv5a.tmp' -> 'C:\\\\Users\\\\kalis\\\\AppData\\\\Local\\\\Temp\\\\codex-room-board-r3-20261002-225116\\\\adversarial-1790997098336846000\\\\readonly-board\\\\BOARD.md'\n"
+  },
+  "parent-rebind": {
+    "junction": "Junction created for C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\adversarial-1790997098336846000\\parent-rebind\\alias <<===>> C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\adversarial-1790997098336846000\\parent-rebind\\real",
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "first_line": "# Coordination board",
+    "next_read_error": "JSONDecodeError"
+  },
+  "rollback": {
+    "room_bytes_equal_base": true,
+    "rc": 0,
+    "stdout": "{\"state\": {\"claims\": {\"x.py\": \"alice\"}, \"last_seq\": 2, \"speakers\": [\"alice\"]}, \"post\": {\"ok\": true, \"seq\": 3}, \"seqs\": [1, 2, 3]}\n",
+    "stderr": ""
+  },
+  "lazy-import": {
+    "tools_unbuilt": true,
+    "files": []
+  },
+  "lazy-concurrency": {
+    "constructors": 1,
+    "unique_instances": 1
+  },
+  "lazy-first-failure": {
+    "failures": [
+      "JSONDecodeError",
+      "JSONDecodeError"
+    ],
+    "cached_failed_instance": false,
+    "retry": {
+      "ok": true,
+      "seq": 1,
+      "topic": "general"
+    }
+  },
+  "takeover-state": {
+    "state": {
+      "claims": {
+        "held.py": "old"
+      },
+      "last_seq": 2,
+      "speakers": [
+        "a",
+        "old"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\adversarial-1790997098336846000\\lazy",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\adversarial-1790997098336846000\\lazy\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\adversarial-1790997098336846000\\lazy\\BOARD.md",
+      "ok": true
+    },
+    "conflict": {
+      "ok": false,
+      "error": "conflict",
+      "holder": "old",
+      "path": "held.py"
+    }
+  },
+  "ownership-order": {
+    "order": [
+      "claim",
+      "serve",
+      "read",
+      "read",
+      "read"
+    ]
+  },
+  "failed-first-call-slot": {
+    "claimed": true,
+    "error": "JSONDecodeError",
+    "pid_record_retained": true,
+    "cached": false
+  },
+  "deployment-capture-window": {
+    "captured": 1,
+    "after_stopped_owner": 2,
+    "step5_equality_passes": false
+  }
+}

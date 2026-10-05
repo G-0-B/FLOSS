@@ -1,0 +1,45 @@
+{
+  "roots": [
+    "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\fixtures-exact\\baseline",
+    "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\fixtures-exact\\rollback",
+    "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\fixtures-exact\\phase1",
+    "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\fixtures-exact\\proposal"
+  ],
+  "operations": 54,
+  "file_counts": {
+    "baseline": 1408,
+    "rollback": 1409,
+    "phase1": 1418,
+    "proposal": 1431
+  }
+}
+{
+  "baseline": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1408
+  },
+  "rollback": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1409
+  },
+  "phase1": {
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "identical": 1418
+  },
+  "proposal": {
+    "changed": [
+      "packages/a2a_mesh/room_bridge.py",
+      "packages/a2a_mesh/tests/test_room_bridge_pair.py",
+      "packages/a2a_mesh/tests/test_room_bridge_parse.py"
+    ],
+    "added": [],
+    "removed": [],
+    "identical": 1428
+  }
+}

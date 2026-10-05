@@ -1,0 +1,364 @@
+[
+  {
+    "case": "upgrade/wrong-bus",
+    "reply": {
+      "ok": true,
+      "seq": 4,
+      "topic": "general"
+    },
+    "shared_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085",
+        "topic": "general"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085",
+        "topic": "general"
+      }
+    ],
+    "shadow_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "deploy-smoke-185a2afb7d4a4a3eb88f7cc663395a0c",
+        "topic": "general"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+        "topic": "general"
+      }
+    ],
+    "shared_state": {
+      "claims": {},
+      "last_seq": 4,
+      "speakers": [
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong\\BOARD.md"
+    }
+  },
+  {
+    "case": "upgrade/correct-with-peer",
+    "reply": {
+      "ok": true,
+      "seq": 5,
+      "topic": "general"
+    },
+    "shared_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "deploy-smoke-185a2afb7d4a4a3eb88f7cc663395a0c",
+        "topic": "general"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085",
+        "topic": "general"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 5,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+        "topic": "general"
+      },
+      {
+        "seq": 6,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085",
+        "topic": "general"
+      }
+    ],
+    "shadow_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "shared_state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    }
+  },
+  {
+    "case": "rollback/wrong-bus",
+    "reply": {
+      "ok": true,
+      "seq": 4
+    },
+    "shared_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085"
+      }
+    ],
+    "shadow_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "rolled back to v0.1 deploy-smoke-185a2afb7d4a4a3eb88f7cc663395a0c"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "rolled back to v0.1 deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b"
+      }
+    ],
+    "shared_state": {
+      "claims": {},
+      "last_seq": 4,
+      "speakers": [
+        "peer",
+        "seed"
+      ]
+    }
+  },
+  {
+    "case": "rollback/correct-with-peer",
+    "reply": {
+      "ok": true,
+      "seq": 5
+    },
+    "shared_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "rolled back to v0.1 deploy-smoke-185a2afb7d4a4a3eb88f7cc663395a0c"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085"
+      },
+      {
+        "seq": 4,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 5,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "rolled back to v0.1 deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b"
+      },
+      {
+        "seq": 6,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "peer",
+        "text": "later peer with non-ASCII: caf\u00e9 \u4e2d \ud83d\ude00 \u2028 \u2029 \u0085"
+      }
+    ],
+    "shadow_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor"
+      }
+    ],
+    "shared_state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ]
+    }
+  },
+  {
+    "case": "real-room-above-int32",
+    "reply": {
+      "ok": true,
+      "seq": 2147483648,
+      "topic": "general"
+    },
+    "shared_rows": [
+      {
+        "seq": 2147483647,
+        "ts": "2026-10-04T00:00:00Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "previous"
+      },
+      {
+        "seq": 2147483648,
+        "ts": "2026-10-04T08:39:18Z",
+        "type": "broadcast",
+        "agent_id": "deploy-smoke",
+        "text": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+        "topic": "general"
+      }
+    ],
+    "shared_state": {
+      "claims": {},
+      "last_seq": 2147483648,
+      "speakers": [
+        "deploy-smoke",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\real-high-sequence",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\real-high-sequence\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\real-high-sequence\\BOARD.md"
+    }
+  }
+]

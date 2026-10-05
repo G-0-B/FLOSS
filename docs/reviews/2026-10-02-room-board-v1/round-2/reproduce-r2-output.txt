@@ -1,0 +1,8 @@
+Isolated fixtures: C:\Users\kalis\AppData\Local\Temp\room-board-r2-repro-_lpkugph
+R2-01 hardlink samefile= True
+R2-01 broadcast= {'ok': True, 'seq': 2, 'topic': 'general'} log_first_line= '# Coordination board'
+R2-01 next_read= JSONDecodeError
+I1 simulated takeover seqs= [1, 2, 2]
+R2-04 rollback state= {"claims": {"x.py": "a"}, "last_seq": 2, "speakers": ["a"]}
+R2-04 missing_required_fields= ['board', 'log', 'root']
+R2-04 rollback append= {'ok': True, 'seq': 3} all_seqs= [1, 2, 3]

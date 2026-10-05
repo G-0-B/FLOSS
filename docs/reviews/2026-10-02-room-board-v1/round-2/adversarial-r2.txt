@@ -1,0 +1,7 @@
+hardlink samefile= True
+hardlink broadcast= {'ok': True, 'seq': 2, 'topic': 'general'} log_first_line= '# Coordination board'
+hardlink next_read= JSONDecodeError
+pre-guard-snapshot seqs= [1, 2, 2]
+rollback state= {"claims": {"x.py": "a"}, "last_seq": 2, "speakers": ["a"]}
+rollback missing_required_fields= ['board', 'log', 'root']
+rollback append= {'ok': True, 'seq': 3} all_seqs= [1, 2, 3]

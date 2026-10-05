@@ -1,0 +1,73 @@
+{
+  "plan": "C:\\~shit\\FLOSS\\docs\\superpowers\\plans\\2026-10-02-coordination-room-board-v1.md",
+  "plan_sha256": "eaa3d75065d8d3582cdcaff1e017d5b214c083ef794a72ba09c583e0462886ff",
+  "base": "4aab13e30f3c2960da787b47c90926256b4b5b73",
+  "a2a_base": "225287c2ed310158a3f699688447db2964e425b2",
+  "blocks": {
+    "docs/specs/coordination-room.schema.json": [
+      211,
+      268
+    ],
+    "packages/coordination_room/evidence.py": [
+      419,
+      485
+    ],
+    "packages/coordination_room/board.py": [
+      662,
+      812
+    ],
+    "packages/coordination_room/room.py": [
+      1189,
+      1362
+    ],
+    "packages/coordination_room/gateway.py": [
+      1368,
+      1457
+    ],
+    "packages/coordination_room/tests/test_evidence.py": [
+      320,
+      408
+    ],
+    "packages/coordination_room/tests/test_board.py": [
+      516,
+      651
+    ],
+    "packages/coordination_room/tests/test_message_board.py": [
+      847,
+      1017
+    ],
+    "packages/coordination_room/tests/test_gateway_board.py": [
+      1021,
+      1109
+    ],
+    "packages/coordination_room/tests/test_schema.py": [
+      1113,
+      1178
+    ],
+    "packages/coordination_room/tests/test_server_tools.py": [
+      1498,
+      1547
+    ],
+    "packages/a2a_mesh/room_bridge.py": [
+      2181,
+      2469
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_parse.py": [
+      1836,
+      1924
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_pair.py": [
+      1928,
+      2048
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_invariants.py": [
+      2052,
+      2094
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_e2e.py": [
+      2098,
+      2170
+    ]
+  },
+  "scratch": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-review-20261002-162041"
+}

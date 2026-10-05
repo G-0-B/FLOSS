@@ -1,0 +1,415 @@
+FURB167 [*] Use of regular expression alias `re.S`
+  --> packages\a2a_mesh\room_bridge.py:50:68
+   |
+49 | _TOPIC = r"[a-z0-9][a-z0-9_-]{0,31}"
+50 | _POST = re.compile(rf"post\s+#(?P<topic>{_TOPIC})\s+(?P<text>.+)", re.S)
+   |                                                                    ^^^^
+51 | _READ = re.compile(rf"read(?:\s+#(?P<topic>{_TOPIC}))?(?:\s+since=(?P<since>\d+))?")
+52 | _OPS = ("post", "read", "topics")
+   |
+help: Replace with `re.DOTALL`
+   |
+49 | _TOPIC = r"[a-z0-9][a-z0-9_-]{0,31}"
+   - _POST = re.compile(rf"post\s+#(?P<topic>{_TOPIC})\s+(?P<text>.+)", re.S)
+50 + _POST = re.compile(rf"post\s+#(?P<topic>{_TOPIC})\s+(?P<text>.+)", re.DOTALL)
+51 | _READ = re.compile(rf"read(?:\s+#(?P<topic>{_TOPIC}))?(?:\s+since=(?P<since>\d+))?")
+   |
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+   --> packages\a2a_mesh\room_bridge.py:153:13
+    |
+151 |       async def call(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
+152 |           try:
+153 | /             async with streamable_http_client(self._url) as (read, write, _):
+154 | |                 async with ClientSession(read, write) as session:
+    | |_________________________________________________________________^
+155 |                       await session.initialize()
+156 |                       result = await session.call_tool(tool, arguments)
+    |
+help: Combine `with` statements
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\a2a_mesh\tests\test_room_bridge_e2e.py:21:50
+   |
+19 | pytest.importorskip("mcp")
+20 |
+21 | from packages.a2a_mesh.client import send_hello  # noqa: E402
+   |                                                  ^^^^^^^^^^^^
+22 | from packages.a2a_mesh.room_bridge import McpRoomPort, build_app  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+20 |
+   - from packages.a2a_mesh.client import send_hello  # noqa: E402
+21 + from packages.a2a_mesh.client import send_hello
+22 | from packages.a2a_mesh.room_bridge import McpRoomPort, build_app  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\a2a_mesh\tests\test_room_bridge_e2e.py:22:67
+   |
+21 | from packages.a2a_mesh.client import send_hello  # noqa: E402
+22 | from packages.a2a_mesh.room_bridge import McpRoomPort, build_app  # noqa: E402
+   |                                                                   ^^^^^^^^^^^^
+23 |
+24 | HOST, ROOM_PORT, BRIDGE_PORT = "127.0.0.1", 19997, 19996
+   |
+help: Remove unused `noqa` directive
+   |
+21 | from packages.a2a_mesh.client import send_hello  # noqa: E402
+   - from packages.a2a_mesh.room_bridge import McpRoomPort, build_app  # noqa: E402
+22 + from packages.a2a_mesh.room_bridge import McpRoomPort, build_app
+23 |
+   |
+
+ISC004 Unparenthesized implicit string concatenation in collection
+  --> packages\coordination_room\board.py:91:9
+   |
+89 |           "# Coordination board",
+90 |           "",
+91 | /         "<!-- Generated from events.jsonl by packages/coordination_room/board.py. "
+92 | |         "A view, not a record: edits are overwritten on the next room event. -->",
+   | |_________________________________________________________________________________^
+93 |           "",
+94 |           f"As of: {as_of}, seq {last_seq}. Rewritten only when the room logs an event, "
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+
+ISC004 Unparenthesized implicit string concatenation in collection
+  --> packages\coordination_room\board.py:94:9
+   |
+92 |           "A view, not a record: edits are overwritten on the next room event. -->",
+93 |           "",
+94 | /         f"As of: {as_of}, seq {last_seq}. Rewritten only when the room logs an event, "
+95 | |         "so an idle board is as old as this line says.",
+   | |_______________________________________________________^
+96 |           "",
+97 |           "## Room claims (advisory)",
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+
+ISC004 Unparenthesized implicit string concatenation in collection
+   --> packages\coordination_room\board.py:99:9
+    |
+ 97 |           "## Room claims (advisory)",
+ 98 |           "",
+ 99 | /         "A room claim records who said they are editing a path. It is a convention, "
+100 | |         "not write authorization.",
+    | |__________________________________^
+101 |           "",
+102 |       ]
+    |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+
+TRY004 Prefer `TypeError` exception for invalid type
+  --> packages\coordination_room\room.py:89:13
+   |
+87 |     def claim(self, agent_id: str, path: str, intent: str = "") -> dict[str, Any]:
+88 |         if not isinstance(intent, str):
+89 |             raise ValueError("intent must be a string")
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+90 |         if len(intent.encode("utf-8")) > INTENT_MAX:
+91 |             raise ValueError(f"intent exceeds {INTENT_MAX} bytes")
+   |
+
+TRY004 Prefer `TypeError` exception for invalid type
+   --> packages\coordination_room\room.py:125:13
+    |
+123 |             raise ValueError("empty agent_id")
+124 |         if not isinstance(text, str):
+125 |             raise ValueError("text must be a string")
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+126 |         if len(text.encode("utf-8")) > TEXT_MAX:
+127 |             raise ValueError(f"broadcast text exceeds {TEXT_MAX} bytes")
+    |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_board.py:22:49
+   |
+20 |     sys.path.insert(0, str(_REPO_ROOT))
+21 |
+22 | from packages.coordination_room.board import (  # noqa: E402
+   |                                                 ^^^^^^^^^^^^
+23 |     render_board,
+24 |     topic_of,
+   |
+help: Remove unused `noqa` directive
+   |
+21 |
+   - from packages.coordination_room.board import (  # noqa: E402
+22 + from packages.coordination_room.board import (
+23 |     render_board,
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_claims.py:19:74
+   |
+17 |     sys.path.insert(0, str(_REPO_ROOT))
+18 |
+19 | from packages.coordination_room.claims import ClaimConflict, ClaimTable  # noqa: E402
+   |                                                                          ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+18 |
+   - from packages.coordination_room.claims import ClaimConflict, ClaimTable  # noqa: E402
+19 + from packages.coordination_room.claims import ClaimConflict, ClaimTable
+20 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_evidence.py:24:50
+   |
+22 |     sys.path.insert(0, str(_REPO_ROOT))
+23 |
+24 | from packages.coordination_room import evidence  # noqa: E402
+   |                                                  ^^^^^^^^^^^^
+25 | from packages.coordination_room.evidence import resolve_all, resolve_ref  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+23 |
+   - from packages.coordination_room import evidence  # noqa: E402
+24 + from packages.coordination_room import evidence
+25 | from packages.coordination_room.evidence import resolve_all, resolve_ref  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_evidence.py:25:75
+   |
+24 | from packages.coordination_room import evidence  # noqa: E402
+25 | from packages.coordination_room.evidence import resolve_all, resolve_ref  # noqa: E402
+   |                                                                           ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+24 | from packages.coordination_room import evidence  # noqa: E402
+   - from packages.coordination_room.evidence import resolve_all, resolve_ref  # noqa: E402
+25 + from packages.coordination_room.evidence import resolve_all, resolve_ref
+26 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_gateway.py:18:71
+   |
+16 |     sys.path.insert(0, str(_REPO_ROOT))
+17 |
+18 | from packages.coordination_room.gateway import CoordinationRoomTools  # noqa: E402
+   |                                                                       ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+17 |
+   - from packages.coordination_room.gateway import CoordinationRoomTools  # noqa: E402
+18 + from packages.coordination_room.gateway import CoordinationRoomTools
+19 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_gateway_board.py:19:71
+   |
+17 |     sys.path.insert(0, str(_REPO_ROOT))
+18 |
+19 | from packages.coordination_room.gateway import CoordinationRoomTools  # noqa: E402
+   |                                                                       ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+18 |
+   - from packages.coordination_room.gateway import CoordinationRoomTools  # noqa: E402
+19 + from packages.coordination_room.gateway import CoordinationRoomTools
+20 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_message_board.py:24:56
+   |
+22 |     sys.path.insert(0, str(_REPO_ROOT))
+23 |
+24 | import packages.coordination_room.room as room_module  # noqa: E402
+   |                                                        ^^^^^^^^^^^^
+25 | from packages.coordination_room.log import EventLog  # noqa: E402
+26 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+23 |
+   - import packages.coordination_room.room as room_module  # noqa: E402
+24 + import packages.coordination_room.room as room_module
+25 | from packages.coordination_room.log import EventLog  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_message_board.py:25:54
+   |
+24 | import packages.coordination_room.room as room_module  # noqa: E402
+25 | from packages.coordination_room.log import EventLog  # noqa: E402
+   |                                                      ^^^^^^^^^^^^
+26 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+24 | import packages.coordination_room.room as room_module  # noqa: E402
+   - from packages.coordination_room.log import EventLog  # noqa: E402
+25 + from packages.coordination_room.log import EventLog
+26 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_message_board.py:26:63
+   |
+24 | import packages.coordination_room.room as room_module  # noqa: E402
+25 | from packages.coordination_room.log import EventLog  # noqa: E402
+26 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |                                                               ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+25 | from packages.coordination_room.log import EventLog  # noqa: E402
+   - from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+26 + from packages.coordination_room.room import CoordinationRoom
+27 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_paths.py:19:74
+   |
+17 |     sys.path.insert(0, str(_REPO_ROOT))
+18 |
+19 | from packages.coordination_room.paths import PathEscape, normalize_path  # noqa: E402
+   |                                                                          ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+18 |
+   - from packages.coordination_room.paths import PathEscape, normalize_path  # noqa: E402
+19 + from packages.coordination_room.paths import PathEscape, normalize_path
+20 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_room.py:21:62
+   |
+19 |     sys.path.insert(0, str(_REPO_ROOT))
+20 |
+21 | from packages.coordination_room.claims import ClaimConflict  # noqa: E402
+   |                                                              ^^^^^^^^^^^^
+22 | from packages.coordination_room.log import EventLog  # noqa: E402
+23 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+20 |
+   - from packages.coordination_room.claims import ClaimConflict  # noqa: E402
+21 + from packages.coordination_room.claims import ClaimConflict
+22 | from packages.coordination_room.log import EventLog  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_room.py:22:54
+   |
+21 | from packages.coordination_room.claims import ClaimConflict  # noqa: E402
+22 | from packages.coordination_room.log import EventLog  # noqa: E402
+   |                                                      ^^^^^^^^^^^^
+23 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+21 | from packages.coordination_room.claims import ClaimConflict  # noqa: E402
+   - from packages.coordination_room.log import EventLog  # noqa: E402
+22 + from packages.coordination_room.log import EventLog
+23 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_room.py:23:63
+   |
+21 | from packages.coordination_room.claims import ClaimConflict  # noqa: E402
+22 | from packages.coordination_room.log import EventLog  # noqa: E402
+23 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |                                                               ^^^^^^^^^^^^
+help: Remove unused `noqa` directive
+   |
+22 | from packages.coordination_room.log import EventLog  # noqa: E402
+   - from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+23 + from packages.coordination_room.room import CoordinationRoom
+24 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_schema.py:22:63
+   |
+20 | jsonschema = pytest.importorskip("jsonschema")
+21 |
+22 | from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+   |                                                               ^^^^^^^^^^^^
+23 |
+24 | _SCHEMA = _REPO_ROOT / "docs" / "specs" / "coordination-room.schema.json"
+   |
+help: Remove unused `noqa` directive
+   |
+21 |
+   - from packages.coordination_room.room import CoordinationRoom  # noqa: E402
+22 + from packages.coordination_room.room import CoordinationRoom
+23 |
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_server_http.py:32:32
+   |
+30 | uvicorn = pytest.importorskip("uvicorn")
+31 |
+32 | from mcp import ClientSession  # noqa: E402
+   |                                ^^^^^^^^^^^^
+33 | from mcp.client.streamable_http import streamable_http_client  # noqa: E402
+   |
+help: Remove unused `noqa` directive
+   |
+31 |
+   - from mcp import ClientSession  # noqa: E402
+32 + from mcp import ClientSession
+33 | from mcp.client.streamable_http import streamable_http_client  # noqa: E402
+   |
+
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
+  --> packages\coordination_room\tests\test_server_http.py:33:64
+   |
+32 | from mcp import ClientSession  # noqa: E402
+33 | from mcp.client.streamable_http import streamable_http_client  # noqa: E402
+   |                                                                ^^^^^^^^^^^^
+34 |
+35 | HOST, PORT = "127.0.0.1", 19995
+   |
+help: Remove unused `noqa` directive
+   |
+32 | from mcp import ClientSession  # noqa: E402
+   - from mcp.client.streamable_http import streamable_http_client  # noqa: E402
+33 + from mcp.client.streamable_http import streamable_http_client
+34 |
+   |
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+  --> packages\coordination_room\tests\test_server_http.py:40:5
+   |
+39 |   async def _call(tool: str, arguments: dict) -> dict:
+40 | /     async with streamable_http_client(URL) as (read, write, _):
+41 | |         async with ClientSession(read, write) as session:
+   | |_________________________________________________________^
+42 |               await session.initialize()
+43 |               result = await session.call_tool(tool, arguments)
+   |
+help: Combine `with` statements
+
+PLW1510 `subprocess.run` without explicit `check` argument
+  --> scripts\tests\test_daemon_scope.py:55:12
+   |
+53 |         "TMP": str(agent_dir),
+54 |     }
+55 |     return subprocess.run(
+   |            ^^^^^^^^^^^^^^
+56 |         [shell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+57 |          "-File", str(SCRIPTS / script), *args],
+   |
+help: Add explicit `check=False`
+
+Found 27 errors.
+[*] 19 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+EXIT_CODE=1

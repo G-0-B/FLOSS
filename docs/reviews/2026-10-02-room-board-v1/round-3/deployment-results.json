@@ -1,0 +1,65 @@
+[
+  {
+    "case": "failed-checkout",
+    "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "rc": 0,
+    "stdout": "GIT_WORKTREE_ADD_FAILED_128\nSTALE_ROLLBACK_START_REACHED only=room dry=True\nSTALE_ROLLBACK_START_REACHED only=room dry=False\n",
+    "stderr": ""
+  },
+  {
+    "case": "failed-bridge-stop",
+    "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "rc": 0,
+    "stdout": "SHUTDOWN INCOMPLETE bridge identity UNVERIFIABLE\nROOM_STOP_REACHED\n",
+    "stderr": ""
+  },
+  {
+    "case": "failed-port-query",
+    "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "rc": 0,
+    "stdout": "False\nNEXT_STEP_REACHED\n",
+    "stderr": ""
+  },
+  {
+    "case": "env-resolution",
+    "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "rc": 0,
+    "stdout": "C:\\Program Files\\Git\\usr\\bin\\env.exe\n",
+    "stderr": ""
+  },
+  {
+    "case": "failed-checkout",
+    "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+    "rc": 0,
+    "stdout": "GIT_WORKTREE_ADD_FAILED_128\nSTALE_ROLLBACK_START_REACHED only=room dry=True\nSTALE_ROLLBACK_START_REACHED only=room dry=False\n",
+    "stderr": ""
+  },
+  {
+    "case": "failed-bridge-stop",
+    "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+    "rc": 0,
+    "stdout": "SHUTDOWN INCOMPLETE bridge identity UNVERIFIABLE\nROOM_STOP_REACHED\n",
+    "stderr": ""
+  },
+  {
+    "case": "failed-port-query",
+    "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+    "rc": 0,
+    "stdout": "False\nNEXT_STEP_REACHED\n",
+    "stderr": ""
+  },
+  {
+    "case": "env-resolution",
+    "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+    "rc": 0,
+    "stdout": "C:\\Program Files\\Git\\usr\\bin\\env.exe\n",
+    "stderr": ""
+  },
+  {
+    "case": "archive-board",
+    "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+    "rc": 0,
+    "stdout": "BOARD.superseded-20261003T031002Z.md\nPRESERVE BOARD\n",
+    "stderr": ""
+  }
+]

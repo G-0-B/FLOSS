@@ -1,0 +1,92 @@
+[
+  {
+    "stage": "baseline",
+    "command": [
+      "C:\\Python313\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "packages/",
+      "tests/",
+      "scripts/tests/",
+      "--deselect",
+      "scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded",
+      "--junitxml=C:\\~shit\\FLOSS\\docs\\reviews\\2026-10-02-room-board-v1\\round-4/baseline-green.xml"
+    ],
+    "cwd": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\fixtures-exact\\baseline",
+    "returncode": 1,
+    "elapsed": 72.017949400004,
+    "env": {
+      "PYTHONPATH": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "FLOSS_AGENT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\agent",
+      "FLOSS_AUDIT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\audit",
+      "COORDINATION_ROOM_ROOT": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\room",
+      "COORDINATION_ROOM_LOG": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\room\\events.jsonl",
+      "COORDINATION_ROOM_BOARD": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\room\\BOARD.md",
+      "TEMP": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\baseline\\tmp"
+    }
+  },
+  {
+    "stage": "phase1",
+    "command": [
+      "C:\\Python313\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "packages/",
+      "tests/",
+      "scripts/tests/",
+      "--deselect",
+      "scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded",
+      "--junitxml=C:\\~shit\\FLOSS\\docs\\reviews\\2026-10-02-room-board-v1\\round-4/phase1-green.xml"
+    ],
+    "cwd": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\fixtures-exact\\phase1",
+    "returncode": 1,
+    "elapsed": 103.83253560005687,
+    "env": {
+      "PYTHONPATH": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "FLOSS_AGENT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\agent",
+      "FLOSS_AUDIT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\audit",
+      "COORDINATION_ROOM_ROOT": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\room",
+      "COORDINATION_ROOM_LOG": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\room\\events.jsonl",
+      "COORDINATION_ROOM_BOARD": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\room\\BOARD.md",
+      "TEMP": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\phase1\\tmp"
+    }
+  },
+  {
+    "stage": "proposal",
+    "command": [
+      "C:\\Python313\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "packages/",
+      "tests/",
+      "scripts/tests/",
+      "--deselect",
+      "scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded",
+      "--junitxml=C:\\~shit\\FLOSS\\docs\\reviews\\2026-10-02-room-board-v1\\round-4/proposal-green.xml"
+    ],
+    "cwd": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\fixtures-exact\\proposal",
+    "returncode": 1,
+    "elapsed": 117.10874439985491,
+    "env": {
+      "PYTHONPATH": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "FLOSS_AGENT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\agent",
+      "FLOSS_AUDIT_DIR": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\audit",
+      "COORDINATION_ROOM_ROOT": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\room",
+      "COORDINATION_ROOM_LOG": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\room\\events.jsonl",
+      "COORDINATION_ROOM_BOARD": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\room\\BOARD.md",
+      "TEMP": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\runtime\\proposal\\tmp"
+    }
+  }
+]

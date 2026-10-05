@@ -1,0 +1,376 @@
+--- revision4
++++ revision5
+@@ -10,14 +10,15 @@
+ 
+ **Spec:** `docs/specs/coordination-room.spec.md` v0.2.0 (Task 1 writes it). Research seam: `docs/research/2026-08-31-mas-papers-reeval-intake.md:49-52` (DELM "admission-time verification"). Nothing here implements DeAR's dynamic topology.
+ 
+-**Revision:** 4, 2026-10-02.
++**Revision:** 5, 2026-10-04.
+ 
+ - Revision 1 (SHA-256 `eaa3d75065d8d3582cdcaff1e017d5b214c083ef794a72ba09c583e0462886ff`): Codex review round 1, "revise before implementation", seven findings.
+ - Revision 2 (SHA-256 `6dabb8e6a6ef9f353af7d5f52f2765cf63746a34f69a493e8e7019be635ca635`): Codex audit round 2, "not deployment-ready", four findings plus one inherited; Antigravity (Gemini 3.1 Pro) review of revision 2 and of the Codex audit.
+ - Revision 3 (SHA-256 `7d25eee2bc44286a141419aa7058978bd9fb6ac7fd27bb33dfb712b2bd02af73`): Codex audit round 3, "revise before execution", five findings (one P1, three P2, one P3). Codex hit its usage limit after writing `round-3/REVIEW.md`, so its closing message and its `receipt-hashes.json` were never written; the review itself is complete.
+-- Every finding was reproduced or checked before anything changed. Dispositions are below. Reviews and evidence: `docs/reviews/2026-10-02-room-board-v1/` (round 1 at its root, rounds 2 and 3 in `round-2/` and `round-3/`).
+-
+-**Truth status:** ⚠️ Specified. Every file body and every edit in this plan was run in a scratch copy of `feat/coordination-room-rebased @ 4aab13e` plus `feat/a2a-harness-mesh @ 225287c`. Measured on the authoring machine for revision 4: 96 passed in `packages/coordination_room/tests` (21 baseline + 75 new); 133 passed and 1 skipped across `coordination_room` and `a2a_mesh`; 18 passed in `scripts/tests/test_daemon_scope.py` after Phase 1 and 22 after Phase 2, each under both Windows PowerShell 5.1 and PowerShell 7; `ruff check --isolated` (ruff 0.15.11) clean on this plan's Python files; all four edited scripts parse with zero errors in both shells; the Deployment helpers pass 14 inert checks in both shells. The combined package figure is 132 passed and 2 skipped where no `.mcp.json` exists above the checkout. Required green set, same machine and environment for all three stages: base 992 passed, 1 failed, 7 skipped; Phase 1 1,085 passed, 1 failed, 7 skipped; Phase 2 1,125 passed, 1 failed, 9 skipped (1 deselected in each). The one failure is the same test in all three stages, `scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte`, which needs a git index and fails in an archive extraction. Compared per test case: nothing new fails and no base pass stops passing. The added skips are the optional Hermes probe and the `.mcp.json` ancestry check. Dependencies were this machine's installed set (MCP 1.27.0), not a clean install. Nothing here has landed on any branch. The Deployment section was not executed against a live daemon.
++- Revision 4 (SHA-256 `7d40c37e91a1e6beb9f45a09cd9d73ca4c8b4cb32e5db7aebf6d6d9da955c6f1`): Codex audit round 4, 2026-10-04, "Phase 1 implementation design is substantially ready for its existing operator decisions"; two P2 findings (deployment smoke acceptance, bridge number parsing) and one P3 (preview match), no P1, no redesign warranted.
++- Every finding was reproduced or checked before anything changed. Dispositions are below. Reviews and evidence: `docs/reviews/2026-10-02-room-board-v1/` (round 1 at its root, rounds 2 to 4 in `round-2/`, `round-3/` and `round-4/`).
++
++**Truth status:** ⚠️ Specified. Every file body and every edit in this plan was run in a scratch copy of `feat/coordination-room-rebased @ 4aab13e` plus `feat/a2a-harness-mesh @ 225287c`. Measured on the authoring machine for revision 5: 96 passed in `packages/coordination_room/tests` (21 baseline + 75 new); 190 passed and 1 skipped across `coordination_room` and `a2a_mesh`; 18 passed in `scripts/tests/test_daemon_scope.py` after Phase 1 and 22 after Phase 2, each under both Windows PowerShell 5.1 and PowerShell 7; `ruff check --isolated` (ruff 0.15.11) clean on this plan's Python files; all four edited scripts parse with zero errors in both shells; the Deployment helpers pass 26 inert checks in both shells. The combined package figure is 189 passed and 2 skipped where no `.mcp.json` exists above the checkout. Required green set, same machine and environment for all three stages: base 992 passed, 1 failed, 7 skipped; Phase 1 1,085 passed, 1 failed, 7 skipped; Phase 2 1,182 passed, 1 failed, 9 skipped (1 deselected in each). The one failure is the same test in all three stages, `scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte`, which needs a git index and fails in an archive extraction. Compared per test case: nothing new fails and no base pass stops passing. The added skips are the optional Hermes probe and the `.mcp.json` ancestry check. Dependencies were this machine's installed set (MCP 1.27.0), not a clean install. Codex reproduced revision 4's three-stage figures exactly in round 4. Nothing here has landed on any branch. The Deployment section was not executed against a live daemon.
+ 
+ **Authored:** 2026-10-02, replacing an Antigravity draft that was pasted into a session and never entered the repo.
+ 
+@@ -33,8 +34,8 @@
+ 6. v0.1 rows load, v0.1 callers see the same rows, and v0.1 code can read a v0.2 log (rollback).
+ 7. Tests write only under their own temp directory, even with an operator's environment set.
+ 8. Nothing regenerates a shared or user-wide surface as a side effect.
+-9. Room deployment and rollback touch only the room, through the existing identity checks, and every step stops on a failed precondition instead of carrying on.
+-10. The daemon scripts with no arguments (the scheduled task) do what they did before, in both phases: the optional bridge is never started that way, and the original success lines and incomplete-run exits are kept.
++9. Room deployment and rollback touch only the room, through the existing identity checks; every step stops on a failed precondition instead of carrying on; and the smoke check finds its own post in the shared log rather than counting the tail.
++10. The daemon scripts with no arguments (the scheduled task) do what they did before, in both phases: the optional bridge is never started that way, and the original success lines and incomplete-run exits are kept. One deliberate addition: after Phase 2 a no-argument stop also stops the bridge if it is running.
+ 11. The paired green-set comparison shows no new failures.
+ 
+ ## What changed from the Antigravity draft, and why
+@@ -106,12 +107,25 @@
+ 
+ Also from round 3, kept as written: the board takes its directory's permissions (now stated in the spec); a lazy first call that fails on a bad log is retried on the next call, and a live PID is not readiness, which is why Deployment requires a successful `room_state`; serving the ASGI app directly bypasses the PID guard, and the production command does not. The three environment-only base failures in Codex's sandbox (Hermes PID liveness denied, `git ls-files` in an archive) are not this plan's.
+ 
++## Review round 4 (Codex, 2026-10-04): dispositions
++
++Codex confirmed the round-3 closures, reproduced revision 4's three-stage green-set figures exactly, and found three things left.
++
++| # | Finding | Checked | Disposition in revision 5 |
++|---|---|---|---|
++| R4-01 (P2) | The smoke acceptance compared the log's tail to `$settled + 1`. That measures a counter, not the post: a post to the wrong bus passed when another agent happened to post to the shared log, and a correct post failed when a peer posted right after it. | Confirmed by reading revision 4's check; the room is a bus for concurrent agents and nothing gives the operator an exclusive window. | The smoke post carries a unique marker (`New-SmokeMarker`). `Assert-SmokeEvent <seq> <agent> <marker>` reads the shared log and requires the row with the returned `seq` to be a broadcast by that agent carrying that marker; `Get-LogRow` throws if the seq is missing or duplicated. Later rows are allowed. The startup check is now "`last_seq` at least `$settled`" plus a row comparison, not equality. Both of Codex's closure cases are in the inert checks, in both shells: wrong bus with an unrelated shared post fails; correct bus with an interleaved peer passes. Used for upgrade and for rollback. |
++| R4-02 (P2, Phase 2, present since revision 1) | The bridge parsed numbers with `int()`: `reply_to: 1.9` and `reply_to: true` became 1, so a reply silently joined another thread; `1e999` decoded to infinity and raised an uncaught `OverflowError`, which reached the A2A caller as JSON-RPC `-32603`. | Reproduced on revision 4's `room_bridge.py`: all three, plus `since_seq: 2.7` becoming 2. | `_integer()` accepts a JSON integer or a plain decimal string (the existing `"4"` form) and nothing else: no float, boolean, exponent, sign-in-string, non-ASCII digit, list or object; values beyond 2^53 are out of range; `reply_to` must be at least 1 and `since_seq` at least 0. The text form `read since=N` goes through the same helper. `limit` is still clamped to 1..100. Tests cover the parser and the real A2A HTTP path with zero room calls. |
++| R4-03 (P3) | `Assert-OnlyAction` matched the expected name as a substring, so `packages.coordination_room.server_other` passed as `...server`. | Reproduced in Windows PowerShell. | The helper takes the word after the marker and compares it exactly, case-sensitively, keeping the single-action count. A prefixed module and a suffixed PID file now fail. |
++| Editorial | "nine acceptance behaviours" was stale; "default behaviour unchanged" did not mention that a no-argument stop gains the bridge in Phase 2. | Both true. | The count is gone from the checklist line; acceptance item 10 and the additive-only constraint now state the one deliberate stop-side addition. |
++
++Codex's stated limits stand and are not claimed here: no clean dependency install, no Linux CI run, no production lifecycle rehearsal, no real `ROLLBACK_COMMIT`, no live Hermes, no load, crash or hostile-concurrency testing.
++
+ ## Global Constraints
+ 
+ - **Base branch:** `feat/coordination-room-rebased` (`4aab13e`). Not `feat/coordination-room`.
+ - **Worktree:** `C:/~shit/FLOSS/.worktrees/room-board-v1`, branch `feat/room-board-v1`. Never implement in `C:/~shit/FLOSS` itself: it is on `feat/coordination-room` with dozens of foreign dirty files.
+ - **Shells.** A ```` ```bash ```` block runs in Git Bash (`C:\Program Files\Git\bin\bash.exe`). A ```` ```powershell ```` block runs in Windows PowerShell 5.1 or PowerShell 7; the daemon scripts are tested under both. Python commands are written `env -u PYTHONPATH C:/Python313/python.exe ...`; the PowerShell form is `Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue; & C:\Python313\python.exe ...`.
+-- **Additive only.** The 21 baseline tests stay green and untouched. No existing field, tool name, or argument changes meaning. Rows written by v0.1 load unchanged. `log.py` is not modified. The daemon scripts' default behaviour (no arguments, as the scheduled task runs them) is unchanged in both phases: the same daemons (the bridge is opt-in), the same success lines, the same incomplete-run exits.
++- **Additive only.** The 21 baseline tests stay green and untouched. No existing field, tool name, or argument changes meaning. Rows written by v0.1 load unchanged. `log.py` is not modified. The daemon scripts' default behaviour (no arguments, as the scheduled task runs them) is unchanged in both phases for starting: the same daemons (the bridge is opt-in), the same success lines, the same incomplete-run exits. The no-argument stop gains one thing in Phase 2: it also stops the bridge.
+ - **Router, not controller.** The room labels evidence. It never rejects a post because of it.
+ - **Truth labels.** The word "verified" never appears in room output. `resolved` is a lookup result.
+ - **One writer per surface.** Only the process that owns the daemon slot reads room state from the log and writes `events.jsonl` and `BOARD.md`. Import, construction and a rejected start do neither. A failed `BOARD.md` write is logged to stderr and never fails the post. No code opens an existing file for writing on the board path.
+@@ -206,7 +220,7 @@
+ cp -r C:/~shit/FLOSS/docs/reviews/2026-10-02-room-board-v1 docs/reviews/
+ git add -- docs/superpowers/plans/2026-10-02-coordination-room-board-v1.md docs/reviews/2026-10-02-room-board-v1
+ git commit -F- -- docs/superpowers/plans/2026-10-02-coordination-room-board-v1.md docs/reviews/2026-10-02-room-board-v1 <<'EOF'
+-docs(plan): coordination room message board v1, revision 4 after three review rounds
++docs(plan): coordination room message board v1, revision 5 after four review rounds
+ EOF
+ ```
+ 
+@@ -2976,7 +2990,7 @@
+ 
+ **Interfaces:**
+ - Consumes: the room's MCP tools `room_broadcast`, `room_read`, `room_topics` over `http://127.0.0.1:7334/mcp`; `packages.mcp_daemon.claim_singleton`; the A2A SDK as `helloworld.py` uses it.
+-- Produces: `parse_command(raw: str) -> BoardCommand` (raises `CommandError`); `agent_id_for(sender: str) -> str` (always `a2a:` prefixed); `RoomPort` protocol (`async call(tool, arguments) -> dict`); `McpRoomPort(url)`; `build_app(host, port, room) -> Starlette`; `serve_room_bridge(host, port, room)`; `AGENT_NAME = "flossi0ullk-a2a-room-bridge"`; `DEFAULT_PORT = 7335`. Entry point: `python -m packages.a2a_mesh.room_bridge` (PID `a2a_room_bridge.pid`, env `A2A_ROOM_BRIDGE_PORT`, `COORDINATION_ROOM_URL`).
++- Produces: `parse_command(raw: str) -> BoardCommand` (raises `CommandError`; `reply_to`, `since_seq` and `limit` must be JSON integers or plain decimal strings, never floats, booleans or anything `int()` would coerce); `agent_id_for(sender: str) -> str` (always `a2a:` prefixed); `RoomPort` protocol (`async call(tool, arguments) -> dict`); `McpRoomPort(url)`; `build_app(host, port, room) -> Starlette`; `serve_room_bridge(host, port, room)`; `AGENT_NAME = "flossi0ullk-a2a-room-bridge"`; `DEFAULT_PORT = 7335`. Entry point: `python -m packages.a2a_mesh.room_bridge` (PID `a2a_room_bridge.pid`, env `A2A_ROOM_BRIDGE_PORT`, `COORDINATION_ROOM_URL`).
+ 
+ Commands accepted: `topics`; `read [#topic] [since=N]`; `post #topic text`; or one JSON object with `op` in `post` | `read` | `topics`. Failures return an artifact `error: ...` and task state `FAILED`.
+ 
+@@ -3041,6 +3055,43 @@
+ def test_json_read_limit_is_clamped():
+     assert parse_command('{"op": "read", "limit": 100000}').limit == 100
+     assert parse_command('{"op": "read", "limit": 0}').limit == 1
++    assert parse_command('{"op": "read", "limit": -5}').limit == 1
++
++
++def test_integers_and_plain_decimal_strings_are_taken_as_written():
++    cmd = parse_command('{"op": "read", "since_seq": "12", "limit": "7"}')
++    assert (cmd.since_seq, cmd.limit) == (12, 7)
++    assert parse_command('{"op": "post", "text": "x", "reply_to": 4}').reply_to == 4
++    assert parse_command('{"op": "post", "text": "x", "reply_to": null}').reply_to is None
++
++
++@pytest.mark.parametrize("field", ["reply_to", "since_seq", "limit"])
++@pytest.mark.parametrize(
++    "value",
++    ["1.9", "true", "false", "1e999", "-1e999", "NaN", "1e3", '"1.9"', '" 4"', '"4abc"', '"-4"',
++     '"٤"', "[4]", '{"n": 4}', "99999999999999999999", '"99999999999999999999"'],
++)
++def test_numbers_are_never_coerced(field: str, value: str):
++    """Review round 4, R4-02: `int()` turned 1.9 and true into 1, so a reply
++    joined another thread, and 1e999 escaped as an OverflowError."""
++    op = "post" if field == "reply_to" else "read"
++    raw = '{"op": "%s", "text": "x", "%s": %s}' % (op, field, value)
++    with pytest.raises(CommandError, match=field):
++        parse_command(raw)
++
++
++@pytest.mark.parametrize(
++    "raw",
++    [
++        '{"op": "post", "text": "x", "reply_to": 0}',
++        '{"op": "post", "text": "x", "reply_to": -3}',
++        '{"op": "read", "since_seq": -1}',
++        "read since=99999999999999999999",
++    ],
++)
++def test_out_of_range_event_numbers_are_refused(raw: str):
++    with pytest.raises(CommandError):
++        parse_command(raw)
+ 
+ 
+ @pytest.mark.parametrize(
+@@ -3190,6 +3241,23 @@
+     assert bridge.calls == []
+ 
+ 
++@pytest.mark.parametrize(
++    "command",
++    [
++        '{"op": "post", "text": "reply", "reply_to": 1.9}',
++        '{"op": "post", "text": "reply", "reply_to": true}',
++        '{"op": "post", "text": "reply", "reply_to": 1e999}',
++        '{"op": "read", "since_seq": 2.7}',
++    ],
++)
++def test_malformed_numbers_get_the_normal_error_and_make_no_room_call(bridge: FakeRoom, command: str):
++    """Review round 4, R4-02, over the real A2A HTTP path: no silent truncation
++    to another event, and no internal error leaking out as JSON-RPC -32603."""
++    reply = _send(command)
++    assert reply.startswith("error: ") and "must be an integer" in reply
++    assert bridge.calls == []
++
++
+ def test_room_error_is_reported_as_error_not_success(bridge: FakeRoom):
+     bridge.reply = {"ok": False, "error": "topic must match [a-z0-9][a-z0-9_-]{0,31}"}
+     assert _send("post #claims hi").startswith("error: topic must match")
+@@ -3383,6 +3451,9 @@
+ DEFAULT_READ_LIMIT = 20
+ READ_LIMIT_MAX = 100
+ SENDER_MAX = 32
++INTEGER_MAX = 2**53  # the largest integer every JSON implementation carries exactly
++
++_DIGITS = re.compile(r"[0-9]{1,16}")
+ 
+ _TOPIC = r"[a-z0-9][a-z0-9_-]{0,31}"
+ _POST = re.compile(rf"post\s+#(?P<topic>{_TOPIC})\s+(?P<text>.+)", re.S)
+@@ -3421,6 +3492,24 @@
+     return f"a2a:{clean or 'anonymous'}"
+ 
+ 
++def _integer(value: Any, name: str) -> int:
++    """A JSON integer, or a plain decimal string. Never converted from anything else.
++
++    `int()` would turn 1.9 and true into 1, so a reply would silently join
++    another thread, and it raises OverflowError on 1e999 (which JSON decodes
++    to infinity). An event number is taken as written or refused.
++    """
++    if isinstance(value, bool) or not isinstance(value, (int, str)):
++        raise CommandError(f"{name} must be an integer")
++    if isinstance(value, str):
++        if not _DIGITS.fullmatch(value):
++            raise CommandError(f"{name} must be an integer")
++        value = int(value)
++    if abs(value) > INTEGER_MAX:
++        raise CommandError(f"{name} is out of range")
++    return value
++
++
+ def _parse_json(body: str) -> BoardCommand:
+     try:
+         obj = json.loads(body)
+@@ -3431,12 +3520,13 @@
+     refs = obj.get("evidence_refs") or []
+     if not isinstance(refs, list) or not all(isinstance(r, str) for r in refs):
+         raise CommandError("evidence_refs must be a list of strings")
+-    try:
+-        reply_to = int(obj["reply_to"]) if obj.get("reply_to") is not None else None
+-        since_seq = int(obj.get("since_seq", 0))
+-        limit = int(obj.get("limit", DEFAULT_READ_LIMIT))
+-    except (TypeError, ValueError) as exc:
+-        raise CommandError("reply_to, since_seq and limit must be integers") from exc
++    reply_to = None if obj.get("reply_to") is None else _integer(obj["reply_to"], "reply_to")
++    since_seq = _integer(obj.get("since_seq", 0), "since_seq")
++    limit = _integer(obj.get("limit", DEFAULT_READ_LIMIT), "limit")
++    if reply_to is not None and reply_to < 1:
++        raise CommandError("reply_to must be at least 1")
++    if since_seq < 0:
++        raise CommandError("since_seq must not be negative")
+     topic, text, sender = obj.get("topic"), obj.get("text", ""), obj.get("sender", "anonymous")
+     if topic is not None and not isinstance(topic, str):
+         raise CommandError("topic must be a string")
+@@ -3471,7 +3561,9 @@
+     match = _READ.fullmatch(body)
+     if match:
+         return BoardCommand(
+-            op="read", topic=match["topic"], since_seq=int(match["since"] or 0)
++            op="read",
++            topic=match["topic"],
++            since_seq=_integer(match["since"] or "0", "since_seq"),
+         )
+     raise CommandError(USAGE)
+ 
+@@ -3633,7 +3725,7 @@
+ env -u PYTHONPATH C:/Python313/python.exe -m pytest -q packages/coordination_room/tests packages/a2a_mesh/tests
+ ```
+ 
+-Expected: no failures; measured `133 passed, 1 skipped` (`132 passed, 2 skipped` where no `.mcp.json` exists above the checkout). The e2e test starts a real FastMCP room and the bridge in-process on scratch ports and takes about 10 seconds.
++Expected: no failures; measured `190 passed, 1 skipped` (`189 passed, 2 skipped` where no `.mcp.json` exists above the checkout). The e2e test starts a real FastMCP room and the bridge in-process on scratch ports and takes about 10 seconds.
+ 
+ - [ ] **Step 5: Lint.**
+ 
+@@ -3865,14 +3957,14 @@
+   Criterion: no new failures versus the base. Run the base in a clean worktree of `feat/coordination-room-rebased`. The authoring run for revision 4 is under Truth status at the top; any later change to this plan needs its own paired run.
+ - [ ] `ruff check --isolated packages/coordination_room packages/a2a_mesh/room_bridge.py packages/a2a_mesh/tests/test_room_bridge_*.py scripts/tests/test_daemon_scope.py` clean. (`packages/a2a_mesh/tests/test_helloworld_pair.py` already carries one unused `import pytest` from the merged branch; leave it, it is not this plan's file.)
+ - [ ] `spec_gate.py --check`: the same three findings as Task 0, no new ones.
+-- [ ] Each of the nine acceptance behaviours at the top has a named passing test or a recorded observation.
++- [ ] Each acceptance behaviour listed at the top has a named passing test or a recorded observation.
+ - [ ] Open the PR from `feat/room-board-v1`, with `ROLLBACK_COMMIT` in its description. Do not merge into `feat/coordination-room`. The PR does not authorize deployment.
+ 
+ ---
+ 
+ ## Deployment (operator-gated, separate from the tasks)
+ 
+-⚠️ Specified, not executed. The room daemon was down in the authoring session and nothing below was run against a live daemon. What was tested: the `-Only` selector (Task 2, dry-run and stand-in interpreters) and the helper block below (14 inert checks in Windows PowerShell 5.1 and PowerShell 7: fake checkouts, a scratch port, a scratch git repository). Each run needs its own operator go-ahead; the Task 0 waiver and a merged PR do not cover it.
++⚠️ Specified, not executed. The room daemon was down in the authoring session and nothing below was run against a live daemon. What was tested: the `-Only` selector (Task 2, dry-run and stand-in interpreters) and the helper block below (26 inert checks in Windows PowerShell 5.1 and PowerShell 7: fake checkouts, a scratch port, a scratch log, a scratch git repository). Each run needs its own operator go-ahead; the Task 0 waiver and a merged PR do not cover it.
+ 
+ Run every block in **one** PowerShell session (5.1 or 7), in order. The helper block sets `$ErrorActionPreference = 'Stop'` and every helper throws on a failed precondition, so a block stops at the first failure. If anything throws, stop there: read the message, do not run the next block, and do not work around it by hand.
+ 
+@@ -3907,11 +3999,15 @@
+ }
+ 
+ function Assert-OnlyAction {
+-    # A dry run's output must name exactly one action, and the expected one.
++    # A dry run's output must name exactly one action, and its target (the word
++    # after the marker: a module or a PID file) must be exactly the expected
++    # name. `...server_other` is not `...server`.
+     param([string]$Output, [string]$Marker, [string]$Expected)
+-    $lines = @($Output -split "`r?`n" | Where-Object { $_ -match $Marker })
+-    if ($lines.Count -ne 1 -or $lines[0] -notmatch [regex]::Escape($Expected)) {
+-        throw "Expected exactly one $Marker for $Expected, got: $($lines -join ' | ')"
++    $targets = @($Output -split "`r?`n" | ForEach-Object {
++        if ($_ -cmatch "$Marker\s+(\S+)") { $Matches[1] }
++    })
++    if ($targets.Count -ne 1 -or $targets[0] -cne $Expected) {
++        throw "Expected exactly one $Marker for $Expected, got: $($targets -join ' | ')"
+     }
+ }
+ 
+@@ -3935,10 +4031,41 @@
+ 
+ function Get-SettledSeq {
+     # The last seq in the shared log. Read it only after the previous owner has
+-    # stopped: before that, it can still append.
+-    $last = Get-Content $log -Tail 1
++    # stopped: before that, it can still append. Once a room is serving again,
++    # other agents may append at any time, so this is a lower bound from then
++    # on, never something to compare a later tail against.
++    $last = Get-Content $log -Tail 1 -Encoding UTF8
+     if (-not $last) { return 0 }
+     return [int](ConvertFrom-Json $last).seq
++}
++
++function Get-LogRow {
++    # The one row of the shared log with this seq. Throws if it is missing or
++    # if the seq appears more than once.
++    param([int]$Seq)
++    $rows = @(Get-Content $log -Encoding UTF8 |
++        Where-Object { $_.Trim() } |
++        ForEach-Object { ConvertFrom-Json $_ } |
++        Where-Object { $_.seq -eq $Seq })
++    if ($rows.Count -ne 1) { throw "seq $Seq appears $($rows.Count) times in $log. Stop here." }
++    return $rows[0]
++}
++
++function New-SmokeMarker {
++    # A text no other post will contain.
++    return "deploy-smoke-$([guid]::NewGuid().ToString('N'))"
++}
++
++function Assert-SmokeEvent {
++    # Proves one specific post reached the shared log: the row with the seq the
++    # room returned must be a broadcast by this agent carrying this marker.
++    # Counting the tail cannot prove that: another agent's post moves the tail
++    # too. Rows other agents add before or after this one are fine.
++    param([int]$Seq, [string]$Agent, [string]$Marker)
++    $row = Get-LogRow $Seq
++    if ($row.type -cne 'broadcast' -or $row.agent_id -cne $Agent -or "$($row.text)" -notlike "*$Marker*") {
++        throw "seq $Seq in $log is not the smoke post by $Agent ($Marker). The room that answered is not writing the shared log. Stop here."
++    }
+ }
+ 
+ function Assert-PinnedLog {
+@@ -4014,15 +4141,28 @@
+ 
+ A live process is not yet a working room: the room is built on its first tool call. Step 5 is that call.
+ 
+-**5. Assert the bus before any post (v0.2).** From an MCP client, call `room_state()`. It must succeed, and, in this order: `log` is `$log`; `board` is `BOARD.md` in the same directory; `root` is `$serve`; `last_seq` equals `$settled`. If any check fails, stop and roll back. An MCP client that connected before the restart may need to reconnect.
+-
+-**6. Smoke.** `room_broadcast` with `topic="announcements"` and `evidence_refs=["file:docs/specs/coordination-room.spec.md"]`. Expected: `"evidence_status": "resolved"` and `seq` equal to `$settled + 1`; then:
+-
+-```powershell
+-if ((Get-SettledSeq) -ne $settled + 1) { throw 'The post did not land at the tail of the shared log. Roll back.' }
+-```
+-
+-`BOARD.md` then shows the post under `### #announcements` with an `As of` line from the same minute.
++**5. Assert the bus before any post (v0.2).** From an MCP client, call `room_state()`. It must succeed, and, in this order: `log` is `$log`; `board` is `BOARD.md` in the same directory; `root` is `$serve`; `last_seq` is at least `$settled`. Not "equal": the room is serving again, and other agents may already have posted. If `$settled` is above 0, also call `room_read(since_seq=<$settled minus 1>, limit=1)` and compare its one row with the log's own:
++
++```powershell
++Get-LogRow $settled | ConvertTo-Json -Compress
++```
++
++Same `seq`, `ts`, `type` and `agent_id`: the room replayed this log. If any check fails, stop and roll back. An MCP client that connected before the restart may need to reconnect.
++
++**6. Smoke: prove your own post is in the shared log.** A moved tail proves nothing here, because another agent's post moves it too.
++
++```powershell
++$marker = New-SmokeMarker
++$marker
++```
++
++From the MCP client: `room_broadcast(agent_id="deploy-smoke", text="<the marker>", topic="announcements", evidence_refs=["file:docs/specs/coordination-room.spec.md"])`. Expected: `"evidence_status": "resolved"` and a `seq`. Put that `seq` in:
++
++```powershell
++Assert-SmokeEvent <seq from the reply> 'deploy-smoke' $marker
++```
++
++It passes only if the shared log's row with that `seq` is a broadcast by `deploy-smoke` carrying the marker; rows other agents add before or after are fine. If it throws, the room that answered is not writing the shared log: roll back. `BOARD.md` then shows the post under `### #announcements` with an `As of` line from the same minute.
+ 
+ **Bridge (Phase 2 only).** Start it alone, after the room. It is never started by a no-argument start.
+ 
+@@ -4094,13 +4234,20 @@
+ EOF
+ ```
+ 
+-`room_state()` must succeed and report that same `last_seq` (equal to `$settled`) and those same `claims`. Then `room_broadcast` a one-line note ("rolled back to v0.1") and run:
+-
+-```powershell
+-if ((Get-SettledSeq) -ne $settled + 1) { throw 'The v0.1 room did not write the shared log. Stop and investigate.' }
+-```
+-
+-That proves the v0.1 daemon writes the shared log, which is the one check v0.1 can pass and a separate bus cannot. v0.1 code was run against a log written by this plan's code and replayed its claims, read every row and continued the sequence; Codex saw the same in rounds 2 and 3.
++`room_state()` must succeed, report a `last_seq` of at least `$settled`, and the same `claims`. If another agent posted or claimed between the two readings, run both again; a difference that persists means stop. Then post a marked note and prove it landed:
++
++```powershell
++$marker = New-SmokeMarker
++$marker
++```
++
++From the MCP client: `room_broadcast(agent_id="deploy-smoke", text="rolled back to v0.1 <the marker>")` (v0.1 takes only those two arguments). Put the `seq` from its reply in:
++
++```powershell
++Assert-SmokeEvent <seq from the reply> 'deploy-smoke' $marker
++```
++
++That proves this exact post is in the shared log, which a v0.1 room on a separate bus cannot produce, whatever other agents post meanwhile. v0.1 cannot report its paths, so this is its bus check. v0.1 code was run against a log written by this plan's code and replayed its claims, read every row and continued the sequence; Codex saw the same in rounds 2 and 3.
+ 
+ ## Decisions left to the operator
+ 
+@@ -4117,6 +4264,7 @@
+ 
+ - **Draft coverage.** `log.py` fields to `**fields` on the existing `EventLog.append` (no edit needed); `board.py` to Task 4; `room.py`/`gateway.py`/`server.py` to Tasks 5 and 6; spec/schema to Task 1; daemon scripts to Tasks 2 and 9; `a2a_mesh` port to Task 7; `room_bridge.py` to Task 8; topics, evidence refs, thread ids, intent, roster, auto-updating board each have a test. The draft's `message_type`, `room_post`, `[VERIFIED]`, `:9900` and `limit=50` are deliberately not implemented.
+ - **Review coverage.** B1: constraint, Task 6 Step 6, Task 9 Step 6. B2 and I1: `test_construction_writes_no_board`, `test_import_touches_nothing_and_builds_no_room`, `test_rejected_duplicate_start_leaves_board_and_log_untouched`, `test_room_state_is_loaded_by_the_owner_not_at_import`. B3: spec "Claim unit", `test_claims_are_labelled_advisory_not_authorization`, Task 0 Step 1. B4: `test_server_http.py`, `test_state_names_the_bus_it_serves`, the start script's printed log path. B5 and R2-01: `test_board_path_that_is_the_log_is_refused_before_any_write`, `test_board_hard_linked_to_the_log_is_refused`, `test_hard_link_to_the_log_at_the_old_staging_name_survives_posts`, `test_a_hard_link_at_the_old_staging_name_is_never_opened`, `test_a_board_replaced_by_a_hard_link_to_the_log_loses_only_its_name`, `test_board_override_that_is_the_log_stops_the_import`, the fixtures, Task 6 Step 8. B6: `test_label_describes_the_lookup_and_says_when_it_ran`, the digest and oid tests. B7: `test_board_states_its_as_of_time_and_seq`, `test_same_log_rendered_after_an_idle_day_drops_the_roster_and_says_when`. R2-02 and R2-03: `scripts/tests/test_daemon_scope.py` (dry-run and real-mode selection, records of other daemons untouched), Deployment steps 2 to 4. R2-04: Deployment rollback steps.
++- **Round 4 coverage.** R4-01: `Assert-SmokeEvent` and `Get-LogRow` in the Deployment helpers; inert checks `wrong-bus-throws`, `interleaved-peer-passes`, `wrong-agent-throws`, `wrong-marker-throws`, `missing-seq-throws`, `duplicate-seq-throws`, in both shells. R4-02: `test_numbers_are_never_coerced`, `test_out_of_range_event_numbers_are_refused`, `test_integers_and_plain_decimal_strings_are_taken_as_written`, and over HTTP `test_malformed_numbers_get_the_normal_error_and_make_no_room_call`. R4-03: inert checks `prefixed-module-throws`, `suffixed-pid-throws`, `exact-module-passes`.
+ - **Round 3 coverage.** R3-01: unchanged `packages/tests/test_mcp_daemon.py` passing, `test_real_stop_with_no_arguments_keeps_its_original_success_line`, `test_real_start_only_room_attempts_only_the_room` (no false success), the paired green set. R3-02: `test_board_directory_re_pointed_at_the_log_after_startup_is_refused`. R3-03: the Deployment helper block and its inert checks. R3-04: the `<2` bound. R3-05: `test_bridge_is_opt_in_for_start_but_stopped_by_a_full_stop`.
+ - **Placeholders.** None in code: every file body and every edit pair is generated from files that were executed. The two `<paste verbatim>` markers and `<ROLLBACK_COMMIT>` are values that do not exist until execution.
+ - **Type consistency.** `board_path`, `check_board_path`, `evidence_status`, `evidence_checked`, `evidence_checked_at`, `thread_id`, `reply_to`, `topic_of`, `resolve_all`, `_tools`, `_tools_instance` and `agent_id_for` are spelled identically across tasks, the schema, and the tests.

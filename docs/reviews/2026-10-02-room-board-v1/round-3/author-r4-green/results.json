@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "exit": 1,
+    "summary": "1 failed, 992 passed, 7 skipped, 1 deselected, 1 warning in 71.64s (0:01:11)",
+    "failed": [
+      "FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte"
+    ]
+  },
+  "phase1": {
+    "exit": 1,
+    "summary": "1 failed, 1085 passed, 7 skipped, 1 deselected, 2 warnings in 100.91s (0:01:40)",
+    "failed": [
+      "FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte"
+    ]
+  },
+  "proposal": {
+    "exit": 1,
+    "summary": "1 failed, 1125 passed, 9 skipped, 1 deselected, 102 warnings in 122.99s (0:02:02)",
+    "failed": [
+      "FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte"
+    ]
+  }
+}

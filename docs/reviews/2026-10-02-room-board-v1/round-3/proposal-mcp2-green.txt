@@ -1,0 +1,491 @@
+..ss.F.................................................................. [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 19%]
+..............ss...ss................................................... [ 25%]
+......................................FF....F........................... [ 31%]
+........................................................................ [ 38%]
+........................................................................ [ 44%]
+........................................................................ [ 50%]
+........................................................................ [ 57%]
+.........FFF............................................................ [ 63%]
+..............................................................sss....... [ 70%]
+................................F....................................... [ 76%]
+........................................................................ [ 82%]
+........................................................................ [ 89%]
+.....F.................................................................. [ 95%]
+..........................................F.......                       [100%]
+================================== FAILURES ===================================
+____________________ test_a2a_post_lands_on_the_room_board ____________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_a2a_post_lands_on_the_roo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001C48757B6F0>
+
+    def test_a2a_post_lands_on_the_room_board(tmp_path: Path, monkeypatch):
+        # Cleared, not inherited: an operator's board override must never be written to.
+        for name in ("COORDINATION_ROOM_BOARD", "FLOSS_AGENT_DIR"):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("COORDINATION_ROOM_ROOT", str(tmp_path))
+        monkeypatch.setenv("COORDINATION_ROOM_LOG", str(tmp_path / "rooms" / "events.jsonl"))
+        monkeypatch.setenv("FLOSS_AUDIT_DIR", str(tmp_path / "audit"))
+        import packages.coordination_room.server as module
+    
+        room_server = importlib.reload(module)
+>       room_srv, room_thread = _serve(room_server.mcp.streamable_http_app(), ROOM_PORT)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'streamable_http_app'
+
+packages\a2a_mesh\tests\test_room_bridge_e2e.py:51: AttributeError
+_______________________ test_board_round_trip_over_http _______________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_board_round_trip_over_htt0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001C487C59C50>
+
+    def test_board_round_trip_over_http(tmp_path: Path, monkeypatch):
+        for name in ("COORDINATION_ROOM_BOARD", "FLOSS_AGENT_DIR"):
+            monkeypatch.delenv(name, raising=False)
+        log = tmp_path / "rooms" / "events.jsonl"
+        monkeypatch.setenv("COORDINATION_ROOM_ROOT", str(tmp_path))
+        monkeypatch.setenv("COORDINATION_ROOM_LOG", str(log))
+        monkeypatch.setenv("FLOSS_AUDIT_DIR", str(tmp_path / "audit"))
+        (tmp_path / "proof.md").write_text("x", encoding="utf-8")
+        import packages.coordination_room.server as module
+    
+        room = importlib.reload(module)
+        server = uvicorn.Server(
+>           uvicorn.Config(room.mcp.streamable_http_app(), host=HOST, port=PORT, log_level="warning")
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        )
+E       AttributeError: 'NoneType' object has no attribute 'streamable_http_app'
+
+packages\coordination_room\tests\test_server_http.py:59: AttributeError
+____________ test_board_tools_are_registered_with_their_parameters ____________
+
+server = <module 'packages.coordination_room.server' from 'C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\proposal\\packages\\coordination_room\\server.py'>
+
+    def test_board_tools_are_registered_with_their_parameters(server):
+>       tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
+                                                ^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'list_tools'
+
+packages\coordination_room\tests\test_server_tools.py:56: AttributeError
+________ test_rejected_duplicate_start_leaves_board_and_log_untouched _________
+
+server = <module 'packages.coordination_room.server' from 'C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\proposal\\packages\\coordination_room\\server.py'>
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_rejected_duplicate_start_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001C487C5A190>
+
+    def test_rejected_duplicate_start_leaves_board_and_log_untouched(server, tmp_path, monkeypatch):
+        """A second `python -m packages.coordination_room.server` builds its room,
+        then loses the PID guard. Nothing durable may change in between."""
+        server.room_broadcast(agent_id="owner", text="seed")
+        log = tmp_path / "rooms" / "events.jsonl"
+        board = tmp_path / "rooms" / "BOARD.md"
+        before = (log.read_bytes(), board.read_bytes(), board.stat().st_mtime_ns)
+    
+        import packages.mcp_daemon as daemon
+    
+        monkeypatch.setattr(daemon, "claim_singleton", lambda pid_filename: False)
+        monkeypatch.chdir(tmp_path)
+        with warnings.catch_warnings(), pytest.raises(SystemExit) as stopped:
+            # runpy notes the module is already imported; that is the point here.
+            warnings.simplefilter("ignore", RuntimeWarning)
+>           runpy.run_module("packages.coordination_room.server", run_name="__main__")
+
+C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\fixtures-exact\proposal\packages\coordination_room\tests\test_server_tools.py:115: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<frozen runpy>:229: in run_module
+    ???
+<frozen runpy>:88: in _run_code
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    """FastMCP server for the coordination room.
+    
+    Router, not controller. File claims + append-only log. Binds 127.0.0.1:7334.
+    
+    Usage:
+        python -m packages.coordination_room.server
+    """
+    
+    from __future__ import annotations
+    
+    import os
+    import threading
+    from pathlib import Path
+    
+    from packages.coordination_room.gateway import CoordinationRoomTools
+    from packages.coordination_room.room import check_board_path
+    
+    _THIS_DIR = Path(__file__).resolve().parent
+    _REPO_ROOT = _THIS_DIR.parent.parent
+    _WORKSPACE_ROOT = _REPO_ROOT.parent
+    
+    
+    def _room_root() -> Path:
+        override = os.environ.get("COORDINATION_ROOM_ROOT")
+        return Path(override).expanduser() if override else _REPO_ROOT
+    
+    
+    def _log_path() -> Path:
+        override = os.environ.get("COORDINATION_ROOM_LOG")
+        if override:
+            return Path(override).expanduser()
+        return _WORKSPACE_ROOT / ".agent-surface" / "rooms" / "default" / "events.jsonl"
+    
+    
+    def _board_path() -> Path:
+        override = os.environ.get("COORDINATION_ROOM_BOARD")
+        if override:
+            return Path(override).expanduser()
+        return _log_path().parent / "BOARD.md"
+    
+    
+    def _audit_sink_path(filename: str) -> str:
+        override = os.environ.get("FLOSS_AUDIT_DIR")
+        base = (
+            Path(override).expanduser()
+            if override
+            else _WORKSPACE_ROOT / ".agent-surface" / "heartbeat"
+        )
+        return str(base / filename)
+    
+    
+    # A board path that would overwrite the log stops the daemon here, before it
+    # serves anything. This is a path check only: nothing is opened or created.
+    check_board_path(_log_path(), _board_path())
+    
+    _tools_instance: CoordinationRoomTools | None = None
+    _tools_lock = threading.Lock()
+    
+    
+    def _tools() -> CoordinationRoomTools:
+        """The room, built on the first tool call rather than at import.
+    
+        A tool call can only arrive after run_http_daemon has won the PID slot, and
+        the slot is only won once any previous owner has exited. So the log is
+        replayed, the seq counter cached and the claim table rebuilt by the owner,
+        from a log nobody else is still appending to. Building the room at import
+        let a starting daemon cache a seq that the exiting one then reused, and
+        grant a path the exiting one had just claimed.
+        """
+        global _tools_instance
+        with _tools_lock:
+            if _tools_instance is None:
+                _tools_instance = CoordinationRoomTools(
+                    root=_room_root(), log_path=_log_path(), board_path=_board_path()
+                )
+            return _tools_instance
+    
+    
+    _SERVER_INSTRUCTIONS = (
+        "FLOSSI0ULLK coordination room. Router, not controller. "
+        "Claim a file path before writing it. Second claim on a held path is a "
+        "system conflict, not a chat parse. A room claim is a coordination "
+        "convention, not write authorization. Broadcast is append-only and may carry "
+        "a topic, a reply_to, and evidence_refs (file:<path> or commit:<sha>); "
+        "evidence is labelled resolved or unresolved by a lookup, never verified. "
+        "BOARD.md is a generated view of the log. room_state names the root, log "
+        "and board this room serves. "
+        "Does not write workspace files. No pycrdt in v0."
+    )
+    
+    
+    def room_claim(agent_id: str, path: str, intent: str = "") -> str:
+        """Exclusive claim on a room-root-relative file path. Optional short intent."""
+        return _tools().room_claim(agent_id=agent_id, path=path, intent=intent)
+    
+    
+    def room_release(agent_id: str, path: str) -> str:
+        """Release a path you hold."""
+        return _tools().room_release(agent_id=agent_id, path=path)
+    
+    
+    def room_broadcast(
+        agent_id: str,
+        text: str,
+        topic: str | None = None,
+        evidence_refs: list[str] | None = None,
+        reply_to: int | None = None,
+    ) -> str:
+        """Append a note to the room log. Does not require a claim.
+    
+        topic: lowercase slug, default general (suggested: announcements, claims,
+        inquiries, general). reply_to: seq of an earlier broadcast; the reply joins
+        its topic and thread. evidence_refs: file:<path> or commit:<sha>; labelled
+        resolved or unresolved, the post is admitted either way.
+        """
+        return _tools().room_broadcast(
+            agent_id=agent_id,
+            text=text,
+            topic=topic,
+            evidence_refs=evidence_refs,
+            reply_to=reply_to,
+        )
+    
+    
+    def room_read(
+        since_seq: int = 0,
+        topic: str | None = None,
+        thread_id: int | None = None,
+        limit: int = 0,
+    ) -> str:
+        """Read log events with seq > since_seq, oldest first. limit 0 means all."""
+        return _tools().room_read(
+            since_seq=since_seq, topic=topic, thread_id=thread_id, limit=limit
+        )
+    
+    
+    def room_topics() -> str:
+        """Topics in use with counts, plus the suggested defaults."""
+        return _tools().room_topics()
+    
+    
+    def room_state() -> str:
+        """Current claims, last seq, speakers, and the root, log and board paths served."""
+        return _tools().room_state()
+    
+    
+    _AUDIT_SINK = _audit_sink_path("janus-coordination-room-audit.jsonl")
+    
+    
+    def _create_mcp():
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError:
+            return None
+    
+        app = FastMCP(
+            "FLOSSI0ULLK Coordination Room",
+            instructions=_SERVER_INSTRUCTIONS,
+        )
+        from packages.mcp_daemon import register_audited_tools
+    
+        register_audited_tools(
+            app,
+            (
+                room_claim,
+                room_release,
+                room_broadcast,
+                room_read,
+                room_topics,
+                room_state,
+            ),
+            _AUDIT_SINK,
+        )
+        return app
+    
+    
+    mcp = _create_mcp()
+    
+    
+    if __name__ == "__main__":
+        if mcp is None:
+>           raise ImportError("MCP SDK not installed. Run: pip install mcp")
+E           ImportError: MCP SDK not installed. Run: pip install mcp
+
+C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\fixtures-exact\proposal\packages\coordination_room\server.py:182: ImportError
+_________________ test_a_clean_shutdown_still_reports_success _________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_a_clean_shutdown_still_re0')
+
+    def test_a_clean_shutdown_still_reports_success(tmp_path):
+        """The guard must narrow to genuine leftovers, not fail every run."""
+        agent_dir = tmp_path / "agent"
+        agent_dir.mkdir()
+    
+        result = _run_stop_script(agent_dir)
+    
+        assert result.returncode == 0, result.stdout[-500:]
+>       assert "All daemons stopped" in result.stdout
+E       AssertionError: assert 'All daemons stopped' in '[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing\n[FLOSS MCP] Stopped: consensus, ensemble, room, bridge, omniroute. PID files cleaned.\n'
+E        +  where '[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing\n[FLOSS MCP] Stopped: consensus, ensemble, room, bridge, omniroute. PID files cleaned.\n' = CompletedProcess(args=['C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE', '-NoProfile', '-ExecutionPoli... FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand\n \n').stdout
+
+packages\tests\test_mcp_daemon.py:875: AssertionError
+_ test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host "[FLOSS MCP] Daemons started (consensus] _
+
+script = 'start_mcp_daemons.ps1', collector = '$skipped'
+banner = 'STARTUP INCOMPLETE'
+success = 'Write-Host "[FLOSS MCP] Daemons started (consensus'
+
+    @pytest.mark.parametrize(
+        "script,collector,banner,success",
+        [
+            (
+                "start_mcp_daemons.ps1",
+                "$skipped",
+                "STARTUP INCOMPLETE",
+                'Write-Host "[FLOSS MCP] Daemons started (consensus',
+            ),
+            (
+                "stop_mcp_daemons.ps1",
+                "$unresolved",
+                "SHUTDOWN INCOMPLETE",
+                'Write-Host "[FLOSS MCP] All daemons stopped',
+            ),
+        ],
+    )
+    def test_no_script_claims_success_it_did_not_achieve(
+        script, collector, banner, success
+    ):
+        """Both scripts deliberately decline to act in several branches, and both
+        then reported a clean run regardless. Fixed in stop first; the start script
+        was the unswept sibling. Asserted as a property over both so the next
+        script with a closing summary is covered before a reviewer finds it.
+    
+        Structural rather than behavioural for the start script specifically:
+        running it launches real daemons, which a test must not do.
+        """
+        text = (SCRIPTS / script).read_text(encoding="utf-8")
+    
+        assert f"{collector} = @()" in text, "collector must be an explicit array"
+        assert f"{collector} +=" in text, "nothing ever records a declined action"
+        assert f"{collector}.Count -gt 0" in text, "the summary is unguarded"
+    
+        guard_at = text.find(f"{collector}.Count -gt 0")
+        success_at = text.find(success)
+        # The EMITTING STATEMENT, not the first mention: both files explain their
+        # own summaries in comments above the code, and matching the prose made an
+        # earlier version of this test compare a comment against the guard.
+>       assert success_at != -1, "the success line has moved"
+E       AssertionError: the success line has moved
+E       assert -1 != -1
+
+packages\tests\test_mcp_daemon.py:918: AssertionError
+_ test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host "[FLOSS MCP] All daemons stopped] _
+
+script = 'stop_mcp_daemons.ps1', collector = '$unresolved'
+banner = 'SHUTDOWN INCOMPLETE'
+success = 'Write-Host "[FLOSS MCP] All daemons stopped'
+
+    @pytest.mark.parametrize(
+        "script,collector,banner,success",
+        [
+            (
+                "start_mcp_daemons.ps1",
+                "$skipped",
+                "STARTUP INCOMPLETE",
+                'Write-Host "[FLOSS MCP] Daemons started (consensus',
+            ),
+            (
+                "stop_mcp_daemons.ps1",
+                "$unresolved",
+                "SHUTDOWN INCOMPLETE",
+                'Write-Host "[FLOSS MCP] All daemons stopped',
+            ),
+        ],
+    )
+    def test_no_script_claims_success_it_did_not_achieve(
+        script, collector, banner, success
+    ):
+        """Both scripts deliberately decline to act in several branches, and both
+        then reported a clean run regardless. Fixed in stop first; the start script
+        was the unswept sibling. Asserted as a property over both so the next
+        script with a closing summary is covered before a reviewer finds it.
+    
+        Structural rather than behavioural for the start script specifically:
+        running it launches real daemons, which a test must not do.
+        """
+        text = (SCRIPTS / script).read_text(encoding="utf-8")
+    
+        assert f"{collector} = @()" in text, "collector must be an explicit array"
+        assert f"{collector} +=" in text, "nothing ever records a declined action"
+        assert f"{collector}.Count -gt 0" in text, "the summary is unguarded"
+    
+        guard_at = text.find(f"{collector}.Count -gt 0")
+        success_at = text.find(success)
+        # The EMITTING STATEMENT, not the first mention: both files explain their
+        # own summaries in comments above the code, and matching the prose made an
+        # earlier version of this test compare a comment against the guard.
+>       assert success_at != -1, "the success line has moved"
+E       AssertionError: the success line has moved
+E       assert -1 != -1
+
+packages\tests\test_mcp_daemon.py:918: AssertionError
+_________________ test_hermes_gateway_alive_detects_dead_pid __________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_hermes_gateway_alive_dete0')
+
+    def test_hermes_gateway_alive_detects_dead_pid(tmp_path):
+        (tmp_path / "gateway.pid").write_text(
+            json.dumps({"pid": 999999, "kind": "hermes-gateway"}), encoding="utf-8"
+        )
+>       assert mas.hermes_gateway_alive(tmp_path) is None
+E       AssertionError: assert 999999 is None
+E        +  where 999999 = <function hermes_gateway_alive at 0x000001C4863B3600>(WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_hermes_gateway_alive_dete0'))
+E        +    where <function hermes_gateway_alive at 0x000001C4863B3600> = mas.hermes_gateway_alive
+
+tests\test_shared_agent_surface_mcp.py:473: AssertionError
+______________ test_yaml_target_writes_when_gateway_pid_is_stale ______________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-2/test_yaml_target_writes_when_g0')
+
+    def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
+        """A `gateway.pid` naming a process that is no longer running must NOT
+        block the write -- only an actually-live gateway is a clobber risk.
+        """
+        pytest.importorskip("ruamel.yaml")
+        surface = load_hook_surface_module()
+    
+        hermes_dir = tmp_path / "hermes"
+        hermes_dir.mkdir()
+        config_path = hermes_dir / "config.yaml"
+        fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+        config_path.write_text(fixture_text, encoding="utf-8")
+        # An implausibly large PID: on Windows, `tasklist /FI "PID eq N"` for a
+        # nonexistent PID returns a non-empty "no tasks match" message (not an
+        # error and not empty output), which `_pid_alive` correctly reads as
+        # "not alive" rather than failing closed.
+        (hermes_dir / "gateway.pid").write_text(
+            json.dumps({"pid": 99999999}), encoding="utf-8"
+        )
+    
+        message, changed = surface.apply_yaml_target(
+            config_path, _hermes_target_cfg(), check=False, dry_run=False
+        )
+    
+>       assert "WROTE" in message
+E       AssertionError: assert 'WROTE' in 'REFUSED C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\tmp\\pytest-of-kalis\\pytest-2\\...hen_g0\\hermes\\config.yaml (gateway PID 99999999 is live; stop it and re-run, or the config is clobbered on shutdown)'
+
+scripts\tests\test_shared_hook_surface.py:1000: AssertionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\review-venv\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 4 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 28 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\a2a\utils\proto_utils.py:303: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    errors = _validate_proto_required_fields_internal(msg)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 6 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 42 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\a2a\utils\proto_utils.py:263: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(val)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 2 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 14 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\a2a\utils\proto_utils.py:272: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(item)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED packages/a2a_mesh/tests/test_room_bridge_e2e.py::test_a2a_post_lands_on_the_room_board
+FAILED packages/coordination_room/tests/test_server_http.py::test_board_round_trip_over_http
+FAILED packages/coordination_room/tests/test_server_tools.py::test_board_tools_are_registered_with_their_parameters
+FAILED packages/coordination_room/tests/test_server_tools.py::test_rejected_duplicate_start_leaves_board_and_log_untouched
+FAILED packages/tests/test_mcp_daemon.py::test_a_clean_shutdown_still_reports_success
+FAILED packages/tests/test_mcp_daemon.py::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host "[FLOSS MCP] Daemons started (consensus]
+FAILED packages/tests/test_mcp_daemon.py::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host "[FLOSS MCP] All daemons stopped]
+FAILED tests/test_shared_agent_surface_mcp.py::test_hermes_gateway_alive_detects_dead_pid
+FAILED scripts/tests/test_shared_hook_surface.py::test_yaml_target_writes_when_gateway_pid_is_stale
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+10 failed, 1111 passed, 9 skipped, 1 deselected, 97 warnings in 103.94s (0:01:43)

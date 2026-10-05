@@ -1,0 +1,6 @@
+Nonexistent PID probe; rc=1
+stdout=
+stderr=ERROR: Access denied
+
+
+Archive fixtures intentionally have no .git index.

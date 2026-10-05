@@ -1,0 +1,98 @@
+[
+    {
+        "stage":  "baseline",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "baseline",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "baseline",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "baseline",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "phase1",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "phase1",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "phase1",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "phase1",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "proposal",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "proposal",
+        "file":  "start_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "proposal",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "utf-8",
+        "errors":  [
+
+                   ]
+    },
+    {
+        "stage":  "proposal",
+        "file":  "stop_mcp_daemons.ps1",
+        "decode":  "windows-1252",
+        "errors":  [
+
+                   ]
+    }
+]

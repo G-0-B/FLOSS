@@ -1,0 +1,7 @@
+[FLOSS MCP] already running on :7334; exiting.
+R1 rejected-start exit= 0 guard_called= True board_changed= True
+R2 board/log alias first_line= '# Coordination board'
+R2 restart= JSONDecodeError
+R3 returned= {"ok": true, "seq": 1, "topic": "general", "evidence_status": "resolved"} file_exists_at_append= False
+R4 same_log_different_projection= True last_seq_same= True
+R5 inherited claim_after_failed_append= {'x.py': 'a'} restarted_claims= {}

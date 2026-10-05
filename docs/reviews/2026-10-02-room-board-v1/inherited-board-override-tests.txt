@@ -1,0 +1,17 @@
+.F                                                                       [100%]
+================================== FAILURES ===================================
+___________ test_import_writes_the_board_beside_the_redirected_log ____________
+
+server = <module 'packages.coordination_room.server' from 'C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-review-20261002-162041\\FLOSS\\packages\\coordination_room\\server.py'>
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/pytest-of-kalis/pytest-1342/test_import_writes_the_board_b0')
+
+    def test_import_writes_the_board_beside_the_redirected_log(server, tmp_path: Path):
+>       assert (tmp_path / "rooms" / "BOARD.md").exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = ((WindowsPath('C:/Users/kalis/AppData/Local/Temp/pytest-of-kalis/pytest-1342/test_import_writes_the_board_b0') / 'rooms') / 'BOARD.md').exists
+
+packages\coordination_room\tests\test_server_tools.py:50: AssertionError
+=========================== short test summary info ===========================
+FAILED packages/coordination_room/tests/test_server_tools.py::test_import_writes_the_board_beside_the_redirected_log
+1 failed, 1 passed in 1.05s

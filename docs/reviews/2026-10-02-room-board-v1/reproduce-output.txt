@@ -1,0 +1,8 @@
+[FLOSS MCP] already running on :7334; exiting.
+Fixtures: C:\Users\kalis\AppData\Local\Temp\codex-room-board-review-20261002-162041\reproduction-5066a95c
+B2 rejected-start exit= 0 guard_called= True board_changed= True
+B5 alias first_line= '# Coordination board'
+B5 alias restart= JSONDecodeError
+B6 result= {"ok": true, "seq": 1, "topic": "general", "evidence_status": "resolved"} file_exists_at_append= False
+B7 same_log_different_projection= True last_seq_same= True
+Inherited claim_after_failed_append= {'x.py': 'a'} restarted_claims= {}

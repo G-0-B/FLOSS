@@ -1,0 +1,83 @@
+{
+  "plan_sha256": "6dabb8e6a6ef9f353af7d5f52f2765cf63746a34f69a493e8e7019be635ca635",
+  "source_lines": {
+    "docs/specs/coordination-room.spec.md": [
+      181,
+      265
+    ],
+    "docs/specs/coordination-room.schema.json": [
+      271,
+      331
+    ],
+    "packages/coordination_room/evidence.py": [
+      510,
+      595
+    ],
+    "packages/coordination_room/board.py": [
+      804,
+      965
+    ],
+    "packages/coordination_room/room.py": [
+      1423,
+      1624
+    ],
+    "packages/coordination_room/gateway.py": [
+      1630,
+      1719
+    ],
+    "packages/coordination_room/tests/test_evidence.py": [
+      384,
+      499
+    ],
+    "packages/coordination_room/tests/test_board.py": [
+      628,
+      793
+    ],
+    "packages/coordination_room/tests/test_message_board.py": [
+      1000,
+      1237
+    ],
+    "packages/coordination_room/tests/test_gateway_board.py": [
+      1241,
+      1329
+    ],
+    "packages/coordination_room/tests/test_schema.py": [
+      1333,
+      1412
+    ],
+    "packages/coordination_room/tests/test_server_tools.py": [
+      1762,
+      1862
+    ],
+    "packages/coordination_room/tests/test_server_http.py": [
+      1866,
+      1974
+    ],
+    "packages/a2a_mesh/room_bridge.py": [
+      2622,
+      2910
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_parse.py": [
+      2274,
+      2362
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_pair.py": [
+      2366,
+      2486
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_invariants.py": [
+      2490,
+      2532
+    ],
+    "packages/a2a_mesh/tests/test_room_bridge_e2e.py": [
+      2536,
+      2611
+    ],
+    "packages/coordination_room/README.md": [
+      2134,
+      2145
+    ]
+  },
+  "base": "4aab13e30f3c2960da787b47c90926256b4b5b73",
+  "a2a_base": "225287c2ed310158a3f699688447db2964e425b2"
+}

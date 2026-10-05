@@ -1,0 +1,684 @@
+[
+  {
+    "name": "upgrade/wrong-bus",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong\\events.jsonl",
+    "seq": 4,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "step5/upgrade/wrong-bus",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-wrong",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 4,
+      "speakers": [
+        "deploy-smoke",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-shadow-wrong",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-shadow-wrong\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-shadow-wrong\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "upgrade/correct-with-peer",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "seq": 5,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "step5/upgrade/correct-with-peer",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": true
+  },
+  {
+    "name": "rollback/wrong-bus",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-wrong\\events.jsonl",
+    "seq": 4,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "rollback4/rollback/wrong-bus",
+    "action": "rollback4-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-wrong\\events.jsonl",
+    "seq": 4,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 4,
+      "speakers": [
+        "deploy-smoke",
+        "seed"
+      ]
+    },
+    "claims": {},
+    "accept": false
+  },
+  {
+    "name": "rollback/correct-with-peer",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-correct\\events.jsonl",
+    "seq": 5,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "rollback4/rollback/correct-with-peer",
+    "action": "rollback4-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-correct\\events.jsonl",
+    "seq": 5,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ]
+    },
+    "claims": {},
+    "accept": true
+  },
+  {
+    "name": "utf8-bom",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\utf8-bom.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "utf16-bom",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\utf16-bom.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "unicode-smoke",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\unicode-smoke.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "wildcards-in-text",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\wildcards-in-text.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "wrong-agent",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\wrong-agent.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "wrong-type",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\wrong-type.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "wrong-marker",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\wrong-marker.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "marker-case-fold",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\marker-case-fold.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "reused-marker-wrong-seq",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\reused-marker-wrong-seq.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "duplicate-seq",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\duplicate-seq.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "missing-seq",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\missing-seq.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "missing-file",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\never-created.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "max-int32",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\max-int32.jsonl",
+    "seq": 2147483647,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "above-int32",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\above-int32.jsonl",
+    "seq": 2147483648,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "real-room-above-int32",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\real-high-sequence\\events.jsonl",
+    "seq": 2147483648,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "settled-above-int32-inherited",
+    "action": "settled",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\real-high-sequence\\events.jsonl",
+    "accept": false
+  },
+  {
+    "name": "non-generated-wildcard-marker",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\non-generated-wildcard-marker.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "*",
+    "accept": true
+  },
+  {
+    "name": "non-generated-empty-marker",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\non-generated-empty-marker.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "",
+    "accept": true
+  },
+  {
+    "name": "large-log-20000",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\large-log-20000.jsonl",
+    "seq": 999,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": true
+  },
+  {
+    "name": "partial-trailing-refuses",
+    "action": "smoke",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\partial-trailing.jsonl",
+    "seq": 2,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "accept": false
+  },
+  {
+    "name": "preview/exact",
+    "action": "preview",
+    "output": "[FLOSS MCP] WOULD_START packages.coordination_room.server",
+    "marker": "WOULD_START",
+    "expected": "packages.coordination_room.server",
+    "accept": true
+  },
+  {
+    "name": "preview/prefix",
+    "action": "preview",
+    "output": "[FLOSS MCP] WOULD_START packages.coordination_room.server_other (wrong)",
+    "marker": "WOULD_START",
+    "expected": "packages.coordination_room.server",
+    "accept": false
+  },
+  {
+    "name": "preview/wrong-case",
+    "action": "preview",
+    "output": "[FLOSS MCP] WOULD_START PACKAGES.COORDINATION_ROOM.SERVER",
+    "marker": "WOULD_START",
+    "expected": "packages.coordination_room.server",
+    "accept": false
+  },
+  {
+    "name": "preview/two",
+    "action": "preview",
+    "output": "[FLOSS MCP] WOULD_START packages.coordination_room.server\n[FLOSS MCP] WOULD_START packages.coordination_room.server",
+    "marker": "WOULD_START",
+    "expected": "packages.coordination_room.server",
+    "accept": false
+  },
+  {
+    "name": "preview/none",
+    "action": "preview",
+    "output": "no actions",
+    "marker": "WOULD_START",
+    "expected": "packages.coordination_room.server",
+    "accept": false
+  },
+  {
+    "name": "preview/pid-exact",
+    "action": "preview",
+    "output": "WOULD_STOP coordination_room.pid",
+    "marker": "WOULD_STOP",
+    "expected": "coordination_room.pid",
+    "accept": true
+  },
+  {
+    "name": "preview/pid-suffix",
+    "action": "preview",
+    "output": "WOULD_STOP coordination_room.pid.bak",
+    "marker": "WOULD_STOP",
+    "expected": "coordination_room.pid",
+    "accept": false
+  },
+  {
+    "name": "markers/1000",
+    "action": "markers",
+    "accept": true
+  },
+  {
+    "name": "step5/wrong-log",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "wrong-bus",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/wrong-root",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "wrong-root",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/wrong-board",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "wrong-board"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/wrong-last_seq",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 0,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/row-seq",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 999,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/row-ts",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "mismatch",
+        "type": "broadcast",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/row-type",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "mismatch",
+        "agent_id": "seed",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/row-agent_id",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\upgrade-correct\\BOARD.md"
+    },
+    "read": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:34:59Z",
+        "type": "broadcast",
+        "agent_id": "mismatch",
+        "text": "predecessor",
+        "topic": "general"
+      }
+    ],
+    "accept": false
+  },
+  {
+    "name": "step5/empty-log",
+    "action": "step5-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty\\events.jsonl",
+    "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty",
+    "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty\\BOARD.md",
+    "settled": 0,
+    "state": {
+      "claims": {},
+      "last_seq": 0,
+      "speakers": [],
+      "root": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty",
+      "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty\\events.jsonl",
+      "board": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\empty\\BOARD.md"
+    },
+    "read": [],
+    "accept": true
+  },
+  {
+    "name": "rollback4/wrong-tail",
+    "action": "rollback4-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-correct\\events.jsonl",
+    "seq": 5,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "settled": 1,
+    "state": {
+      "claims": {},
+      "last_seq": 0,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ]
+    },
+    "claims": {},
+    "accept": false
+  },
+  {
+    "name": "rollback4/wrong-claims",
+    "action": "rollback4-policy",
+    "log": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\deployment-audit\\rollback-correct\\events.jsonl",
+    "seq": 5,
+    "agent": "deploy-smoke",
+    "marker": "deploy-smoke-0b6f3edb5219487d8ee16f0102e46d2b",
+    "settled": 1,
+    "state": {
+      "claims": {
+        "x": "someone"
+      },
+      "last_seq": 6,
+      "speakers": [
+        "deploy-smoke",
+        "peer",
+        "seed"
+      ]
+    },
+    "claims": {},
+    "accept": false
+  }
+]

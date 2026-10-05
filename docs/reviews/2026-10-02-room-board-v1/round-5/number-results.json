@@ -1,0 +1,4116 @@
+{
+  "integer_max": 9007199254740992,
+  "python_digit_limit": 4300,
+  "parser": [
+    {
+      "case": "reply_to/fraction",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1.9}",
+      "input_length": 39,
+      "input_sha256": "177accde703a0f0c624d6c10a7f9353ff3ff8321669a2b467fd9e7d16607857f",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/whole-float",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1.0}",
+      "input_length": 39,
+      "input_sha256": "13736f52e0a86a6a2d168aeaf77579f89d61504a2517a5632a842d3767ca94c0",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/true",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":true}",
+      "input_length": 40,
+      "input_sha256": "d3b8ca6cb9d81798dc2a9643c314ccc4512173321d2509099cfad3f2ecd434a2",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/false",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":false}",
+      "input_length": 41,
+      "input_sha256": "1dd084a39cb88fc850a26d8213706a38f03d624727824c7dc918b5a1a61625ab",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/positive-inf",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1e999}",
+      "input_length": 41,
+      "input_sha256": "15a79fe5ee7dd922ce785fefc81f866ce23faa8385a9b0c68014035ffbccdb7f",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/negative-inf",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-1e999}",
+      "input_length": 42,
+      "input_sha256": "ecfcf613d56f2bc4d38a62cfa54ca1f45da0f4ad91824fad6a09169c2b9e69c9",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/nan",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":NaN}",
+      "input_length": 39,
+      "input_sha256": "4cb1751e852aa3d18cc216d673df40cb011e6af4320aa3477f98c2c251b6b8ff",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/exponent-integer",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1e3}",
+      "input_length": 39,
+      "input_sha256": "7c512953ffde92ec788975dd3a9576ae2f84cd0029cfabbfd3fea806a008575f",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":0}",
+      "input_length": 37,
+      "input_sha256": "60847b3ebbcda22c308ffa561640cb70044620b73954636804408c099affdc4c",
+      "outcome": "CommandError",
+      "message": "reply_to must be at least 1"
+    },
+    {
+      "case": "reply_to/negative-zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-0}",
+      "input_length": 38,
+      "input_sha256": "faaa26d7491e30a4465ad4f665eaf7ef6b3e7292c6fc5bebc90fed1192a03287",
+      "outcome": "CommandError",
+      "message": "reply_to must be at least 1"
+    },
+    {
+      "case": "reply_to/negative",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-1}",
+      "input_length": 38,
+      "input_sha256": "cc46ff322595cfc66c4d84c67354d6b78bed6129437d47aa27c2547110251ef9",
+      "outcome": "CommandError",
+      "message": "reply_to must be at least 1"
+    },
+    {
+      "case": "reply_to/one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1}",
+      "input_length": 37,
+      "input_sha256": "b0d1bc12cc06d899541c98981642250e397667300ed93d7f9e63de9115aa7a1e",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 1,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/max-minus-one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740991}",
+      "input_length": 52,
+      "input_sha256": "b53e9b23c7723274317333a975584cbbd742d179492b17e08e1e8d3266ae3c91",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 9007199254740991,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/max",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740992}",
+      "input_length": 52,
+      "input_sha256": "dc89504aa3baa25ec186fb82be1a9254f767751a1eaaa377ce810caf0df01d49",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 9007199254740992,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/max-plus-one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740993}",
+      "input_length": 52,
+      "input_sha256": "02cf6bf0514968d18e8323c382f93e150e861a589ba451a02a0594352b5ae6c4",
+      "outcome": "CommandError",
+      "message": "reply_to is out of range"
+    },
+    {
+      "case": "reply_to/negative-max",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-9007199254740992}",
+      "input_length": 53,
+      "input_sha256": "3b97ba6c43d0317ab59b2480b7d0495f23cfec0d0a4cad04342d8d585b8f40a8",
+      "outcome": "CommandError",
+      "message": "reply_to must be at least 1"
+    },
+    {
+      "case": "reply_to/negative-overflow",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-9007199254740993}",
+      "input_length": 53,
+      "input_sha256": "a367fedaac2ca880b2dbe4ed4aa4757711d410bec6eabd524eea06e334d2957e",
+      "outcome": "CommandError",
+      "message": "reply_to is out of range"
+    },
+    {
+      "case": "reply_to/empty-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\"}",
+      "input_length": 38,
+      "input_sha256": "e5769cd2d8334db0d5c1e5ec8f20084d477464c05d4ab55b4e60723083aa5550",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/decimal-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"4\"}",
+      "input_length": 39,
+      "input_sha256": "7be9be35e9164b92face7d2046e23ba68865df693c3a26c2abccf2193df5bda4",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 4,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/plus-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"+4\"}",
+      "input_length": 40,
+      "input_sha256": "3bc99061fed820a1a1cf27bcbf27a19a6a4aed160035bf4409ea63e04fb507e9",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/minus-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"-4\"}",
+      "input_length": 40,
+      "input_sha256": "759f15396fa7232ff8dfe061c0ed127d7275d352e6cc682147e4a8099da8e7a7",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/space-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\" 4\"}",
+      "input_length": 40,
+      "input_sha256": "5b80ba7b3e96cc3e4353962215dd799fdd01f750eb2f49a93979b721fdeaf2c8",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/trailing-space",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"4 \"}",
+      "input_length": 40,
+      "input_sha256": "b5d88ed6ea0424ba2e9ed85aff86856653ee3ab3f401a3a98fa8696ba41ca048",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/leading-zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"0004\"}",
+      "input_length": 42,
+      "input_sha256": "e42027318abc425f6b629e159ea2e274f065ba33a8d95f60b977b719d12643e2",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 4,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/16-zeroes",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"0000000000000000\"}",
+      "input_length": 54,
+      "input_sha256": "fee2d4135e6f24c7ca1a42a5c9e9f491e0e80497fe7ec332ca9ab43883e527c6",
+      "outcome": "CommandError",
+      "message": "reply_to must be at least 1"
+    },
+    {
+      "case": "reply_to/17-zeroes",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"00000000000000000\"}",
+      "input_length": 55,
+      "input_sha256": "4c40c9df5aae64e170f070a82f059498c9a607b97dfc0a4fe7f6ccb4c5872fa1",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/max-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"9007199254740992\"}",
+      "input_length": 54,
+      "input_sha256": "2a777839264197b5dff6a32e12adbf366b543b91aa7d36c104b5380dab7ce8e6",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": 9007199254740992,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/max-overflow-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"9007199254740993\"}",
+      "input_length": 54,
+      "input_sha256": "1c3a68e0132d33877c0e8bffa08f01d726f40273a2302d1b232039f05972e95e",
+      "outcome": "CommandError",
+      "message": "reply_to is out of range"
+    },
+    {
+      "case": "reply_to/arabic-digit",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u0664\"}",
+      "input_length": 44,
+      "input_sha256": "43fb6436ef2c9a1e92d488f1f2be027275798bc0c703df55b28dc7713cacbccd",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/fullwidth-digit",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\uff14\"}",
+      "input_length": 44,
+      "input_sha256": "f79e9eb1ab58f0de0b10b34c7ba6490cef34997aa981adef31bdaada65a7f953",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/unicode-minus",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u22124\"}",
+      "input_length": 45,
+      "input_sha256": "f25d1ed9094ee35c349d6039aa18601d482c372a683a3ed3f2e58e0675aba783",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/superscript",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u00b2\"}",
+      "input_length": 44,
+      "input_sha256": "09c6f6080af9b1bf15285e854c1abb26d4ee05c16eb091d72652966d20095506",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/underscore",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"1_0\"}",
+      "input_length": 41,
+      "input_sha256": "14c28a6713478c15463108129dc675ec0f85d59d5858f958b6a34c0068dab580",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/list",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":[4]}",
+      "input_length": 39,
+      "input_sha256": "5fe370d5fdfe6d1ce66c8272e4495fa3f6a1c2cad3e706c2157b3fc5c6cf44f1",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/object",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":{\"n\":4}}",
+      "input_length": 43,
+      "input_sha256": "d8bfdf9c4c7eb03dbc6ff43ff010b2374590fdd78e39da9da38c1da00b82354b",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "reply_to/null",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":null}",
+      "input_length": 40,
+      "input_sha256": "594f46f3e4b682ffb4bc2a70d974b6763df73ed56c87e98e0b0fd527df534569",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "reply_to/4300-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 4336,
+      "input_sha256": "5bf84e6d7f0415c62fb93e8fa4ed59e49a33cf686055cb8fd2cf82141624f814",
+      "outcome": "CommandError",
+      "message": "reply_to is out of range"
+    },
+    {
+      "case": "reply_to/4301-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 4337,
+      "input_sha256": "d210d03fc0c6ff4e520c4467248e52b5d16cb8d02711e5437251b6a9c7820601",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "reply_to/4301-digit-negative",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-99999999999999999999999999999... <see script>",
+      "input_length": 4338,
+      "input_sha256": "897b98d6cbae85a20acbd487520d84e1a41a7b7aeefb770bce69b9c59be99665",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "reply_to/10000-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 10036,
+      "input_sha256": "e93d429e443017f77f1c9880d4698e278d66cb3042cb9f53d8898c2bfc9e67c9",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "reply_to/10000-digit-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"99999999999999999999999999999... <see script>",
+      "input_length": 10038,
+      "input_sha256": "3c87480a8534c3f5cd3cc7897191dacdef494d9e02aece80eb3b73534fb7cbea",
+      "outcome": "CommandError",
+      "message": "reply_to must be an integer"
+    },
+    {
+      "case": "since_seq/fraction",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1.9}",
+      "input_length": 40,
+      "input_sha256": "a5a61279a7e97b4b52b7b449c1758297b9a42aefb1d88d8c77f64eba1511c440",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/whole-float",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1.0}",
+      "input_length": 40,
+      "input_sha256": "eb87185236d5f281e36848cd8ef8b11a7a28cb32344ee5a4113e77f6c4d2197a",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/true",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":true}",
+      "input_length": 41,
+      "input_sha256": "8fdf5e792f894951b275719f9886aeba5e38d620115c4eeff5e4f6539c6b666c",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/false",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":false}",
+      "input_length": 42,
+      "input_sha256": "00f714c3f9c2dcc0ea164b9b522ab46777b628468c961467b7a386bfa23cefb1",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/positive-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1e999}",
+      "input_length": 42,
+      "input_sha256": "0a451329c73cfb8ec76cbe7ab041afe2eb0493aa40f4b0ab180c647756687811",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/negative-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-1e999}",
+      "input_length": 43,
+      "input_sha256": "cffb59b5107d59a75b0ae2f19127c173fb5ec88afd5e6220bbc15e5877b97897",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/nan",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":NaN}",
+      "input_length": 40,
+      "input_sha256": "a52235bbdf1d4bd61438bb27dca2c90d1044d0ce1b665959e1b006dde85ab215",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/exponent-integer",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1e3}",
+      "input_length": 40,
+      "input_sha256": "116436637c6777c6abe39fedea74215bd2ae062100cfde07ca22ba67c8238408",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":0}",
+      "input_length": 38,
+      "input_sha256": "48e5b7052fc21eee90e7ad25bb09c3a4ecc174deb0984b723756afc1944279ee",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/negative-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-0}",
+      "input_length": 39,
+      "input_sha256": "d30256a58eb43292902f65f67f3a499c81efadb269ffbdbbab635e0d8da41c07",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-1}",
+      "input_length": 39,
+      "input_sha256": "93b151139c045ec4329ef7d29128d8c4d7097dc196723a7f39e0014262ff29ea",
+      "outcome": "CommandError",
+      "message": "since_seq must not be negative"
+    },
+    {
+      "case": "since_seq/one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1}",
+      "input_length": 38,
+      "input_sha256": "303f265f765cdf8990fbdecc316e19726bf44aa96130b64449dfe54c2ab75604",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 1,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/max-minus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740991}",
+      "input_length": 53,
+      "input_sha256": "3bc54fe37dbcd3d4d984e05b9a3f6743698198f732178d888e1e994e9ea8cf27",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 9007199254740991,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740992}",
+      "input_length": 53,
+      "input_sha256": "f45f0ae232d2386c81bdd224b04428bff0e10a1f61d2c22582c042b0665f7c81",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 9007199254740992,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/max-plus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740993}",
+      "input_length": 53,
+      "input_sha256": "283ceb33f496b7505500b348a166d2d6917d8f37027312ee80a825ef652a93fe",
+      "outcome": "CommandError",
+      "message": "since_seq is out of range"
+    },
+    {
+      "case": "since_seq/negative-max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9007199254740992}",
+      "input_length": 54,
+      "input_sha256": "583e6babbd8fbef6e4d4fa4ce67b8a22fb2a65fb0b10c34f55917617dc78eea2",
+      "outcome": "CommandError",
+      "message": "since_seq must not be negative"
+    },
+    {
+      "case": "since_seq/negative-overflow",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9007199254740993}",
+      "input_length": 54,
+      "input_sha256": "fad75268c63ab5339c1f4127b23307a6db75a3e70a935e3748a7cb20e165b291",
+      "outcome": "CommandError",
+      "message": "since_seq is out of range"
+    },
+    {
+      "case": "since_seq/empty-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\"}",
+      "input_length": 39,
+      "input_sha256": "2907b767cf2b37bb28267313275cb2a3be9fb053e8e10c307ca49f9a0d52b1b2",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/decimal-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"4\"}",
+      "input_length": 40,
+      "input_sha256": "2f3bb488d73edaa44f65c3179ddcdd826e93d472ad639d6fc055d4e0de13be56",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 4,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/plus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"+4\"}",
+      "input_length": 41,
+      "input_sha256": "36c58b531ee041bf9dda11a6d04c957651f244254d7bb1fee8a13c9c4309f00d",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/minus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"-4\"}",
+      "input_length": 41,
+      "input_sha256": "747aa33a4a64bb4df7876571358a9f2d112fdf0d24ef663d9eef4a43b3252a62",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/space-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\" 4\"}",
+      "input_length": 41,
+      "input_sha256": "b2f75dfab6558099a98c6cf28812c3e75447f5eab8f738fab8cf89c716ea62ac",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/trailing-space",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"4 \"}",
+      "input_length": 41,
+      "input_sha256": "42efc60d90cca0ca0cfe3c1f423ce0ee7e6da2b1fb912b6614e6487c9573b146",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/leading-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"0004\"}",
+      "input_length": 43,
+      "input_sha256": "17a21211006d487439b1269fc1b935ba307e3320dd4c794b86348c74372a9fe3",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 4,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/16-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"0000000000000000\"}",
+      "input_length": 55,
+      "input_sha256": "b56117317a5f64a8f1fd38586d923dc66e51ae0de4f58a56f04437c8dd685ee8",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/17-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"00000000000000000\"}",
+      "input_length": 56,
+      "input_sha256": "84ad9e10f82341fdcd8022d279d2c3046aa5b9a45596dd07b6e321588f356954",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/max-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9007199254740992\"}",
+      "input_length": 55,
+      "input_sha256": "e09f1fd28ea851a9f16e7bba2cba7841b86cdfb9295ae3802c99364a658c9cc5",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 9007199254740992,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "since_seq/max-overflow-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9007199254740993\"}",
+      "input_length": 55,
+      "input_sha256": "866bb6c5747bce3a641adb04739ffc50ad186b5c4370e3378c43aca4341abc93",
+      "outcome": "CommandError",
+      "message": "since_seq is out of range"
+    },
+    {
+      "case": "since_seq/arabic-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u0664\"}",
+      "input_length": 45,
+      "input_sha256": "dd93758d98f7b535f572cf22489f489cef7ed80f7100523d75a0ea785a90bdd1",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/fullwidth-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\uff14\"}",
+      "input_length": 45,
+      "input_sha256": "8d7c1006dce043a77627c05074ecc2c1ac3977ef4b16a9e5bca4ab62d3031fb4",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/unicode-minus",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u22124\"}",
+      "input_length": 46,
+      "input_sha256": "6b7a74a915ec421a470b09dde3aa72ca7aa5099fc9b284c3671eddb6441bb4a0",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/superscript",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u00b2\"}",
+      "input_length": 45,
+      "input_sha256": "3cdf75e0da7bc2300e66259ff86a426c48b335e00907d7e6a80382421ef2cd45",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/underscore",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"1_0\"}",
+      "input_length": 42,
+      "input_sha256": "59b1057a988ced5fa803dbee01c554a73441dc83ec928270ba51f77d81fbcd84",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/list",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":[4]}",
+      "input_length": 40,
+      "input_sha256": "a5c8a8765a17865d8d88adcbb440d57efe43eb1d9388cdbfe82620e28710bfc3",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/object",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":{\"n\":4}}",
+      "input_length": 44,
+      "input_sha256": "c6ab48e7de1be60c88aeb2bc7ec1ebecad75e3bea448a170ea0ea8ad29f90c07",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/null",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":null}",
+      "input_length": 41,
+      "input_sha256": "42f34aaf9b2b454f9f8617def997f5c6e6cb35e7ab14af971aeb4f7a8053c8cc",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "since_seq/4300-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 4337,
+      "input_sha256": "5059bb1216e1428050d21a02c86095512270bab9a223f2a5104a5050cb61fbf6",
+      "outcome": "CommandError",
+      "message": "since_seq is out of range"
+    },
+    {
+      "case": "since_seq/4301-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 4338,
+      "input_sha256": "d96f918d5385d6b77b7cb6623d32cfc84167dc37a52699d102305ee3705d4e9e",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "since_seq/4301-digit-negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9999999999999999999999999999... <see script>",
+      "input_length": 4339,
+      "input_sha256": "a1c63c448782098885faecef5903b5a940997651ff4697c2ac993ef50cfe9ae9",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "since_seq/10000-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 10037,
+      "input_sha256": "4d743dcbce4f40b87bb49930b690aa3a0221c5c01613c9e0996ed0b4079ea3a4",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "since_seq/10000-digit-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9999999999999999999999999999... <see script>",
+      "input_length": 10039,
+      "input_sha256": "83210c398d9fe514a627fbff684f794a5478ae94c09ba32dd6c439e7902b66bc",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "limit/fraction",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1.9}",
+      "input_length": 36,
+      "input_sha256": "b717241cf43331cc0d44e3492fa6c28834b82f0bfe180600b6e1ee10f155656e",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/whole-float",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1.0}",
+      "input_length": 36,
+      "input_sha256": "6c0ab00d3648665d74ba86b8c6223dc9278a043bb3b6995b923e707fd4135f34",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/true",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":true}",
+      "input_length": 37,
+      "input_sha256": "a0b9542ac9eb851d5dd002555728b84ecfd1034817d497709d10348c0bb22bfb",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/false",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":false}",
+      "input_length": 38,
+      "input_sha256": "7be7cb21ae56a8e4e77c81c303790709db2768eb2edb8c225346fe43b0c7b3ba",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/positive-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1e999}",
+      "input_length": 38,
+      "input_sha256": "4dc6cd451a8146abf8fe7b0a028be958ebcaf03c8d552d7a2af3aba15993083d",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/negative-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-1e999}",
+      "input_length": 39,
+      "input_sha256": "7de7b31fee3b18175c44b7886203a3648c17bca08c7b4449d534a7344aef6b05",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/nan",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":NaN}",
+      "input_length": 36,
+      "input_sha256": "71928c941f91873247ddfeedab282e095eb0c193e2d1d63adf16f33a22eeb4e1",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/exponent-integer",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1e3}",
+      "input_length": 36,
+      "input_sha256": "f042cfc631d06f1f7bc2d22b664031329134684ea18ac1c97d34e234baf3b3dc",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":0}",
+      "input_length": 34,
+      "input_sha256": "2cbec06b55d91a81992cd123e80039b7525cfb13215ebd3f7f0fdd6a749c8ade",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/negative-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-0}",
+      "input_length": 35,
+      "input_sha256": "08fd28c358d5f330933ce81f62e089dc21efc5006caa808d5c9e5fc5505ee145",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-1}",
+      "input_length": 35,
+      "input_sha256": "4cd769cbdd16c00db4d65bbf1506f701cf7e767787e86e4e904d4d9d9a0a5f35",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1}",
+      "input_length": 34,
+      "input_sha256": "320ef7e25998385516173bd64cca8db4317a9ccd7523cd92a6f0f7ace51b9785",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/max-minus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740991}",
+      "input_length": 49,
+      "input_sha256": "0643d422b7580840c1d4c015a87b82866de67789c5f24bd7d320970f5922adcf",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 100,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740992}",
+      "input_length": 49,
+      "input_sha256": "37613276b863de42e2e30a11c063b2255b72b325e4ee26b89a293efa52e00190",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 100,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/max-plus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740993}",
+      "input_length": 49,
+      "input_sha256": "3c461f6c9d4e3a588eef0aa3b12dcf06d896156b44c448f7be632ad6d07809f3",
+      "outcome": "CommandError",
+      "message": "limit is out of range"
+    },
+    {
+      "case": "limit/negative-max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-9007199254740992}",
+      "input_length": 50,
+      "input_sha256": "3ed827c1bbede4ce9e6ef645059982d52f8675ae57576f9f2493a4dd470458d7",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/negative-overflow",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-9007199254740993}",
+      "input_length": 50,
+      "input_sha256": "d055312f7018c111fb4ee6ce7ff7e0e54149297c4804b5cde5699d3067a8dd4c",
+      "outcome": "CommandError",
+      "message": "limit is out of range"
+    },
+    {
+      "case": "limit/empty-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\"}",
+      "input_length": 35,
+      "input_sha256": "16ca06e6155d4e0438b97e12f4977453b3154a5c863cfb066cf3f92de1f9d284",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/decimal-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"4\"}",
+      "input_length": 36,
+      "input_sha256": "16b3bcbd3184862a1c08287de4672d66c10eada7964d38d03650c995a6fcf1ae",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 4,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/plus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"+4\"}",
+      "input_length": 37,
+      "input_sha256": "fcdb384e58a43e11d3990d50f4030bbb1d4d5617cbbec9258925897520ab8480",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/minus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"-4\"}",
+      "input_length": 37,
+      "input_sha256": "fb3930b537241b0acd2532a2c2fade670ed68dc5a302102022c3db3a549e8d06",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/space-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\" 4\"}",
+      "input_length": 37,
+      "input_sha256": "21735f92827699884b3e56ab8229f777ad63e70f81f944a4c86ed93695806203",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/trailing-space",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"4 \"}",
+      "input_length": 37,
+      "input_sha256": "4553ab9c2c260c260bf61fa9a08e4999802c8f6295c47cffebd0533d6e6503ee",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/leading-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"0004\"}",
+      "input_length": 39,
+      "input_sha256": "88aaf1ceff48c7e4e33509cb3068067b94b1af38e40a1b7a6c8a2c6db539106d",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 4,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/16-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"0000000000000000\"}",
+      "input_length": 51,
+      "input_sha256": "644e58f97749ee53ad3d0bfa49af874522624bf55d3ce7080d50864031461e8c",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 1,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/17-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"00000000000000000\"}",
+      "input_length": 52,
+      "input_sha256": "6cfa50088ad91378629c2e5c96928a923077e4da007b1f7640656f74c0206eae",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/max-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"9007199254740992\"}",
+      "input_length": 51,
+      "input_sha256": "94b9e5631d967487e7634811e34dad6a1f9ab553ca027b5033e11dfb14c046b3",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "x",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 100,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "limit/max-overflow-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"9007199254740993\"}",
+      "input_length": 51,
+      "input_sha256": "08ec66f5bc993de2aa0d42da96ac145c7153109d903e958761fc2719bb4023fb",
+      "outcome": "CommandError",
+      "message": "limit is out of range"
+    },
+    {
+      "case": "limit/arabic-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u0664\"}",
+      "input_length": 41,
+      "input_sha256": "1dbc6f59207c8996e0e98e900c974392e34ffebddbaa8ce9427733f9ecf5ee0c",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/fullwidth-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\uff14\"}",
+      "input_length": 41,
+      "input_sha256": "6a88f28ab1c398d30feb6e68f70b10a85692e47e778bb838c5b021148c20b9bc",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/unicode-minus",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u22124\"}",
+      "input_length": 42,
+      "input_sha256": "47944b07bac7aee4f7604a684a04b29de96ef4b1a26d21e7929acc4245590b2a",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/superscript",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u00b2\"}",
+      "input_length": 41,
+      "input_sha256": "d6a042b64a59cd0d2b7e866eca3c6850d42fe3d3eceaccb4b45e1bb4a6d007a1",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/underscore",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"1_0\"}",
+      "input_length": 38,
+      "input_sha256": "c73a67b54064c3af3ba042f338f6f186230be815fab4e0a13f7be81ed593b7e8",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/list",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":[4]}",
+      "input_length": 36,
+      "input_sha256": "840f9a02ab3e01d52b2763f25832715bab22d98d350fd3c5a15074bf2c30229b",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/object",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":{\"n\":4}}",
+      "input_length": 40,
+      "input_sha256": "0ee47c3960d8e630961b5aeb6c78e821744875e6802b7fddd7ac59e886c70ca7",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/null",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":null}",
+      "input_length": 37,
+      "input_sha256": "9524b485fc2db7bc7d000e031cfe5db7bbeec04f8a350aafcff6430f4234be41",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "limit/4300-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 4333,
+      "input_sha256": "f64a33ee38a4bad57ce301a97d8c76ae464001096251ab4eb6d626b6119cfe6d",
+      "outcome": "CommandError",
+      "message": "limit is out of range"
+    },
+    {
+      "case": "limit/4301-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 4334,
+      "input_sha256": "74b19f843602085a67652cb437ef286b7fa6c7229eb02d450dc5818f0a3b0c38",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "limit/4301-digit-negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-99999999999999999999999999999999... <see script>",
+      "input_length": 4335,
+      "input_sha256": "9d57c556ece17d3db41900a09f2394109bc2c60eaccc698f26760f2fd963f665",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "limit/10000-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 10033,
+      "input_sha256": "d9870046e8b6fb08e9fcdc894b2510f40fd686cca824549941dfe3c616c52c5a",
+      "outcome": "ValueError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit"
+    },
+    {
+      "case": "limit/10000-digit-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"99999999999999999999999999999999... <see script>",
+      "input_length": 10035,
+      "input_sha256": "bd61ec0f7caee8a17cad9cdd541a8fdc1c5531c41ae58df0f527d9580e172f14",
+      "outcome": "CommandError",
+      "message": "limit must be an integer"
+    },
+    {
+      "case": "text-since/0",
+      "input": "read since=0",
+      "input_length": 12,
+      "input_sha256": "17e32c3d82760d0b58d71d169c3015a1887f6de2e7d90bf5569ac762c2a8750f",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-since/1",
+      "input": "read since=1",
+      "input_length": 12,
+      "input_sha256": "9f082699502a637f8ee99b27d9116677a5bddbc6e8fe4276bf66e7521aa974bb",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 1,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-since/0004",
+      "input": "read since=0004",
+      "input_length": 15,
+      "input_sha256": "0dc6499e61fa8b4afcaec645ae2f675915be4986f7fd3b3b097a49a5fc7db30c",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 4,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-since/+1",
+      "input": "read since=+1",
+      "input_length": 13,
+      "input_sha256": "ffdaaeb5ad5663af4c5405113338f6be87b44e8a237064b26adc19757b203adf",
+      "outcome": "CommandError",
+      "message": "commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+    },
+    {
+      "case": "text-since/-1",
+      "input": "read since=-1",
+      "input_length": 13,
+      "input_sha256": "73db0e0dc8d671ad896e92544497b9a1dc8f3c00fafd570be7fa3761f63e7aac",
+      "outcome": "CommandError",
+      "message": "commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+    },
+    {
+      "case": "text-since/1.0",
+      "input": "read since=1.0",
+      "input_length": 14,
+      "input_sha256": "39375064e1de75809a29eebd8306538b9a785060e29e3d0916cdc6cd706e73bd",
+      "outcome": "CommandError",
+      "message": "commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+    },
+    {
+      "case": "text-since/1e3",
+      "input": "read since=1e3",
+      "input_length": 14,
+      "input_sha256": "295ff41f2a00a3495684b74709173835535bd6de404fb15dba1424148aa60cc8",
+      "outcome": "CommandError",
+      "message": "commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+    },
+    {
+      "case": "text-since/\u0664",
+      "input": "read since=\u0664",
+      "input_length": 12,
+      "input_sha256": "18b2baba005b35d9bc81001b1ea4cb41f87ac866c0c08314b0bdf8d8cb03c02a",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "text-since/\uff14",
+      "input": "read since=\uff14",
+      "input_length": 12,
+      "input_sha256": "1049c22969bc78e983296a17194db50e1e8d51340caaf372d4b9ad1d1996eb5d",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "text-since/9007199254740992",
+      "input": "read since=9007199254740992",
+      "input_length": 27,
+      "input_sha256": "9826061269c66866e884d8ffd42bb8af94872a3ea26f024e576ceffb9e54b382",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 9007199254740992,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-since/9007199254740993",
+      "input": "read since=9007199254740993",
+      "input_length": 27,
+      "input_sha256": "53fe517c43ba7d34ef5cda6bc56b8322203ac82c63d962e62741cc93ba201749",
+      "outcome": "CommandError",
+      "message": "since_seq is out of range"
+    },
+    {
+      "case": "text-since/4301-digits",
+      "input": "read since=999999999999999999999999999999999999999999999999999999... <see script>",
+      "input_length": 4312,
+      "input_sha256": "a4a3240d242ed1ac01cf752e9c2aac55392d75b44af0df23ef4970e90a4cb213",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "text-since/00000000000000000",
+      "input": "read since=00000000000000000",
+      "input_length": 28,
+      "input_sha256": "1a16527f2f5540d1a223c882cf2b7a2570d07e5a613e391880caff21a55229d7",
+      "outcome": "CommandError",
+      "message": "since_seq must be an integer"
+    },
+    {
+      "case": "text-read-topic",
+      "input": "read #announcements since=4",
+      "input_length": 27,
+      "input_sha256": "18981fe2f9fda05509b8a2b9e74bb008253b21deb63ebc05a702790a647c2850",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": "announcements",
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 4,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-read-default",
+      "input": "read",
+      "input_length": 4,
+      "input_sha256": "3316348dbadfb7b11c7c2ea235949419e23f9fa898ad2c198f999617912a9925",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-read-trailing-whitespace",
+      "input": "read since=4\n",
+      "input_length": 13,
+      "input_sha256": "ee99184f310dc6986215611dd4a0c7d0e0a14fd33b4639572c0483a469614862",
+      "outcome": "accepted",
+      "command": {
+        "op": "read",
+        "topic": null,
+        "text": "",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 4,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "text-read-split",
+      "input": "read since=4 more",
+      "input_length": 17,
+      "input_sha256": "3251b13d2ef1e392e1bdf90a2c26fcf7eb968e76f10162c225e217a6a2ba5eda",
+      "outcome": "CommandError",
+      "message": "commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+    },
+    {
+      "case": "text-post-is-text",
+      "input": "post #announcements 1e999",
+      "input_length": 25,
+      "input_sha256": "be4db91549aa7130814c4a057a96f587ccfceca1427cbfa34334f68bd2099bb0",
+      "outcome": "accepted",
+      "command": {
+        "op": "post",
+        "topic": "announcements",
+        "text": "1e999",
+        "evidence_refs": [],
+        "reply_to": null,
+        "since_seq": 0,
+        "limit": 20,
+        "sender": "anonymous"
+      }
+    },
+    {
+      "case": "json-plus-number",
+      "input": "{\"op\":\"read\",\"since_seq\":+4}",
+      "input_length": 28,
+      "input_sha256": "1d653bad93260403b4348c3bdb8b0a3d8c2eef90da5e048860e22c00f8326df0",
+      "outcome": "CommandError",
+      "message": "invalid JSON: Expecting value"
+    }
+  ],
+  "http": [
+    {
+      "case": "reply_to/fraction",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1.9}",
+      "input_length": 39,
+      "input_sha256": "177accde703a0f0c624d6c10a7f9353ff3ff8321669a2b467fd9e7d16607857f",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/whole-float",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1.0}",
+      "input_length": 39,
+      "input_sha256": "13736f52e0a86a6a2d168aeaf77579f89d61504a2517a5632a842d3767ca94c0",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/true",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":true}",
+      "input_length": 40,
+      "input_sha256": "d3b8ca6cb9d81798dc2a9643c314ccc4512173321d2509099cfad3f2ecd434a2",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/false",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":false}",
+      "input_length": 41,
+      "input_sha256": "1dd084a39cb88fc850a26d8213706a38f03d624727824c7dc918b5a1a61625ab",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/positive-inf",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1e999}",
+      "input_length": 41,
+      "input_sha256": "15a79fe5ee7dd922ce785fefc81f866ce23faa8385a9b0c68014035ffbccdb7f",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/negative-inf",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-1e999}",
+      "input_length": 42,
+      "input_sha256": "ecfcf613d56f2bc4d38a62cfa54ca1f45da0f4ad91824fad6a09169c2b9e69c9",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/nan",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":NaN}",
+      "input_length": 39,
+      "input_sha256": "4cb1751e852aa3d18cc216d673df40cb011e6af4320aa3477f98c2c251b6b8ff",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/exponent-integer",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1e3}",
+      "input_length": 39,
+      "input_sha256": "7c512953ffde92ec788975dd3a9576ae2f84cd0029cfabbfd3fea806a008575f",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":0}",
+      "input_length": 37,
+      "input_sha256": "60847b3ebbcda22c308ffa561640cb70044620b73954636804408c099affdc4c",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be at least 1"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/negative-zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-0}",
+      "input_length": 38,
+      "input_sha256": "faaa26d7491e30a4465ad4f665eaf7ef6b3e7292c6fc5bebc90fed1192a03287",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be at least 1"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/negative",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-1}",
+      "input_length": 38,
+      "input_sha256": "cc46ff322595cfc66c4d84c67354d6b78bed6129437d47aa27c2547110251ef9",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be at least 1"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":1}",
+      "input_length": 37,
+      "input_sha256": "b0d1bc12cc06d899541c98981642250e397667300ed93d7f9e63de9115aa7a1e",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/max-minus-one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740991}",
+      "input_length": 52,
+      "input_sha256": "b53e9b23c7723274317333a975584cbbd742d179492b17e08e1e8d3266ae3c91",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 9007199254740991
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/max",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740992}",
+      "input_length": 52,
+      "input_sha256": "dc89504aa3baa25ec186fb82be1a9254f767751a1eaaa377ce810caf0df01d49",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 9007199254740992
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/max-plus-one",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":9007199254740993}",
+      "input_length": 52,
+      "input_sha256": "02cf6bf0514968d18e8323c382f93e150e861a589ba451a02a0594352b5ae6c4",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/negative-max",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-9007199254740992}",
+      "input_length": 53,
+      "input_sha256": "3b97ba6c43d0317ab59b2480b7d0495f23cfec0d0a4cad04342d8d585b8f40a8",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be at least 1"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/negative-overflow",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-9007199254740993}",
+      "input_length": 53,
+      "input_sha256": "a367fedaac2ca880b2dbe4ed4aa4757711d410bec6eabd524eea06e334d2957e",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/empty-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\"}",
+      "input_length": 38,
+      "input_sha256": "e5769cd2d8334db0d5c1e5ec8f20084d477464c05d4ab55b4e60723083aa5550",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/decimal-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"4\"}",
+      "input_length": 39,
+      "input_sha256": "7be9be35e9164b92face7d2046e23ba68865df693c3a26c2abccf2193df5bda4",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 4
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/plus-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"+4\"}",
+      "input_length": 40,
+      "input_sha256": "3bc99061fed820a1a1cf27bcbf27a19a6a4aed160035bf4409ea63e04fb507e9",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/minus-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"-4\"}",
+      "input_length": 40,
+      "input_sha256": "759f15396fa7232ff8dfe061c0ed127d7275d352e6cc682147e4a8099da8e7a7",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/space-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\" 4\"}",
+      "input_length": 40,
+      "input_sha256": "5b80ba7b3e96cc3e4353962215dd799fdd01f750eb2f49a93979b721fdeaf2c8",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/trailing-space",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"4 \"}",
+      "input_length": 40,
+      "input_sha256": "b5d88ed6ea0424ba2e9ed85aff86856653ee3ab3f401a3a98fa8696ba41ca048",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/leading-zero",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"0004\"}",
+      "input_length": 42,
+      "input_sha256": "e42027318abc425f6b629e159ea2e274f065ba33a8d95f60b977b719d12643e2",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 4
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/16-zeroes",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"0000000000000000\"}",
+      "input_length": 54,
+      "input_sha256": "fee2d4135e6f24c7ca1a42a5c9e9f491e0e80497fe7ec332ca9ab43883e527c6",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be at least 1"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/17-zeroes",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"00000000000000000\"}",
+      "input_length": 55,
+      "input_sha256": "4c40c9df5aae64e170f070a82f059498c9a607b97dfc0a4fe7f6ccb4c5872fa1",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/max-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"9007199254740992\"}",
+      "input_length": 54,
+      "input_sha256": "2a777839264197b5dff6a32e12adbf366b543b91aa7d36c104b5380dab7ce8e6",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x",
+            "reply_to": 9007199254740992
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/max-overflow-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"9007199254740993\"}",
+      "input_length": 54,
+      "input_sha256": "1c3a68e0132d33877c0e8bffa08f01d726f40273a2302d1b232039f05972e95e",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/arabic-digit",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u0664\"}",
+      "input_length": 44,
+      "input_sha256": "43fb6436ef2c9a1e92d488f1f2be027275798bc0c703df55b28dc7713cacbccd",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/fullwidth-digit",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\uff14\"}",
+      "input_length": 44,
+      "input_sha256": "f79e9eb1ab58f0de0b10b34c7ba6490cef34997aa981adef31bdaada65a7f953",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/unicode-minus",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u22124\"}",
+      "input_length": 45,
+      "input_sha256": "f25d1ed9094ee35c349d6039aa18601d482c372a683a3ed3f2e58e0675aba783",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/superscript",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"\\u00b2\"}",
+      "input_length": 44,
+      "input_sha256": "09c6f6080af9b1bf15285e854c1abb26d4ee05c16eb091d72652966d20095506",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/underscore",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"1_0\"}",
+      "input_length": 41,
+      "input_sha256": "14c28a6713478c15463108129dc675ec0f85d59d5858f958b6a34c0068dab580",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/list",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":[4]}",
+      "input_length": 39,
+      "input_sha256": "5fe370d5fdfe6d1ce66c8272e4495fa3f6a1c2cad3e706c2157b3fc5c6cf44f1",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/object",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":{\"n\":4}}",
+      "input_length": 43,
+      "input_sha256": "d8bfdf9c4c7eb03dbc6ff43ff010b2374590fdd78e39da9da38c1da00b82354b",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/null",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":null}",
+      "input_length": 40,
+      "input_sha256": "594f46f3e4b682ffb4bc2a70d974b6763df73ed56c87e98e0b0fd527df534569",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "x"
+          }
+        }
+      ]
+    },
+    {
+      "case": "reply_to/4300-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 4336,
+      "input_sha256": "5bf84e6d7f0415c62fb93e8fa4ed59e49a33cf686055cb8fd2cf82141624f814",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/4301-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 4337,
+      "input_sha256": "d210d03fc0c6ff4e520c4467248e52b5d16cb8d02711e5437251b6a9c7820601",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/4301-digit-negative",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":-99999999999999999999999999999... <see script>",
+      "input_length": 4338,
+      "input_sha256": "897b98d6cbae85a20acbd487520d84e1a41a7b7aeefb770bce69b9c59be99665",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/10000-digit-int",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":999999999999999999999999999999... <see script>",
+      "input_length": 10036,
+      "input_sha256": "e93d429e443017f77f1c9880d4698e278d66cb3042cb9f53d8898c2bfc9e67c9",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "reply_to/10000-digit-string",
+      "input": "{\"op\":\"post\",\"text\":\"x\",\"reply_to\":\"99999999999999999999999999999... <see script>",
+      "input_length": 10038,
+      "input_sha256": "3c87480a8534c3f5cd3cc7897191dacdef494d9e02aece80eb3b73534fb7cbea",
+      "outcome": "response",
+      "artifacts": [
+        "error: reply_to must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/fraction",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1.9}",
+      "input_length": 40,
+      "input_sha256": "a5a61279a7e97b4b52b7b449c1758297b9a42aefb1d88d8c77f64eba1511c440",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/whole-float",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1.0}",
+      "input_length": 40,
+      "input_sha256": "eb87185236d5f281e36848cd8ef8b11a7a28cb32344ee5a4113e77f6c4d2197a",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/true",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":true}",
+      "input_length": 41,
+      "input_sha256": "8fdf5e792f894951b275719f9886aeba5e38d620115c4eeff5e4f6539c6b666c",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/false",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":false}",
+      "input_length": 42,
+      "input_sha256": "00f714c3f9c2dcc0ea164b9b522ab46777b628468c961467b7a386bfa23cefb1",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/positive-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1e999}",
+      "input_length": 42,
+      "input_sha256": "0a451329c73cfb8ec76cbe7ab041afe2eb0493aa40f4b0ab180c647756687811",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/negative-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-1e999}",
+      "input_length": 43,
+      "input_sha256": "cffb59b5107d59a75b0ae2f19127c173fb5ec88afd5e6220bbc15e5877b97897",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/nan",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":NaN}",
+      "input_length": 40,
+      "input_sha256": "a52235bbdf1d4bd61438bb27dca2c90d1044d0ce1b665959e1b006dde85ab215",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/exponent-integer",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1e3}",
+      "input_length": 40,
+      "input_sha256": "116436637c6777c6abe39fedea74215bd2ae062100cfde07ca22ba67c8238408",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":0}",
+      "input_length": 38,
+      "input_sha256": "48e5b7052fc21eee90e7ad25bb09c3a4ecc174deb0984b723756afc1944279ee",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/negative-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-0}",
+      "input_length": 39,
+      "input_sha256": "d30256a58eb43292902f65f67f3a499c81efadb269ffbdbbab635e0d8da41c07",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-1}",
+      "input_length": 39,
+      "input_sha256": "93b151139c045ec4329ef7d29128d8c4d7097dc196723a7f39e0014262ff29ea",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must not be negative"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":1}",
+      "input_length": 38,
+      "input_sha256": "303f265f765cdf8990fbdecc316e19726bf44aa96130b64449dfe54c2ab75604",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 1,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/max-minus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740991}",
+      "input_length": 53,
+      "input_sha256": "3bc54fe37dbcd3d4d984e05b9a3f6743698198f732178d888e1e994e9ea8cf27",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 9007199254740991,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740992}",
+      "input_length": 53,
+      "input_sha256": "f45f0ae232d2386c81bdd224b04428bff0e10a1f61d2c22582c042b0665f7c81",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 9007199254740992,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/max-plus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":9007199254740993}",
+      "input_length": 53,
+      "input_sha256": "283ceb33f496b7505500b348a166d2d6917d8f37027312ee80a825ef652a93fe",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/negative-max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9007199254740992}",
+      "input_length": 54,
+      "input_sha256": "583e6babbd8fbef6e4d4fa4ce67b8a22fb2a65fb0b10c34f55917617dc78eea2",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must not be negative"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/negative-overflow",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9007199254740993}",
+      "input_length": 54,
+      "input_sha256": "fad75268c63ab5339c1f4127b23307a6db75a3e70a935e3748a7cb20e165b291",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/empty-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\"}",
+      "input_length": 39,
+      "input_sha256": "2907b767cf2b37bb28267313275cb2a3be9fb053e8e10c307ca49f9a0d52b1b2",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/decimal-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"4\"}",
+      "input_length": 40,
+      "input_sha256": "2f3bb488d73edaa44f65c3179ddcdd826e93d472ad639d6fc055d4e0de13be56",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 4,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/plus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"+4\"}",
+      "input_length": 41,
+      "input_sha256": "36c58b531ee041bf9dda11a6d04c957651f244254d7bb1fee8a13c9c4309f00d",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/minus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"-4\"}",
+      "input_length": 41,
+      "input_sha256": "747aa33a4a64bb4df7876571358a9f2d112fdf0d24ef663d9eef4a43b3252a62",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/space-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\" 4\"}",
+      "input_length": 41,
+      "input_sha256": "b2f75dfab6558099a98c6cf28812c3e75447f5eab8f738fab8cf89c716ea62ac",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/trailing-space",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"4 \"}",
+      "input_length": 41,
+      "input_sha256": "42efc60d90cca0ca0cfe3c1f423ce0ee7e6da2b1fb912b6614e6487c9573b146",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/leading-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"0004\"}",
+      "input_length": 43,
+      "input_sha256": "17a21211006d487439b1269fc1b935ba307e3320dd4c794b86348c74372a9fe3",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 4,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/16-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"0000000000000000\"}",
+      "input_length": 55,
+      "input_sha256": "b56117317a5f64a8f1fd38586d923dc66e51ae0de4f58a56f04437c8dd685ee8",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/17-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"00000000000000000\"}",
+      "input_length": 56,
+      "input_sha256": "84ad9e10f82341fdcd8022d279d2c3046aa5b9a45596dd07b6e321588f356954",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/max-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9007199254740992\"}",
+      "input_length": 55,
+      "input_sha256": "e09f1fd28ea851a9f16e7bba2cba7841b86cdfb9295ae3802c99364a658c9cc5",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 9007199254740992,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "since_seq/max-overflow-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9007199254740993\"}",
+      "input_length": 55,
+      "input_sha256": "866bb6c5747bce3a641adb04739ffc50ad186b5c4370e3378c43aca4341abc93",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/arabic-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u0664\"}",
+      "input_length": 45,
+      "input_sha256": "dd93758d98f7b535f572cf22489f489cef7ed80f7100523d75a0ea785a90bdd1",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/fullwidth-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\uff14\"}",
+      "input_length": 45,
+      "input_sha256": "8d7c1006dce043a77627c05074ecc2c1ac3977ef4b16a9e5bca4ab62d3031fb4",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/unicode-minus",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u22124\"}",
+      "input_length": 46,
+      "input_sha256": "6b7a74a915ec421a470b09dde3aa72ca7aa5099fc9b284c3671eddb6441bb4a0",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/superscript",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"\\u00b2\"}",
+      "input_length": 45,
+      "input_sha256": "3cdf75e0da7bc2300e66259ff86a426c48b335e00907d7e6a80382421ef2cd45",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/underscore",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"1_0\"}",
+      "input_length": 42,
+      "input_sha256": "59b1057a988ced5fa803dbee01c554a73441dc83ec928270ba51f77d81fbcd84",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/list",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":[4]}",
+      "input_length": 40,
+      "input_sha256": "a5c8a8765a17865d8d88adcbb440d57efe43eb1d9388cdbfe82620e28710bfc3",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/object",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":{\"n\":4}}",
+      "input_length": 44,
+      "input_sha256": "c6ab48e7de1be60c88aeb2bc7ec1ebecad75e3bea448a170ea0ea8ad29f90c07",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/null",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":null}",
+      "input_length": 41,
+      "input_sha256": "42f34aaf9b2b454f9f8617def997f5c6e6cb35e7ab14af971aeb4f7a8053c8cc",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/4300-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 4337,
+      "input_sha256": "5059bb1216e1428050d21a02c86095512270bab9a223f2a5104a5050cb61fbf6",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/4301-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 4338,
+      "input_sha256": "d96f918d5385d6b77b7cb6623d32cfc84167dc37a52699d102305ee3705d4e9e",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/4301-digit-negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":-9999999999999999999999999999... <see script>",
+      "input_length": 4339,
+      "input_sha256": "a1c63c448782098885faecef5903b5a940997651ff4697c2ac993ef50cfe9ae9",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/10000-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":99999999999999999999999999999... <see script>",
+      "input_length": 10037,
+      "input_sha256": "4d743dcbce4f40b87bb49930b690aa3a0221c5c01613c9e0996ed0b4079ea3a4",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "since_seq/10000-digit-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"since_seq\":\"9999999999999999999999999999... <see script>",
+      "input_length": 10039,
+      "input_sha256": "83210c398d9fe514a627fbff684f794a5478ae94c09ba32dd6c439e7902b66bc",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/fraction",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1.9}",
+      "input_length": 36,
+      "input_sha256": "b717241cf43331cc0d44e3492fa6c28834b82f0bfe180600b6e1ee10f155656e",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/whole-float",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1.0}",
+      "input_length": 36,
+      "input_sha256": "6c0ab00d3648665d74ba86b8c6223dc9278a043bb3b6995b923e707fd4135f34",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/true",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":true}",
+      "input_length": 37,
+      "input_sha256": "a0b9542ac9eb851d5dd002555728b84ecfd1034817d497709d10348c0bb22bfb",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/false",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":false}",
+      "input_length": 38,
+      "input_sha256": "7be7cb21ae56a8e4e77c81c303790709db2768eb2edb8c225346fe43b0c7b3ba",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/positive-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1e999}",
+      "input_length": 38,
+      "input_sha256": "4dc6cd451a8146abf8fe7b0a028be958ebcaf03c8d552d7a2af3aba15993083d",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/negative-inf",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-1e999}",
+      "input_length": 39,
+      "input_sha256": "7de7b31fee3b18175c44b7886203a3648c17bca08c7b4449d534a7344aef6b05",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/nan",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":NaN}",
+      "input_length": 36,
+      "input_sha256": "71928c941f91873247ddfeedab282e095eb0c193e2d1d63adf16f33a22eeb4e1",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/exponent-integer",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1e3}",
+      "input_length": 36,
+      "input_sha256": "f042cfc631d06f1f7bc2d22b664031329134684ea18ac1c97d34e234baf3b3dc",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":0}",
+      "input_length": 34,
+      "input_sha256": "2cbec06b55d91a81992cd123e80039b7525cfb13215ebd3f7f0fdd6a749c8ade",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/negative-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-0}",
+      "input_length": 35,
+      "input_sha256": "08fd28c358d5f330933ce81f62e089dc21efc5006caa808d5c9e5fc5505ee145",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-1}",
+      "input_length": 35,
+      "input_sha256": "4cd769cbdd16c00db4d65bbf1506f701cf7e767787e86e4e904d4d9d9a0a5f35",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":1}",
+      "input_length": 34,
+      "input_sha256": "320ef7e25998385516173bd64cca8db4317a9ccd7523cd92a6f0f7ace51b9785",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/max-minus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740991}",
+      "input_length": 49,
+      "input_sha256": "0643d422b7580840c1d4c015a87b82866de67789c5f24bd7d320970f5922adcf",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 100
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740992}",
+      "input_length": 49,
+      "input_sha256": "37613276b863de42e2e30a11c063b2255b72b325e4ee26b89a293efa52e00190",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 100
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/max-plus-one",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":9007199254740993}",
+      "input_length": 49,
+      "input_sha256": "3c461f6c9d4e3a588eef0aa3b12dcf06d896156b44c448f7be632ad6d07809f3",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/negative-max",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-9007199254740992}",
+      "input_length": 50,
+      "input_sha256": "3ed827c1bbede4ce9e6ef645059982d52f8675ae57576f9f2493a4dd470458d7",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/negative-overflow",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-9007199254740993}",
+      "input_length": 50,
+      "input_sha256": "d055312f7018c111fb4ee6ce7ff7e0e54149297c4804b5cde5699d3067a8dd4c",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/empty-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\"}",
+      "input_length": 35,
+      "input_sha256": "16ca06e6155d4e0438b97e12f4977453b3154a5c863cfb066cf3f92de1f9d284",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/decimal-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"4\"}",
+      "input_length": 36,
+      "input_sha256": "16b3bcbd3184862a1c08287de4672d66c10eada7964d38d03650c995a6fcf1ae",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 4
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/plus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"+4\"}",
+      "input_length": 37,
+      "input_sha256": "fcdb384e58a43e11d3990d50f4030bbb1d4d5617cbbec9258925897520ab8480",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/minus-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"-4\"}",
+      "input_length": 37,
+      "input_sha256": "fb3930b537241b0acd2532a2c2fade670ed68dc5a302102022c3db3a549e8d06",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/space-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\" 4\"}",
+      "input_length": 37,
+      "input_sha256": "21735f92827699884b3e56ab8229f777ad63e70f81f944a4c86ed93695806203",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/trailing-space",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"4 \"}",
+      "input_length": 37,
+      "input_sha256": "4553ab9c2c260c260bf61fa9a08e4999802c8f6295c47cffebd0533d6e6503ee",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/leading-zero",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"0004\"}",
+      "input_length": 39,
+      "input_sha256": "88aaf1ceff48c7e4e33509cb3068067b94b1af38e40a1b7a6c8a2c6db539106d",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 4
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/16-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"0000000000000000\"}",
+      "input_length": 51,
+      "input_sha256": "644e58f97749ee53ad3d0bfa49af874522624bf55d3ce7080d50864031461e8c",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 1
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/17-zeroes",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"00000000000000000\"}",
+      "input_length": 52,
+      "input_sha256": "6cfa50088ad91378629c2e5c96928a923077e4da007b1f7640656f74c0206eae",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/max-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"9007199254740992\"}",
+      "input_length": 51,
+      "input_sha256": "94b9e5631d967487e7634811e34dad6a1f9ab553ca027b5033e11dfb14c046b3",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 100
+          }
+        }
+      ]
+    },
+    {
+      "case": "limit/max-overflow-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"9007199254740993\"}",
+      "input_length": 51,
+      "input_sha256": "08ec66f5bc993de2aa0d42da96ac145c7153109d903e958761fc2719bb4023fb",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/arabic-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u0664\"}",
+      "input_length": 41,
+      "input_sha256": "1dbc6f59207c8996e0e98e900c974392e34ffebddbaa8ce9427733f9ecf5ee0c",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/fullwidth-digit",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\uff14\"}",
+      "input_length": 41,
+      "input_sha256": "6a88f28ab1c398d30feb6e68f70b10a85692e47e778bb838c5b021148c20b9bc",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/unicode-minus",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u22124\"}",
+      "input_length": 42,
+      "input_sha256": "47944b07bac7aee4f7604a684a04b29de96ef4b1a26d21e7929acc4245590b2a",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/superscript",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"\\u00b2\"}",
+      "input_length": 41,
+      "input_sha256": "d6a042b64a59cd0d2b7e866eca3c6850d42fe3d3eceaccb4b45e1bb4a6d007a1",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/underscore",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"1_0\"}",
+      "input_length": 38,
+      "input_sha256": "c73a67b54064c3af3ba042f338f6f186230be815fab4e0a13f7be81ed593b7e8",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/list",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":[4]}",
+      "input_length": 36,
+      "input_sha256": "840f9a02ab3e01d52b2763f25832715bab22d98d350fd3c5a15074bf2c30229b",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/object",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":{\"n\":4}}",
+      "input_length": 40,
+      "input_sha256": "0ee47c3960d8e630961b5aeb6c78e821744875e6802b7fddd7ac59e886c70ca7",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/null",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":null}",
+      "input_length": 37,
+      "input_sha256": "9524b485fc2db7bc7d000e031cfe5db7bbeec04f8a350aafcff6430f4234be41",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/4300-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 4333,
+      "input_sha256": "f64a33ee38a4bad57ce301a97d8c76ae464001096251ab4eb6d626b6119cfe6d",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "limit/4301-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 4334,
+      "input_sha256": "74b19f843602085a67652cb437ef286b7fa6c7229eb02d450dc5818f0a3b0c38",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "limit/4301-digit-negative",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":-99999999999999999999999999999999... <see script>",
+      "input_length": 4335,
+      "input_sha256": "9d57c556ece17d3db41900a09f2394109bc2c60eaccc698f26760f2fd963f665",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "limit/10000-digit-int",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":999999999999999999999999999999999... <see script>",
+      "input_length": 10033,
+      "input_sha256": "d9870046e8b6fb08e9fcdc894b2510f40fd686cca824549941dfe3c616c52c5a",
+      "outcome": "InternalError",
+      "message": "Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit",
+      "room_calls": []
+    },
+    {
+      "case": "limit/10000-digit-string",
+      "input": "{\"op\":\"read\",\"text\":\"x\",\"limit\":\"99999999999999999999999999999999... <see script>",
+      "input_length": 10035,
+      "input_sha256": "bd61ec0f7caee8a17cad9cdd541a8fdc1c5531c41ae58df0f527d9580e172f14",
+      "outcome": "response",
+      "artifacts": [
+        "error: limit must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/0",
+      "input": "read since=0",
+      "input_length": 12,
+      "input_sha256": "17e32c3d82760d0b58d71d169c3015a1887f6de2e7d90bf5569ac762c2a8750f",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-since/1",
+      "input": "read since=1",
+      "input_length": 12,
+      "input_sha256": "9f082699502a637f8ee99b27d9116677a5bddbc6e8fe4276bf66e7521aa974bb",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 1,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-since/0004",
+      "input": "read since=0004",
+      "input_length": 15,
+      "input_sha256": "0dc6499e61fa8b4afcaec645ae2f675915be4986f7fd3b3b097a49a5fc7db30c",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 4,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-since/+1",
+      "input": "read since=+1",
+      "input_length": 13,
+      "input_sha256": "ffdaaeb5ad5663af4c5405113338f6be87b44e8a237064b26adc19757b203adf",
+      "outcome": "response",
+      "artifacts": [
+        "error: commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/-1",
+      "input": "read since=-1",
+      "input_length": 13,
+      "input_sha256": "73db0e0dc8d671ad896e92544497b9a1dc8f3c00fafd570be7fa3761f63e7aac",
+      "outcome": "response",
+      "artifacts": [
+        "error: commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/1.0",
+      "input": "read since=1.0",
+      "input_length": 14,
+      "input_sha256": "39375064e1de75809a29eebd8306538b9a785060e29e3d0916cdc6cd706e73bd",
+      "outcome": "response",
+      "artifacts": [
+        "error: commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/1e3",
+      "input": "read since=1e3",
+      "input_length": 14,
+      "input_sha256": "295ff41f2a00a3495684b74709173835535bd6de404fb15dba1424148aa60cc8",
+      "outcome": "response",
+      "artifacts": [
+        "error: commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/\u0664",
+      "input": "read since=\u0664",
+      "input_length": 12,
+      "input_sha256": "18b2baba005b35d9bc81001b1ea4cb41f87ac866c0c08314b0bdf8d8cb03c02a",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/\uff14",
+      "input": "read since=\uff14",
+      "input_length": 12,
+      "input_sha256": "1049c22969bc78e983296a17194db50e1e8d51340caaf372d4b9ad1d1996eb5d",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/9007199254740992",
+      "input": "read since=9007199254740992",
+      "input_length": 27,
+      "input_sha256": "9826061269c66866e884d8ffd42bb8af94872a3ea26f024e576ceffb9e54b382",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 9007199254740992,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-since/9007199254740993",
+      "input": "read since=9007199254740993",
+      "input_length": 27,
+      "input_sha256": "53fe517c43ba7d34ef5cda6bc56b8322203ac82c63d962e62741cc93ba201749",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq is out of range"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/4301-digits",
+      "input": "read since=999999999999999999999999999999999999999999999999999999... <see script>",
+      "input_length": 4312,
+      "input_sha256": "a4a3240d242ed1ac01cf752e9c2aac55392d75b44af0df23ef4970e90a4cb213",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-since/00000000000000000",
+      "input": "read since=00000000000000000",
+      "input_length": 28,
+      "input_sha256": "1a16527f2f5540d1a223c882cf2b7a2570d07e5a613e391880caff21a55229d7",
+      "outcome": "response",
+      "artifacts": [
+        "error: since_seq must be an integer"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-read-topic",
+      "input": "read #announcements since=4",
+      "input_length": 27,
+      "input_sha256": "18981fe2f9fda05509b8a2b9e74bb008253b21deb63ebc05a702790a647c2850",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 4,
+            "limit": 20,
+            "topic": "announcements"
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-read-default",
+      "input": "read",
+      "input_length": 4,
+      "input_sha256": "3316348dbadfb7b11c7c2ea235949419e23f9fa898ad2c198f999617912a9925",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 0,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-read-trailing-whitespace",
+      "input": "read since=4\n",
+      "input_length": 13,
+      "input_sha256": "ee99184f310dc6986215611dd4a0c7d0e0a14fd33b4639572c0483a469614862",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_read",
+          "arguments": {
+            "since_seq": 4,
+            "limit": 20
+          }
+        }
+      ]
+    },
+    {
+      "case": "text-read-split",
+      "input": "read since=4 more",
+      "input_length": 17,
+      "input_sha256": "3251b13d2ef1e392e1bdf90a2c26fcf7eb968e76f10162c225e217a6a2ba5eda",
+      "outcome": "response",
+      "artifacts": [
+        "error: commands: `topics` | `read [#topic] [since=N]` | `post #topic text` | JSON {\"op\": \"post|read|topics\", \"topic\", \"text\", \"evidence_refs\", \"reply_to\", \"since_seq\", \"limit\", \"sender\"}"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    },
+    {
+      "case": "text-post-is-text",
+      "input": "post #announcements 1e999",
+      "input_length": 25,
+      "input_sha256": "be4db91549aa7130814c4a057a96f587ccfceca1427cbfa34334f68bd2099bb0",
+      "outcome": "response",
+      "artifacts": [
+        "{\"ok\": true, \"seq\": 7, \"events\": [], \"topic\": \"announcements\"}"
+      ],
+      "states": [
+        3
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": [
+        {
+          "tool": "room_broadcast",
+          "arguments": {
+            "agent_id": "a2a:anonymous",
+            "text": "1e999",
+            "topic": "announcements"
+          }
+        }
+      ]
+    },
+    {
+      "case": "json-plus-number",
+      "input": "{\"op\":\"read\",\"since_seq\":+4}",
+      "input_length": 28,
+      "input_sha256": "1d653bad93260403b4348c3bdb8b0a3d8c2eef90da5e048860e22c00f8326df0",
+      "outcome": "response",
+      "artifacts": [
+        "error: invalid JSON: Expecting value"
+      ],
+      "states": [
+        4
+      ],
+      "chunks": [
+        "task"
+      ],
+      "room_calls": []
+    }
+  ],
+  "port": 6668,
+  "summary": {
+    "parser_cases": 142,
+    "http_cases": 142,
+    "parser_unexpected": [
+      "reply_to/4301-digit-int",
+      "reply_to/4301-digit-negative",
+      "reply_to/10000-digit-int",
+      "since_seq/4301-digit-int",
+      "since_seq/4301-digit-negative",
+      "since_seq/10000-digit-int",
+      "limit/4301-digit-int",
+      "limit/4301-digit-negative",
+      "limit/10000-digit-int"
+    ],
+    "http_internal_errors": [
+      "reply_to/4301-digit-int",
+      "reply_to/4301-digit-negative",
+      "reply_to/10000-digit-int",
+      "since_seq/4301-digit-int",
+      "since_seq/4301-digit-negative",
+      "since_seq/10000-digit-int",
+      "limit/4301-digit-int",
+      "limit/4301-digit-negative",
+      "limit/10000-digit-int"
+    ]
+  }
+}

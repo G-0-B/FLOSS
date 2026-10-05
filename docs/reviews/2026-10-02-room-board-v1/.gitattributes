@@ -1,0 +1,6 @@
+# Review evidence: stored byte for byte, never line-ending normalized.
+# The repository rule (root .gitattributes, "Review and provenance EVIDENCE")
+# covers *.json and *.txt under docs/reviews/. This folder also holds reviewer
+# scripts, JUnit XML, a diff and Markdown with CRLF, and round-4/receipt-hashes.json
+# publishes their hashes; normalizing them would make those hashes fail on a clone.
+* -text

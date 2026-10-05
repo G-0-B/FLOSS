@@ -1,0 +1,135 @@
+Producer[cb003714-60bd-418a-a754-027f5f87eaab]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 201, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 127, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 97, in _parse_json
+    reply_to = int(obj["reply_to"]) if obj.get("reply_to") is not None else None
+               ~~~^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert float infinity to integer
+Task cb003714-60bd-418a-a754-027f5f87eaab already exists. Ignoring task replacement.
+Consumer[cb003714-60bd-418a-a754-027f5f87eaab]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 201, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 127, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 97, in _parse_json
+    reply_to = int(obj["reply_to"]) if obj.get("reply_to") is not None else None
+               ~~~^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert float infinity to integer
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Roaming\Python\Python313\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 201, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 127, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r4-20261004-ly7g_a9b\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 97, in _parse_json
+    reply_to = int(obj["reply_to"]) if obj.get("reply_to") is not None else None
+               ~~~^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert float infinity to integer
+Request Error (ID: d6a028c1-6868-4d98-9d4d-f63b37b3eb4a): Code=-32603, Message='cannot convert float infinity to integer'
+Dispatcher task was cancelled or finished. Events may be lost.
+[
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1.9}",
+    "room_calls": [
+      {
+        "tool": "room_broadcast",
+        "arguments": {
+          "agent_id": "a2a:anonymous",
+          "text": "reply",
+          "reply_to": 1
+        }
+      }
+    ],
+    "response": "{\"ok\": true, \"seq\": 2, \"topic\": \"general\"}"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":true}",
+    "room_calls": [
+      {
+        "tool": "room_broadcast",
+        "arguments": {
+          "agent_id": "a2a:anonymous",
+          "text": "reply",
+          "reply_to": 1
+        }
+      }
+    ],
+    "response": "{\"ok\": true, \"seq\": 2, \"topic\": \"general\"}"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1e999}",
+    "room_calls": [],
+    "exception": "InternalError",
+    "message": "cannot convert float infinity to integer"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":\"abc\"}",
+    "room_calls": [],
+    "response": "error: reply_to, since_seq and limit must be integers"
+  }
+]

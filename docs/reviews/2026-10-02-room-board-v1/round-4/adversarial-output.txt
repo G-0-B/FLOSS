@@ -1,0 +1,142 @@
+{
+  "wrong-bus-accepted": {
+    "settled": 1,
+    "probe_reply": {
+      "ok": true,
+      "seq": 2
+    },
+    "shared_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:03:04Z",
+        "type": "broadcast",
+        "agent_id": "previous",
+        "text": "seed"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:03:04Z",
+        "type": "broadcast",
+        "agent_id": "other-agent",
+        "text": "unrelated shared-bus traffic"
+      }
+    ],
+    "shadow_rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:03:04Z",
+        "type": "broadcast",
+        "agent_id": "previous",
+        "text": "seed"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:03:04Z",
+        "type": "broadcast",
+        "agent_id": "operator",
+        "text": "rolled back to v0.1; probe R4"
+      }
+    ],
+    "checks": [
+      {
+        "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "rc": 0,
+        "stdout": "ROLLBACK_CHECK_PASSED\n",
+        "stderr": ""
+      },
+      {
+        "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+        "rc": 0,
+        "stdout": "ROLLBACK_CHECK_PASSED\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "correct-bus-rejected": {
+    "settled": 1,
+    "probe_reply": {
+      "ok": true,
+      "seq": 2
+    },
+    "rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:03:05Z",
+        "type": "broadcast",
+        "agent_id": "previous",
+        "text": "seed"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:03:05Z",
+        "type": "broadcast",
+        "agent_id": "operator",
+        "text": "rolled back to v0.1; correct probe"
+      },
+      {
+        "seq": 3,
+        "ts": "2026-10-04T08:03:05Z",
+        "type": "broadcast",
+        "agent_id": "other-agent",
+        "text": "after correct probe"
+      }
+    ],
+    "checks": [
+      {
+        "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "rc": 1,
+        "stdout": "",
+        "stderr": "The v0.1 room did not write the shared log. Stop and investigate.\nAt C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\adversarial-r4-h1cfhauc\\verify-tail.ps1:5 \nchar:42\n+ ... tled + 1) { throw 'The v0.1 room did not write the shared log. Stop a ...\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n    + CategoryInfo          : OperationStopped: (The v0.1 room d...nd investigate.:String) [], RuntimeException\n    + FullyQualifiedErrorId : The v0.1 room did not write the shared log. Stop and investigate.\n \n"
+      },
+      {
+        "shell": "C:\\apPs\\PowerShell\\7\\pwsh.exe",
+        "rc": 1,
+        "stdout": "",
+        "stderr": "Exception: C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\adversarial-r4-h1cfhauc\\verify-tail.ps1:5\nLine |\n   5 |  \u2026 tled + 1) { throw 'The v0.1 room did not write the shared log. Stop a \u2026\n     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | The v0.1 room did not write the shared log. Stop and investigate.\n"
+      }
+    ]
+  },
+  "parent-rebind-refused": {
+    "reply": {
+      "ok": true,
+      "seq": 2,
+      "topic": "general"
+    },
+    "rows": [
+      {
+        "seq": 1,
+        "ts": "2026-10-04T08:03:07Z",
+        "type": "broadcast",
+        "agent_id": "a",
+        "text": "seed",
+        "topic": "general"
+      },
+      {
+        "seq": 2,
+        "ts": "2026-10-04T08:03:07Z",
+        "type": "broadcast",
+        "agent_id": "a",
+        "text": "after-rebind",
+        "topic": "general"
+      }
+    ],
+    "stderr": "[coordination_room] BOARD.md projection refused: board_path C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\adversarial-r4-h1cfhauc\\parent-rebind\\alias\\events.jsonl is the event log C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r4-20261004-ly7g_a9b\\adversarial-r4-h1cfhauc\\parent-rebind\\real\\events.jsonl\n"
+  },
+  "parser-numeric-boundary": [
+    {
+      "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1.9}",
+      "reply_to": 1,
+      "exception": null
+    },
+    {
+      "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":true}",
+      "reply_to": 1,
+      "exception": null
+    },
+    {
+      "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1e999}",
+      "exception": "OverflowError",
+      "message": "cannot convert float infinity to integer"
+    }
+  ]
+}

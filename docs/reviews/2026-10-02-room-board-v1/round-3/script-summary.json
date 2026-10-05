@@ -1,0 +1,11 @@
+{
+  "runs": 296,
+  "dry_runs": 140,
+  "parse_calls": 16,
+  "parse_errors": 0,
+  "violations": [],
+  "shells": [
+    "5.1.22621.6133",
+    "7.6.6"
+  ]
+}

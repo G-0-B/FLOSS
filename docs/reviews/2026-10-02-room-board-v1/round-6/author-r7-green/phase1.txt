@@ -1,0 +1,39 @@
+........................................................................ [  6%]
+........................................................................ [ 12%]
+................................................ss...ss................. [ 19%]
+........................................................................ [ 25%]
+............................s........................................... [ 32%]
+........................................................................ [ 38%]
+........................................................................ [ 45%]
+........................................................................ [ 51%]
+........................................................................ [ 57%]
+........................................................................ [ 64%]
+..............................................sss....................... [ 70%]
+........................................................................ [ 77%]
+........................................................................ [ 83%]
+........................................................................ [ 90%]
+........................................................................ [ 96%]
+................................F.......                                 [100%]
+================================== FAILURES ===================================
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/coordination_room/tests/test_deploy_helpers.py::test_every_helper_check_holds[C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE]
+  C:\Python313\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+1 failed, 1111 passed, 8 skipped, 1 deselected, 2 warnings in 149.21s (0:02:29)

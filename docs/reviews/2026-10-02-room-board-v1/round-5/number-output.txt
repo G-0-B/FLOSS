@@ -1,0 +1,1088 @@
+Producer[4049e3a4-3179-4bf5-815f-26db804d6e2e]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 4049e3a4-3179-4bf5-815f-26db804d6e2e already exists. Ignoring task replacement.
+Consumer[4049e3a4-3179-4bf5-815f-26db804d6e2e]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 3e6c8ca5-e33f-463d-b0b7-89358037c5a0): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[8a286bd2-2fee-4d92-8a27-5c78a9479042]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 8a286bd2-2fee-4d92-8a27-5c78a9479042 already exists. Ignoring task replacement.
+Consumer[8a286bd2-2fee-4d92-8a27-5c78a9479042]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 1729cadb-157b-454d-875c-8cc4a1630c30): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[21f12cca-87b7-4bac-b58a-b3cc43bcd324]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 21f12cca-87b7-4bac-b58a-b3cc43bcd324 already exists. Ignoring task replacement.
+Consumer[21f12cca-87b7-4bac-b58a-b3cc43bcd324]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 7d1da9cb-7c31-4a23-9c06-3aaf4a923f70): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[84f4ace1-2410-4dae-9eb7-a3478466b610]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 84f4ace1-2410-4dae-9eb7-a3478466b610 already exists. Ignoring task replacement.
+Consumer[84f4ace1-2410-4dae-9eb7-a3478466b610]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 0072f2a3-cc83-4d88-b622-2234654b2118): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[87a6a4d6-e6ae-417e-9135-b82c842949d5]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 87a6a4d6-e6ae-417e-9135-b82c842949d5 already exists. Ignoring task replacement.
+Consumer[87a6a4d6-e6ae-417e-9135-b82c842949d5]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: c8cd5fb0-cd01-40d4-a3e7-5715d8703ae9): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[620c573c-7849-46df-861c-506bdf15d331]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 620c573c-7849-46df-861c-506bdf15d331 already exists. Ignoring task replacement.
+Consumer[620c573c-7849-46df-861c-506bdf15d331]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: a950054a-cddc-4bc1-87b5-0ab4ab69cc3d): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[33e1b7f4-6ed9-4606-bd47-bc61af240347]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 33e1b7f4-6ed9-4606-bd47-bc61af240347 already exists. Ignoring task replacement.
+Consumer[33e1b7f4-6ed9-4606-bd47-bc61af240347]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 8fe6e4d4-3dda-48f7-9cfd-7c764b1be413): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[f662ce96-1586-41d1-ad76-97cd3cd55f91]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Task f662ce96-1586-41d1-ad76-97cd3cd55f91 already exists. Ignoring task replacement.
+Consumer[f662ce96-1586-41d1-ad76-97cd3cd55f91]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: f5376c16-863e-41f6-94a2-86b06615bc28): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 4301 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+Producer[1f300c9a-81c3-4d2b-8311-e4595b115d9b]: Execution failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Task 1f300c9a-81c3-4d2b-8311-e4595b115d9b already exists. Ignoring task replacement.
+Consumer[1f300c9a-81c3-4d2b-8311-e4595b115d9b]: Failed
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Unhandled exception
+Traceback (most recent call last):
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 315, in handle_requests
+    raw_result = await self._process_non_streaming_request(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        specific_request, call_context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\version_validator.py", line 126, in async_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 515, in _process_non_streaming_request
+    return await self._handle_send_message(request_obj, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\routes\jsonrpc_dispatcher.py", line 405, in _handle_send_message
+    task_or_message = await self.request_handler.on_message_send(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        request_obj, context
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\request_handler.py", line 285, in async_wrapper
+    return await method(self, params, context, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\request_handlers\default_request_handler_v2.py", line 252, in on_message_send
+    async for raw_event in active_task.subscribe(
+    ...<23 lines>...
+            result = event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 665, in subscribe
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 132, in run
+    await self._process_event(event)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 177, in _process_event
+    raise event
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\server\agent_execution\active_task.py", line 540, in _run_producer
+    await self._agent_executor.execute(
+        request_context, self._event_queue_agent
+    )
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 225, in execute
+    reply = await run_command(self._room, parse_command(raw))
+                                          ~~~~~~~~~~~~~^^^^^
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 149, in parse_command
+    return _parse_json(body)
+  File "C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\fixtures-exact\proposal\packages\a2a_mesh\room_bridge.py", line 109, in _parse_json
+    obj = json.loads(body)
+  File "C:\Python313\Lib\json\__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Python313\Lib\json\decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\json\decoder.py", line 361, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ~~~~~~~~~~~~~~^^^^^^^^
+ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit
+Request Error (ID: 9bf8ac48-9345-4c42-a79d-6f8909362f58): Code=-32603, Message='Exceeds the limit (4300 digits) for integer string conversion: value has 10000 digits; use sys.set_int_max_str_digits() to increase the limit'
+Dispatcher task was cancelled or finished. Events may be lost.
+{
+  "parser_cases": 142,
+  "http_cases": 142,
+  "parser_unexpected": [
+    "reply_to/4301-digit-int",
+    "reply_to/4301-digit-negative",
+    "reply_to/10000-digit-int",
+    "since_seq/4301-digit-int",
+    "since_seq/4301-digit-negative",
+    "since_seq/10000-digit-int",
+    "limit/4301-digit-int",
+    "limit/4301-digit-negative",
+    "limit/10000-digit-int"
+  ],
+  "http_internal_errors": [
+    "reply_to/4301-digit-int",
+    "reply_to/4301-digit-negative",
+    "reply_to/10000-digit-int",
+    "since_seq/4301-digit-int",
+    "since_seq/4301-digit-negative",
+    "since_seq/10000-digit-int",
+    "limit/4301-digit-int",
+    "limit/4301-digit-negative",
+    "limit/10000-digit-int"
+  ]
+}

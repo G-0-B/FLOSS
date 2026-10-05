@@ -1,0 +1,106 @@
+..ss.................................................................... [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 18%]
+.......................................................................s [ 24%]
+s...ss.................................................................. [ 30%]
+........................................................................ [ 36%]
+........................................................................ [ 42%]
+........................................................................ [ 48%]
+........................................................................ [ 54%]
+........................................................................ [ 60%]
+........................................................................ [ 66%]
+................................................sss..................... [ 72%]
+..................F..................................................... [ 78%]
+........................................................................ [ 84%]
+...................................................................F.... [ 90%]
+........................................................................ [ 96%]
+................................F.......                                 [100%]
+================================== FAILURES ===================================
+_________________ test_hermes_gateway_alive_detects_dead_pid __________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r5-20261004-042545/runtime/proposal/tmp/pytest-of-kalis/pytest-0/test_hermes_gateway_alive_dete0')
+
+    def test_hermes_gateway_alive_detects_dead_pid(tmp_path):
+        (tmp_path / "gateway.pid").write_text(
+            json.dumps({"pid": 999999, "kind": "hermes-gateway"}), encoding="utf-8"
+        )
+>       assert mas.hermes_gateway_alive(tmp_path) is None
+E       AssertionError: assert 999999 is None
+E        +  where 999999 = <function hermes_gateway_alive at 0x0000026C6F250540>(WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r5-20261004-042545/runtime/proposal/tmp/pytest-of-kalis/pytest-0/test_hermes_gateway_alive_dete0'))
+E        +    where <function hermes_gateway_alive at 0x0000026C6F250540> = mas.hermes_gateway_alive
+
+tests\test_shared_agent_surface_mcp.py:473: AssertionError
+______________ test_yaml_target_writes_when_gateway_pid_is_stale ______________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r5-20261004-042545/runtime/proposal/tmp/pytest-of-kalis/pytest-0/test_yaml_target_writes_when_g0')
+
+    def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
+        """A `gateway.pid` naming a process that is no longer running must NOT
+        block the write -- only an actually-live gateway is a clobber risk.
+        """
+        pytest.importorskip("ruamel.yaml")
+        surface = load_hook_surface_module()
+    
+        hermes_dir = tmp_path / "hermes"
+        hermes_dir.mkdir()
+        config_path = hermes_dir / "config.yaml"
+        fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+        config_path.write_text(fixture_text, encoding="utf-8")
+        # An implausibly large PID: on Windows, `tasklist /FI "PID eq N"` for a
+        # nonexistent PID returns a non-empty "no tasks match" message (not an
+        # error and not empty output), which `_pid_alive` correctly reads as
+        # "not alive" rather than failing closed.
+        (hermes_dir / "gateway.pid").write_text(
+            json.dumps({"pid": 99999999}), encoding="utf-8"
+        )
+    
+        message, changed = surface.apply_yaml_target(
+            config_path, _hermes_target_cfg(), check=False, dry_run=False
+        )
+    
+>       assert "WROTE" in message
+E       AssertionError: assert 'WROTE' in 'REFUSED C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\runtime\\proposal\\tmp\\pytest-o...hen_g0\\hermes\\config.yaml (gateway PID 99999999 is live; stop it and re-run, or the config is clobbered on shutdown)'
+
+scripts\tests\test_shared_hook_surface.py:1000: AssertionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\.venv\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 4 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 8 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 22 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\proto_utils.py:303: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    errors = _validate_proto_required_fields_internal(msg)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 6 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 12 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 32 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\proto_utils.py:263: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(val)
+
+packages/a2a_mesh/tests/test_helloworld_pair.py: 2 warnings
+packages/a2a_mesh/tests/test_room_bridge_e2e.py: 4 warnings
+packages/a2a_mesh/tests/test_room_bridge_pair.py: 10 warnings
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\a2a\utils\proto_utils.py:272: DeprecationWarning: label() is deprecated. Use is_required() or is_repeated() instead.
+    sub_errs = _validate_proto_required_fields_internal(item)
+
+packages/a2a_mesh/tests/test_room_bridge_e2e.py::test_a2a_post_lands_on_the_room_board
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r5-20261004-042545\.venv\Lib\site-packages\pydantic_settings\sources\utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_shared_agent_surface_mcp.py::test_hermes_gateway_alive_detects_dead_pid
+FAILED scripts/tests/test_shared_hook_surface.py::test_yaml_target_writes_when_gateway_pid_is_stale
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+3 failed, 1180 passed, 9 skipped, 1 deselected, 102 warnings in 118.32s (0:01:58)

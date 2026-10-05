@@ -1,0 +1,41 @@
+[
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1.9}",
+    "room_calls": [
+      {
+        "tool": "room_broadcast",
+        "arguments": {
+          "agent_id": "a2a:anonymous",
+          "text": "reply",
+          "reply_to": 1
+        }
+      }
+    ],
+    "response": "{\"ok\": true, \"seq\": 2, \"topic\": \"general\"}"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":true}",
+    "room_calls": [
+      {
+        "tool": "room_broadcast",
+        "arguments": {
+          "agent_id": "a2a:anonymous",
+          "text": "reply",
+          "reply_to": 1
+        }
+      }
+    ],
+    "response": "{\"ok\": true, \"seq\": 2, \"topic\": \"general\"}"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":1e999}",
+    "room_calls": [],
+    "exception": "InternalError",
+    "message": "cannot convert float infinity to integer"
+  },
+  {
+    "input": "{\"op\":\"post\",\"text\":\"reply\",\"reply_to\":\"abc\"}",
+    "room_calls": [],
+    "response": "error: reply_to, since_seq and limit must be integers"
+  }
+]

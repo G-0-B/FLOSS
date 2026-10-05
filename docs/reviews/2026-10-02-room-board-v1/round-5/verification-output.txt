@@ -1,0 +1,185 @@
+{
+  "python": "3.13.1 (tags/v3.13.1:0671451, Dec  3 2024, 19:06:28) [MSC v.1942 64 bit (AMD64)]",
+  "executable": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\.venv\\Scripts\\python.exe",
+  "stages": {
+    "baseline": {
+      "counts": {
+        "passed": 990,
+        "skipped": 7,
+        "failure": 3
+      },
+      "failures": [
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ]
+    },
+    "phase1": {
+      "counts": {
+        "passed": 1083,
+        "skipped": 7,
+        "failure": 3
+      },
+      "failures": [
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ]
+    },
+    "proposal": {
+      "counts": {
+        "passed": 1180,
+        "skipped": 9,
+        "failure": 3
+      },
+      "failures": [
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ]
+    }
+  },
+  "hashes": {
+    "snapshot": {
+      "sha256": "f2a8392e874a6f90c6818657fccc0050625da518fb09860dff0d58c68b8d1752",
+      "newline_lines": 4272
+    },
+    "live": {
+      "sha256": "f2a8392e874a6f90c6818657fccc0050625da518fb09860dff0d58c68b8d1752",
+      "newline_lines": 4272
+    },
+    "round4": {
+      "sha256": "7d40c37e91a1e6beb9f45a09cd9d73ca4c8b4cb32e5db7aebf6d6d9da955c6f1",
+      "newline_lines": 4124
+    }
+  },
+  "source_drift": {
+    "baseline": [],
+    "rollback": [],
+    "phase1": [],
+    "proposal": []
+  },
+  "archive_text_scan": {
+    "baseline": {
+      "count": 1250,
+      "nul_offenders": []
+    },
+    "rollback": {
+      "count": 1251,
+      "nul_offenders": []
+    },
+    "phase1": {
+      "count": 1260,
+      "nul_offenders": []
+    },
+    "proposal": {
+      "count": 1273,
+      "nul_offenders": []
+    }
+  },
+  "git_bases": {
+    "command": [
+      "git",
+      "-c",
+      "safe.directory=C:/~shit/FLOSS",
+      "-C",
+      "C:\\~shit\\FLOSS",
+      "rev-parse",
+      "feat/coordination-room-rebased",
+      "feat/a2a-harness-mesh"
+    ],
+    "cwd": null,
+    "rc": 0,
+    "stdout": "4aab13e30f3c2960da787b47c90926256b4b5b73\n225287c2ed310158a3f699688447db2964e425b2\n",
+    "stderr": ""
+  },
+  "baseline_environment": {
+    "tasklist": {
+      "command": [
+        "tasklist",
+        "/FI",
+        "PID eq 999999",
+        "/FO",
+        "CSV",
+        "/NH"
+      ],
+      "cwd": null,
+      "rc": 1,
+      "stdout": "",
+      "stderr": "ERROR: Access denied\n\n"
+    },
+    "git_inventory": {
+      "command": [
+        "git",
+        "ls-files"
+      ],
+      "cwd": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r5-20261004-042545\\fixtures-exact\\baseline",
+      "rc": 128,
+      "stdout": "",
+      "stderr": "fatal: not a git repository (or any of the parent directories): .git\n"
+    }
+  },
+  "numbers": {
+    "parser_cases": 142,
+    "http_cases": 142,
+    "parser_unexpected": [
+      "reply_to/4301-digit-int",
+      "reply_to/4301-digit-negative",
+      "reply_to/10000-digit-int",
+      "since_seq/4301-digit-int",
+      "since_seq/4301-digit-negative",
+      "since_seq/10000-digit-int",
+      "limit/4301-digit-int",
+      "limit/4301-digit-negative",
+      "limit/10000-digit-int"
+    ],
+    "http_internal_errors": [
+      "reply_to/4301-digit-int",
+      "reply_to/4301-digit-negative",
+      "reply_to/10000-digit-int",
+      "since_seq/4301-digit-int",
+      "since_seq/4301-digit-negative",
+      "since_seq/10000-digit-int",
+      "limit/4301-digit-int",
+      "limit/4301-digit-negative",
+      "limit/10000-digit-int"
+    ],
+    "outcomes": {
+      "CommandError": 98,
+      "accepted": 35,
+      "ValueError": 9
+    },
+    "normal_errors": 98,
+    "all_normal_errors_failed_and_no_calls": true,
+    "all_internal_errors_no_calls": true
+  },
+  "deployment": [
+    {
+      "shell": "5.1.22621.6133",
+      "cases": 45,
+      "unexpected": []
+    },
+    {
+      "shell": "7.6.6",
+      "cases": 45,
+      "unexpected": []
+    }
+  ]
+}
+{
+  "baseline-phase1": {
+    "missing": [],
+    "added_count": 93,
+    "changed": {}
+  },
+  "baseline-proposal": {
+    "missing": [],
+    "added_count": 192,
+    "changed": {}
+  },
+  "phase1-proposal": {
+    "missing": [],
+    "added_count": 99,
+    "changed": {}
+  }
+}

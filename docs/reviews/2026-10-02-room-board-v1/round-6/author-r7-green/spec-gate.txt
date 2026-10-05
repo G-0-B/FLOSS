@@ -1,0 +1,21 @@
+== baseline
+SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py
+SPEC-GATE MISSING FLOSS/hooks/grok_session_register.py
+SPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)
+
+SPEC-GATE FAIL: 2 unregistered gated artifact(s) — the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>" --tier 1
+exit 1
+== p1
+SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py
+SPEC-GATE MISSING FLOSS/hooks/grok_session_register.py
+SPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)
+
+SPEC-GATE FAIL: 2 unregistered gated artifact(s) — the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>" --tier 1
+exit 1
+== p2
+SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py
+SPEC-GATE MISSING FLOSS/hooks/grok_session_register.py
+SPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)
+
+SPEC-GATE FAIL: 2 unregistered gated artifact(s) — the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec "<one-liner>" --tier 1
+exit 1

@@ -1,0 +1,39 @@
+[
+  {
+    "stage": "baseline",
+    "check": "spec_gate",
+    "rc": 1,
+    "output": "SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py\nSPEC-GATE MISSING FLOSS/hooks/grok_session_register.py\nSPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent \u2014 prune or restore)\n\nSPEC-GATE FAIL: 2 unregistered gated artifact(s) \u2014 the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\" --tier 1\n"
+  },
+  {
+    "stage": "phase1",
+    "check": "spec_gate",
+    "rc": 1,
+    "output": "SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py\nSPEC-GATE MISSING FLOSS/hooks/grok_session_register.py\nSPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent \u2014 prune or restore)\n\nSPEC-GATE FAIL: 2 unregistered gated artifact(s) \u2014 the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\" --tier 1\n"
+  },
+  {
+    "stage": "proposal",
+    "check": "spec_gate",
+    "rc": 1,
+    "output": "SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py\nSPEC-GATE MISSING FLOSS/hooks/grok_session_register.py\nSPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent \u2014 prune or restore)\n\nSPEC-GATE FAIL: 2 unregistered gated artifact(s) \u2014 the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\" --tier 1\n"
+  },
+  {
+    "check": "ruff",
+    "command": [
+      "C:\\Python313\\python.exe",
+      "-m",
+      "ruff",
+      "check",
+      "--isolated",
+      "packages/coordination_room",
+      "packages/a2a_mesh/room_bridge.py",
+      "scripts/tests/test_daemon_scope.py",
+      "packages\\a2a_mesh\\tests\\test_room_bridge_e2e.py",
+      "packages\\a2a_mesh\\tests\\test_room_bridge_invariants.py",
+      "packages\\a2a_mesh\\tests\\test_room_bridge_pair.py",
+      "packages\\a2a_mesh\\tests\\test_room_bridge_parse.py"
+    ],
+    "rc": 0,
+    "output": "All checks passed!\n"
+  }
+]

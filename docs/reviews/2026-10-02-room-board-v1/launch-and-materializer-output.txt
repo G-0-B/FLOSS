@@ -1,0 +1,11 @@
+R6 direct worktree launch root: C:\~shit\FLOSS\.worktrees\room-board-v1
+R6 direct worktree launch log: C:\~shit\FLOSS\.worktrees\.agent-surface\rooms\default\events.jsonl
+R6 direct worktree launch board: C:\~shit\FLOSS\.worktrees\.agent-surface\rooms\default\BOARD.md
+R6 expected shared log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+R7 materializer entries at plan worktree defaults: 0
+PLAN  WRITE C:\~shit\FLOSS\.worktrees\.agent-surface\memory\memory-registry.json
+PLAN  WRITE C:\~shit\FLOSS\.worktrees\.agent-surface\memory\AGENT_MEMORY.md
+PLAN  WRITE C:\~shit\FLOSS\.worktrees\FLOSS\docs\agent-memory\MEMORY.md
+PLAN  WRITE C:\~shit\FLOSS\.worktrees\FLOSS\docs\agent-memory\CHATGPT_MEMORY_EXPORT.md
+PLAN  WRITE C:\Users\kalis\.claude\projects\C---shit\memory\MEMORY.md
+R7 would-be Claude index: '# Claude Memory Index\n\nGenerated from `FLOSS/docs/agent-memory/`. Do not hand-edit this projection.\n'

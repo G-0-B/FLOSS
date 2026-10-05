@@ -1,0 +1,261 @@
+{
+  "source_changed_after_tests": [],
+  "runs": {
+    "baseline-green": {
+      "counts": {
+        "passed": 990,
+        "failed": 3,
+        "skipped": 7
+      },
+      "failures": [
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 21,
+          "failed": 0,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        },
+        "daemon_scope": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "phase1-green": {
+      "counts": {
+        "passed": 1077,
+        "failed": 6,
+        "skipped": 7
+      },
+      "failures": [
+        "packages.tests.test_mcp_daemon::test_a_clean_shutdown_still_reports_success",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host \"[FLOSS MCP] Daemons started (consensus]",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host \"[FLOSS MCP] All daemons stopped]",
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 95,
+          "failed": 0,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        },
+        "daemon_scope": {
+          "passed": 16,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "proposal-green": {
+      "counts": {
+        "passed": 1115,
+        "failed": 6,
+        "skipped": 9
+      },
+      "failures": [
+        "packages.tests.test_mcp_daemon::test_a_clean_shutdown_still_reports_success",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host \"[FLOSS MCP] Daemons started (consensus]",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host \"[FLOSS MCP] All daemons stopped]",
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.a2a_mesh.tests.test_hermes_card_optional::test_hermes_serves_agent_card",
+        "packages.a2a_mesh.tests.test_invariants::test_root_mcp_json_has_no_a2a_server_key",
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 95,
+          "failed": 0,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 36,
+          "failed": 0,
+          "skipped": 2
+        },
+        "daemon_scope": {
+          "passed": 18,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "baseline-mcp2-green": {
+      "counts": {
+        "passed": 990,
+        "failed": 3,
+        "skipped": 7
+      },
+      "failures": [
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 21,
+          "failed": 0,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        },
+        "daemon_scope": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "phase1-mcp2-green": {
+      "counts": {
+        "passed": 1074,
+        "failed": 9,
+        "skipped": 7
+      },
+      "failures": [
+        "packages.coordination_room.tests.test_server_http::test_board_round_trip_over_http",
+        "packages.coordination_room.tests.test_server_tools::test_board_tools_are_registered_with_their_parameters",
+        "packages.coordination_room.tests.test_server_tools::test_rejected_duplicate_start_leaves_board_and_log_untouched",
+        "packages.tests.test_mcp_daemon::test_a_clean_shutdown_still_reports_success",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host \"[FLOSS MCP] Daemons started (consensus]",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host \"[FLOSS MCP] All daemons stopped]",
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 92,
+          "failed": 3,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 0,
+          "failed": 0,
+          "skipped": 0
+        },
+        "daemon_scope": {
+          "passed": 16,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "proposal-mcp2-green": {
+      "counts": {
+        "passed": 1111,
+        "failed": 10,
+        "skipped": 9
+      },
+      "failures": [
+        "packages.a2a_mesh.tests.test_room_bridge_e2e::test_a2a_post_lands_on_the_room_board",
+        "packages.coordination_room.tests.test_server_http::test_board_round_trip_over_http",
+        "packages.coordination_room.tests.test_server_tools::test_board_tools_are_registered_with_their_parameters",
+        "packages.coordination_room.tests.test_server_tools::test_rejected_duplicate_start_leaves_board_and_log_untouched",
+        "packages.tests.test_mcp_daemon::test_a_clean_shutdown_still_reports_success",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host \"[FLOSS MCP] Daemons started (consensus]",
+        "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host \"[FLOSS MCP] All daemons stopped]",
+        "tests.test_shared_agent_surface_mcp::test_hermes_gateway_alive_detects_dead_pid",
+        "scripts.tests.test_shared_hook_surface::test_yaml_target_writes_when_gateway_pid_is_stale",
+        "scripts.tests.test_text_sources_are_text::test_no_tracked_text_file_contains_a_nul_byte"
+      ],
+      "skips": [
+        "packages.a2a_mesh.tests.test_hermes_card_optional::test_hermes_serves_agent_card",
+        "packages.a2a_mesh.tests.test_invariants::test_root_mcp_json_has_no_a2a_server_key",
+        "packages.activity_log.tests.test_witness::test_garbage_proof_bytes_are_unavailable_not_a_crash",
+        "packages.activity_log.tests.test_witness::test_a_proof_for_a_different_digest_is_rejected",
+        "packages.activity_log.tests.test_witness::test_no_calendar_reachable_is_unavailable_not_pending",
+        "packages.activity_log.tests.test_witness::test_a_bitcoin_attestation_is_never_reported_as_confirmed",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_exits_zero_and_names_the_step",
+        "tests.test_refresh_agent_surfaces::test_dry_run_only_summary_says_planned_not_clean",
+        "tests.test_refresh_agent_surfaces::test_check_and_dry_run_together_uses_check_semantics"
+      ],
+      "groups": {
+        "room": {
+          "passed": 92,
+          "failed": 3,
+          "skipped": 0
+        },
+        "a2a": {
+          "passed": 35,
+          "failed": 1,
+          "skipped": 2
+        },
+        "daemon_scope": {
+          "passed": 18,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    }
+  },
+  "new_failures": [
+    "packages.tests.test_mcp_daemon::test_a_clean_shutdown_still_reports_success",
+    "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host \"[FLOSS MCP] Daemons started (consensus]",
+    "packages.tests.test_mcp_daemon::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host \"[FLOSS MCP] All daemons stopped]"
+  ]
+}

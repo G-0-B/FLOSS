@@ -1,0 +1,207 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+................................................ss...ss................. [ 19%]
+........................................................................ [ 26%]
+........................................................................ [ 33%]
+........................................................................ [ 39%]
+........................................................................ [ 46%]
+........................................................................ [ 52%]
+...........................................FFF.......................... [ 59%]
+........................................................................ [ 66%]
+........................sss.......................................F..... [ 72%]
+........................................................................ [ 79%]
+........................................................................ [ 85%]
+.....................................F.................................. [ 92%]
+........................................................................ [ 99%]
+..F.......                                                               [100%]
+================================== FAILURES ===================================
+_________________ test_a_clean_shutdown_still_reports_success _________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-4/test_a_clean_shutdown_still_re0')
+
+    def test_a_clean_shutdown_still_reports_success(tmp_path):
+        """The guard must narrow to genuine leftovers, not fail every run."""
+        agent_dir = tmp_path / "agent"
+        agent_dir.mkdir()
+    
+        result = _run_stop_script(agent_dir)
+    
+        assert result.returncode == 0, result.stdout[-500:]
+>       assert "All daemons stopped" in result.stdout
+E       AssertionError: assert 'All daemons stopped' in '[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing\n[FLOSS MCP] Stopped: consensus, ensemble, room, omniroute. PID files cleaned.\n'
+E        +  where '[FLOSS MCP] OmniRoute not started by this stack, or identity unverifiable - killing nothing\n[FLOSS MCP] Stopped: consensus, ensemble, room, omniroute. PID files cleaned.\n' = CompletedProcess(args=['C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE', '-NoProfile', '-ExecutionPoli... FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand\n \n').stdout
+
+packages\tests\test_mcp_daemon.py:875: AssertionError
+_ test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host "[FLOSS MCP] Daemons started (consensus] _
+
+script = 'start_mcp_daemons.ps1', collector = '$skipped'
+banner = 'STARTUP INCOMPLETE'
+success = 'Write-Host "[FLOSS MCP] Daemons started (consensus'
+
+    @pytest.mark.parametrize(
+        "script,collector,banner,success",
+        [
+            (
+                "start_mcp_daemons.ps1",
+                "$skipped",
+                "STARTUP INCOMPLETE",
+                'Write-Host "[FLOSS MCP] Daemons started (consensus',
+            ),
+            (
+                "stop_mcp_daemons.ps1",
+                "$unresolved",
+                "SHUTDOWN INCOMPLETE",
+                'Write-Host "[FLOSS MCP] All daemons stopped',
+            ),
+        ],
+    )
+    def test_no_script_claims_success_it_did_not_achieve(
+        script, collector, banner, success
+    ):
+        """Both scripts deliberately decline to act in several branches, and both
+        then reported a clean run regardless. Fixed in stop first; the start script
+        was the unswept sibling. Asserted as a property over both so the next
+        script with a closing summary is covered before a reviewer finds it.
+    
+        Structural rather than behavioural for the start script specifically:
+        running it launches real daemons, which a test must not do.
+        """
+        text = (SCRIPTS / script).read_text(encoding="utf-8")
+    
+        assert f"{collector} = @()" in text, "collector must be an explicit array"
+        assert f"{collector} +=" in text, "nothing ever records a declined action"
+        assert f"{collector}.Count -gt 0" in text, "the summary is unguarded"
+    
+        guard_at = text.find(f"{collector}.Count -gt 0")
+        success_at = text.find(success)
+        # The EMITTING STATEMENT, not the first mention: both files explain their
+        # own summaries in comments above the code, and matching the prose made an
+        # earlier version of this test compare a comment against the guard.
+>       assert success_at != -1, "the success line has moved"
+E       AssertionError: the success line has moved
+E       assert -1 != -1
+
+packages\tests\test_mcp_daemon.py:918: AssertionError
+_ test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host "[FLOSS MCP] All daemons stopped] _
+
+script = 'stop_mcp_daemons.ps1', collector = '$unresolved'
+banner = 'SHUTDOWN INCOMPLETE'
+success = 'Write-Host "[FLOSS MCP] All daemons stopped'
+
+    @pytest.mark.parametrize(
+        "script,collector,banner,success",
+        [
+            (
+                "start_mcp_daemons.ps1",
+                "$skipped",
+                "STARTUP INCOMPLETE",
+                'Write-Host "[FLOSS MCP] Daemons started (consensus',
+            ),
+            (
+                "stop_mcp_daemons.ps1",
+                "$unresolved",
+                "SHUTDOWN INCOMPLETE",
+                'Write-Host "[FLOSS MCP] All daemons stopped',
+            ),
+        ],
+    )
+    def test_no_script_claims_success_it_did_not_achieve(
+        script, collector, banner, success
+    ):
+        """Both scripts deliberately decline to act in several branches, and both
+        then reported a clean run regardless. Fixed in stop first; the start script
+        was the unswept sibling. Asserted as a property over both so the next
+        script with a closing summary is covered before a reviewer finds it.
+    
+        Structural rather than behavioural for the start script specifically:
+        running it launches real daemons, which a test must not do.
+        """
+        text = (SCRIPTS / script).read_text(encoding="utf-8")
+    
+        assert f"{collector} = @()" in text, "collector must be an explicit array"
+        assert f"{collector} +=" in text, "nothing ever records a declined action"
+        assert f"{collector}.Count -gt 0" in text, "the summary is unguarded"
+    
+        guard_at = text.find(f"{collector}.Count -gt 0")
+        success_at = text.find(success)
+        # The EMITTING STATEMENT, not the first mention: both files explain their
+        # own summaries in comments above the code, and matching the prose made an
+        # earlier version of this test compare a comment against the guard.
+>       assert success_at != -1, "the success line has moved"
+E       AssertionError: the success line has moved
+E       assert -1 != -1
+
+packages\tests\test_mcp_daemon.py:918: AssertionError
+_________________ test_hermes_gateway_alive_detects_dead_pid __________________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-4/test_hermes_gateway_alive_dete0')
+
+    def test_hermes_gateway_alive_detects_dead_pid(tmp_path):
+        (tmp_path / "gateway.pid").write_text(
+            json.dumps({"pid": 999999, "kind": "hermes-gateway"}), encoding="utf-8"
+        )
+>       assert mas.hermes_gateway_alive(tmp_path) is None
+E       AssertionError: assert 999999 is None
+E        +  where 999999 = <function hermes_gateway_alive at 0x0000025A6E67CE00>(WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-4/test_hermes_gateway_alive_dete0'))
+E        +    where <function hermes_gateway_alive at 0x0000025A6E67CE00> = mas.hermes_gateway_alive
+
+tests\test_shared_agent_surface_mcp.py:473: AssertionError
+______________ test_yaml_target_writes_when_gateway_pid_is_stale ______________
+
+tmp_path = WindowsPath('C:/Users/kalis/AppData/Local/Temp/codex-room-board-r3-20261002-225116/tmp/pytest-of-kalis/pytest-4/test_yaml_target_writes_when_g0')
+
+    def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
+        """A `gateway.pid` naming a process that is no longer running must NOT
+        block the write -- only an actually-live gateway is a clobber risk.
+        """
+        pytest.importorskip("ruamel.yaml")
+        surface = load_hook_surface_module()
+    
+        hermes_dir = tmp_path / "hermes"
+        hermes_dir.mkdir()
+        config_path = hermes_dir / "config.yaml"
+        fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+        config_path.write_text(fixture_text, encoding="utf-8")
+        # An implausibly large PID: on Windows, `tasklist /FI "PID eq N"` for a
+        # nonexistent PID returns a non-empty "no tasks match" message (not an
+        # error and not empty output), which `_pid_alive` correctly reads as
+        # "not alive" rather than failing closed.
+        (hermes_dir / "gateway.pid").write_text(
+            json.dumps({"pid": 99999999}), encoding="utf-8"
+        )
+    
+        message, changed = surface.apply_yaml_target(
+            config_path, _hermes_target_cfg(), check=False, dry_run=False
+        )
+    
+>       assert "WROTE" in message
+E       AssertionError: assert 'WROTE' in 'REFUSED C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\tmp\\pytest-of-kalis\\pytest-4\\...hen_g0\\hermes\\config.yaml (gateway PID 99999999 is live; stop it and re-run, or the config is clobbered on shutdown)'
+
+scripts\tests\test_shared_hook_surface.py:1000: AssertionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\review-venv\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/coordination_room/tests/test_server_http.py::test_board_round_trip_over_http
+  C:\Users\kalis\AppData\Local\Temp\codex-room-board-r3-20261002-225116\review-venv\Lib\site-packages\pydantic_settings\sources\utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED packages/tests/test_mcp_daemon.py::test_a_clean_shutdown_still_reports_success
+FAILED packages/tests/test_mcp_daemon.py::test_no_script_claims_success_it_did_not_achieve[start_mcp_daemons.ps1-$skipped-STARTUP INCOMPLETE-Write-Host "[FLOSS MCP] Daemons started (consensus]
+FAILED packages/tests/test_mcp_daemon.py::test_no_script_claims_success_it_did_not_achieve[stop_mcp_daemons.ps1-$unresolved-SHUTDOWN INCOMPLETE-Write-Host "[FLOSS MCP] All daemons stopped]
+FAILED tests/test_shared_agent_surface_mcp.py::test_hermes_gateway_alive_detects_dead_pid
+FAILED scripts/tests/test_shared_hook_surface.py::test_yaml_target_writes_when_gateway_pid_is_stale
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+6 failed, 1077 passed, 7 skipped, 1 deselected, 2 warnings in 97.17s (0:01:37)

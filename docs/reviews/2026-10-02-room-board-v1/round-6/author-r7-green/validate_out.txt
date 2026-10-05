@@ -1,0 +1,205 @@
+ok   no '@@' left in the plan
+ok   no '{{file:' left in the plan
+ok   no '{{pairs:' left in the plan
+ok   no literal U+2028 in the plan
+ok   no literal U+2029 in the plan
+ok   no literal U+FEFF in the plan
+ok   no literal U+00A0 in the plan
+ok   no literal U+200B in the plan
+ok   no control characters in the plan
+ok   plan has LF line endings
+ok   inlined verbatim: docs/specs/coordination-room.spec.md
+ok   green run used the same bytes: docs/specs/coordination-room.spec.md
+ok   no literal U+2028 in docs/specs/coordination-room.spec.md
+ok   no literal U+2029 in docs/specs/coordination-room.spec.md
+ok   no literal U+FEFF in docs/specs/coordination-room.spec.md
+ok   inlined verbatim: docs/specs/coordination-room.schema.json
+ok   green run used the same bytes: docs/specs/coordination-room.schema.json
+ok   no code fence inside docs/specs/coordination-room.schema.json
+ok   no literal U+2028 in docs/specs/coordination-room.schema.json
+ok   no literal U+2029 in docs/specs/coordination-room.schema.json
+ok   no literal U+FEFF in docs/specs/coordination-room.schema.json
+ok   inlined verbatim: scripts/tests/test_daemon_scope.py
+ok   green run used the same bytes: scripts/tests/test_daemon_scope.py
+ok   no code fence inside scripts/tests/test_daemon_scope.py
+ok   no literal U+2028 in scripts/tests/test_daemon_scope.py
+ok   no literal U+2029 in scripts/tests/test_daemon_scope.py
+ok   no literal U+FEFF in scripts/tests/test_daemon_scope.py
+ok   inlined verbatim: packages/coordination_room/tests/test_evidence.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_evidence.py
+ok   no code fence inside packages/coordination_room/tests/test_evidence.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_evidence.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_evidence.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_evidence.py
+ok   inlined verbatim: packages/coordination_room/evidence.py
+ok   green run used the same bytes: packages/coordination_room/evidence.py
+ok   no code fence inside packages/coordination_room/evidence.py
+ok   no literal U+2028 in packages/coordination_room/evidence.py
+ok   no literal U+2029 in packages/coordination_room/evidence.py
+ok   no literal U+FEFF in packages/coordination_room/evidence.py
+ok   inlined verbatim: packages/coordination_room/tests/test_board.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_board.py
+ok   no code fence inside packages/coordination_room/tests/test_board.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_board.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_board.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_board.py
+ok   inlined verbatim: packages/coordination_room/board.py
+ok   green run used the same bytes: packages/coordination_room/board.py
+ok   no code fence inside packages/coordination_room/board.py
+ok   no literal U+2028 in packages/coordination_room/board.py
+ok   no literal U+2029 in packages/coordination_room/board.py
+ok   no literal U+FEFF in packages/coordination_room/board.py
+ok   inlined verbatim: packages/coordination_room/tests/test_message_board.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_message_board.py
+ok   no code fence inside packages/coordination_room/tests/test_message_board.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_message_board.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_message_board.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_message_board.py
+ok   inlined verbatim: packages/coordination_room/tests/test_gateway_board.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_gateway_board.py
+ok   no code fence inside packages/coordination_room/tests/test_gateway_board.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_gateway_board.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_gateway_board.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_gateway_board.py
+ok   inlined verbatim: packages/coordination_room/tests/test_schema.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_schema.py
+ok   no code fence inside packages/coordination_room/tests/test_schema.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_schema.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_schema.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_schema.py
+ok   inlined verbatim: packages/coordination_room/tests/test_v01_compat.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_v01_compat.py
+ok   no code fence inside packages/coordination_room/tests/test_v01_compat.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_v01_compat.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_v01_compat.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_v01_compat.py
+ok   inlined verbatim: packages/coordination_room/log.py
+ok   green run used the same bytes: packages/coordination_room/log.py
+ok   no code fence inside packages/coordination_room/log.py
+ok   no literal U+2028 in packages/coordination_room/log.py
+ok   no literal U+2029 in packages/coordination_room/log.py
+ok   no literal U+FEFF in packages/coordination_room/log.py
+ok   inlined verbatim: packages/coordination_room/room.py
+ok   green run used the same bytes: packages/coordination_room/room.py
+ok   no code fence inside packages/coordination_room/room.py
+ok   no literal U+2028 in packages/coordination_room/room.py
+ok   no literal U+2029 in packages/coordination_room/room.py
+ok   no literal U+FEFF in packages/coordination_room/room.py
+ok   inlined verbatim: packages/coordination_room/gateway.py
+ok   green run used the same bytes: packages/coordination_room/gateway.py
+ok   no code fence inside packages/coordination_room/gateway.py
+ok   no literal U+2028 in packages/coordination_room/gateway.py
+ok   no literal U+2029 in packages/coordination_room/gateway.py
+ok   no literal U+FEFF in packages/coordination_room/gateway.py
+ok   inlined verbatim: packages/coordination_room/tests/room_server.py
+ok   green run used the same bytes: packages/coordination_room/tests/room_server.py
+ok   no code fence inside packages/coordination_room/tests/room_server.py
+ok   no literal U+2028 in packages/coordination_room/tests/room_server.py
+ok   no literal U+2029 in packages/coordination_room/tests/room_server.py
+ok   no literal U+FEFF in packages/coordination_room/tests/room_server.py
+ok   inlined verbatim: packages/coordination_room/tests/test_server_tools.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_server_tools.py
+ok   no code fence inside packages/coordination_room/tests/test_server_tools.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_server_tools.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_server_tools.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_server_tools.py
+ok   inlined verbatim: packages/coordination_room/tests/test_server_http.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_server_http.py
+ok   no code fence inside packages/coordination_room/tests/test_server_http.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_server_http.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_server_http.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_server_http.py
+ok   inlined verbatim: packages/coordination_room/tests/deploy_harness.ps1
+ok   green run used the same bytes: packages/coordination_room/tests/deploy_harness.ps1
+ok   no code fence inside packages/coordination_room/tests/deploy_harness.ps1
+ok   no literal U+2028 in packages/coordination_room/tests/deploy_harness.ps1
+ok   no literal U+2029 in packages/coordination_room/tests/deploy_harness.ps1
+ok   no literal U+FEFF in packages/coordination_room/tests/deploy_harness.ps1
+ok   inlined verbatim: packages/coordination_room/tests/test_deploy_helpers.py
+ok   green run used the same bytes: packages/coordination_room/tests/test_deploy_helpers.py
+ok   no code fence inside packages/coordination_room/tests/test_deploy_helpers.py
+ok   no literal U+2028 in packages/coordination_room/tests/test_deploy_helpers.py
+ok   no literal U+2029 in packages/coordination_room/tests/test_deploy_helpers.py
+ok   no literal U+FEFF in packages/coordination_room/tests/test_deploy_helpers.py
+ok   inlined verbatim: packages/coordination_room/server.py
+ok   green run used the same bytes: packages/coordination_room/server.py
+ok   no code fence inside packages/coordination_room/server.py
+ok   no literal U+2028 in packages/coordination_room/server.py
+ok   no literal U+2029 in packages/coordination_room/server.py
+ok   no literal U+FEFF in packages/coordination_room/server.py
+ok   inlined verbatim: packages/coordination_room/client.py
+ok   green run used the same bytes: packages/coordination_room/client.py
+ok   no code fence inside packages/coordination_room/client.py
+ok   no literal U+2028 in packages/coordination_room/client.py
+ok   no literal U+2029 in packages/coordination_room/client.py
+ok   no literal U+FEFF in packages/coordination_room/client.py
+ok   inlined verbatim: packages/coordination_room/deploy.ps1
+ok   green run used the same bytes: packages/coordination_room/deploy.ps1
+ok   no code fence inside packages/coordination_room/deploy.ps1
+ok   no literal U+2028 in packages/coordination_room/deploy.ps1
+ok   no literal U+2029 in packages/coordination_room/deploy.ps1
+ok   no literal U+FEFF in packages/coordination_room/deploy.ps1
+ok   inlined verbatim: packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   green run used the same bytes: packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   no code fence inside packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   no literal U+2028 in packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   no literal U+2029 in packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   no literal U+FEFF in packages/a2a_mesh/tests/test_room_bridge_parse.py
+ok   inlined verbatim: packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   green run used the same bytes: packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   no code fence inside packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   no literal U+2028 in packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   no literal U+2029 in packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   no literal U+FEFF in packages/a2a_mesh/tests/test_room_bridge_pair.py
+ok   inlined verbatim: packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   green run used the same bytes: packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   no code fence inside packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   no literal U+2028 in packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   no literal U+2029 in packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   no literal U+FEFF in packages/a2a_mesh/tests/test_room_bridge_invariants.py
+ok   inlined verbatim: packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   green run used the same bytes: packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   no code fence inside packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   no literal U+2028 in packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   no literal U+2029 in packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   no literal U+FEFF in packages/a2a_mesh/tests/test_room_bridge_e2e.py
+ok   inlined verbatim: packages/a2a_mesh/room_bridge.py
+ok   green run used the same bytes: packages/a2a_mesh/room_bridge.py
+ok   no code fence inside packages/a2a_mesh/room_bridge.py
+ok   no literal U+2028 in packages/a2a_mesh/room_bridge.py
+ok   no literal U+2029 in packages/a2a_mesh/room_bridge.py
+ok   no literal U+FEFF in packages/a2a_mesh/room_bridge.py
+ok   25 replace pairs in the plan (found 25)
+ok   registry: old text occurs once (1): '"irreducible_delta": "Event types claim|release|br'
+ok   start phase 1: old text occurs once (1): '#   schtasks /Create /TN "FLOSS-MCP-Daemons" /TR "'
+ok   start phase 1: old text occurs once (1): '    param([string]$Interpreter, [string]$Module, ['
+ok   start phase 1: old text occurs once (1): '$consensusProc = Start-Daemon $py "packages.metaco'
+ok   start phase 1: old text occurs once (1): '$ensembleProc = Start-Daemon $py "packages.reasoni'
+ok   start phase 1: old text occurs once (1): "$intakeRoot = if ($workspace -match '\\\\.worktrees\\"
+ok   start phase 1: old text occurs once (1): "if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $om"
+ok   start phase 1: old text occurs once (1): 'Write-Host "[FLOSS MCP] Daemons started (consensus'
+ok   start phase 1: the plan's edits reproduce the tested scripts/start_mcp_daemons.ps1
+ok   stop phase 1: old text occurs once (1): '# Removes PID files so next start is clean.\n\n# Sam'
+ok   stop phase 1: old text occurs once (1): '$pidFiles = @("consensus.pid", "reasoning_ensemble'
+ok   stop phase 1: old text occurs once (1): "if ($omniVerdict -eq 'OURS') {"
+ok   stop phase 1: old text occurs once (1): 'Write-Host "[FLOSS MCP] All daemons stopped. PID f'
+ok   stop phase 1: the plan's edits reproduce the tested scripts/stop_mcp_daemons.ps1
+ok   how-to phase 1: old text occurs once (1): '1. `room_claim(agent_id, path)` before you write t'
+ok   how-to phase 1: old text occurs once (1): 'Binds `127.0.0.1:7334` only. Not yet in `start_mcp'
+ok   how-to phase 1: old text occurs once (1): '`python -m pytest packages/coordination_room/tests'
+ok   scope test phase 2: old text occurs once (1): '        "coordination_room.pid",\n        "omnirout'
+ok   scope test phase 2: old text occurs once (1): '    done = _run(shell, script, "-Only", "everythin'
+ok   scope test phase 2: the plan's edits reproduce the tested scripts/tests/test_daemon_scope.py
+ok   start phase 2: old text occurs once (1): '# -Only picks which daemons to start (default: all'
+ok   start phase 2: old text occurs once (1): "$knownDaemons = @('consensus', 'ensemble', 'room',"
+ok   start phase 2: old text occurs once (1): '    if (-not $roomProc) { $skipped += "coordinatio'
+ok   start phase 2: the plan's edits reproduce the tested scripts/start_mcp_daemons.ps1
+ok   stop phase 2: old text occurs once (1): '# Kills: consensus (:7331), ensemble (:7332), coor'
+ok   stop phase 2: old text occurs once (1): "    [string[]]$Only = @('consensus', 'ensemble', '"
+ok   stop phase 2: old text occurs once (1): "$knownDaemons = @('consensus', 'ensemble', 'room',"
+ok   stop phase 2: old text occurs once (1): "    room      = 'coordination_room.pid'\n}"
+ok   stop phase 2: the plan's edits reproduce the tested scripts/stop_mcp_daemons.ps1
+ok   how-to phase 2: old text occurs once (1): '- Not A2A (task handshake) — `feat/a2a-harness-mes'
+ok   requirements-ci.txt has exactly one bare 'mcp' line on the base
+plan lines: 5769 sha256: cf241ce69b9d8a753cb3787944cf27488a29ebaa7586647214f6dcc1ebb45932
+PROBLEMS: 0

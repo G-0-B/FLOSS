@@ -1,0 +1,266 @@
+[
+  {
+    "cell": null,
+    "code": "F401",
+    "end_location": {
+      "column": 60,
+      "row": 9
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\room.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "from packages.coordination_room.claims import ClaimTable",
+          "end_location": {
+            "column": 72,
+            "row": 9
+          },
+          "location": {
+            "column": 1,
+            "row": 9
+          }
+        }
+      ],
+      "message": "Remove unused import: `packages.coordination_room.claims.ClaimConflict`"
+    },
+    "location": {
+      "column": 47,
+      "row": 9
+    },
+    "message": "`packages.coordination_room.claims.ClaimConflict` imported but unused",
+    "name": "unused-import",
+    "noqa_row": 9,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-import"
+  },
+  {
+    "cell": null,
+    "code": "TRY004",
+    "end_location": {
+      "column": 54,
+      "row": 51
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\room.py",
+    "fix": null,
+    "location": {
+      "column": 13,
+      "row": 51
+    },
+    "message": "Prefer `TypeError` exception for invalid type",
+    "name": "type-check-without-type-error",
+    "noqa_row": 51,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/type-check-without-type-error"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 86,
+      "row": 19
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_claims.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 86,
+            "row": 19
+          },
+          "location": {
+            "column": 72,
+            "row": 19
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 74,
+      "row": 19
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 19,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 83,
+      "row": 18
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_gateway.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 83,
+            "row": 18
+          },
+          "location": {
+            "column": 69,
+            "row": 18
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 71,
+      "row": 18
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 18,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 86,
+      "row": 19
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_paths.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 86,
+            "row": 19
+          },
+          "location": {
+            "column": 72,
+            "row": 19
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 74,
+      "row": 19
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 19,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 74,
+      "row": 21
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_room.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 74,
+            "row": 21
+          },
+          "location": {
+            "column": 60,
+            "row": 21
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 62,
+      "row": 21
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 21,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 66,
+      "row": 22
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_room.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 66,
+            "row": 22
+          },
+          "location": {
+            "column": 52,
+            "row": 22
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 54,
+      "row": 22
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 22,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  },
+  {
+    "cell": null,
+    "code": "RUF100",
+    "end_location": {
+      "column": 75,
+      "row": 23
+    },
+    "filename": "C:\\Users\\kalis\\AppData\\Local\\Temp\\codex-room-board-r3-20261002-225116\\fixtures-exact\\baseline\\packages\\coordination_room\\tests\\test_room.py",
+    "fix": {
+      "applicability": "safe",
+      "edits": [
+        {
+          "content": "",
+          "end_location": {
+            "column": 75,
+            "row": 23
+          },
+          "location": {
+            "column": 61,
+            "row": 23
+          }
+        }
+      ],
+      "message": "Remove unused `noqa` directive"
+    },
+    "location": {
+      "column": 63,
+      "row": 23
+    },
+    "message": "Unused `noqa` directive (non-enabled: `E402`)",
+    "name": "unused-noqa",
+    "noqa_row": 23,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/unused-noqa"
+  }
+]

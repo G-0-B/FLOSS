@@ -1,0 +1,11 @@
+R2-02 inert launcher trace; no real starts:
+3042-3044: 0 parse errors
+3050-3051: 0 parse errors
+R2-03 CONFIGURED_AGENT_DIR=C:\Users\kalis\AppData\Local\Temp\room-r2-inert-agent-path
+
+ProcessId CommandLine
+--------- -----------
+     4242 python -m packages.coordination_room.server
+WOULD_STOP_PID=4242
+No actual PID files or processes read or stopped.
+
