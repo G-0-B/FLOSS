@@ -104,8 +104,9 @@ DEFAULT_SYNTHESIS_STAGING_CAP = 25
 @dataclass
 class WorkItem:
     """One unit of work the heartbeat may invoke this tick."""
+
     name: str
-    script: str               # path under FLOSS/scripts/
+    script: str  # path under FLOSS/scripts/
     args: list[str]
     flourishing_rationale: str  # required per CLAUDE.md north-star test
     timeout_seconds: int = 300
@@ -151,28 +152,30 @@ def emit_work_item_action(item: WorkItem, result: dict[str, Any]) -> None:
     """Tee one heartbeat work item result into the global Action log."""
     success = result.get("returncode") == 0
     error = result.get("error") if not success else None
-    append_action(Action(
-        action_id=f"heartbeat-{item.name}-{result.get('started_at', utc_iso())}",
-        kind="heartbeat_work_item",
-        harness="heartbeat.py",
-        started_at=str(result.get("started_at", utc_iso())),
-        ended_at=str(result.get("ended_at", utc_iso())),
-        duration_seconds=float(result.get("duration_seconds", 0.0) or 0.0),
-        success=success,
-        inputs={
-            "item": item.name,
-            "script": item.script,
-            "args": item.args,
-            "rationale": item.flourishing_rationale,
-            "timeout_seconds": item.timeout_seconds,
-        },
-        outputs={
-            "returncode": result.get("returncode"),
-            "stdout_tail": result.get("stdout_tail", ""),
-            "stderr_tail": result.get("stderr_tail", ""),
-        },
-        error=error,
-    ))
+    append_action(
+        Action(
+            action_id=f"heartbeat-{item.name}-{result.get('started_at', utc_iso())}",
+            kind="heartbeat_work_item",
+            harness="heartbeat.py",
+            started_at=str(result.get("started_at", utc_iso())),
+            ended_at=str(result.get("ended_at", utc_iso())),
+            duration_seconds=float(result.get("duration_seconds", 0.0) or 0.0),
+            success=success,
+            inputs={
+                "item": item.name,
+                "script": item.script,
+                "args": item.args,
+                "rationale": item.flourishing_rationale,
+                "timeout_seconds": item.timeout_seconds,
+            },
+            outputs={
+                "returncode": result.get("returncode"),
+                "stdout_tail": result.get("stdout_tail", ""),
+                "stderr_tail": result.get("stderr_tail", ""),
+            },
+            error=error,
+        )
+    )
 
 
 def stop_requested() -> bool:
@@ -287,7 +290,7 @@ def should_schedule_high_roi_poll(
     poll_state = load_poll_state()
     last_signature = poll_state.get("last_slate_signature")
     ticks_today = int(daily_state.get("ticks_today", 0))
-    last_poll_tick = int(poll_state.get("last_poll_tick", -10**9))
+    last_poll_tick = int(poll_state.get("last_poll_tick", -(10**9)))
     confirm_interval = int(
         os.environ.get(
             "FLOSS_HEARTBEAT_CONFIRM_INTERVAL_TICKS",
@@ -372,34 +375,52 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
 
     # 1. PROCESS INTAKE EVENTS — cheapest, no LLM calls, always safe to run.
     # Consumes the filewatch queue produced by watch_intake.py.
-    rotation.append(WorkItem(
-        name="process_intake",
-        script=str(SCRIPTS_DIR / "process_intake_events.py"),
-        args=["--limit", "50", "--summary-depth", "100"],
-        flourishing_rationale=(
-            "Substrate-enabling: keeps the filewatch queue from accumulating "
-            "stale events, preserving observability (Light) and provenance "
-            "(Knowledge) of what entered the workspace while away."
-        ),
-        timeout_seconds=120,
-    ))
+    rotation.append(
+        WorkItem(
+            name="process_intake",
+            script=str(SCRIPTS_DIR / "process_intake_events.py"),
+            args=["--limit", "50", "--summary-depth", "100"],
+            flourishing_rationale=(
+                "Substrate-enabling: keeps the filewatch queue from accumulating "
+                "stale events, preserving observability (Light) and provenance "
+                "(Knowledge) of what entered the workspace while away."
+            ),
+            timeout_seconds=120,
+        )
+    )
 
     # 2. DYNAMIC SLATE — regenerate the next_slate.json so the poll picks up
     # whatever is actually accumulating in the workspace right now. Cheap,
     # no LLM calls. Falls back to baseline candidates when there is no fresh
     # filewatch signal.
-    rotation.append(WorkItem(
-        name="heartbeat_slate",
-        script=str(SCRIPTS_DIR / "heartbeat_slate.py"),
-        args=["--max-candidates", "8"],
-        flourishing_rationale=(
-            "Substrate-enabling: ensures consensus rounds reflect current "
-            "workspace state, not a fossilized hardcoded slate. CCES L5 "
-            "(Collective Intelligence) demands the system attend to what's "
-            "actually happening, not what was happening a month ago."
-        ),
-        timeout_seconds=60,
-    ))
+    rotation.append(
+        WorkItem(
+            name="heartbeat_slate",
+            script=str(SCRIPTS_DIR / "heartbeat_slate.py"),
+            args=["--max-candidates", "8"],
+            flourishing_rationale=(
+                "Substrate-enabling: ensures consensus rounds reflect current "
+                "workspace state, not a fossilized hardcoded slate. CCES L5 "
+                "(Collective Intelligence) demands the system attend to what's "
+                "actually happening, not what was happening a month ago."
+            ),
+            timeout_seconds=60,
+        )
+    )
+
+    rotation.append(
+        WorkItem(
+            name="consume_digest_queue",
+            script=str(SCRIPTS_DIR / "consume_digest_queue.py"),
+            args=[],
+            flourishing_rationale=(
+                "Substrate-enabling: converts raw intake artifacts into structured, "
+                "deduplicated, and grounded candidate knowledge (DIGEST tract). "
+                "Bounded to 3 files per tick to prevent API exhaustion and token bleed."
+            ),
+            timeout_seconds=300,
+        )
+    )
 
     # 3. HIGH-ROI ACTION POLL — uses gateway + voters. Real consensus rounds.
     # Costs free-tier quota. Gate by daily round budget.
@@ -442,7 +463,9 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
     )
     routine_profile = os.environ.get("FLOSS_HEARTBEAT_PROFILE", "balanced")
     wide_profile = os.environ.get("FLOSS_HEARTBEAT_WIDE_PROFILE", "diverse-max")
-    use_wide_this_tick = wide_interval > 0 and ticks_today > 0 and (ticks_today % wide_interval == 0)
+    use_wide_this_tick = (
+        wide_interval > 0 and ticks_today > 0 and (ticks_today % wide_interval == 0)
+    )
     poll_profile = wide_profile if use_wide_this_tick else routine_profile
 
     should_poll, poll_reason = should_schedule_high_roi_poll(
@@ -452,22 +475,24 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
     )
 
     if should_poll:
-        rotation.append(WorkItem(
-            name=f"poll_high_roi_actions[{poll_profile}]",
-            script=str(SCRIPTS_DIR / "poll_high_roi_actions.py"),
-            args=["--profile", poll_profile],
-            flourishing_rationale=(
-                f"Substrate-enabling: surfaces ranked next-actions through "
-                f"multi-voter consensus (profile={poll_profile}; "
-                f"{'periodic wide-sweep tick' if use_wide_this_tick else 'routine balanced tick'}). "
-                f"Budget gate: {poll_reason}. "
-                f"Token-budget restructure 2026-05-19 cuts default Groq pressure "
-                f"5× vs prior diverse-max-every-tick. Direct path to Phase 0 "
-                f"substrate viability AND consumes idle inference capacity "
-                f"productively (CCES L5/L7)."
-            ),
-            timeout_seconds=1200,  # higher-cap voters can be slower
-        ))
+        rotation.append(
+            WorkItem(
+                name=f"poll_high_roi_actions[{poll_profile}]",
+                script=str(SCRIPTS_DIR / "poll_high_roi_actions.py"),
+                args=["--profile", poll_profile],
+                flourishing_rationale=(
+                    f"Substrate-enabling: surfaces ranked next-actions through "
+                    f"multi-voter consensus (profile={poll_profile}; "
+                    f"{'periodic wide-sweep tick' if use_wide_this_tick else 'routine balanced tick'}). "
+                    f"Budget gate: {poll_reason}. "
+                    f"Token-budget restructure 2026-05-19 cuts default Groq pressure "
+                    f"5× vs prior diverse-max-every-tick. Direct path to Phase 0 "
+                    f"substrate viability AND consumes idle inference capacity "
+                    f"productively (CCES L5/L7)."
+                ),
+                timeout_seconds=1200,  # higher-cap voters can be slower
+            )
+        )
     else:
         log_tick_line(f"[skip] poll_high_roi_actions — {poll_reason}")
 
@@ -478,20 +503,22 @@ def get_work_rotation(daily_state: dict[str, Any]) -> list[WorkItem]:
     # burn provider quota without creating immediate value.
     should_synthesize, synthesis_reason = should_schedule_autonomous_synthesis()
     if should_synthesize:
-        rotation.append(WorkItem(
-            name="autonomous_synthesis",
-            script=str(SCRIPTS_DIR / "autonomous_synthesis_loop.py"),
-            args=["--model", "groq/llama-3.3-70b-versatile", "--limit", "3"],
-            flourishing_rationale=(
-                "Substrate-enabling: distills knowledge from the research corpus "
-                "into staged drafts (Plane A only) for later human-gated promotion. "
-                "Preserves the filter-through-not-out doctrine (Knowledge). Higher-"
-                "capability extraction model produces fewer hallucinations and "
-                "richer summaries for the same wall-clock budget. "
-                f"Budget gate: {synthesis_reason}."
-            ),
-            timeout_seconds=1800,  # 3 files × 10 min budget per file (raised 2026-07-08 from 900s — pathologically large files like Holistic_Vision.md need ~78 chunks)
-        ))
+        rotation.append(
+            WorkItem(
+                name="autonomous_synthesis",
+                script=str(SCRIPTS_DIR / "autonomous_synthesis_loop.py"),
+                args=["--model", "groq/llama-3.3-70b-versatile", "--limit", "3"],
+                flourishing_rationale=(
+                    "Substrate-enabling: distills knowledge from the research corpus "
+                    "into staged drafts (Plane A only) for later human-gated promotion. "
+                    "Preserves the filter-through-not-out doctrine (Knowledge). Higher-"
+                    "capability extraction model produces fewer hallucinations and "
+                    "richer summaries for the same wall-clock budget. "
+                    f"Budget gate: {synthesis_reason}."
+                ),
+                timeout_seconds=1800,  # 3 files × 10 min budget per file (raised 2026-07-08 from 900s — pathologically large files like Holistic_Vision.md need ~78 chunks)
+            )
+        )
     else:
         log_tick_line(f"[skip] autonomous_synthesis — {synthesis_reason}")
 
@@ -507,7 +534,9 @@ def run_work_item(item: WorkItem) -> dict[str, Any]:
     """
     started = time.perf_counter()
     started_iso = utc_iso()
-    log_tick_line(f"[run] {item.display()} rationale=\"{item.flourishing_rationale[:80]}...\"")
+    log_tick_line(
+        f'[run] {item.display()} rationale="{item.flourishing_rationale[:80]}..."'
+    )
     try:
         proc = subprocess.run(
             [sys.executable, item.script, *item.args],
@@ -646,48 +675,54 @@ def write_resumption_page(tick: TickResult, daily_state: dict[str, Any]) -> None
             lines.append(f"- `{e.get('item', '?')}`: {e.get('error', 'unknown')}")
         lines.append("")
 
-    lines.extend([
-        "## Review queue",
-        "",
-        f"**Recent ROI polls** ({len(recent_polls)}):",
-    ])
+    lines.extend(
+        [
+            "## Review queue",
+            "",
+            f"**Recent ROI polls** ({len(recent_polls)}):",
+        ]
+    )
     for p in recent_polls:
         rel = p.relative_to(WORKSPACE_ROOT).as_posix()
         lines.append(f"- `{rel}`")
 
-    lines.extend([
-        "",
-        f"**Synthesis drafts in staging** ({len(staged_drafts)}):",
-    ])
+    lines.extend(
+        [
+            "",
+            f"**Synthesis drafts in staging** ({len(staged_drafts)}):",
+        ]
+    )
     for d in staged_drafts[:10]:
         rel = d.relative_to(WORKSPACE_ROOT).as_posix()
         lines.append(f"- `{rel}`")
     if len(staged_drafts) > 10:
         lines.append(f"- ... and {len(staged_drafts) - 10} more")
 
-    lines.extend([
-        "",
-        "## To resume",
-        "",
-        "1. Read this page. If anything else is required to know system state,"
-        " the resumption surface has failed — fix it before iterating.",
-        "2. Triage the review queue: accept / revise / reject / archive.",
-        "3. For staged synthesis drafts, run "
-        "`python FLOSS/scripts/autonomous_synthesis_loop.py --commit --dry-run`"
-        " to preview; drop `--dry-run` when ready.",
-        "4. To halt the loop: create `.agent-surface/heartbeat/STOP`."
-        " To resume: delete it.",
-        "",
-        "## Constraints honored",
-        "",
-        "- Plane A only — no canon writes, no remote pushes, no external sends.",
-        "- Universal-flourishing gate — every work item declares what it enables.",
-        "- STOP file checked as literal first action every tick.",
-        "- Daily round cap caps consensus-round spend across all ticks.",
-        "- Synthesis backpressure skips Groq-backed extraction when staging is full.",
-        "",
-        "*Generated by `FLOSS/scripts/heartbeat.py` — Plane A overlay only.*",
-    ])
+    lines.extend(
+        [
+            "",
+            "## To resume",
+            "",
+            "1. Read this page. If anything else is required to know system state,"
+            " the resumption surface has failed — fix it before iterating.",
+            "2. Triage the review queue: accept / revise / reject / archive.",
+            "3. For staged synthesis drafts, run "
+            "`python FLOSS/scripts/autonomous_synthesis_loop.py --commit --dry-run`"
+            " to preview; drop `--dry-run` when ready.",
+            "4. To halt the loop: create `.agent-surface/heartbeat/STOP`."
+            " To resume: delete it.",
+            "",
+            "## Constraints honored",
+            "",
+            "- Plane A only — no canon writes, no remote pushes, no external sends.",
+            "- Universal-flourishing gate — every work item declares what it enables.",
+            "- STOP file checked as literal first action every tick.",
+            "- Daily round cap caps consensus-round spend across all ticks.",
+            "- Synthesis backpressure skips Groq-backed extraction when staging is full.",
+            "",
+            "*Generated by `FLOSS/scripts/heartbeat.py` — Plane A overlay only.*",
+        ]
+    )
 
     try:
         ensure_dirs()
@@ -735,7 +770,9 @@ def run_one_tick() -> TickResult:
 
         result = run_work_item(item)
         rounds_used = estimate_rounds_from_result(item.name, result)
-        if result.get("returncode") == 0 and item.name.startswith("poll_high_roi_actions"):
+        if result.get("returncode") == 0 and item.name.startswith(
+            "poll_high_roi_actions"
+        ):
             mark_high_roi_poll_completed(item, daily_state)
         rounds_dispatched_this_tick += rounds_used
         daily_state["rounds_today"] = (
@@ -769,6 +806,7 @@ def run_one_tick() -> TickResult:
 
 def install_signal_handlers(state: dict[str, bool]) -> None:
     """Best-effort graceful shutdown on SIGINT/SIGTERM."""
+
     def _handler(signum: int, _frame: Any) -> None:
         state["stop"] = True
         log_tick_line(f"[signal] received {signum} — graceful shutdown requested")
@@ -801,17 +839,21 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     ensure_dirs()
-    log_tick_line(f"[startup] heartbeat scheduler starting "
-                  f"mode={'loop' if args.loop else 'once'} "
-                  f"interval={args.interval_seconds}s")
+    log_tick_line(
+        f"[startup] heartbeat scheduler starting "
+        f"mode={'loop' if args.loop else 'once'} "
+        f"interval={args.interval_seconds}s"
+    )
 
     shutdown_state = {"stop": False}
     install_signal_handlers(shutdown_state)
 
     if args.once:
         tick = run_one_tick()
-        print(f"Tick complete: {len(tick.completed)} ok, "
-              f"{len(tick.errors)} err, {len(tick.skipped)} skip")
+        print(
+            f"Tick complete: {len(tick.completed)} ok, "
+            f"{len(tick.errors)} err, {len(tick.skipped)} skip"
+        )
         print(f"Resumption page: {RESUMPTION_FILE}")
         return 0
 
@@ -823,10 +865,12 @@ def main() -> int:
             continue
         try:
             tick = run_one_tick()
-            print(f"[{tick.ended_at}] tick: "
-                  f"{len(tick.completed)} ok, "
-                  f"{len(tick.errors)} err, "
-                  f"{len(tick.skipped)} skip")
+            print(
+                f"[{tick.ended_at}] tick: "
+                f"{len(tick.completed)} ok, "
+                f"{len(tick.errors)} err, "
+                f"{len(tick.skipped)} skip"
+            )
         except Exception:  # noqa: BLE001
             log_tick_line(f"[fatal] tick crashed:\n{traceback.format_exc()}")
             # Don't tight-loop on crash; back off.
