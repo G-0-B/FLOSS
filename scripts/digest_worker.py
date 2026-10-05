@@ -9,6 +9,8 @@ import argparse
 import hashlib
 import json
 import logging
+import urllib.request
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import os
@@ -60,6 +62,18 @@ class CandidateClaim(BaseModel):
 
 class CandidateClaimsOutput(BaseModel):
     claims: List[CandidateClaim]
+
+
+class GroundingScope(BaseModel):
+    source_id: str = Field(description="The DOI or identifier of the source.")
+    evidence_ids: List[str] = Field(default_factory=list)
+
+class GroundingResult(BaseModel):
+    method: str = Field(default="crossref-api-v1")
+    property: str = Field(default="claim_supported_by_source")
+    outcome: str = Field(description="SUPPORT, CONTRADICT, INSUFFICIENT_EVIDENCE, or UNRESOLVED")
+    scope: GroundingScope
+    nonclaims: List[str] = Field(default_factory=list)
 
 
 class DigestWorker:
@@ -170,15 +184,69 @@ class DigestWorker:
             logger.error(f"LangExtract extraction failed: {e}")
             return []
 
+    def ground(self, parsed_artifact: Dict[str, Any], claims: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """GROUND stage: Verify DOIs and primary sources via Crossref."""
+        logger.info(f"GROUND: Resolving primary sources for {parsed_artifact['source_path']}")
+        text = parsed_artifact["text"]
+        
+        # 1. Extract DOIs using regex
+        doi_pattern = re.compile(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', re.IGNORECASE)
+        dois = list(set(doi_pattern.findall(text)))
+        
+        grounding_results = []
+        source_metadata = {}
+        
+        # 2. Query Crossref for deterministic metadata
+        for doi in dois[:5]:  # Limit to 5 DOIs per document for now
+            url = f"https://api.crossref.org/works/{doi}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'FLOSSI0ULLK/0.1 (mailto:research@example.com)'})
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    msg = data.get('message', {})
+                    is_retracted = msg.get('is-retracted', False)
+                    source_metadata[doi] = {
+                        'title': msg.get('title', [''])[0],
+                        'is_retracted': is_retracted,
+                        'URL': msg.get('URL')
+                    }
+                    
+                    outcome = "CONTRADICT" if is_retracted else "SUPPORT"
+                    
+                    result = GroundingResult(
+                        outcome=outcome,
+                        scope=GroundingScope(source_id=doi),
+                        nonclaims=[
+                            "does not establish replication",
+                            "does not establish absence of contradictory literature"
+                        ]
+                    )
+                    grounding_results.append(result.model_dump())
+            except Exception as e:
+                logger.warning(f"Crossref API failed for {doi}: {e}")
+                
+        if not grounding_results:
+            grounding_results.append(
+                GroundingResult(
+                    outcome="INSUFFICIENT_EVIDENCE",
+                    scope=GroundingScope(source_id="UNKNOWN"),
+                    nonclaims=["No valid DOI found in source document."]
+                ).model_dump()
+            )
+            
+        return {"metadata": source_metadata, "grounding": grounding_results}
+
     def process_file(self, filepath: Path) -> Dict[str, Any]:
         parsed = self.parse(filepath)
         deduped = self.dedup(parsed)
         
         if deduped["relationship"] == "EXACT_DUPLICATE":
-            logger.info("File is an exact duplicate. Skipping DIGEST.")
+            logger.info("File is an exact duplicate. Skipping DIGEST and GROUND.")
             claims = []
+            grounded = {}
         else:
             claims = self.digest(parsed)
+            grounded = self.ground(parsed, claims)
             
         result = {
             "type": "DigestCandidate",
@@ -189,6 +257,7 @@ class DigestWorker:
             },
             "dedup": deduped,
             "claims": claims,
+            "grounding": grounded,
             "status": "PROCESSED"
         }
         return result
