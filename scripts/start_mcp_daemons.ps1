@@ -2,6 +2,29 @@
 # Idempotent: PID guard in mcp_daemon.py makes re-runs safe (second launch self-exits).
 # Register as a Scheduled Task:
 #   schtasks /Create /TN "FLOSS-MCP-Daemons" /TR "powershell -WindowStyle Hidden -File C:\~shit\FLOSS\scripts\start_mcp_daemons.ps1" /SC ONLOGON /RU "MSI\kalis" /RL LIMITED /F
+#
+# -Only picks which daemons to start (default: all, so the scheduled task is
+# unchanged). A room deployment runs `-Only room`, so a daemon someone stopped
+# on purpose stays stopped. Several names go in one comma-separated argument
+# (`-Only room,ensemble`). -DryRun prints WOULD_START lines and starts nothing.
+
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [string[]]$Only = @('consensus', 'ensemble', 'room', 'omniroute'),
+    [switch]$DryRun
+)
+
+# Checked here, not by ValidateSet: under `powershell -File` (the scheduled task
+# and the deployment helpers) `-Only a,b` arrives as the one string "a,b", which
+# ValidateSet would reject. PositionalBinding is off so that `-Only room ensemble`
+# is an error, not a silent selection of `room` alone.
+$knownDaemons = @('consensus', 'ensemble', 'room', 'omniroute')
+$Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$unknownDaemons = @($Only | Where-Object { $knownDaemons -cnotcontains $_ })
+if ($Only.Count -eq 0 -or $unknownDaemons.Count -gt 0) {
+    Write-Host "[FLOSS MCP] -Only takes: $($knownDaemons -join ', '). Not understood: $($unknownDaemons -join ', ')"
+    exit 2
+}
 
 # Derive everything from where THIS script lives. The hardcoded
 # C:\~shit\FLOSS and C:\Python313\python.exe worked on exactly one machine and
@@ -83,6 +106,10 @@ function Start-Daemon {
     #>
     param([string]$Interpreter, [string]$Module, [string]$Label, [string]$WorkDir)
 
+    if ($DryRun) {
+        Write-Host "[FLOSS MCP] WOULD_START $Module ($Label)"
+        return $true
+    }
     $proc = Start-Process -WindowStyle Hidden -PassThru -WorkingDirectory $WorkDir $Interpreter "-m $Module"
     if (-not $proc) {
         Write-Host "[FLOSS MCP] $Label failed to launch"
@@ -110,26 +137,33 @@ function Start-Daemon {
 }
 
 # Start consensus gateway daemon (port 7331)
-$consensusProc = Start-Daemon $py "packages.metacoordinator_mcp.server" "consensus gateway (:7331)" $workspace
-if (-not $consensusProc) { $skipped += "consensus gateway (:7331) - exited immediately after launch" }
+if ($Only -contains 'consensus') {
+    $consensusProc = Start-Daemon $py "packages.metacoordinator_mcp.server" "consensus gateway (:7331)" $workspace
+    if (-not $consensusProc) { $skipped += "consensus gateway (:7331) - exited immediately after launch" }
+}
 
 # Start reasoning ensemble daemon (port 7332)
-$ensembleProc = Start-Daemon $py "packages.reasoning_ensemble.mcp_server" "reasoning ensemble (:7332)" $workspace
-if (-not $ensembleProc) { $skipped += "reasoning ensemble (:7332) - exited immediately after launch" }
+if ($Only -contains 'ensemble') {
+    $ensembleProc = Start-Daemon $py "packages.reasoning_ensemble.mcp_server" "reasoning ensemble (:7332)" $workspace
+    if (-not $ensembleProc) { $skipped += "reasoning ensemble (:7332) - exited immediately after launch" }
+}
 
 # Start coordination room (port 7334) — file-claim bus. Same Start-Daemon /
 # claim_singleton path as 7331/7332. Do not start computer-use (:7333) here.
 # Pin the log at the workspace intake mouth so a worktree launch does not
 # create a second bus under FLOSS/.worktrees/.agent-surface.
-$intakeRoot = if ($workspace -match '\\.worktrees\\') {
-    Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $workspace))
-} else {
-    Split-Path -Parent $workspace
+if ($Only -contains 'room') {
+    $intakeRoot = if ($workspace -match '\\.worktrees\\') {
+        Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $workspace))
+    } else {
+        Split-Path -Parent $workspace
+    }
+    $env:COORDINATION_ROOM_LOG = Join-Path $intakeRoot '.agent-surface\rooms\default\events.jsonl'
+    $env:COORDINATION_ROOM_ROOT = $workspace
+    Write-Host "[FLOSS MCP] coordination room log: $env:COORDINATION_ROOM_LOG (root $workspace)"
+    $roomProc = Start-Daemon $py "packages.coordination_room.server" "coordination room (:7334)" $workspace
+    if (-not $roomProc) { $skipped += "coordination room (:7334) - exited immediately after launch" }
 }
-$env:COORDINATION_ROOM_LOG = Join-Path $intakeRoot '.agent-surface\rooms\default\events.jsonl'
-$env:COORDINATION_ROOM_ROOT = $workspace
-$roomProc = Start-Daemon $py "packages.coordination_room.server" "coordination room (:7334)" $workspace
-if (-not $roomProc) { $skipped += "coordination room (:7334) - exited immediately after launch" }
 
 # Start OmniRoute daemon (port 20128) — model routing + token compression
 # Match on the COMMAND LINE, not $_.Path. For an npm-installed OmniRoute the
@@ -179,7 +213,11 @@ if ($null -ne $omniRaw) { $omniRaw = $omniRaw.Trim() }
 # that once inodes are recycled -- so testing emptiness alone would send every
 # new reservation down the UNVERIFIABLE path and never start OmniRoute again.
 $omniIsReservation = ($omniRaw -eq '') -or ($omniRaw -like 'RESERVED*')
-if ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
+if ($Only -notcontains 'omniroute') {
+    Write-Host "[FLOSS MCP] OmniRoute not selected (-Only) - left as it is"
+} elseif ($DryRun) {
+    Write-Host "[FLOSS MCP] WOULD_START omniroute (or find it already running)"
+} elseif ($omniVerdict -eq 'UNKNOWN' -and (Test-Path $omniPid) -and $omniIsReservation) {
     # A RESERVATION is a claim whose launcher never came back, not an
     # unverifiable holder. --reserve-slot below reclaims one past its stale
     # window, so fall through and let it decide instead of rejecting here: this
@@ -342,4 +380,13 @@ if ($skipped.Count -gt 0) {
     exit 1
 }
 
-Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, coordination room :7334, omniroute :20128). PID guard prevents duplicates."
+# The default run keeps its original success line, word for word: it is
+# still exactly true, and packages/tests/test_mcp_daemon.py checks that it is
+# emitted only after the $skipped guard above.
+if ($DryRun) {
+    Write-Host "[FLOSS MCP] Dry run: nothing was started (selected: $($Only -join ', '))."
+} elseif (-not $PSBoundParameters.ContainsKey('Only')) {
+    Write-Host "[FLOSS MCP] Daemons started (consensus :7331, ensemble :7332, coordination room :7334, omniroute :20128). PID guard prevents duplicates."
+} else {
+    Write-Host "[FLOSS MCP] Started or already running: $($Only -join ', '). PID guard prevents duplicates."
+}

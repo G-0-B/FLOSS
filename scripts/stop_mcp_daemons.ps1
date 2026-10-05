@@ -1,6 +1,28 @@
 # FLOSS/scripts/stop_mcp_daemons.ps1 — stop all FLOSS MCP daemons cleanly.
 # Kills: consensus (:7331), ensemble (:7332), coordination room (:7334), OmniRoute (:20128).
 # Removes PID files so next start is clean.
+#
+# -Only picks which daemons to stop (default: all), through the same identity
+# check as a full stop. A room deployment runs `-Only room`. Several names go in
+# one comma-separated argument. -DryRun prints WOULD_STOP lines and stops nothing.
+
+[CmdletBinding(PositionalBinding = $false)]
+param(
+    [string[]]$Only = @('consensus', 'ensemble', 'room', 'omniroute'),
+    [switch]$DryRun
+)
+
+# Checked here, not by ValidateSet: under `powershell -File` (the scheduled task
+# and the deployment helpers) `-Only a,b` arrives as the one string "a,b", which
+# ValidateSet would reject. PositionalBinding is off so that `-Only room ensemble`
+# is an error, not a silent selection of `room` alone.
+$knownDaemons = @('consensus', 'ensemble', 'room', 'omniroute')
+$Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$unknownDaemons = @($Only | Where-Object { $knownDaemons -cnotcontains $_ })
+if ($Only.Count -eq 0 -or $unknownDaemons.Count -gt 0) {
+    Write-Host "[FLOSS MCP] -Only takes: $($knownDaemons -join ', '). Not understood: $($unknownDaemons -join ', ')"
+    exit 2
+}
 
 # Same resolution mcp_daemon.py uses when it WRITES these files
 # (`Path(os.environ.get("FLOSS_AGENT_DIR", Path.home() / ".floss_agent"))`).
@@ -36,9 +58,18 @@ if ($env:FLOSS_PYTHON) {
 $unresolved = @()
 
 # Kill FLOSS MCP daemons via PID files
-$pidFiles = @("consensus.pid", "reasoning_ensemble.pid", "coordination_room.pid")
+$pidFileFor = [ordered]@{
+    consensus = 'consensus.pid'
+    ensemble  = 'reasoning_ensemble.pid'
+    room      = 'coordination_room.pid'
+}
+$pidFiles = @($pidFileFor.Keys | Where-Object { $Only -contains $_ } | ForEach-Object { $pidFileFor[$_] })
 foreach ($pidFile in $pidFiles) {
     $pidPath = Join-Path $flossAgent $pidFile
+    if ($DryRun) {
+        Write-Host "[FLOSS MCP] WOULD_STOP $pidFile (only if its identity check says OURS)"
+        continue
+    }
     if (Test-Path $pidPath) {
         # MUST NOT be named $pid: PowerShell's $PID is a read-only automatic
         # variable holding THIS process's id, and the name is case-insensitive.
@@ -198,7 +229,11 @@ if ($py -and (Test-Path $omniPid)) {
     if ($tok) { $tok = $tok.ToString().Trim() }
     if ($tok -eq 'OURS' -or $tok -eq 'FOREIGN') { $omniVerdict = $tok }
 }
-if ($omniVerdict -eq 'OURS') {
+if ($Only -notcontains 'omniroute') {
+    Write-Host "[FLOSS MCP] OmniRoute not selected (-Only) - left as it is"
+} elseif ($DryRun) {
+    Write-Host "[FLOSS MCP] WOULD_STOP omniroute (only if its identity check says OURS)"
+} elseif ($omniVerdict -eq 'OURS') {
     # CONFIRM IT IS GONE BEFORE DELETING THE RECORD.
     #
     # -ErrorAction SilentlyContinue swallowed access-denied and every other
@@ -297,4 +332,13 @@ if ($unresolved.Count -gt 0) {
     exit 1
 }
 
-Write-Host "[FLOSS MCP] All daemons stopped. PID files cleaned."
+# The default run keeps its original success line, word for word: with no
+# -Only every daemon was selected, so it is still exactly true, and
+# packages/tests/test_mcp_daemon.py checks it.
+if ($DryRun) {
+    Write-Host "[FLOSS MCP] Dry run: nothing was stopped (selected: $($Only -join ', '))."
+} elseif (-not $PSBoundParameters.ContainsKey('Only')) {
+    Write-Host "[FLOSS MCP] All daemons stopped. PID files cleaned."
+} else {
+    Write-Host "[FLOSS MCP] Stopped: $($Only -join ', '). PID files cleaned."
+}
