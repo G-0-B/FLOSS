@@ -4,23 +4,165 @@
   "title": "Coordination room event",
   "description": "One append-only JSONL line in the coordination-room event log.",
   "type": "object",
-  "required": ["seq", "ts", "type", "agent_id"],
+  "required": [
+    "seq",
+    "ts",
+    "type",
+    "agent_id"
+  ],
   "properties": {
-    "seq": { "type": "integer", "minimum": 1 },
-    "ts": { "type": "string" },
-    "type": { "enum": ["claim", "release", "broadcast"] },
-    "agent_id": { "type": "string", "minLength": 1 },
-    "path": { "type": "string" },
-    "text": { "type": "string", "maxLength": 4096 }
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "ts": {
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "claim",
+        "release",
+        "broadcast"
+      ]
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "The room caps this at 4096 UTF-8 bytes; maxLength here counts characters and is the looser bound."
+    },
+    "intent": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "The room caps this at 256 UTF-8 bytes; maxLength here counts characters."
+    },
+    "topic": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+    },
+    "reply_to": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "thread_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "evidence_status": {
+      "enum": [
+        "resolved",
+        "unresolved"
+      ]
+    },
+    "evidence_checked_at": {
+      "type": "string"
+    },
+    "evidence_checked": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "ref",
+          "kind",
+          "ok"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "commit",
+              "unknown"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "oid": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40,64}$"
+          }
+        }
+      }
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "type": { "const": "broadcast" } } },
-      "then": { "required": ["text"] }
+      "if": {
+        "properties": {
+          "type": {
+            "const": "broadcast"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "text"
+        ]
+      }
     },
     {
-      "if": { "properties": { "type": { "enum": ["claim", "release"] } } },
-      "then": { "required": ["path"] }
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "claim",
+              "release"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "path"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "reply_to"
+        ]
+      },
+      "then": {
+        "required": [
+          "thread_id",
+          "topic"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "evidence_refs"
+        ]
+      },
+      "then": {
+        "required": [
+          "evidence_status",
+          "evidence_checked",
+          "evidence_checked_at"
+        ]
+      }
     }
   ]
 }

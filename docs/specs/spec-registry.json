@@ -311,7 +311,7 @@
           }
         ],
         "verdict": "extend",
-        "irreducible_delta": "Event types claim|release|broadcast with optional path/text. No new schema language."
+        "irreducible_delta": "Event types claim|release|broadcast with optional path/text/intent plus topic, reply_to, thread_id and evidence fields on broadcast. No new schema language."
       }
     },
     "FLOSS/docs/specs/coordination-room.spec.md": {
