@@ -24,6 +24,43 @@
 
 **Authored:** 2026-10-02, replacing an Antigravity draft that was pasted into a session and never entered the repo.
 
+## Execution record: Phase 1 (2026-10-04)
+
+Phase 1 (Tasks 0 to 6) is on branch `feat/room-board-v1`, built from `4aab13e` in the worktree `C:/~shit/FLOSS/.worktrees/room-board-v1`. Everything below this section is the plan as written: revision 7, SHA-256 `cf241ce69b9d8a753cb3787944cf27488a29ebaa7586647214f6dcc1ebb45932` before this section was added. Read it as the specification the commits were built from. Its Truth status paragraph above describes the state before execution.
+
+**Operator answers** (Task 0 Step 1), one message, verbatim: `approved, advisory claims, start phase 1 as commits`. The third question, pushing the base commit, was not answered.
+
+| Task | Commit | Subject |
+|---|---|---|
+| 0 | `029b871b192df76b655bbf5c9fd60e66a075f44a` | docs(plan): coordination room message board v1, revision 7 after six review rounds |
+| 1 | `a817be966dfd46d974f21744e93d93f72195c77b` | docs(specs): coordination room v0.2.0, topics, threads and evidence labels |
+| 2 | `e0b2216945ba9080133b55d769a2a0243255baba` | feat(daemons): -Only and -DryRun on the start and stop scripts |
+| 3 | `ea64bcd0d0a394c61c2b7dd88c3fd1d8ead4ab34` | feat(coordination-room): look up file and commit evidence refs within a time budget |
+| 4 | `50315b55126d1ffa8d19c86353628a554d7a59da` | feat(coordination-room): BOARD.md as a dated view of the event log, staged exclusively |
+| 5 | `5dbce4de4aa9d1a452b330950d01f95d45253c67` | feat(coordination-room): topics, threads, evidence labels and intent on the room |
+| 6 | `0281a47cd817efb2f2426886e3a1058c157b33eb` | feat(coordination-room): board tools over MCP, a shell client, deployment helpers |
+
+`ROLLBACK_COMMIT` is the Task 2 commit, `e0b2216945ba9080133b55d769a2a0243255baba`.
+
+**Measured at `0281a47`, on Windows, in that worktree.** ✅ Verified:
+
+- `packages/coordination_room/tests`: 117 passed, none skipped. The v0.1 compatibility test ran against real git history here.
+- With `scripts/tests/test_daemon_scope.py`: 143 passed (see deviation 3 for why the script count is 26).
+- The required green set, same machine and environment: base `4aab13e` 993 passed, 7 skipped; branch 1,115 passed, 7 skipped; 1 deselected in each; no failures in either. Compared per test case: nothing regressed, nothing went missing, the same seven skips, and all 122 new cases pass. (The archive-only failure reported under Truth status does not occur in a real checkout.)
+- `ruff check --isolated packages/coordination_room scripts/tests/test_daemon_scope.py`: clean. `scripts/spec_gate.py --check`: the same three findings as on the base.
+- Twenty of the twenty-two Phase 1 files this plan inlines are byte-identical to their inlined bodies; the other two are deviations 2 and 3.
+- The live bus was not touched: the listeners on 7331, 7332 and 20128 kept their process ids, 7334 stayed down, and the shared log kept its size and modification time.
+
+**Where the commits differ from the plan text.** Three places, each also explained in its commit message:
+
+1. Task 0. `docs/reviews/2026-10-02-room-board-v1/.gitattributes` (`* -text`) was added. The repository preserves review evidence byte for byte only for `*.json` and `*.txt`; this folder also holds reviewer scripts, JUnit XML, a diff and Markdown with CRLF, and `round-4/receipt-hashes.json` publishes their hashes. All 187 committed blobs were compared with their source files: none differ.
+2. Task 1. Two phrases of the spec said "pending operator": the `approval` line and the claim-precedence sentence. They now record the 2026-10-04 answer. The precedence stays marked Specified because the enforced claim mechanism it defers to is proposed, not built.
+3. Task 2. The plan's `test_daemon_scope.py` left a literal `%SystemDrive%` directory in whatever directory pytest was started from, which was the checkout: the scripts are run with a bare environment, and Windows creates that directory in the process's working directory on a launch. `_run` now uses the test's temp directory as the working directory, and `test_a_real_run_writes_nothing_where_pytest_was_started` fails without that. The file therefore has 26 cases after Phase 1, not 24, and will have 30 after Phase 2, not 28. The Phase 2 edit pairs in Task 9 were re-checked against the committed files: each old string still occurs exactly once.
+
+**Not done.** ⚠️ Nothing is pushed and no pull request is open: the base `4aab13e` is not on the remote. Not run on Linux by anyone at this revision; the required CI job will be the first Linux run. The Deployment section has not been run; the live room is still v0.1 and still down. The agent-memory projections were not regenerated. Phase 2 has not been started.
+
+**Seen while executing, not changed.** On the base, `scripts/tests/test_heartbeat_budget.py` appends to `ticks.log` under the parent of the checkout (`FLOSS/.worktrees/.agent-surface/heartbeat/` when run from a worktree) each time the green set runs. It is outside this plan's files.
+
 ## Acceptance is behaviour, not a test count
 
 The counts above are a measurement, not the bar. The work is acceptable when all of these hold:
