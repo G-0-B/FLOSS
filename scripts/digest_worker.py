@@ -11,6 +11,14 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import os
+from pydantic import BaseModel, Field
+
+try:
+    import langextract as lx
+    LANGEXTRACT_AVAILABLE = True
+except ImportError:
+    LANGEXTRACT_AVAILABLE = False
 
 try:
     from datasketch import MinHash
@@ -40,6 +48,18 @@ def jaccard_similarity(m1: 'MinHash', m2: 'MinHash') -> float:
     if not MINHASH_AVAILABLE or not m1 or not m2:
         return 0.0
     return m1.jaccard(m2)
+
+
+class CandidateClaim(BaseModel):
+    statement: str = Field(description="The atomic claim extracted from the text.")
+    subject: str = Field(description="The subject of the claim.")
+    predicate: str = Field(description="The predicate or relationship.")
+    object_val: str = Field(description="The object of the claim.")
+    char_start: int = Field(default=-1, description="Start index in the original text where evidence is found.")
+    char_end: int = Field(default=-1, description="End index in the original text.")
+
+class CandidateClaimsOutput(BaseModel):
+    claims: List[CandidateClaim]
 
 
 class DigestWorker:
@@ -120,11 +140,46 @@ class DigestWorker:
 
         return dedup_result
 
+    def digest(self, parsed_artifact: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Digest stage: Extract CandidateClaims using LangExtract."""
+        logger.info(f"DIGEST: Extracting claims from {parsed_artifact['source_path']}")
+        text = parsed_artifact["text"]
+        
+        if not LANGEXTRACT_AVAILABLE:
+            logger.warning("LangExtract not available, returning mock claims.")
+            return []
+
+        if not os.environ.get("GEMINI_API_KEY"):
+            logger.warning("GEMINI_API_KEY not found. Returning mock claims to avoid extraction failure.")
+            return []
+
+        try:
+            result = lx.extract(
+                text_or_documents=text[:4000],  # truncate for safety in tests
+                output_schema=CandidateClaimsOutput,
+                model_id="gemini-2.5-flash", 
+            )
+            
+            claims = []
+            for doc_result in result:
+                if hasattr(doc_result, 'extractions') and doc_result.extractions:
+                    for ext in doc_result.extractions:
+                        claims.append(ext.model_dump())
+            return claims
+        except Exception as e:
+            logger.error(f"LangExtract extraction failed: {e}")
+            return []
+
     def process_file(self, filepath: Path) -> Dict[str, Any]:
         parsed = self.parse(filepath)
         deduped = self.dedup(parsed)
         
-        # Combine into a GroundingAttempt / Candidate
+        if deduped["relationship"] == "EXACT_DUPLICATE":
+            logger.info("File is an exact duplicate. Skipping DIGEST.")
+            claims = []
+        else:
+            claims = self.digest(parsed)
+            
         result = {
             "type": "DigestCandidate",
             "artifact": {
@@ -133,6 +188,7 @@ class DigestWorker:
                 "parser": parsed["parser"]
             },
             "dedup": deduped,
+            "claims": claims,
             "status": "PROCESSED"
         }
         return result
