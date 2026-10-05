@@ -1,0 +1,28 @@
+HEAD 6e38f6fbdddb29071eb9bf8bbcfcfbac5ecb7574
+........................................................................ [  6%]
+........................................................................ [ 12%]
+................................................ss...ss................. [ 19%]
+........................................................................ [ 25%]
+........................................................................ [ 32%]
+........................................................................ [ 38%]
+........................................................................ [ 44%]
+........................................................................ [ 51%]
+........................................................................ [ 57%]
+........................................................................ [ 64%]
+..............................................sss....................... [ 70%]
+........................................................................ [ 77%]
+........................................................................ [ 83%]
+........................................................................ [ 89%]
+........................................................................ [ 96%]
+..........................................                               [100%]
+============================== warnings summary ===============================
+..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/coordination_room/tests/test_deploy_helpers.py::test_every_helper_check_holds[C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE]
+  C:\Python313\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1115 passed, 7 skipped, 1 deselected, 2 warnings in 144.23s (0:02:24)
