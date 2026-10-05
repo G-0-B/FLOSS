@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import urllib.request
+import xml.etree.ElementTree as ET
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -225,6 +226,41 @@ class DigestWorker:
             except Exception as e:
                 logger.warning(f"Crossref API failed for {doi}: {e}")
                 
+        # 1b. Extract ArXiv IDs using regex
+        arxiv_pattern = re.compile(r'arxiv:(\d{4}\.\d{4,5}(?:v\d+)?)', re.IGNORECASE)
+        arxiv_ids = list(set(arxiv_pattern.findall(text)))
+
+        # 2b. Query ArXiv API
+        for arxiv_id in arxiv_ids[:5]:
+            url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
+            req = urllib.request.Request(url, headers={'User-Agent': 'FLOSSI0ULLK/0.1'})
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    xml_data = response.read()
+                root = ET.fromstring(xml_data)
+                entry = root.find('{http://www.w3.org/2005/Atom}entry')
+                if entry is not None:
+                    title = entry.find('{http://www.w3.org/2005/Atom}title').text.strip()
+                    summary = entry.find('{http://www.w3.org/2005/Atom}summary').text.strip()
+                    
+                    # Store metadata and leave a hook for alphaxiv AI summary
+                    source_metadata[f"arxiv:{arxiv_id}"] = {
+                        'title': title,
+                        'is_retracted': False,  # ArXiv has withdrawal notices in titles usually
+                        'URL': f"https://arxiv.org/abs/{arxiv_id}",
+                        'author_abstract': summary,
+                        'ai_summary': None  # Hook for AlphaXiv MCP / alphaxiv-py integration
+                    }
+                    
+                    result = GroundingResult(
+                        outcome="SUPPORT",
+                        scope=GroundingScope(source_id=f"arxiv:{arxiv_id}"),
+                        nonclaims=[]
+                    )
+                    grounding_results.append(result.model_dump())
+            except Exception as e:
+                logger.warning(f"ArXiv API failed for {arxiv_id}: {e}")
+
         if not grounding_results:
             grounding_results.append(
                 GroundingResult(
