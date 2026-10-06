@@ -63,7 +63,9 @@ python FLOSS/packages/reasoning_ensemble/synthesizer.py "<prompt>"
 
 ### 2.1 Voter pool resolution
 
-Default voter pool (`DEFAULT_VOTER_POOL` constant): 4 local Ollama models spanning distinct families per ADR-Suite v2.0 voter-diversity policy.
+Voter pool resolution (v0.2, `transport.resolve_voter_pool()`): **online-primary by default** (`FLOSS_ENSEMBLE_VOTER_MODE=online`). The online pool is drawn from the consensus-gateway roster (`metacoordinator_mcp/voter_registry.json`, profile via `FLOSS_ENSEMBLE_ONLINE_PROFILE`, default `diverse`) over LiteLLM + Flowith transports. `=local` uses the legacy 4-model Ollama pool below; `=mixed` unions both. Rationale: the local-only pool reliably degraded (0-of-4 embeddings) under GPU serialization on 16 GB hardware, so generation was moved off the local GPU. Embeddings still use local mxbai when reachable, else one cloud embedder (`FLOSS_ENSEMBLE_EMBED_MODEL`, default `mistral/mistral-embed`) resolved once per run so all responses share a vector space.
+
+Legacy local pool (`DEFAULT_VOTER_POOL` / `transport.LOCAL_VOTER_POOL`): 4 local Ollama models spanning distinct families per ADR-Suite v2.0 voter-diversity policy.
 
 ```yaml
 - voter_id: phi4-mini         model: phi4-mini:latest               family: phi
@@ -169,7 +171,7 @@ Per `FLOSS/docs/research/2026-05-18-metaharness-unification.md` Action schema.
 
 1. **Graph Attention Network meta-model** for cluster-based Tier classification (per `2026-05-17` §12.3) — current greedy clustering is the v0.1 approximation. GAT requires labeled training data from accumulated activity log (~50+ Tier-4 events expected by ~end-of-v0.2).
 2. **Real coherence verifier model.** v0.1 coherence proxy is length+variance heuristic; v0.2 should use a dedicated verifier prompt scored by the local Router model.
-3. **Cloud voter integration via LiteLLM.** Currently local-only for cost reasons. Cloud voters would expand the voter pool but require token-budget discipline per `heartbeat-runtime-budget.spec.md`.
+3. ~~**Cloud voter integration via LiteLLM.**~~ ✅ Landed v0.2 (`transport.py`, online-primary default). Token-budget discipline per `heartbeat-runtime-budget.spec.md` still applies — the ensemble is on-demand, not cadence-driven, and defaults to the cheap `diverse` roster.
 4. **Frame-cousin detection** (per `2026-05-17` §12.6) — voters that always co-cluster over many prompts should be flagged as frame-cousins (sharing hidden meta-assumption). Implementation in v0.2 once activity log has ≥50 ensemble calls.
 
 ---
@@ -191,4 +193,4 @@ Same as `reasoning-ensemble-router.spec.md` §7: spec change → failing test �
 - **Consent governance:** `FLOSS/docs/adr/ADR-12-consent-gate-protocol.md`
 - **Activity log schema:** `FLOSS/packages/activity_log/schema.py`
 - **Operator guide:** `FLOSS/docs/architecture/RUNTIME_SURFACES.md`
-- **Decision-grade peer:** `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` (ADR-10)
+- **Decision-grade peer:** `FLOSS/docs/adr/ADR-10-local-agent-node.md` (ADR-10)

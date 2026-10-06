@@ -1,0 +1,83 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+.......................................................ss...ss.......... [ 19%]
+........................................................................ [ 26%]
+........................................................................ [ 33%]
+........................................................................ [ 39%]
+........................................................................ [ 46%]
+........................................................................ [ 53%]
+........................................................................ [ 59%]
+..............................................................sss....... [ 66%]
+................................F....................................... [ 73%]
+........................................................................ [ 79%]
+........................................................................ [ 86%]
+........................F............................................... [ 92%]
+....................................................................F... [ 99%]
+....                                                                     [100%]
+================================== FAILURES ===================================
+_________________ test_hermes_gateway_alive_detects_dead_pid __________________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-full/test_hermes_gateway_alive_dete0')
+
+    def test_hermes_gateway_alive_detects_dead_pid(tmp_path):
+        (tmp_path / "gateway.pid").write_text(
+            json.dumps({"pid": 999999, "kind": "hermes-gateway"}), encoding="utf-8"
+        )
+>       assert mas.hermes_gateway_alive(tmp_path) is None
+E       AssertionError: assert 999999 is None
+E        +  where 999999 = <function hermes_gateway_alive at 0x000002953027A0C0>(WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-full/test_hermes_gateway_alive_dete0'))
+E        +    where <function hermes_gateway_alive at 0x000002953027A0C0> = mas.hermes_gateway_alive
+
+tests\test_shared_agent_surface_mcp.py:474: AssertionError
+______________ test_yaml_target_writes_when_gateway_pid_is_stale ______________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-full/test_yaml_target_writes_when_g0')
+
+    def test_yaml_target_writes_when_gateway_pid_is_stale(tmp_path):
+        """A `gateway.pid` naming a process that is no longer running must NOT
+        block the write -- only an actually-live gateway is a clobber risk.
+        """
+        pytest.importorskip("ruamel.yaml")
+        surface = load_hook_surface_module()
+    
+        hermes_dir = tmp_path / "hermes"
+        hermes_dir.mkdir()
+        config_path = hermes_dir / "config.yaml"
+        fixture_text = _canonical_yaml_text(_YAML_FIXTURE_RAW)
+        config_path.write_text(fixture_text, encoding="utf-8")
+        # An implausibly large PID: on Windows, `tasklist /FI "PID eq N"` for a
+        # nonexistent PID returns a non-empty "no tasks match" message (not an
+        # error and not empty output), which `_pid_alive` correctly reads as
+        # "not alive" rather than failing closed.
+        (hermes_dir / "gateway.pid").write_text(
+            json.dumps({"pid": 99999999}), encoding="utf-8"
+        )
+    
+        message, changed = surface.apply_yaml_target(
+            config_path, _hermes_target_cfg(), check=False, dry_run=False
+        )
+    
+>       assert "WROTE" in message
+E       AssertionError: assert 'WROTE' in 'REFUSED C:\\~shit\\_audit\\pr41-response-20260927\\pytest-full\\test_yaml_target_writes_when_g0\\hermes\\config.yaml (gateway PID 99999999 is live; stop it and re-run, or the config is clobbered on shutdown)'
+
+scripts\tests\test_shared_hook_surface.py:1000: AssertionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_shared_agent_surface_mcp.py::test_hermes_gateway_alive_detects_dead_pid
+FAILED scripts/tests/test_shared_hook_surface.py::test_yaml_target_writes_when_gateway_pid_is_stale
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+3 failed, 1074 passed, 7 skipped, 1 deselected, 1 warning in 89.58s (0:01:29)

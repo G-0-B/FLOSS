@@ -1,0 +1,192 @@
+{
+ "reviewer": {
+  "model_selected": "grok-4-6-thinking-all-tools-github-mcp",
+  "harness": "grok",
+  "model_vendor_states": null,
+  "model_self_reported": "grok-4.6",
+  "self_reported_harness": "grok-tool-use (GitHub MCP + web + raw.githubusercontent + local file read)",
+  "tools_used": [
+   "github",
+   "web",
+   "execution"
+  ],
+  "saw_prior_reviews": false
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "claim": "ANCHOR_STALE is documented as 'strict superset; nothing anchored has gone' but the classifier never tests set inclusion, so interior deletions plus net growth are reported as honest growth.",
+   "severity": "critical",
+   "location": "packages/activity_log/anchor.py:393-404 and docs/specs/provenance-anchor.spec.md:157",
+   "evidence": [
+    "docs/specs/provenance-anchor.spec.md:157: \"`ANCHOR_STALE` | 1 | Store is a strict superset; nothing anchored has gone.\"",
+    "packages/activity_log/anchor.py:393-404: \"if vanished or regressions or missing_heads: ... TRUNCATION_DETECTED elif len(leaves) > (anchor.get('packet_count') or 0): ... ANCHOR_STALE else: ... ANCHOR_MISMATCH\"",
+    "packages/activity_log/tests/test_anchor.py:114-122 only asserts growth-alone is STALE; no test deletes an interior packet and adds two others.",
+    "missing_heads iterates only entry.get('head_saids') (anchor.py:389-391), so any non-head SAID can disappear without leaving vanished/regression/missing_heads."
+   ],
+   "falsifier": "A test that deletes an interior packet, adds two new packets, and still returns ANCHOR_MISMATCH or TRUNCATION_DETECTED — or a classifier that checks every anchored SAID (or recomputed leaf set) is still present before emitting STALE.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F2",
+   "claim": "The specified verify step that walks prev_root is unimplemented, and publish overwrites the only stored anchor document, so the 'anchor series is a hash chain' is a field on the latest file, not a retained series.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md:143 versus packages/activity_log/anchor.py:327-411 and scripts/provenance_anchor.py:86-103",
+   "evidence": [
+    "docs/specs/provenance-anchor.spec.md:143: \"2. Walk `prev_root` backwards and confirm the series is unbroken.\"",
+    "verify_anchor (anchor.py:327-411) loads one dict, checks its signature, recomputes one root, and classifies; it never opens a previous document or walks prev_root.",
+    "scripts/provenance_anchor.py:87-103: previous = load_anchor(args.anchor); then args.anchor.write_bytes(...) to the same DEFAULT_ANCHOR_PATH `.anchors/anchor.json`.",
+    "GitHub contents on reconcile/pr38-salvage-20260817: `.anchors/` contains only `anchor.json` (sha f758943a3a5cc3a2d0bfdfae06dcecfdb22175d5).",
+    "docs/specs/provenance-anchor.spec.md:111-112: \"The anchor series is itself a hash chain via `prev_root`, so dropping an old anchor breaks linkage and is visible rather than silent.\" Dropping the old file is the default publish path."
+   ],
+   "falsifier": "A `.anchors/` history of signed documents plus verify code that rejects a broken or skipped prev_root against those documents.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F3",
+   "claim": "The load-bearing publication mechanism (root in a git tag name reaching third-party mirrors) has not been instantiated: the repository has no tags, and the CLI never creates them.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py:54-65,118-124; commit fbaae97; GitHub list_tags on G-0-B/FLOSS",
+   "evidence": [
+    "github___list_tags owner=G-0-B repo=FLOSS returned [] — no tags on the public repository.",
+    "commit fbaae97b74f72436fe3a79fa792beb4d3eb8ce0e message: \"The tag carrying this root is not created here. Pushing a tag to a public repository is an operator action, and the spec says so\"",
+    "scripts/provenance_anchor.py:118-124 prints `git tag \"{tag_name}\"` and `git push origin HEAD --tags` only under --print-tag; \"Runs none.\"",
+    "tag_name() truncates merkle_root to 24 characters (provenance_anchor.py:64), so even a created tag would not carry the full root the spec treats as the external fact.",
+    "docs/specs/provenance-anchor.spec.md:4: \"publication ⚠️ not yet performed\" and Limits line 209-213 already mark mirror retention Specified."
+   ],
+   "falsifier": "A tag whose name contains the published root, plus a GH Archive / BigQuery row for that CreateEvent on G-0-B/FLOSS retrievable from a party with no write access.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F4",
+   "claim": "GitHub's public event firehose is a real external record of ref names and commit messages, but it is not a record of the packet set, and this repository's packets are not in the published tree.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py:47-49; docs/specs/provenance-anchor.spec.md:136-150; .gitattributes / default provenance root",
+   "evidence": [
+    "DEFAULT_PROVENANCE_ROOT = WORKSPACE_ROOT / \".agent-surface\" / \"provenance\" (scripts/provenance_anchor.py:47) — parent of the git repo, not inside G-0-B/FLOSS.",
+    ".gitattributes marks `.agent-surface/provenance/**/*.json -text` while that path is outside the clone a third party receives.",
+    "docs/specs/provenance-anchor.spec.md:145: \"3. Independently recompute the root from whatever packet set they hold.\" A public clone holds `.anchors/anchor.json`, not the 257 packets.",
+    "GitHub CreateEvent payload includes `ref` / `ref_type` but not file contents (https://docs.github.com/v3/activity/event_types CreateEvent table).",
+    "GH Archive / githubarchive BigQuery retains public PushEvent commit messages and CreateEvent refs (https://trufflesecurity.com/blog/guest-post-how-i-scanned-all-of-github-s-oops-commits-for-leaked-secrets ; https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/security/oss-forensics/references/github-archive-guide.md). That witnesses the string in fbaae97's subject, not the leaf set.",
+    "Attempt to list /repos/G-0-B/FLOSS/events returned HTTP 403 rate-limit from this runner — live firehose presence for this repo was not confirmed here."
+   ],
+   "falsifier": "Packets published in-tree (or another public content-addressed store) so a stranger can recompute merkle_root, plus a retrieved GH Archive event whose payload matches that root.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F5",
+   "claim": "ADR-18 adopt-before-build was skipped for witnessing: Rekor hashedrekord or OpenTimestamps over the already-built root would supply the external 'no-later-than' the git-tag story only Specified, and would not replace the local set-commitment.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md:219-236 and author's quarantined reasoning; docs/adr/ADR-18-prior-art-reuse-gate.md; Rekor security model",
+   "evidence": [
+    "docs/specs/provenance-anchor.spec.md:223-224: \"Rekor becomes a `hashed-rekord` over the same root, at which point a non-operator-controlled Merkle log anchors ours and real inclusion proofs exist.\" Composition already names Rekor as the witness, then does not call it.",
+    "docs/specs/provenance-anchor.spec.md:238-243: prior-art survey was one model family; registry emergency is the admission that reuse review was owed.",
+    "Sigstore: \"The log is append-only and once entries are added they cannot be modified\" and an entry is \"a single-party attestation that a piece of data existed prior to a certain time\" (https://docs.sigstore.dev/about/security/).",
+    "rekor-cli upload of a hashedrekord needs the artifact hash, signature, and public key — the same PyNaCl identity already used (https://docs.sigstore.dev/logging/cli/).",
+    "What adopting Rekor/OTS as first witness would lose versus this code: zero-egress offline operation, zero new network dependency, and operator control of when a fact leaves the machine. What it would not lose: leaf format, domain separation, identity summaries, STALE/TRUNCATION split — those stay local.",
+    "What a signed git tag alone would lose versus this Merkle document: per-identity max_seq / head_saids / interior_gaps. The custom tree is the set commitment; the tag is only a transport. Building the tree locally is defensible. Treating an uncreated tag as the external root of trust is not."
+   ],
+   "falsifier": "A documented reject of Rekor/OTS that names a concrete property this design needs which those systems cannot carry even as a hash of `.anchors/anchor.json`, or a live Rekor/OTS inclusion proof for the genesis root E3Ehni4XGXL3Zku90BaAfB_HyCOGR4x_cZVCDGTUlYi0.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F6",
+   "claim": "scan_packets builds interior_gaps with range(max_seq+1) over an unbounded parsed integer, so one packet with a huge `s` wedges or memory-bombs publish/verify.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:193-202 and 229-244",
+   "evidence": [
+    "anchor.py:193-202: `slot = int(sequence)` with only ValueError handled; no upper bound.",
+    "anchor.py:229-244: `top = max(sequences)` then `\"interior_gaps\": [n for n in range(top + 1) if n not in present]`.",
+    "A single `{\"t\":\"prov\",\"i\":\"D…\",\"s\":\"1000000000\",\"d\":\"E…\"}` makes range(10**9+1).",
+    "test_anchor.py never uses a large sequence; test_a_packet_with_a_non_integer_sequence_is_named only covers `s=\"x\"`."
+   ],
+   "falsifier": "A rejected or capped sequence in scan_packets, or interior_gaps computed without materialising range(0..max_seq).",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F7",
+   "claim": "publish defaults to load_or_create_identity, so a missing key directory silently mints a new AID and signs a fresh consistent series — the failure mode the spec says pinning exists to stop.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py:89 and packages/activity_log/provenance.py load_or_create_identity; docs/specs/provenance-anchor.spec.md:202-204",
+   "evidence": [
+    "scripts/provenance_anchor.py:89: `identity = load_or_create_identity(args.identity_dir)` with no confirmation that the AID matches a previous signer.",
+    "provenance.py load_or_create_identity: if private.key is absent, `SigningKey.generate()` and write private/public/aid.",
+    "docs/specs/provenance-anchor.spec.md:202-204: \"A rotated identity can sign a fresh consistent series. Pinning the public key beforehand is the actual root of trust.\"",
+    "verify --expect-signer defaults to None (provenance_anchor.py:143-150), so the minted key verifies against itself."
+   ],
+   "falsifier": "publish refuses to create a key and refuses to sign unless --expect-signer (or a pinned aid file) matches the loaded identity.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F8",
+   "claim": "The one-line scope 'silent wholesale truncation impossible' is false after the operator publishes a new consistent anchor over the truncated store; verify then returns VERIFIED.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:38-39 and 363-365; accepted limit 1, which is worse than stated once combined with overwrite-publish",
+   "evidence": [
+    "anchor.py:38-39: \"this makes silent wholesale truncation impossible and loud truncation attributable, for anyone holding one prior root.\"",
+    "anchor.py:363-365: if current_root == anchored_root: status = VERIFIED — after republish, the truncated store matches the new document.",
+    "Accepted weakness 1 says detectability requires a retained prior root; F2 shows the repo keeps only the latest file, so the default verifier holds no prior root.",
+    "fbaae97 already published one root in a commit message; a later publish that overwrites `.anchors/anchor.json` and force-pushes the branch leaves only firehose text, not identities[]."
+   ],
+   "falsifier": "verify compares the live store to every historically published signed anchor (or refuses VERIFIED when prev_root is not locally present), not only to the overwritten tip file.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F9",
+   "claim": "Leaf/tree construction (JCS {d,i,s}, 0x00/0x01 domain tags, odd-node promotion, sorted leaves, empty-tree E+43 zeros, sig/signer excluded) is not the exploitable part; no second-preimage or ambiguous packet-set collision is evidenced in the 40-line tree.",
+   "severity": "nit",
+   "location": "packages/activity_log/anchor.py:64-142, 273-284, 114-123",
+   "evidence": [
+    "LEAF_TAG = b\"\\x00\"; NODE_TAG = b\"\\x01\" (anchor.py:67-68); interior hash is _hash(NODE_TAG, left, right) (138).",
+    "Odd node promoted unchanged (139-140); test_an_odd_leaf_count_is_promoted_not_duplicated asserts merkle_root([a,b,c]) != merkle_root([a,b,c,c]) (test_anchor.py:247-251).",
+    "Leaves sorted by (identity, sequence, said) after scan (anchor.py:207).",
+    "Empty root is the constant \"E\"+\"0\"*43, not blake3(b\"\") (132-133).",
+    "anchor_signing_bytes drops only sig and signer (282-283); test_the_signature_covers_the_identity_summaries tampers max_seq and expects a signature problem (test_anchor.py:188-193).",
+    "VerifyKey is derived from signer[1:] (anchor.py:319), so swapping signer without the matching secret fails verification rather than rebinding the claims."
+   ],
+   "falsifier": "Two distinct sorted leaf lists that produce one root under this hasher, or a signature that verifies after identities[] or merkle_root is edited.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F10",
+   "claim": "Limits section is missing: STALE is not a subset check (F1); prev_root walk is specified and absent (F2); unbounded max_seq materialisation (F6); key auto-mint (F7); packet store is off-repo so public verifiers cannot do spec step 3; operator-republish restores VERIFIED (F8); no concurrent-writer lock around scan-then-sign.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md:187-217 (Limits) versus implementation cited in F1-F8",
+   "evidence": [
+    "Limits lists eight items matching the review packet's accepted weaknesses; none mention the STALE heuristic, the single-file overwrite, range(max_seq), load_or_create_identity, or the off-repo store.",
+    "scan_packets / build_anchor / sign_anchor / write_bytes is a non-atomic sequence (anchor.py:251-270; provenance_anchor.py:86-103) with no lock on provenance_root; a packet created mid-scan is the accepted window, but a packet half-written then completed can land in unreadable[] or leaves depending on timing, and neither status treats unreadable_now as a failed gate (anchor.py:361 only records it).",
+    "docs/specs/provenance-anchor.spec.md:149-150: \"Step 4 is the only step that survives an operator who rewrites their own repository.\" Step 4 has no implementation in verify_anchor or the CLI."
+   ],
+   "falsifier": "Limits rewritten to include each of those behaviours as named, tested properties — or the behaviours changed to match the current Limits text.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F11",
+   "claim": "This should not be promoted as an external anchor in this form: keep the local set-commitment and identity summaries, stop calling git-tag-as-mirror a witness until one is retrieved, and do not ship STALE as a 'nothing has gone' gate.",
+   "severity": "major",
+   "location": "artifact as a whole; docs/specs/provenance-anchor.spec.md:215-217",
+   "evidence": [
+    "Spec one-liner (215-217) claims silent wholesale truncation is impossible for anyone who has held one prior root.",
+    "Shipped surface: one overwritten signed JSON in-tree, packets out-of-tree, zero tags, verify that will VERIFIED a republished truncation and STALE an interior-loss-plus-growth, no Rekor/OTS/SCITT call.",
+    "Author's own composition section already splits leaf computation (stable, small, no new dependency) from witnessing (pluggable). The defect is shipping the first half under the threat model of the second.",
+    "Genesis commit fbaae97 subject does place root E3Ehni4XGXL3Zku90BaAfB_HyCOGR4x_cZVCDGTUlYi0 and packets=257 in git history — that is a real, weaker, in-band commitment, not the mechanism the spec argues for."
+   ],
+   "falsifier": "A retrieved third-party ingest of the full signed document, STALE defined as actual set inclusion, retained prior anchors, and a pin-required publish path.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  }
+ ],
+ "refutations": [],
+ "predicted_majority": "The custom Merkle leaf/tree is acceptable; the publication argument is Specified-not-Verified; ADR-18 should have adopted a transparency log as the witness rather than inventing one from git events; several Limits items are understated.",
+ "where_you_expect_to_be_alone": "F1 — ANCHOR_STALE as a false-negative classifier for interior deletion plus net growth — because the accepted-weakness list already contains 'window between runs' and 'does not stop the operator', which will absorb this unless someone reads the elif packet_count branch against the spec's 'strict superset' sentence."
+}

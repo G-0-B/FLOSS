@@ -604,7 +604,7 @@ I’ve reviewed the three‑system synthesis and the underlying files. The conse
 | **AD4M** as semantic spanning layer (Perspectives, Languages, Social DNA). | § “AD4M” | `INTEGRATION-STATUS.md` (AD4M fields in Understanding); `ADR-1` (caution on early integration) | Yes (caution) | **Hold** | Code exists but governance warns against building on it prematurely. Label **Specified** until validated user story emerges. |
 | **KERI** for sovereign identity. | § “KERI” | `INTEGRATION-STATUS.md` (KERI bridge zomes); `ADR-1` (same caution) | Yes (caution) | **Hold** | Same as AD4M. Keep as Specified, but do not treat as production‑ready foundation. |
 | **hREA** for economic coordination. | § “Market‑Based Mechanisms” | `INTEGRATION-STATUS.md` (hREA zomes); `ADR-1` (same caution) | Yes (caution) | **Hold** | Same as above. Need concrete economic user story (e.g., contribution tracking) before promoting to Verified. |
-| **IPFS + Filecoin** for content‑addressed persistence. | § “IPFS, IPLD” | `ADR-N-IPFS-Integration-VVS.md`; `CLAUDE.md` (pointer files) | No | **Promote** | Working pattern documented; IPFS peer availability decline reinforces multi‑pinning approach already in ADR‑N. |
+| **IPFS + Filecoin** for content‑addressed persistence. | § “IPFS, IPLD” | `ADR-11-ipfs-large-file-integration.md`; `CLAUDE.md` (pointer files) | No | **Promote** | Working pattern documented; IPFS peer availability decline reinforces multi‑pinning approach already in ADR‑N. |
 | **Local AI inference** (AD4M v0.10.1, Ollama). | § “AD4M” | `MVP_PLAN.md` (Phase 2: real embeddings); `CLAUDE.md` (sentence‑transformers) | No | **Promote** | Enables Plane B runtime without API dependence. Aligns with “local first” principle. |
 
 ---

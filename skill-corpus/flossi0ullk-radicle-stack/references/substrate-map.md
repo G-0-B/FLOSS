@@ -10,7 +10,7 @@
 ## ADR surfaces
 
 - `FLOSS/docs/adr/ADR-8-radicle-dev-substrate.md`
-- `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md`
+- `FLOSS/docs/adr/ADR-10-local-agent-node.md`
 - `FLOSS/docs/adr/INDEX.md`
 
 ## Active bridge code

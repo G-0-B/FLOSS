@@ -1,0 +1,18 @@
+{
+  "commit": "5e52d40a3e42499dc6360638a9c50f5f71d401f8",
+  "dependencies_from": "5a1a2b1655274d4d37bba9e27a3bb2d11f2e35f6",
+  "files": [
+    {
+      "path": "packages/reasoning_ensemble/synthesizer.py",
+      "sha256": "39061a93688fa218791e5592656461450477f842144f541f0261e5541301b4ab"
+    },
+    {
+      "path": "packages/reasoning_ensemble/tests/test_survivor_independence.py",
+      "sha256": "0e8ab63d4a47220bb88ea70b72372c42cc47733a594072a3bec9d2aa53dfc42f"
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/RESULT.md",
+      "sha256": "ac7a1508d29057cbb447639521d3c19d0f5c1187480388df4d625416533eb285"
+    }
+  ]
+}

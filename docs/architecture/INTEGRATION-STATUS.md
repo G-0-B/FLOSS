@@ -19,14 +19,14 @@ This document tracks the integration of four critical distributed technologies i
 
 We've implemented the **foundational integration layers** that enable these technologies to work together:
 
-- ✅ **KERI Identity Bridge**: Maps KERI AIDs to Holochain agent keys with cryptographic seals
-- ✅ **AD4M Semantic Layer**: Integrated perspectives, semantic contexts, and language addresses
-- ✅ **hREA Economic Events**: Full REA ontology implementation with value flows and DICE attribution
-- ✅ **Vector Bridge**: Connects economic events to semantic search over Rose Forest
+- ⚠️ **[Specified] KERI Identity Bridge**: Maps KERI AIDs to Holochain agent keys with cryptographic seals
+- ⚠️ **[Specified] AD4M Semantic Layer**: Integrated perspectives, semantic contexts, and language addresses
+- ⚠️ **[Specified] hREA Economic Events**: Full REA ontology implementation with value flows and DICE attribution
+- ⚠️ **[Specified] Vector Bridge**: Connects economic events to semantic search over Rose Forest
 
 ### Current State
 
-**Production-Ready Components**:
+**Specified Components (Pending Implementation)**:
 - Identity integrity zome (KERI structures)
 - Identity coordinator zome (seal creation, AID registration, key rotation)
 - hREA integrity zome (economic events, value flows, contribution values)

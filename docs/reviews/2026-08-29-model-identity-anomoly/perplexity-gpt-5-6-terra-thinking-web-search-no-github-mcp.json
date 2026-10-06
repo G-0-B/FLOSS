@@ -1,0 +1,57 @@
+{
+  "reviewer": {
+    "model": "Perplexity",
+    "harness": "independent artifact audit",
+    "tools_used": [
+      "web"
+    ],
+    "saw_prior_reviews": false
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "claim": "The claimed review branch and its anchor implementation could not be retrieved, so the artifact's cryptographic, operational, and line-level claims are presently unauditable rather than verified.",
+      "severity": "major",
+      "location": "Repository `G-0-B/FLOSS`, branch `reconcile/pr38-salvage-20260817`; claimed files `packages/activity_log/anchor.py` and `scripts/provenance_anchor.py`",
+      "evidence": [
+        "Repository search located the project security overview at https://github.com/G-0-B/FLOSS/security, but did not return the claimed branch, commits `0a34637` or `fbaae97`, or any claimed anchor files. ", [github](https://github.com/G-0-B/FLOSS/security)
+        "Direct retrieval attempts for `https://github.com/G-0-B/FLOSS/tree/reconcile/pr38-salvage-20260817`, `https://raw.githubusercontent.com/G-0-B/FLOSS/reconcile/pr38-salvage-20260817/packages/activity_log/anchor.py`, and `https://raw.githubusercontent.com/G-0-B/FLOSS/reconcile/pr38-salvage-20260817/scripts/provenance_anchor.py` returned: `Failed to fetch url content`.",
+        "This is a `could not retrieve` finding, not a claim that the branch or files do not exist."
+      ],
+      "falsifier": "A publicly retrievable immutable commit URL, tarball, or raw-file URLs resolving to the stated branch and files, permitting inspection of the exact source and tests.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F2",
+      "claim": "The assertion that the mechanism has 25 passing tests and produces the listed verification outcomes is unsupported by independently retrievable test evidence.",
+      "severity": "major",
+      "location": "`packages/activity_log/tests/test_anchor.py:1-332`; behavioral claims in THE ARTIFACT",
+      "evidence": [
+        "The claimed test path was not available in the retrieved repository search results; no result exposed `packages/activity_log/tests/test_anchor.py`, its test output, or CI run associated with commits `0a34637` or `fbaae97`.",
+        "The only located repository result identifies the project but supplies no test execution, workflow result, commit state, or anchor implementation evidence: https://github.com/G-0-B/FLOSS/security ", [github](https://github.com/G-0-B/FLOSS/security)
+        "This is a `could not retrieve` finding, not a claim that the test file, tests, or passing run do not exist."
+      ],
+      "falsifier": "A reproducible checkout pinned to `0a34637` or `fbaae97`, plus complete command output for the anchor test suite and any required fixture-generation steps.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    },
+    {
+      "id": "F3",
+      "claim": "No conclusion about whether the custom Merkle construction is safe, whether its signature scope is complete, or whether it can yield false `VERIFIED` outcomes can be grounded because the implementation and specification text were unavailable.",
+      "severity": "major",
+      "location": "`packages/activity_log/anchor.py:1-418`; `docs/specs/provenance-anchor.spec.md:1-244`",
+      "evidence": [
+        "No retrieved source exposed the required code for leaf serialization, integer parsing, BLAKE3 domain-prefix application, odd-node handling, empty-tree construction, scan semantics, signature canonicalization, atomic file handling, or verification outcome selection.",
+        "No retrieved source exposed the stated specification's section 7 or its line numbers; therefore the stated-limits completeness claim cannot be compared against actual normative text.",
+        "The accessible repository search result provides only a generic GitHub repository/security page, not these source files: https://github.com/G-0-B/FLOSS/security " [github](https://github.com/G-0-B/FLOSS/security)
+      ],
+      "falsifier": "Retrievable source at the claimed revision, including the implementation, specification, existing packet validator, fixtures, dependency lockfiles, and test output.",
+      "confidence": "verified",
+      "novel_vs_prior": "novel"
+    }
+  ],
+  "refutations": [],
+  "predicted_majority": "Other reviewers with access to the claimed revision will likely focus on the lack of independently verified third-party retention and on the custom-build-versus-adopt decision; this review cannot validate or refute those substantive claims because the cited artifact was not retrievable.",
+  "where_you_expect_to_be_alone": "The strongest present finding is evidentiary: treating a non-retrievable tier-2 emergency artifact as reviewed would violate the requested retrieval-grounded audit standard, regardless of whether its prose description is technically plausible."
+}

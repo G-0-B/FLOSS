@@ -73,7 +73,23 @@ OVERRIDE_ALLOWED: dict[BlastRadius, bool] = {
 }
 
 EVIDENCE_TYPES: frozenset[str] = frozenset(
-    {"spec", "test", "adr", "url", "commit", "provenance_packet"}
+    {
+        "spec",
+        "test",
+        "adr",
+        "url",
+        "commit",
+        "provenance_packet",
+        # v1.5 D3 widening. ADR-19's own evidence table cites commits, live
+        # smoke runs, script output, and a claim UUID; under the original
+        # six-value enum those flatten into `url` or prose. A wider root
+        # vocabulary makes the "non-packet DAG root" requirement in
+        # docs/specs/provenance-packet.spec.md satisfiable honestly.
+        "file",
+        "log",
+        "activity",
+        "source_chain",
+    }
 )
 
 CERTAINTY_LIMIT: float = 0.999

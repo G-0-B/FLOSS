@@ -117,3 +117,16 @@ ARF/tests/tryorama/.hc/
 # Do not commit the overgrowth; distill load-bearing parts into a small doc if needed.
 docs/research/Holistic_Vision.md
 docs/research/consolidation_processed.txt
+
+# Compilation / build artifacts not already covered above. The 25 tracked
+# .pyc files removed in the "untrack compiled Python artifacts" commit
+# predated the __pycache__/ rule; these close the remaining gaps.
+*.pyo
+*.pyd
+.ruff_cache/
+.mypy_cache/
+target/
+
+# Isolated git worktrees and Superpowers SDD scratch (briefs, ledger, review packages)
+.worktrees/
+.superpowers/

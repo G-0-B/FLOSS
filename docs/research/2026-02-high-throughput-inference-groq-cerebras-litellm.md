@@ -3,7 +3,7 @@
 **Date:** February 2026
 **Source:** External research report, pasted by Anthony into Claude Code session 2026-04-12
 **Status:** Research reference — NOT YET IMPLEMENTED in FLOSSIØULLK
-**Relates to:** `ADR-MCP-ORCHESTRATOR.md` (the LiteLLM layer this document describes is the missing piece), `Automated-Agent-Orchestration-Report_v2.0.0.md`
+**Relates to:** `ADR-10-local-agent-node.md` (the LiteLLM layer this document describes is the missing piece), `Automated-Agent-Orchestration-Report_v2.0.0.md`
 **Known paste artifacts:** Code samples contain OCR-style errors (`response.choices.message.content` should be `response.choices[0].message.content`; `os.environ = "gsk_..."` should be `os.environ["GROQ_API_KEY"] = "gsk_..."`). Preserved verbatim below; fix when implementing.
 
 ---
@@ -401,6 +401,6 @@ This comparison definitively proves the superiority of the direct-access method.
 7. Once a single call works, wire `make_litellm_voter(config)` into `packages/metacoordinator_mcp/` so the MCP gateway can actively invoke Cerebras/Groq as voters — this is the piece that currently doesn't exist and is the reason every session re-burns Claude tokens to do work these free tiers could do instead.
 
 See also:
-- `FLOSS/docs/adr/ADR-MCP-ORCHESTRATOR.md` — the architecture this integrates into
+- `FLOSS/docs/adr/ADR-10-local-agent-node.md` — the architecture this integrates into
 - `FLOSS/docs/research/Automated-Agent-Orchestration-Report_v2.0.0.md` — broader orchestration landscape context
 - `FLOSS/docs/research/openrouter-llms-full.txt` — OpenRouter reference (for completeness, though this guide is explicitly arguing *against* OpenRouter)

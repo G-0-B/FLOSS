@@ -1,0 +1,14 @@
+[
+  {
+    "check": true,
+    "exception": "UnicodeDecodeError",
+    "detail": "'utf-8' codec can't decode byte 0xc3 in position 25: unexpected end of data",
+    "payload_intact": true
+  },
+  {
+    "check": false,
+    "exception": "UnicodeDecodeError",
+    "detail": "'utf-8' codec can't decode byte 0xc3 in position 25: unexpected end of data",
+    "payload_intact": true
+  }
+]

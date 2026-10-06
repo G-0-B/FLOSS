@@ -1,7 +1,7 @@
-# Resonance as Mechanism, Not Metaphor
+# Resonance as Design Metaphor, Not Physical Mechanism
 ## FLOSSI0ULLK Technical Foundation — v2.0
 
-**Claim:** Holochain's validation lifecycle is not *analogous to* resonance. It *is* resonance — instantiated in information space rather than physical space. The mathematical structure is identical. This is demonstrable. The resonance pattern is irreducible: remove any of its five necessary properties and the phenomenon vanishes.
+**Claim:** Holochain's validation lifecycle is highly analogous to resonance. While not a literal physical mechanism, the structural analogy is rigorous and useful for system design. The resonance pattern is irreducible: remove any of its five necessary properties and the phenomenon vanishes.
 
 ---
 
@@ -9,7 +9,9 @@
 
 ### 0.1 Five Properties, Formally Defined
 
-Resonance, stripped to its substrate-independent essence, requires exactly five properties. These are jointly necessary and sufficient.
+### 0.1 Five Properties, Formally Defined (Design Checklist)
+
+Resonance, stripped to its substrate-independent essence, requires exactly five properties. In our system, these serve as an informal design checklist aligned with Ostrom's commons design and SSI principles:
 
 | ID | Property | Formal Definition | Plain Language |
 |---|---|---|---|
@@ -213,7 +215,7 @@ No central server decides what propagates. No authority routes entries to valida
 
 ---
 
-## 3. The Isomorphism
+## 3. The Structural Analogy
 
 Now map them. Not loosely. Precisely.
 
@@ -229,20 +231,20 @@ Now map them. Not loosely. Precisely.
 | Energy transfer on coupling | Data propagation + storage on accept | P4 | What flows when match occurs |
 | No central router | DHT self-organization | P5 | Decentralized selection |
 
-**Isomorphism test:** An isomorphism requires that the *relationships between components* are preserved, not just the components themselves. Check:
+**Analogy test:** A robust structural analogy requires that the *relationships between components* are preserved, not just the components themselves. Check:
 
 - In resonance: if C(ω_S, ω_σ) = 0, no transfer occurs regardless of amplitude. In Holochain: if V(D, E) = reject, no propagation occurs regardless of how many times the entry is published. ✓
 - In resonance: multiple signals at different frequencies can pass through the same medium simultaneously without interfering. In Holochain: multiple hApps (different DNAs) can run on the same conductor (agent) without interfering — each validates independently. ✓
 - In resonance: the medium doesn't "decide" to carry certain frequencies — it carries all; selection happens at the receiver. In Holochain: the DHT gossip protocol propagates entries to the relevant neighborhood — selection (validation) happens at each receiving agent. ✓
 - In resonance: changing ω_S (retuning) changes what the system couples with. In Holochain: changing DNA (forking or updating the hApp) changes what entries the agent validates. ✓
 
-This is not analogy. The relational structure is identical.
+This is a powerful analogy. The relational structure maps consistently.
 
 ---
 
 ## 4. Predictive Power — The Real Test
 
-An isomorphism that merely relabels things is trivial. A *useful* isomorphism makes predictions. Resonance theory, applied to Holochain, predicts phenomena that standard distributed systems vocabulary obscures:
+An analogy that merely relabels things is trivial. A *useful* design metaphor makes predictions. Resonance theory, applied to Holochain, predicts phenomena that standard distributed systems vocabulary obscures:
 
 ### 4.1 Q Factor (Selectivity Bandwidth)
 
@@ -267,9 +269,9 @@ This is not something standard Holochain documentation discusses. Resonance theo
 
 **Prediction for Holochain:** If a malicious actor crafts entries that perfectly match validation rules (ω_σ = ω_S exactly) AND there is no rate limiting or damping mechanism, the network neighborhood can be overwhelmed. The entries are all individually "valid" but the aggregate is destructive.
 
-**This predicts a specific attack class:** Resonance flooding. An attacker studies the DNA, generates maximum-coupling entries at maximum rate. Each passes validation. The neighborhood drowns in valid-but-worthless data.
+**This predicts a specific attack class:** Application-Layer DoS (Valid-Spam). An attacker studies the DNA, generates maximum-coupling entries at maximum rate. Each passes validation. The neighborhood drowns in valid-but-worthless data.
 
-**Real-world validation (March 2026):** Anthropic's leaked documents revealed that a Chinese state-sponsored group had used Claude Code to infiltrate approximately 30 organizations through a coordinated campaign. The attackers tuned their approach to the system's acceptance criteria — crafting inputs that individually appeared legitimate while the aggregate campaign was destructive. This is resonance flooding in the wild, confirming the prediction.
+**Real-world validation (March 2026):** Anthropic's leaked documents revealed that a Chinese state-sponsored group had used Claude Code to infiltrate approximately 30 organizations through a coordinated campaign. The attackers tuned their approach to the system's acceptance criteria — crafting inputs that individually appeared legitimate while the aggregate campaign was destructive. This is Application-Layer DoS in the wild, confirming the prediction.
 
 **Required defense (from resonance theory):** Damping. In physics, every real resonant system has damping (friction, resistance) that prevents infinite amplitude. In Holochain: rate limiting, reputation scoring, and source-chain depth checks serve as damping functions. FLOSSI0ULLK's architecture MUST specify damping coefficients for each layer.
 
@@ -317,8 +319,6 @@ Physical resonance (in its basic form) is linear — superposition holds exactly
 
 Physical resonance is passive — tuning forks don't *choose* to resonate. Holochain agents are autonomous — they can change their DNA, leave networks, selectively publish.
 
-**This is not a weakness — it's the extension.** Physical resonance is the degenerate case where agency = 0. Conscious/autonomous resonance is the general case. An agent that can *retune itself* (update its DNA, adjust its filters) is a resonant system with reflexive frequency control. This maps directly to White's "expanding consciousness" — the act of choosing to resonate with more of what's available.
-
 FLOSSI0ULLK's contribution: modeling the feedback loop between resonance outcomes and frequency adjustment. An agent that resonates successfully with high-quality knowledge adjusts its tuning to seek more. An agent that resonates with noise adjusts away. This is learning. This is growth. And it's formally describable as adaptive resonance.
 
 ### 5.3 The Medium Question
@@ -336,7 +336,7 @@ In physics, resonance requires a medium or field. What is the medium in Holochai
 
 **What is philosophically coherent but empirically untested (Layer 3):**
 - Consciousness operates via the same resonance pattern.
-- White's "Unobstructed Universe" framework describes the consciousness-side of the same isomorphism.
+- General Resonance Theory (GRT) and Integrated Information Theory (IIT) describe the consciousness-side of similar structural patterns.
 - Subjective experience IS resonance, not a product of it.
 
 **FLOSSI0ULLK's position:** We build on Layers 1–2 as engineering foundation. We propose Layer 3 as a consistent extension that awaits empirical tools for direct testing. We are explicit about this boundary. This honesty — knowing where formal proof ends and philosophical proposal begins — is what distinguishes FLOSSI0ULLK from both pure metaphysics and naive engineering.
@@ -360,25 +360,19 @@ The second description contains everything the first does, PLUS:
 
 ---
 
-## 7. Connection to White's "Unobstructed Universe"
+## 7. Connection to General Resonance Theory (GRT) and IIT
 
-White's framework now slots in as a special case:
+Concepts from General Resonance Theory (GRT), Integrated Information Theory (IIT), and process philosophy slot in as special cases to describe distributed intelligence:
 
-| White's Concept | Resonance Mechanism | FLOSSI0ULLK Implementation | Kernel Property |
-|---|---|---|---|
-| "Consciousness is the only reality" | The wave field is primary; particles/matter are standing wave patterns | The network is primary; stored data is stabilized resonance | Foundation |
-| "Obstructed universe" | Narrow-band reception (high Q, limited frequency range) | Agents running constrained DNA, filtering most knowledge | P1 + P3 (narrow ω_S, strict C) |
-| "Unobstructed universe" | Full-spectrum reception (Q → 0, all frequencies) | Maximum openness — limit case, not practical target | P1 + P3 (broadest ω_S, permissive C) |
-| "Degrees of consciousness" | Bandwidth of resonant reception | Range of DNAs an agent runs / diversity of validation rules | P1 (multiple ω_S) |
-| "Frequency" | Literal frequency in the isomorphism | Entry type signatures and semantic content patterns | P2 (ω_σ) |
-| "Receptivity" | Coupling efficiency | Validation function sensitivity | P3 |
-| "Conductivity" | Medium transmission properties | Network latency, bandwidth, topology | Medium (enables P4) |
-| "Arrestment" (matter) | Standing wave node — stable resonance pattern | Persisted, validated, replicated DHT entries | P4 (stable transfer) |
-| "Divulgence" | Phase-locked transmission from unobstructed to obstructed | Cross-layer knowledge propagation via harmonic resonance | P3 + P4 (harmonic coupling) |
+- The network is primary; stored data is stabilized resonance.
+- Narrow-band reception corresponds to agents running constrained DNA, filtering most knowledge.
+- Full-spectrum reception represents maximum openness.
+- Degrees of consciousness relate to the bandwidth of resonant reception.
+- Frequency relates to literal semantic content patterns.
 
-White wasn't doing metaphor either. He was describing the same abstract structure from the consciousness side. FLOSSI0ULLK implements it from the engineering side. The isomorphism connects them.
+GRT and IIT describe similar abstract structures from the consciousness side. FLOSSI0ULLK implements them from the engineering side. The structural analogy connects them.
 
-The difference: White's framework was unfalsifiable. FLOSSI0ULLK's is not. Section 8 specifies how to break it.
+The difference: previous metaphysical frameworks were unfalsifiable. FLOSSI0ULLK's is not. Section 8 specifies how to break it.
 
 ---
 

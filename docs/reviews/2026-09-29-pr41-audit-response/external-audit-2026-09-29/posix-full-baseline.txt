@@ -1,0 +1,3 @@
+CHECK DRIFT /mnt/c/~shit/_audit/pr41-round3-20260929/posix-full-fixture/workspace/out/skill-registry.json
+CHECK DRIFT /mnt/c/~shit/_audit/pr41-round3-20260929/posix-full-fixture/workspace/out/SKILL_INDEX.md
+DRIFT first: bad-identity is an installed managed projection with no skill in the manifest (withdrawn or renamed)

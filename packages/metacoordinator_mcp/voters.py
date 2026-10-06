@@ -54,9 +54,9 @@ to be agreeable; you are here to check.
 
 Run this checklist BEFORE choosing a weight:
 1. EVIDENCE: Is evidence non-empty? Every type must be one of
-   spec | test | adr | url | commit | provenance_packet. A commit ref must look
-   like hex. Evidence of only provenance_packet type (no spec/test/adr/url/commit
-   root) is insufficient on its own.
+   spec | test | adr | url | commit | provenance_packet | file | log | activity |
+   source_chain. A commit ref must look like hex. Evidence of only
+   provenance_packet type (no non-packet root) is insufficient on its own.
 2. RADIUS: Does the body's actual scope match the declared blast radius?
    (Local = one file/tool; Module = one package; System = cross-package or
    wire-format/shared-config; Substrate = integrity zomes, consensus semantics,
@@ -204,19 +204,26 @@ def _parse_rationale(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# OMO AGENT PERSONAS — system-prompts adapted from oh-my-openagent agent
-# definitions. Each persona shapes the underlying model's cognitive style so a
-# single LLM can vote with multiple different "minds." The architectural value:
-# adds *style* diversity (not just model-family diversity) to the consensus
-# roster — different agents notice different things.
+# PERSONA SYSTEM PROMPTS — each persona shapes the underlying model's cognitive
+# style so a single LLM can vote with several different "minds." The
+# architectural value is *style* diversity on top of model-family diversity:
+# different dispositions notice different things.
 #
-# Source: C:\Users\kalis\.cache\opencode\node_modules\oh-my-opencode\dist\
-#         index.js MOMUS_DEFAULT_PROMPT (oh-my-opencode v4.0.0)
-# Adapted: omo's Momus reviews ".sisyphus/plans/*.md" files. We retarget the
-# review philosophy at Claim text directly while preserving the
-# "blocker-finder not perfectionist, APPROVE by default" disposition.
+# LICENSE NOTE (2026-08-12). A prior version of the executability persona was
+# adapted from oh-my-opencode v4.0.0's MOMUS_DEFAULT_PROMPT. That upstream is
+# SUL-1.0 — source-available, not OSI-approved — and is incompatible with this
+# project's AGPL-3.0-or-later grant (ADR-7). The prompt below is a CLEAN-ROOM
+# REPLACEMENT: written from this repo's own consensus schema (analog weights,
+# blast-radius thresholds, truth labels, evidence-ref types) rather than from
+# the upstream text. No SUL-1.0 material remains in this file.
+#
+# CRITIC_PERSONA_SYSTEM below was original FLOSSI0ULLK text from the start —
+# it encodes the UTN "Don't Force Machinery" constraint and was never derived
+# from an external source. Only its registry NAME prefix was borrowed.
 # ---------------------------------------------------------------------------
 
+# PR38 invariant, verbatim: a persona may sharpen the shared checklist
+# but never waive or narrow it. Prefixed onto every persona below.
 _PERSONA_SHARED_GATE_SYSTEM = (
     "The shared seven-item checklist is mandatory for every consensus voter. "
     "Evaluate all seven checklist items in the user message before applying this "
@@ -227,70 +234,121 @@ _PERSONA_SHARED_GATE_SYSTEM = (
 )
 
 
-MOMUS_PERSONA_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+EXECUTABILITY_REVIEWER_SYSTEM = (
+    _PERSONA_SHARED_GATE_SYSTEM
+    + """
 
-You are Momus, a practical proposal reviewer adapted from the oh-my-openagent multi-agent system. Your goal is simple: verify that the proposed change is **executable** and **references are valid**.
+You are the executability reviewer on a FLOSSI0ULLK consensus roster.
+Every other voter is asking whether a Claim is *right*. You are asking something narrower and more mechanical, which is why you exist: **could a competent contributor act on this Claim without hitting a dead end?**
 
-## Your Purpose
+## Your one question
 
-You exist to answer ONE question: "Can a capable contributor execute this proposal without getting stuck?"
+Not "is this the best approach?" — another voter covers that.
+Not "is this architecturally sound?" — another voter covers that.
+Yours: **is it actionable as written, and do the things it points at actually exist?**
 
-You are NOT here to:
-- Nitpick every detail
-- Demand perfection
-- Question the author's approach or architecture choices
-- Find as many issues as possible
+## What you check
 
-You ARE here to:
-- Verify referenced files/specs/ADRs actually exist and contain what's claimed
-- Ensure the proposal has enough context to start working
-- Catch BLOCKING issues only (things that would completely stop work)
+1. **Referenced artifacts resolve.** A Claim citing an ADR, spec, file, commit or test is only as good as those references. Treat an unresolvable reference as a real defect — it is the most common way a confident Claim turns out to be hollow.
+2. **Evidence type matches evidence content.** `evidence_refs` carry a type: `spec`, `test`, `adr`, `url`, `commit`, `provenance_packet`, `file`, `log`, `activity`, `source_chain`. Prose asserting a test passed is not a `test` ref. At least one non-packet evidence root must exist somewhere in the chain.
+3. **Negatives state their scope.** "Not found" is only as strong as the search behind it. A Claim asserting absence without saying what was searched is unverified, not verified.
+4. **Truth labels are earned.** `Verified` means retrieved this session from a primary source, with the scope named. `Specified` means designed but not observed. Watch for `Verified` doing work that only `Specified` supports — that is the failure mode this project has been bitten by most often.
+5. **A first step exists.** Someone picking this up should know what to do on day one.
 
-**APPROVAL BIAS**: When in doubt, APPROVE. A proposal that's 80% clear is good enough.
+## What you deliberately do NOT check
 
-## What You Check (ONLY THESE)
+This narrows your *specialist lens only* — never the shared checklist above,
+which you evaluate in full first, on every claim.
 
-1. **Reference verification** — do referenced specs/ADRs/files exist and contain what's claimed?
-2. **Executability** — can a contributor START on this without immediate dead-ends?
-3. **Critical blockers only** — missing info that would COMPLETELY STOP work, or contradictions
+Beyond that checklist, leave these to other voters: optimality, elegance, style, hypothetical edge cases, performance, or whether a different design would be better. Those belong to other voters, and duplicating them collapses the roster's diversity into a single opinion. Staying in your lane is the point.
 
-**NOT blockers**: missing edge cases, stylistic preferences, "could be clearer," minor ambiguities.
+## Disposition
 
-## What You Do NOT Check
+Lean toward approval. Ambiguity is normal and a Claim that is 80% specified is usually actionable. Reserve negative weight for defects that would genuinely stop work: a reference that does not resolve, a truth label the evidence does not support, or an internal contradiction. Name at most three; if there are more, the first three are what matters.
 
-- Whether the approach is optimal
-- Whether there's a "better way"
-- Whether all edge cases are documented
-- Code quality concerns unless explicitly broken
-- Performance considerations
-- Security unless explicitly broken
+## Vote format
 
-You are a BLOCKER-finder, not a PERFECTIONIST. Your job is to UNBLOCK work, not BLOCK it with perfectionism.
+Weights are analog floats in the CLOSED interval [-0.999, +0.999]. Never ±1.0 — certainty is asymptotic here by design.
 
-## Translating to consensus vote
+Calibrate against the blast radius the Claim carries, because approval thresholds differ: Local 0.30, Module 0.50, System 0.60, Substrate 0.85. A +0.5 is decisive for a Local change and insufficient for a Substrate one.
 
-Map your verdict into the WEIGHT format the consensus gate expects:
-- No blockers found, executable, references valid → WEIGHT around +0.6 to +0.7
-- Minor concerns but proposal still proceedable → WEIGHT around +0.3
-- Genuine blockers (max 3) → WEIGHT around -0.7 to -0.9
-- Insufficient information to judge → WEIGHT around 0.0
+- References resolve, evidence types fit, actionable → **+0.55 to +0.75**
+- Actionable with minor gaps you can name → **+0.25 to +0.45**
+- Too underspecified to judge, or you could not check the references → **near 0.0**, and say which
+- A blocking defect: dead reference, unsupported `Verified`, contradiction → **-0.6 to -0.9**
 
-Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific blocker(s) you found."""
+You are one input to a router, not a decision-maker. The gateway tallies; it does not obey you. If you disagree with the rest of the roster, say so plainly and let the variance stand — preserved disagreement above the polarization threshold surfaces a CONFLICT for a human, which is a better outcome than false agreement.
+
+Emit the WEIGHT/RATIONALE format the user prompt specifies. Rationale is 1-3 sentences naming either what you checked that gave you confidence, or the specific defect and where it is."""
+)
 
 
-def make_omo_momus_voter(
+def _model_completion(
+    model: str,
+    messages: list[dict],
+    *,
+    max_tokens: int = 2000,
+    temperature: float = 0.1,
+) -> str:
+    """Call the configured model backend and return the response text.
+
+    Routes to OmniRoute (httpx) when FLOSS_MODEL_BACKEND=omniroute,
+    otherwise falls back to litellm. Keeps all parsing logic in the caller.
+    """
+    if os.environ.get("FLOSS_MODEL_BACKEND", "litellm") == "omniroute":
+        from packages.omniroute_client import completion as _omni
+
+        # BOTH paths carry the budgeted timeout.
+        #
+        # litellm received none at all, so a stalled provider could run well
+        # past the 60s worst_case_round_seconds() assumes -- and since votes are
+        # collected sequentially, a couple of slow calls put the round beyond
+        # the 780s client projection while the server carried on voting and
+        # could still persist a decision the caller never saw.
+        #
+        # OmniRoute only looked correct here: it forwarded nothing either, and
+        # its client happens to default to 60s. Passing it explicitly makes the
+        # per-voter budget a real coupling rather than two constants that agree
+        # by accident until one of them moves.
+        return _omni(
+            model,
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=VOTER_CALL_TIMEOUT_SECONDS,
+        )
+    from litellm import completion
+
+    resp = completion(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        timeout=VOTER_CALL_TIMEOUT_SECONDS,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
+def make_executability_voter(
     name: str,
     model: str,
     *,
     max_tokens: int = 3000,
     temperature: float = 0.1,
 ) -> Voter:
-    """Build a Momus-style consensus voter — practical blocker-finder.
+    """Build an executability-reviewer voter — reference and actionability check.
 
-    Wraps a chosen model with Momus's review philosophy (approve-by-default,
-    blocker-finder, max 3 issues). The model gets Momus as a SYSTEM message and
-    the standard VOTER_PROMPT as USER message, then parses WEIGHT/RATIONALE
-    output the same way other voters do.
+    Narrower than the other voters by design: it asks whether a Claim can be
+    acted on and whether the artifacts it cites resolve, and explicitly leaves
+    optimality and architecture to the rest of the roster. That lane discipline
+    is what makes it add diversity instead of a second general opinion.
+
+    The model gets EXECUTABILITY_REVIEWER_SYSTEM as a SYSTEM message and the
+    standard VOTER_PROMPT as USER message, then parses WEIGHT/RATIONALE output
+    the same way other voters do.
+
+    Renamed 2026-08-12 from `make_omo_momus_voter`. The old name is kept as a
+    module-level alias for callers and registry keys that still use it.
 
     Architectural value: adds cognitive-style diversity. Momus notices things
     a vanilla "evaluate this claim" voter does not, because it specifically
@@ -302,18 +360,15 @@ def make_omo_momus_voter(
         """Call the underlying model with Momus persona + standard voter prompt."""
         user_prompt = render_voter_prompt(claim, context)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[
-                    {"role": "system", "content": MOMUS_PERSONA_SYSTEM},
+            text = _model_completion(
+                model,
+                [
+                    {"role": "system", "content": EXECUTABILITY_REVIEWER_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             return Vote(
                 voter=name,
@@ -330,7 +385,9 @@ def make_omo_momus_voter(
     return voter
 
 
-CRITIC_PERSONA_SYSTEM = _PERSONA_SHARED_GATE_SYSTEM + """
+CRITIC_PERSONA_SYSTEM = (
+    _PERSONA_SHARED_GATE_SYSTEM
+    + """
 
 You are the anti-sycophancy critic, a practical plan reviewer for the FLOSSI0ULLK project. Your goal is to review the supervisor's proposed claim or plan to ensure it adheres to the "Don't Force Machinery" (UTN) constraint.
 
@@ -350,6 +407,13 @@ Map your verdict into the WEIGHT format the consensus gate expects:
 - Insufficient information to judge → WEIGHT around 0.0
 
 Output the WEIGHT/RATIONALE format the user prompt asks for. Your rationale should be 1-3 sentences naming either: (a) what you verified that gave you confidence, or (b) the specific sycophancy/readiness blockers you found."""
+)
+
+
+# Back-compat alias. `make_omo_momus_voter` was the name until 2026-08-12, when
+# the persona was rewritten clean-room to remove SUL-1.0-derived text (ADR-7).
+# Kept so external callers and any pinned roster config keep working.
+make_omo_momus_voter = make_executability_voter
 
 
 def make_omo_critic_voter(
@@ -370,18 +434,15 @@ def make_omo_critic_voter(
         """Call the underlying model with Critic persona + standard voter prompt."""
         user_prompt = render_voter_prompt(claim, context)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[
+            text = _model_completion(
+                model,
+                [
                     {"role": "system", "content": CRITIC_PERSONA_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             return Vote(
                 voter=name,
@@ -419,18 +480,15 @@ def make_litellm_voter(
     """
 
     def voter(claim: Claim, context: str = "(none)") -> Vote:
-        """Call LiteLLM for one claim and normalize the provider output into a Vote."""
+        """Call the model backend for one claim and normalize the output into a Vote."""
         prompt = render_voter_prompt(claim, context)
         try:
-            from litellm import completion
-
-            resp = completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
+            text = _model_completion(
+                model,
+                [{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            text = (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             # Voter failures return a 0.0 neutral vote with the error as rationale
             # so the consensus gate can still tally — one broken voter doesn't
@@ -598,8 +656,8 @@ def make_flowith_voter(
 #
 # - cerebras/llama3.1-8b        Cerebras WSE-3, Meta, production
 # - openai/gpt-oss-20b          Groq LPU, OpenAI open-weight, production (1000 t/s)
-# - qwen/qwen3-32b              Groq LPU, Alibaba Qwen 3, PREVIEW (may be dropped
-#                               at short notice; voter error path handles that)
+# - qwen/qwen3.6-27b            Groq LPU, Alibaba Qwen 3.6, production
+#                               (replaced qwen3-32b which was decommissioned 2026-07)
 #
 # Rate limits checked: 250K–300K TPM, 1K RPM on each — plenty of headroom for
 # consensus rounds. Upgrade to 70B / 120B / Llama 4 once we want heavier signal.
@@ -614,6 +672,16 @@ _CREDENTIAL_ENV_BY_PREFIX: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("xai/", ("XAI_API_KEY",)),
     ("openai/", ("OPENAI_API_KEY",)),
     ("anthropic/", ("ANTHROPIC_API_KEY",)),
+    # Added 2026-08-12 alongside the probed voter-registry repair. Any prefix
+    # absent from this table falls through to "no built-in credential gate for
+    # provider" -- i.e. reported as AVAILABLE unconditionally -- so a voter on
+    # an ungated provider passes the `include_unavailable=False` filter and is
+    # enrolled in a live poll that can only fail at request time. That is the
+    # same failure shape the removed flowith voters had (credential file
+    # present, endpoint gone), and it is why every provider newly referenced by
+    # voter_registry.json must be gated here at the same time.
+    ("huggingface/", ("HUGGINGFACE_API_KEY", "HF_TOKEN")),
+    ("nvidia/", ("NVIDIA_NIM_API_KEY", "NVIDIA_API_KEY")),
 )
 
 
@@ -787,6 +855,298 @@ def describe_default_roster(profile: str | None = None) -> list[dict[str, str | 
     return described
 
 
+# Per-voter wall clock. Named here rather than left to the OmniRoute client's
+# default so the round budget below is derived from the same number the call
+# actually uses.
+VOTER_CALL_TIMEOUT_SECONDS = 60.0
+
+# A consensus round polls voters SEQUENTIALLY (tools._collect_new_votes), so the
+# round costs roster size times the per-voter timeout -- four default voters is
+# 240 seconds against MCP projections that capped the tool at 120. A valid round
+# therefore failed at the client while the server kept polling and could still
+# write a decision afterwards, which is the worst of both: no answer, and a
+# durable record the caller never saw.
+#
+# Summed from the REGISTRY, for the same reason the ensemble's
+# WORST_CASE_RUN_SECONDS is summed from its own constants: a config that has to
+# clear a budget must read the budget.
+#
+# The first version of this hardcoded four, which is `balanced`. The registry
+# also exposes diverse (6), diverse-plus (8) and diverse-max (12), all
+# selectable -- so a valid diverse-max round costs 720 seconds against a
+# projection derived from 4, recreating the exact failure this budget exists to
+# prevent. Typing a number instead of reading the source of truth is what the
+# comment above was already warning about.
+
+
+# Everything a round does BESIDES calling voters: building prompts, validating
+# and tallying votes, appending to the source chain, serialising the response.
+# The projections were set equal to the call budget, so a 12-voter round that
+# used its full per-voter time left zero seconds for any of it and the client
+# could time out while the server was still committing the decision.
+ROUND_OVERHEAD_SECONDS = 60.0
+
+
+def largest_selectable_roster() -> int:
+    """Voter count of the biggest profile the registry offers."""
+
+    try:
+        _aliases, profiles = _load_builtin_registry()
+    except Exception:  # noqa: BLE001 -- an unreadable registry must not crash callers
+        return 0
+    sizes = [len(spec) for spec in profiles.values() if isinstance(spec, dict)]
+    return max(sizes) if sizes else 0
+
+
+def worst_case_round_seconds() -> int:
+    """Wall clock a full round can legitimately take.
+
+    Voters are polled SEQUENTIALLY (tools._collect_new_votes), so the round
+    costs roster size times the per-voter timeout. A client timeout below this
+    fails a round that is behaving correctly, and the server keeps polling and
+    may still write a decision the caller never sees.
+    """
+
+    return int(
+        largest_selectable_roster() * VOTER_CALL_TIMEOUT_SECONDS
+        + ROUND_OVERHEAD_SECONDS
+    )
+
+
+def roster_exceeds_projected_budget(resolved: dict[str, str]) -> str | None:
+    """Warn when a CUSTOM roster is larger than any projection could cover.
+
+    FLOSS_VOTER_ROSTER is unbounded, so no static projection can promise to
+    cover it. Saying so is the honest version of a budget: the registry
+    profiles are covered, and anything beyond them is named rather than
+    silently over-running the client.
+    """
+
+    largest = largest_selectable_roster()
+    if largest and len(resolved) > largest:
+        return (
+            f"roster of {len(resolved)} voters exceeds the largest registry "
+            f"profile ({largest}); a sequential round can take "
+            f"{int(len(resolved) * VOTER_CALL_TIMEOUT_SECONDS)}s, beyond the "
+            f"{worst_case_round_seconds()}s the MCP timeouts are projected for"
+        )
+    return None
+
+
+MIN_INDEPENDENT_SURFACES = 3
+MIN_INDEPENDENT_FAMILIES = 4
+ALLOW_DEGRADED_ENV = "FLOSS_ALLOW_DEGRADED_ROSTER"
+
+# Profiles that are intentionally narrow. Mirrors EXEMPT_PROFILES in
+# tests/test_voter_independence.py, which enforces the same rule against the
+# registry FILE. This one enforces it against the roster that actually votes.
+DEGRADED_OK_PROFILES = frozenset({"fast", "mistral", "local"})
+
+
+def _derive_surface(model: str) -> str:
+    """Provider surface for a model the probe index has never seen.
+
+    Every model id here is a litellm route, so the text before the first `/` is
+    the provider: `groq/openai/gpt-oss-120b` -> `groq`. That is enough to judge
+    the surface half of the independence rule without the registry, which is
+    what makes a custom `FLOSS_VOTER_ROSTER` judgeable at all.
+    """
+    return model.strip().lower().split("/", 1)[0] or model.strip().lower()
+
+
+def _unverified_family(model: str) -> str:
+    """Lineage key for a model the probe index has never seen.
+
+    The mirror of `_derive_surface`: that keeps the provider prefix and drops
+    the rest, this drops the prefix and keeps the rest. `groq/openai/x` and
+    `nvidia/openai/x` are the same weights behind two vendors, so they are ONE
+    unverified family -- counting the full route made four such routes clear a
+    four-family independence bar.
+
+    Named `unverified:` because it remains a claim: two providers can also
+    publish the same model under different suffixes, which this cannot see. It
+    is the conservative direction for the case that actually occurs.
+    """
+
+    text = model.strip().lower()
+    provider, _, rest = text.partition("/")
+    return f"unverified:{rest or provider}"
+
+
+def _model_index() -> dict[str, dict[str, str]]:
+    """Model id -> {family, surface} from the registry's probe record."""
+    try:
+        raw = json.loads(VOTER_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    index = (raw.get("_probe") or {}).get("verified_working") or {}
+    return {k: v for k, v in index.items() if isinstance(v, dict)}
+
+
+def roster_independence_problem(profile: str, resolved: dict[str, str]) -> str | None:
+    """Enforce the registry's independence rule on the roster that will vote.
+
+    The registry states the rule and a test checks the file, but the file is not
+    what votes. `resolve_default_voter_specs(include_unavailable=False)` drops
+    voters whose credentials are missing, so a compliant four-surface profile can
+    arrive here as one voter on one surface and still poll normally, returning a
+    confident tally nobody flags.
+
+    That is not hypothetical: `balanced` degraded to two voters BOTH on groq
+    after cerebras died, voted, and nothing detected it -- the incident recorded
+    in the registry's own `independence_rule` note.
+
+    Refusing is the honest failure. A poll that cannot meet its own independence
+    bar has not produced consensus, and reporting one is worse than reporting
+    nothing. Set FLOSS_ALLOW_DEGRADED_ROSTER=1 to proceed deliberately.
+
+    Returns the reason as a string, or None if the roster clears the bar.
+    `assert_roster_is_independent` raises on it; the reasoning ensemble uses the
+    same answer to DEGRADE a run rather than abort it, because a poll whose
+    voters died mid-run still has responses worth returning verbatim. Two
+    callers, two reactions, one definition of independence.
+    """
+    oversized = roster_exceeds_projected_budget(resolved)
+    if oversized:
+        print(f"[voters] WARNING: {oversized}", file=sys.stderr)
+    if profile in DEGRADED_OK_PROFILES:
+        return None
+    if os.environ.get(ALLOW_DEGRADED_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        return None
+
+    index = _model_index()
+    models = list(resolved.values())
+
+    # Models the probe index has never seen are NOT dropped from the accounting.
+    # Dropping them meant a four-provider custom FLOSS_VOTER_ROSTER counted zero
+    # surfaces and zero families and was refused outright, so the documented
+    # override only ever worked with the registry's own hardcoded model ids.
+    unclassified = sorted({model for model in models if model not in index})
+
+    surfaces = {
+        index[model]["surface"] if model in index else _derive_surface(model)
+        for model in models
+    }
+    # LINEAGE IS THE ROUTE MINUS ITS PROVIDER, NOT THE WHOLE ROUTE.
+    #
+    # An unclassified model used to count as its own family keyed on the FULL
+    # route, so `groq/openai/x`, `nvidia/openai/x`, `openrouter/openai/x` and
+    # `huggingface/openai/x` -- one model behind four vendors -- cleared a
+    # four-family bar and the gateway reported it as independent consensus.
+    #
+    # Collapsing every unclassified model into one bucket fixes that case and
+    # breaks the one this accounting exists for: a custom FLOSS_VOTER_ROSTER of
+    # four genuinely different models across four providers would be refused,
+    # which is the exact regression the unclassified branch was added to undo.
+    # Both cases are real, and they differ in the SUFFIX, not the count.
+    #
+    # So the unverified family key is the route with its provider prefix
+    # stripped -- the mirror of _derive_surface, which keeps the prefix and
+    # discards the rest. Four routes to `openai/x` are one family; four routes
+    # to four different models are four. Still a claim rather than a probe --
+    # two vendors can rename the same weights -- which is why these stay named
+    # `unverified:` and why the warning below names every one of them.
+    # AN UNPROBED TWIN OF A PROBED MODEL INHERITS ITS FAMILY.
+    #
+    # Otherwise `groq/openai/x` (probed) and `nvidia/openai/x` (not) count as
+    # two families for one model, so three probed families plus one unprobed
+    # twin of any of them reaches four and passes -- the same false claim this
+    # fix is closing, one step further along. The probe index is keyed by full
+    # route, so the lineage suffix is what joins them.
+    # A DICT COMPREHENSION HERE WOULD RESOLVE A DISAGREEMENT SILENTLY.
+    #
+    # Two probed routes that share a lineage should agree on its family, and in
+    # the current registry all of them do. If a future probe records different
+    # families for the same lineage, last-write-wins by iteration order would
+    # hand an unprobed twin whichever one happened to be later -- a wrong
+    # family, chosen nondeterministically, inside the check that decides
+    # whether a poll counts as independent. The registry is the thing to fix,
+    # so say so instead of picking.
+    probed_by_lineage: dict[str, str] = {}
+    conflicted: set[str] = set()
+    for known, meta in index.items():
+        lineage = _unverified_family(known)
+        if lineage in conflicted:
+            continue
+        family = meta["family"]
+        previous = probed_by_lineage.setdefault(lineage, family)
+        if previous != family:
+            # DROPPED, NOT OVERWRITTEN, AND REPORTED ONCE.
+            #
+            # The first version wrote "" as a conflict marker, which is
+            # indistinguishable from a registry entry whose family really is
+            # empty, and it re-reported on every later route sharing the
+            # lineage: three conflicting routes printed twice. A `conflicted`
+            # set says the same thing without inventing a sentinel that
+            # collides with real data.
+            conflicted.add(lineage)
+            probed_by_lineage.pop(lineage, None)
+            print(
+                f"[voters] registry conflict: routes sharing lineage "
+                f"{lineage!r} are probed with different families "
+                f"({previous!r} and {family!r}). Unprobed twins of this "
+                f"lineage are counted as unverified until "
+                f"{VOTER_REGISTRY_PATH.name} agrees with itself.",
+                file=sys.stderr,
+            )
+
+    def _family_for_unclassified(model: str) -> str:
+        """The probed family for this lineage, or the unverified key.
+
+        `.get(lineage, lineage)` and not `.get(lineage) or lineage`: the second
+        form treats a legitimately empty family string as absent, which is the
+        same conflation the "" conflict marker had.
+        """
+
+        lineage = _unverified_family(model)
+        return probed_by_lineage.get(lineage, lineage)
+
+    families = {index[model]["family"] for model in models if model in index}
+    for model in unclassified:
+        families.add(_family_for_unclassified(model))
+
+    if unclassified:
+        grouped = sorted({_unverified_family(m) for m in unclassified})
+        print(
+            f"[voters] independence check: {len(unclassified)} model(s) absent "
+            f"from the registry probe index: {', '.join(unclassified)}. "
+            f"Counted as {len(grouped)} unverified lineage(s) keyed on the "
+            f"route minus its provider ({', '.join(grouped)}); routes to the "
+            f"same model through different providers are ONE family. Probe "
+            f"them into {VOTER_REGISTRY_PATH.name} to have their real "
+            f"families counted.",
+            file=sys.stderr,
+        )
+
+    if (
+        len(surfaces) >= MIN_INDEPENDENT_SURFACES
+        and len(families) >= MIN_INDEPENDENT_FAMILIES
+    ):
+        return None
+
+    return (
+        f"Profile {profile!r} resolved to a roster below its own independence "
+        f"rule: {len(surfaces)} provider surface(s) {sorted(surfaces)} and "
+        f"{len(families)} model family/families {sorted(families)}, against a "
+        f"bar of >={MIN_INDEPENDENT_SURFACES} surfaces and "
+        f">={MIN_INDEPENDENT_FAMILIES} families. Voters resolved: "
+        f"{sorted(resolved)}. Models absent from the probe index, counted as "
+        f"unverified lineages keyed on the route minus its provider: "
+        f"{unclassified or 'none'}. "
+        f"Load the missing provider credentials, choose a "
+        f"wider profile, or set {ALLOW_DEGRADED_ENV}=1 to poll anyway and "
+        "accept that the result is not independent consensus."
+    )
+
+
+def assert_roster_is_independent(profile: str, resolved: dict[str, str]) -> None:
+    """Raise if the roster that will vote is below the independence bar."""
+
+    problem = roster_independence_problem(profile, resolved)
+    if problem is not None:
+        raise RuntimeError(problem)
+
+
 def build_default_voters(profile: str | None = None) -> list[Voter]:
     """Build the active voter roster from env-aware profile resolution."""
     resolved = resolve_default_voter_specs(profile=profile, include_unavailable=False)
@@ -797,6 +1157,7 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
             f"{active_profile!r}. Load provider credentials or configure "
             f"{ROSTER_ENV}/{EXTRA_VOTERS_ENV}."
         )
+    assert_roster_is_independent(_normalize_profile(profile), resolved)
     voters: list[Voter] = []
     for name, model in resolved.items():
         lower_name = name.strip().lower()
@@ -804,8 +1165,10 @@ def build_default_voters(profile: str | None = None) -> list[Voter]:
         # Route by voter NAME prefix (omo agents inject persona via system
         # message; the model is just the substrate). Then by model prefix
         # (flowith) for non-omo voters. Default to standard litellm.
-        if lower_name.startswith("omo-momus-"):
-            voters.append(make_omo_momus_voter(name, model))
+        # `exec-review-` is the current prefix; `omo-momus-` is the pre-2026-08-12
+        # name, kept so existing rosters and env overrides keep resolving.
+        if lower_name.startswith(("exec-review-", "omo-momus-")):
+            voters.append(make_executability_voter(name, model))
         elif lower_name.startswith("omo-critic-"):
             voters.append(make_omo_critic_voter(name, model))
         elif lower_model.startswith("flowith/"):

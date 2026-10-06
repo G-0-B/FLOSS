@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 import sys
+import time
+
+import pytest
 from pathlib import Path
 
 FLOSS_ROOT = Path(__file__).resolve().parents[2]
@@ -106,7 +111,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
             "server_overrides": {
                 "flossiullk-reasoning-ensemble": {
                     "startup_timeout_sec": 120,
-                    "tool_timeout_sec": 240,
+                    "tool_timeout_sec": 420,
                     "sampling_enabled": False,
                 }
             },
@@ -116,7 +121,7 @@ def test_vibe_config_projects_reasoning_ensemble_mcp_with_cold_start_budget(tmp_
     assert 'name = "flossiullk-reasoning-ensemble"' in config
     assert "C:/~shit/.mcp/lenses/flossiullk-reasoning-ensemble.yaml" in config
     assert "startup_timeout_sec = 120.0" in config
-    assert "tool_timeout_sec = 240.0" in config
+    assert "tool_timeout_sec = 420.0" in config
     assert "sampling_enabled = false" in config
 
 
@@ -172,8 +177,12 @@ def test_umbrella_materializer_refreshes_memory_before_context(tmp_path, monkeyp
     monkeypatch.setattr(surface, "DEFAULT_AI_ROSTER_MANIFEST_PATH", roster_manifest)
     monkeypatch.setattr(surface, "DEFAULT_MEMORY_MANIFEST_PATH", memory_manifest)
     monkeypatch.setattr(surface, "DEFAULT_CONTEXT_MANIFEST_PATH", context_manifest)
-    monkeypatch.setattr(surface, "DEFAULT_HOOK_MANIFEST_PATH", floss / "missing-hooks.json")
-    monkeypatch.setattr(surface, "DEFAULT_SKILL_MANIFEST_PATH", floss / "missing-skills.json")
+    monkeypatch.setattr(
+        surface, "DEFAULT_HOOK_MANIFEST_PATH", floss / "missing-hooks.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_SKILL_MANIFEST_PATH", floss / "missing-skills.json"
+    )
 
     calls: list[str] = []
 
@@ -220,3 +229,519 @@ def test_doctor_report_summarizes_surface_memory_provenance_and_heartbeat():
     assert "- Heartbeat STOP: `present`" in report
     assert "- Providers: `12`" in report
     assert "- Provenance: `8 valid`, `2 superseded`, `1 invalid`" in report
+
+
+def _mute_sub_materializers(surface, floss_dir, monkeypatch):
+    """Point every optional sub-manifest at a nonexistent path.
+
+    Their real counterparts live in the actual repo (this module is loaded
+    from the real `scripts/` dir), which would make them run against a
+    workspace_root that doesn't match -- irrelevant noise for guard tests
+    that only care about the Hermes dispatch block.
+    """
+    monkeypatch.setattr(
+        surface, "DEFAULT_AI_ROSTER_MANIFEST_PATH", floss_dir / "missing-roster.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_MEMORY_MANIFEST_PATH", floss_dir / "missing-memory.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_CONTEXT_MANIFEST_PATH", floss_dir / "missing-context.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_HOOK_MANIFEST_PATH", floss_dir / "missing-hooks.json"
+    )
+    monkeypatch.setattr(
+        surface, "DEFAULT_SKILL_MANIFEST_PATH", floss_dir / "missing-skills.json"
+    )
+
+
+def test_resolve_dotted_key_handles_nested_and_missing_paths():
+    surface = load_surface_module()
+    doc = {"approvals": {"mode": "smart"}, "hooks_auto_accept": False}
+
+    assert surface.resolve_dotted_key(doc, "hooks_auto_accept") == (True, False)
+    assert surface.resolve_dotted_key(doc, "approvals.mode") == (True, "smart")
+    assert surface.resolve_dotted_key(doc, "approvals.cron_mode") == (False, None)
+    assert surface.resolve_dotted_key(doc, "missing_top.level") == (False, None)
+    # An intermediate segment that is not itself a mapping must not be
+    # indexed into -- treated as "not found", not a crash.
+    assert surface.resolve_dotted_key(
+        {"approvals": "not-a-dict"}, "approvals.mode"
+    ) == (False, None)
+
+
+def test_check_guarded_keys_distinguishes_wrong_value_absent_and_match():
+    surface = load_surface_module()
+    doc = {
+        "hooks_auto_accept": True,  # wrong -- expected False
+        "approvals": {"mode": "smart"},  # matches expectation
+        # approvals.cron_mode is entirely absent
+    }
+    guarded_keys = {
+        "hooks_auto_accept": False,
+        "approvals.mode": "smart",
+        "approvals.cron_mode": "deny",
+    }
+
+    findings = surface.check_guarded_keys("hermes_user", doc, guarded_keys)
+
+    assert (
+        "GUARD DRIFT hermes_user hooks_auto_accept: expected False, found True"
+        in findings
+    )
+    assert (
+        "GUARD DRIFT hermes_user approvals.cron_mode: expected 'deny', key is absent"
+        in findings
+    )
+    # A matching key produces no finding at all.
+    assert not any("approvals.mode" in line for line in findings)
+    assert len(findings) == 2
+
+
+def test_guard_hermes_config_skips_silently_when_config_missing(tmp_path):
+    surface = load_surface_module()
+    missing = tmp_path / "does-not-exist" / "config.yaml"
+
+    findings = surface.guard_hermes_config(
+        "hermes_user", missing, {"hooks_auto_accept": False}
+    )
+
+    assert findings == []
+
+
+def test_guard_hermes_config_reports_parse_failure_without_raising(tmp_path):
+    surface = load_surface_module()
+    bad = tmp_path / "config.yaml"
+    bad.write_text("hooks_auto_accept: [unterminated\n", encoding="utf-8")
+
+    findings = surface.guard_hermes_config(
+        "hermes_user", bad, {"hooks_auto_accept": False}
+    )
+
+    assert len(findings) == 1
+    assert findings[0].startswith("GUARD DRIFT hermes_user: could not parse")
+
+
+def test_user_scope_hermes_target_guarded_without_include_user_scope(
+    tmp_path, monkeypatch
+):
+    """The key regression test.
+
+    A `hooks_auto_accept` flip in the user-scope (AppData) Hermes home must
+    be caught by a routine repo-scope `--check` -- i.e. WITHOUT passing
+    `--include-user-scope`. Scope gating exists to protect *writes* outside
+    the repo; a guard check is read-only, so gating it behind the write
+    flag would leave exactly the hole that let a real flip go unnoticed.
+    """
+    surface = load_surface_module()
+    workspace = tmp_path
+    floss = workspace / "FLOSS"
+    floss.mkdir()
+    (workspace / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    hermes_user_dir = workspace / "fake_appdata_hermes"
+    hermes_user_dir.mkdir()
+    hermes_user_config = hermes_user_dir / "config.yaml"
+    hermes_user_config.write_text(
+        "hooks_auto_accept: true\n_config_version: 33\n",
+        encoding="utf-8",
+    )
+    original_bytes = hermes_user_config.read_bytes()
+
+    manifest = floss / "shared-agent-surface.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": "0.1.0",
+                "workspace_id": "flossi0ullk",
+                "workspace_name": "FLOSSI0ULLK",
+                "mcp_source": ".mcp.json",
+                "targets": {
+                    "hermes_user": {
+                        "scope": "user",
+                        "config_path": "fake_appdata_hermes/config.yaml",
+                        "guarded_keys": {"hooks_auto_accept": False},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _mute_sub_materializers(surface, floss, monkeypatch)
+
+    # No --include-user-scope: include_user_scope defaults False here, same
+    # as a routine `refresh_agent_surfaces.py --check` invocation.
+    results, drift_found = surface.materialize(
+        workspace, manifest, check=True, dry_run=False, include_user_scope=False
+    )
+
+    assert drift_found is True
+    assert (
+        "GUARD DRIFT hermes_user hooks_auto_accept: expected False, found True"
+        in results
+    )
+    # The write path is still scope-skipped -- guard visibility and write
+    # gating are independent.
+    assert any(line.startswith("SKIP  hermes_user (user scope") for line in results)
+    # Read-only: the guard must never touch the file, drifted or not.
+    assert hermes_user_config.read_bytes() == original_bytes
+
+
+def test_repo_scope_hermes_guard_drift_never_raises_and_leaves_key_untouched(
+    tmp_path, monkeypatch
+):
+    surface = load_surface_module()
+    workspace = tmp_path
+    floss = workspace / "FLOSS"
+    floss.mkdir()
+    (workspace / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    hermes_dir = workspace / ".toilet" / "hermes"
+    hermes_dir.mkdir(parents=True)
+    hermes_config = hermes_dir / "config.yaml"
+    hermes_config.write_text(
+        "hooks_auto_accept: true\nmcp_servers: {}\n",
+        encoding="utf-8",
+    )
+
+    manifest = floss / "shared-agent-surface.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "manifest_version": "0.1.0",
+                "workspace_id": "flossi0ullk",
+                "workspace_name": "FLOSSI0ULLK",
+                "mcp_source": ".mcp.json",
+                "targets": {
+                    "hermes_workspace": {
+                        "scope": "repo",
+                        "config_path": ".toilet/hermes/config.yaml",
+                        "guarded_keys": {"hooks_auto_accept": False},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    _mute_sub_materializers(surface, floss, monkeypatch)
+
+    # Must not raise even though this target's write path (mcp merge) also
+    # executes in the same run -- the guard finding and the mcp write are
+    # independent, and neither should crash the other.
+    results, drift_found = surface.materialize(
+        workspace, manifest, check=False, dry_run=False, include_user_scope=False
+    )
+
+    assert drift_found is True
+    assert (
+        "GUARD DRIFT hermes_workspace hooks_auto_accept: expected False, found True"
+        in results
+    )
+    # The write path only ever touches `mcp_servers`; the guarded key itself
+    # must never be silently reset back to the expected value.
+    updated = hermes_config.read_text(encoding="utf-8")
+    assert "hooks_auto_accept: true" in updated
+
+
+# ---------------------------------------------------------------------------
+# A client timeout below the server's own work budget fails runs that are
+# behaving correctly. Derived from the synthesizer's constants, not typed in,
+# so raising a budget cannot silently outgrow the timeouts that wait on it.
+# ---------------------------------------------------------------------------
+
+
+def _reasoning_budget_seconds() -> int:
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.reasoning_ensemble import synthesizer
+
+    # Read the sum from the module that owns the budgets. Re-adding the terms
+    # here is what let the Tier-4 logging embed go uncounted: the test agreed
+    # with a derivation that was itself missing a step, so it passed while the
+    # configured timeout sat 65 seconds under the real path.
+    return synthesizer.WORST_CASE_RUN_SECONDS
+
+
+def _consensus_budget_seconds() -> int:
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    # The FUNCTION, which reads the registry, not a constant someone typed.
+    return voters.worst_case_round_seconds()
+
+
+def _server_timeouts(server: str) -> list[tuple[str, int]]:
+    surface = json.loads(
+        (FLOSS_ROOT / "shared-agent-surface.json").read_text(encoding="utf-8")
+    )
+    found: list[tuple[str, int]] = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == server and isinstance(value, dict):
+                    for tkey in ("tool_timeout_sec", "timeout"):
+                        if isinstance(value.get(tkey), (int, float)):
+                            found.append((f"{path}.{key}.{tkey}", value[tkey]))
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                walk(item, f"{path}[{i}]")
+
+    walk(surface, "surface")
+    return found
+
+
+def _reasoning_timeouts() -> list[tuple[str, int]]:
+    return _server_timeouts("flossiullk-reasoning-ensemble")
+
+
+def test_every_consensus_timeout_clears_a_full_sequential_round():
+    """A round polls voters sequentially, so it costs roster size times the
+    per-voter timeout. Four default voters is 240s against projections that
+    capped the tool at 120 -- a valid round failed at the client while the
+    server kept polling and could still write a decision afterwards."""
+    budget = _consensus_budget_seconds()
+    timeouts = _server_timeouts("flossiullk-consensus")
+
+    assert timeouts, "no consensus timeouts found -- has the shape moved?"
+    too_small = [(where, value) for where, value in timeouts if value < budget]
+    assert not too_small, (
+        f"timeout(s) below the {budget}s round budget: {too_small}. "
+        "Raise them, or bound the round below the client timeout."
+    )
+
+
+def test_every_reasoning_ensemble_timeout_clears_the_servers_own_budget():
+    """A voter may legitimately take 180s and its embedding another 90s. A 120s
+    client timeout fails that run while the server is inside every budget it was
+    configured with -- and the operator sees a client error for a working
+    server."""
+    budget = _reasoning_budget_seconds()
+    timeouts = _reasoning_timeouts()
+
+    assert timeouts, "no reasoning-ensemble timeouts found -- has the shape moved?"
+    too_small = [(where, value) for where, value in timeouts if value < budget]
+    assert not too_small, (
+        f"timeout(s) below the {budget}s server budget: {too_small}. "
+        "Raise them, or lower the synthesizer's budgets to match."
+    )
+
+
+def test_the_hook_filters_read_the_resolved_path_not_the_raw_spelling(tmp_path):
+    """Containment was checked against the resolved path while the filters
+    inspected the raw string, so the two disagreed about the same file:
+    `packages/tests/../prod.py` resolves to production code and was skipped for
+    containing "/tests/"; `packages/../docs/research/x.py` resolves to an
+    intake mouth and was treated as package code."""
+    import importlib.util
+
+    for name in ("hook_post_write", "hook_pre_write"):
+        spec = importlib.util.spec_from_file_location(
+            f"{name}_paths_under_test", FLOSS_ROOT / "hooks" / f"{name}.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        disguised_code = str(FLOSS_ROOT / "packages" / "tests" / ".." / "prod.py")
+        disguised_intake = str(
+            FLOSS_ROOT / "packages" / ".." / "docs" / "research" / "x.py"
+        )
+
+        assert (
+            module.is_substantive(disguised_code) is True
+        ), f"{name}: production code hidden behind a ../ was skipped"
+        assert (
+            module.is_substantive(disguised_intake) is False
+        ), f"{name}: an intake path spelled through packages/ was accepted"
+
+
+def test_the_intake_scan_holds_its_lock_across_counting_and_emitting(tmp_path):
+    """The lock was taken only around save_state, so two overlapping watchers
+    each loaded the same state, counted the same queue, and were independently
+    granted the same remaining capacity -- two scans of the same 5,000 changes
+    could enqueue 10,000 events, defeating the cap outright."""
+    source = (FLOSS_ROOT / "scripts" / "watch_intake.py").read_text(encoding="utf-8")
+    body = source.split("def scan_once(", 1)[1].split("def parse_args(", 1)[0]
+
+    lock_at = body.find('lock_file(event_root / "locks", "watch-state"')
+    load_at = body.find("load_state(state_path)")
+    save_at = body.find("save_state(state_path, current)")
+
+    assert lock_at != -1, "the scan no longer takes the state lock"
+    assert lock_at < load_at, "state is loaded before the lock is held"
+    assert lock_at < save_at, "state is saved outside the lock"
+    assert (
+        body.count('lock_file(event_root / "locks", "watch-state"') == 1
+    ), "two lock acquisitions means two critical sections, which is the defect"
+
+
+def test_the_round_budget_covers_the_largest_profile_the_registry_offers():
+    """The first version of this budget hardcoded four voters, which is
+    `balanced`. diverse-max is twelve and equally selectable, so a valid round
+    cost 720s against a projection derived from 4."""
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    _aliases, profiles = voters._load_builtin_registry()
+    biggest = max(len(spec) for spec in profiles.values() if isinstance(spec, dict))
+
+    assert voters.largest_selectable_roster() == biggest
+    assert voters.worst_case_round_seconds() >= int(
+        biggest * voters.VOTER_CALL_TIMEOUT_SECONDS
+    )
+
+
+def test_a_roster_beyond_every_profile_is_named_rather_than_silently_over_running():
+    """FLOSS_VOTER_ROSTER is unbounded, so no static projection can cover it.
+    Saying so is the honest version of a budget."""
+    if str(FLOSS_ROOT.parent) not in sys.path:
+        sys.path.insert(0, str(FLOSS_ROOT.parent))
+    from packages.metacoordinator_mcp import voters
+
+    huge = {
+        f"v{i}": "groq/model" for i in range(voters.largest_selectable_roster() + 1)
+    }
+
+    warning = voters.roster_exceeds_projected_budget(huge)
+
+    assert warning is not None
+    assert "exceeds the largest registry profile" in warning
+    assert voters.roster_exceeds_projected_budget({"a": "groq/model"}) is None
+
+
+def test_an_abandoned_watcher_lock_does_not_disable_intake(tmp_path):
+    """A watcher killed mid-scan left watch-state.lock behind forever: every
+    later run waited its timeout and failed, --loop died, and intake stayed
+    disabled until a human found the file.
+
+    The fixture is a leftover FILE, which is what a killed holder leaves. Under
+    an OS lock that file is inert -- the kernel released the lock when the
+    holder died -- so this now passes without any reclamation logic at all. The
+    version of this test that asserted reclamation was asserting a mechanism,
+    not the guarantee.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "watch_intake_lock_under_test", FLOSS_ROOT / "scripts" / "watch_intake.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules["watch_intake_lock_under_test"] = module
+    spec.loader.exec_module(module)
+
+    locks = tmp_path / "locks"
+    locks.mkdir()
+    abandoned = locks / "watch-state.lock"
+    abandoned.write_text("4242\nthe-dead-holders-token", encoding="utf-8")
+    old = time.time() - 3600
+    os.utime(abandoned, (old, old))
+
+    with module.lock_file(locks, "watch-state", timeout_seconds=2.0) as held:
+        assert held == abandoned
+
+    assert abandoned.exists(), "the handle is not unlinked; released means reacquirable"
+    with module.lock_file(locks, "watch-state", timeout_seconds=2.0):
+        pass
+
+
+def test_the_intake_watcher_imports_no_provenance_extras():
+    """The watcher was standard-library-only, and importing the shared lock from
+    `provenance` dragged blake3, jcs and PyNaCl in -- defeating the lazy-import
+    guard activity_log's __init__ exists to provide and breaking
+    `watch_intake.py --help` on any install without the provenance extras.
+
+    Asserted by running the module in an interpreter where those extras cannot
+    be imported, because a source grep would miss a transitive pull.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    blocker = textwrap.dedent("""
+        import sys
+
+        class _Blocked:
+            def find_module(self, name, path=None):
+                if name.split(".")[0] in {"blake3", "jcs", "nacl"}:
+                    raise ImportError(f"{name} is not installed in this profile")
+                return None
+
+            def find_spec(self, name, path=None, target=None):
+                if name.split(".")[0] in {"blake3", "jcs", "nacl"}:
+                    raise ImportError(f"{name} is not installed in this profile")
+                return None
+
+        sys.meta_path.insert(0, _Blocked())
+        """)
+    script = FLOSS_ROOT / "scripts" / "watch_intake.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            blocker + f"\nimport runpy, sys\n"
+            f"sys.argv = ['watch_intake.py', '--help']\n"
+            f"runpy.run_path({str(script)!r}, run_name='__main__')",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(FLOSS_ROOT),
+    )
+
+    combined = result.stdout + result.stderr
+    assert "ModuleNotFoundError" not in combined, combined[-600:]
+    assert "is not installed in this profile" not in combined, combined[-600:]
+    assert "usage:" in combined.lower(), combined[-600:]
+
+
+def test_loop_mode_survives_lock_contention():
+    """Widening the lock to the whole scan made an overlap ordinary, and one
+    ordinary overlap terminated a --loop watcher permanently."""
+    source = (FLOSS_ROOT / "scripts" / "watch_intake.py").read_text(encoding="utf-8")
+    loop = source.split("while True:", 1)[1].split("else:", 1)[0]
+
+    assert "except TimeoutError" in loop, "one overlap still ends the watcher"
+
+
+def test_a_windows_only_target_does_not_break_a_posix_surface_run(tmp_path):
+    """`hermes_user` is `%LOCALAPPDATA%/hermes/config.yaml`, and POSIX
+    expandvars leaves `%VAR%` literal -- so resolving it raised before the
+    user-scope skip could run, taking an ordinary repo-scope materialization or
+    --check down with it. The hook materializer already solved this and says so
+    in its docstring; the agent materializer's guard loop never got it."""
+    surface = load_surface_module()
+
+    # POSIX expandvars leaves `%VAR%` literal. Simulated rather than asserted
+    # directly, because on Windows it expands and the raise never happens --
+    # a test that only fails on the platform that does not have the bug is no
+    # test at all.
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(surface.os.path, "expandvars", lambda value: value)
+    try:
+        with pytest.raises(surface.SharedSurfaceError):
+            surface.resolve_manifest_path(tmp_path, "%LOCALAPPDATA%/hermes/config.yaml")
+    finally:
+        monkey.undo()
+
+    # The guard loop lives inside materialize(); assert on the loop itself
+    # rather than inventing an entry point it does not have. The property is
+    # that the resolve is guarded, not that some helper exists.
+    body = (
+        (FLOSS_ROOT / "scripts" / "materialize_shared_agent_surface.py")
+        .read_text(encoding="utf-8")
+        .split("for hermes_key in (", 1)[1]
+        .split("resolved = ", 1)[0]
+    )
+
+    assert "except SharedSurfaceError" in body, (
+        "the Hermes guard resolve is unguarded; a Windows-only target still "
+        "aborts a POSIX surface run"
+    )
+    resolve_at = body.find("resolve_manifest_path(")
+    guard_at = body.find("try:")
+    assert guard_at != -1 and guard_at < resolve_at, "the resolve is outside the try"

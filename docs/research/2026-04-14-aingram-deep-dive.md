@@ -417,4 +417,4 @@ FLOSS is AIngram's Holochain substrate.
 - Author ORCID: 0009-0007-4864-2001
 - First-pass harvest: `2026-04-14-paper-harvest-notes.md`
 - Related FLOSS code: `packages/metacoordinator_mcp/`, `packages/orchestrator/`,
-  `docs/adr/ADR-MCP-ORCHESTRATOR.md`
+  `docs/adr/ADR-10-local-agent-node.md`

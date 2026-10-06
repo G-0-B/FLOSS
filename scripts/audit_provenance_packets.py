@@ -19,7 +19,6 @@ if str(FLOSS_ROOT) not in sys.path:
 
 from packages.activity_log import provenance  # noqa: E402
 
-
 MUTABLE_GENERATED_PATH_PREFIXES = (
     ".agent-surface/",
     ".claude/",
@@ -61,8 +60,7 @@ def _is_mutable_generated_ref(path: str) -> bool:
     if normalized in MUTABLE_GENERATED_EXACT_PATHS:
         return True
     return any(
-        normalized.startswith(prefix)
-        or f"/{prefix}" in normalized
+        normalized.startswith(prefix) or f"/{prefix}" in normalized
         for prefix in MUTABLE_GENERATED_PATH_PREFIXES
     )
 
@@ -200,6 +198,7 @@ def audit_packets(
             "ok": result.ok,
             "packet_digest": result.packet_digest,
             "errors": result.errors,
+            "warnings": result.warnings,
             "narrative_lines": result.narrative_lines,
             "_packet": result.packet,
         }
@@ -223,6 +222,15 @@ def audit_packets(
             )
         else:
             lines.append(f"[INVALID] {record['path']} :: {';'.join(record['errors'])}")
+        if record["warnings"]:
+            # A warning is not a rejection, but an unsurfaced warning is the same
+            # thing as no warning at all. E_CONSENT_GATE_UNRESOLVED in particular
+            # exists to tell an operator that a governed claim was admitted on an
+            # unresolved hash; it is worthless if only the dataclass ever sees it.
+            lines.extend(
+                f"[WARN] {record['path']} :: {warning}"
+                for warning in record["warnings"]
+            )
 
     invalid_count = sum(1 for record in records if record["audit_status"] == "invalid")
     for record in records:

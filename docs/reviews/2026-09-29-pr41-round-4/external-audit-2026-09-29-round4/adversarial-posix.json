@@ -1,0 +1,173 @@
+{
+  "python": "3.12.3 (main, Mar  3 2026, 12:15:18) [GCC 13.3.0]",
+  "results": [
+    {
+      "label": "base-hardlink",
+      "external_changed": false,
+      "marker_is_symlink": false,
+      "removed_via_preservation": [
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-hardlink/target/steady"
+      ],
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-hardlink/target/steady"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "base-symlink",
+      "external_changed": false,
+      "marker_is_symlink": false,
+      "removed_via_preservation": [
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-symlink/target/steady"
+      ],
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-symlink/target/steady"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "base-unmanaged-collision",
+      "managed_before": false,
+      "evolved_before": true,
+      "current_inventory_equal": true,
+      "evolved_original_preserved": true,
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-unmanaged-collision/target/steady"
+      ]
+    },
+    {
+      "label": "base-newline",
+      "before_exit": 2,
+      "after_exit": 0,
+      "stderr": "",
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-newline/target/steady"
+      ],
+      "check": [
+        "CHECK OK /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/base-newline/target/steady"
+      ],
+      "drift": false,
+      "byte_equal": true
+    },
+    {
+      "label": "endpoint-hardlink",
+      "external_changed": true,
+      "marker_is_symlink": false,
+      "removed_via_preservation": [],
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-hardlink/target/steady (marker only)"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "endpoint-symlink",
+      "external_changed": true,
+      "marker_is_symlink": true,
+      "removed_via_preservation": [],
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-symlink/target/steady (marker only)"
+      ],
+      "payload_retained": true
+    },
+    {
+      "label": "endpoint-unmanaged-collision",
+      "managed_before": false,
+      "evolved_before": true,
+      "current_inventory_equal": true,
+      "evolved_original_preserved": true,
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-unmanaged-collision/target/steady"
+      ]
+    },
+    {
+      "label": "endpoint-newline",
+      "before_exit": 2,
+      "after_exit": 2,
+      "stderr": "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-newline/target/steady/run.sh: line 1: exit: 0\n: numeric argument required\n",
+      "output": [
+        "WROTE /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-newline/target/steady (marker only)"
+      ],
+      "check": [
+        "CHECK OK /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/endpoint-newline/target/steady"
+      ],
+      "drift": false,
+      "byte_equal": false
+    },
+    {
+      "label": "base-nul-cli",
+      "command": [
+        "/usr/bin/python3",
+        "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py",
+        "--workspace-root",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner",
+        "--manifest",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/manifest.json",
+        "--output-dir",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out",
+        "--check"
+      ],
+      "exit_code": 1,
+      "traceback": true,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 695, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 679, in main\n    results, drift_found = materialize(\n                           ^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 631, in materialize\n    messages, changed = prune_stale_projections(\n                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 508, in prune_stale_projections\n    if not projection_owned_by(child, owner_root):\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 465, in projection_owned_by\n    return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(\n                                ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/pathlib.py\", line 1242, in resolve\n    s = self._flavour.realpath(self, strict=strict)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<frozen posixpath>\", line 432, in realpath\n  File \"<frozen posixpath>\", line 476, in _joinrealpath\nValueError: embedded null byte\n",
+      "fixture_retained": true
+    },
+    {
+      "label": "endpoint-nul-cli",
+      "command": [
+        "/usr/bin/python3",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py",
+        "--workspace-root",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner",
+        "--manifest",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/manifest.json",
+        "--output-dir",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out",
+        "--check"
+      ],
+      "exit_code": 1,
+      "traceback": false,
+      "stdout": "CHECK DRIFT /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out/skill-registry.json\nCHECK DRIFT /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out/SKILL_INDEX.md\nKEEP  first: a-unusable has a managed marker with no usable installing-workspace identity (missing or invalid); ownership unknown, left in place (delete it by hand if it is stale)\nDRIFT first: z-withdrawn is an installed managed projection with no skill in the manifest (withdrawn or renamed)\n",
+      "stderr": "",
+      "fixture_retained": true
+    },
+    {
+      "label": "base-loop-cli",
+      "command": [
+        "/usr/bin/python3",
+        "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py",
+        "--workspace-root",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner",
+        "--manifest",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/manifest.json",
+        "--output-dir",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/out",
+        "--check"
+      ],
+      "exit_code": 1,
+      "traceback": true,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/usr/lib/python3.12/pathlib.py\", line 1252, in resolve\n    p.stat()\n  File \"/usr/lib/python3.12/pathlib.py\", line 842, in stat\n    return os.stat(self, follow_symlinks=follow_symlinks)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: [Errno 40] Too many levels of symbolic links: '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 695, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 679, in main\n    results, drift_found = materialize(\n                           ^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 631, in materialize\n    messages, changed = prune_stale_projections(\n                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 508, in prune_stale_projections\n    if not projection_owned_by(child, owner_root):\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py\", line 465, in projection_owned_by\n    return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(\n                                ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/pathlib.py\", line 1254, in resolve\n    check_eloop(e)\n  File \"/usr/lib/python3.12/pathlib.py\", line 1239, in check_eloop\n    raise RuntimeError(\"Symlink loop from %r\" % e.filename)\nRuntimeError: Symlink loop from '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'\n",
+      "fixture_retained": true
+    },
+    {
+      "label": "endpoint-loop-cli",
+      "command": [
+        "/usr/bin/python3",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py",
+        "--workspace-root",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner",
+        "--manifest",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/manifest.json",
+        "--output-dir",
+        "/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/out",
+        "--check"
+      ],
+      "exit_code": 1,
+      "traceback": true,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/usr/lib/python3.12/pathlib.py\", line 1252, in resolve\n    p.stat()\n  File \"/usr/lib/python3.12/pathlib.py\", line 842, in stat\n    return os.stat(self, follow_symlinks=follow_symlinks)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: [Errno 40] Too many levels of symbolic links: '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 754, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 738, in main\n    results, drift_found = materialize(\n                           ^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 690, in materialize\n    messages, changed = prune_stale_projections(\n                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 527, in prune_stale_projections\n    if not projection_owned_by(child, owner_root):\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 462, in projection_owned_by\n    recorded = recorded_workspace(marker)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py\", line 486, in recorded_workspace\n    return Path(recorded).resolve()\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/pathlib.py\", line 1254, in resolve\n    check_eloop(e)\n  File \"/usr/lib/python3.12/pathlib.py\", line 1239, in check_eloop\n    raise RuntimeError(\"Symlink loop from %r\" % e.filename)\nRuntimeError: Symlink loop from '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'\n",
+      "fixture_retained": true
+    }
+  ]
+}

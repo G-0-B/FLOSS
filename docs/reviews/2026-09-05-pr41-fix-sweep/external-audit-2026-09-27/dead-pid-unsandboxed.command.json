@@ -1,0 +1,22 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-response-20260927\\pytest-dead-pid-unsandboxed",
+    "tests/test_shared_agent_surface_mcp.py::test_hermes_gateway_alive_detects_dead_pid"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-response-20260927\\snapshot-5a1a2b1",
+  "exit_code": 0,
+  "env_overrides": {
+    "PYTHONPATH": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TEMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "TMP": "C:\\~shit\\_audit\\pr41-response-20260927\\temp",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8"
+  }
+}

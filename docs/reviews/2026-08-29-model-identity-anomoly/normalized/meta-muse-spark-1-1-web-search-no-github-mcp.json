@@ -1,0 +1,139 @@
+{
+ "reviewer": {
+  "model_selected": "meta-muse-spark-1-1-web-search-no-github-mcp",
+  "harness": "meta",
+  "model_vendor_states": null,
+  "model_self_reported": "muse-spark-1.1",
+  "self_reported_harness": "meta-ai-audit",
+  "tools_used": [
+   "web",
+   "execution"
+  ],
+  "saw_prior_reviews": false
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "claim": "Tier-2 reuse review requirement violated: prior-art survey was single-model-family, not 3 provider surfaces and 4 model families.",
+   "severity": "major",
+   "location": "docs/research/2026-08-26-ensemble-aggregation-prior-art.md and ADR-18 governance status",
+   "evidence": [
+    "Verbatim from artifact prompt: \"The prior-art survey that informed the design was conducted by a single model family and is recorded at `docs/research/2026-08-26-ensemble-aggregation-prior-art.md`\"",
+    "Verbatim from artifact prompt: \"tier-2 (architecture-class) artifacts require an independent review spanning at least 3 provider surfaces and 4 model families.\"",
+    "Verbatim from artifact prompt: \"The tier-2 reuse review has not been performed. This review is that review.\"",
+    "Attempted retrieval of `packages/activity_log/anchor.py` via raw.githubusercontent.com returned PAGE_NOT_FOUND and connection reset; tool output: \"The requested URL was not found\" and \"<urlopen error [Errno 104] Connection reset by peer>\" – recorded as could-not-retrieve, not does-not-exist."
+   ],
+   "falsifier": "Show prior-art doc lists 3 provider surfaces and 4 model families with dated model outputs, or show ADR-18 emergency:true waives the 3x4 surface requirement.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F2",
+   "claim": "Leaf JCS canonicalization does not reject duplicate JSON keys, enabling last-value-wins canonicalization confusion.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py: leaf preimage RFC 8785 JCS over {\"d\": SAID, \"i\": AID, \"s\": sequence}",
+   "evidence": [
+    "Verbatim spec: \"Leaf preimage: RFC 8785 JCS over `{\\\"d\\\": SAID, \\\"i\\\": AID, \\\"s\\\": sequence}`.\"",
+    "Web search: \"RFC 8785 builds on I-JSON (RFC 7493), which forbids duplicate member names.\"",
+    "Web search: \"Duplicate-key contract... RFC 8785 §3.2.3 leaves duplicate object keys as undefined behavior. This crate, via the underlying `serde_json` parser and `serde_jcs` serializer, resolves duplicates by **last-value-wins**: `{\\\"a\\\":1,\\\"a\\\":2}` canonicalizes to `{\\\"a\\\":2}` with no warning.\"",
+    "Web search: JCS duplicate-key issue title \"S2 — JCS does not reject duplicate object keys → non-canonical output / signature confusion\""
+   ],
+   "falsifier": "Show anchor.py validates parsed JSON rejects duplicate keys before jcs.canonicalize() or constructs leaf preimage from typed struct never parsing untrusted JSON.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F3",
+   "claim": "Publication argument correct in mechanism but unverified in practice, and cheaper externally-witnessed alternatives exist by construction.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py: root in git tag name and commit message",
+   "evidence": [
+    "Verbatim from artifact: \"The root is placed in the git **tag name** and **commit message**, not only in file contents.\"",
+    "Verbatim from artifact weakness 8: \"Third-party mirror retention is asserted, not verified. The claim that public-repository push events reach mirrors outside the operator's control is marked ⚠ Specified. No mirror has been confirmed to have indexed this repository.\"",
+    "Web search push webhook: \"`ref`: Branch or tag that was pushed to (e.g., \\\"refs/heads/main\\\")\"",
+    "Web search push webhook: \"| `ref` | `string` | The full `git ref` that was pushed.\"",
+    "Web search Rekor: \"The Rekor project provides a restful API based server for validation and a transparency log for storage.\"",
+    "Web search OpenTimestamps: \"A fourth anchor — [OpenTimestamps](https://opentimestamps.org/) submission, which writes the file's hash into a Bitcoin transaction — is on the roadmap.\""
+   ],
+   "falsifier": "Provide GitHub audit log or third-party mirror showing ref refs/tags/<root> ingested for this repository, moving claim from Specified to Verified; or demonstrate no cheaper witness.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F4",
+   "claim": "Domain separation and odd-node promotion follow RFC 6962 best practice and block leaf/node confusion and CVE-2012-2459 duplication, but empty-tree constant distinctness not proven to avoid collision with leaf hash.",
+   "severity": "minor",
+   "location": "packages/activity_log/anchor.py: Tree RFC 6962-shaped binary Merkle over BLAKE3-256, domain-separated (0x00 leaf, 0x01 interior), odd node promoted",
+   "evidence": [
+    "Verbatim from artifact: \"Tree: RFC 6962-shaped binary Merkle over BLAKE3-256, domain-separated (`0x00` leaf, `0x01` interior), odd node promoted rather than duplicated. Leaves sorted by `(identity, int(sequence), said)`. Empty tree has a distinct constant.\"",
+    "Web search: \"Leaves and parents are domain-separated (0x00 vs 0x01 prefix) to block parent-as-leaf second preimages, and odd levels promote the lone node instead of duplicating it (no CVE-2012-2459-style ambiguity).\"",
+    "Web search: \"The integrity hash (scheme **v2**) is `SHA-256(0x00 ‖ len-prefixed(id, timestamp, source, canonical(payload)))` — each field is length-prefixed so content cannot shift across field boundaries undetected, and the `0x00` tag domain-separates a Merkle leaf from an internal node (`0x01`); the tree promotes an odd trailing node instead of duplicating it (CVE-2012-2459).\"",
+    "Could not retrieve anchor.py to verify empty-tree constant value; execution attempts failed with \"No such file or directory: 'git'\" and connection reset, so collision freedom is speculative."
+   ],
+   "falsifier": "Show empty constant equals BLAKE3(0x02 ||...) or other domain never produced by leaf = BLAKE3(0x00 || JCS) or node = BLAKE3(0x01 || left || right).",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F5",
+   "claim": "Signing scope excludes signer, so signature does not bind to claimed signer identity, enabling signer field substitution.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py: Anchor document Ed25519-signed, sig and signer excluded from signed bytes",
+   "evidence": [
+    "Verbatim from artifact: \"Anchor document: merkle root, packet and identity counts, per-identity `max_seq` / `head_saids[]` / `interior_gaps[]` / `duplicate_seqs[]`, `unreadable[]`, and `prev_root` chaining each anchor to its predecessor. Ed25519-signed with an existing project identity; `sig` and `signer` excluded from the signed bytes.\"",
+    "This matches weakness 5: \"The signing key is the operator's key. A rotated identity can sign a fresh consistent series. Pinning the public key beforehand is the actual root of trust.\" – pinning mitigates but signer field remains unauthenticated metadata."
+   ],
+   "falsifier": "Show verify checks that decoded signer value equals pinned key fingerprint and rejects mismatch even if signature verifies, or show signer included in JCS bytes via separate field.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F6",
+   "claim": "Operational race: scan is not atomic with packet writes, and filesystem semantics on Windows allow silent false VERIFIED or ANCHOR_STALE misclassification.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py: scan, plus behavior \"packet moved to the store root → VERIFIED\"",
+   "evidence": [
+    "Verbatim from artifact: \"Behaviour exercised against a copy of the live store: unchanged → VERIFIED; 5-packet head truncation → TRUNCATION_DETECTED;... packet moved to the store root → VERIFIED;\"",
+    "Verbatim from artifact weakness 2: \"The window between anchor runs is undefended — a packet created and deleted inside it never enters a leaf set.\"",
+    "No locking or fsync described; could not retrieve anchor.py to confirm atomic directory snapshot – execution tool reports no git and no network, so file not inspected.",
+    "Known risk: on Windows, case-insensitive FS and file locking cause duplicate identity collision and partial reads; anchor does not state handling of symlinks, hardlinks, or case-folding."
+   ],
+   "falsifier": "Show anchor.py takes exclusive lock or snapshots file list then hashes with open(O_NOFOLLOW) and retries on ENOENT, and tests cover concurrent writer.",
+   "confidence": "speculative",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F7",
+   "claim": "Ladder: adopting Rekor/SCITT/Trillian/OpenTimestamps or signed git tag alone delivers external witness by construction, losing only offline/no-egress and no-new-deps properties; custom build therefore violates adopt-before-build without quantified loss analysis.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md and reasoning quote about Rekor and SCITT",
+   "evidence": [
+    "Verbatim reasoning target: \"Rekor and SCITT are the correct hardening layer but not the correct first anchor. Holochain is the correct terminal destination and is disqualified as a first anchor because a single-operator DHT provides zero anchoring in principle. Building a small Merkle commitment on existing dependencies (BLAKE3, `jcs`, PyNaCl — all already required) was preferred to adopting a transparency-log service because it adds no dependency and no network egress.\"",
+    "Web search SCITT: \"Transparency Services MUST feature an Append-only Log. The Append-only Log is the verifiable data structure that records Signed Statements and supports the production of Receipts.\"",
+    "Web search Rekor: production instance offers \"24/7 oncall rotation\" and \"99.5% availability SLO for the following API... `/api/v1/log`\"",
+    "Governance: artifact disqualifies Holochain for single-operator DHT providing zero anchoring, yet its own anchor is single-operator GitHub repo with no confirmed mirrors – same disqualifier applies."
+   ],
+   "falsifier": "Provide ADR-18 prior-art matrix showing Rekor, SCITT, Trillian, signed git tag, OpenTimestamps each fail to deliver set-commitment over 253 packets with per-identity max_seq/head_saids/interior_gaps/duplicate_seqs, or quantify that network egress or new dependency cost exceeds truncation-detection value.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F8",
+   "claim": "Threat model omits equivocation via forking prev_root chain and operator-controlled tag deletion rewriting history without retaining root.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md: stated-limits section (weaknesses 1-8)",
+   "evidence": [
+    "Verbatim weakness 1: \"It does not stop the operator. It converts undetectable deletion into detectable *equivocation*, and only for a party who retained a prior root. With no retained copy it is a self-consistency check.\"",
+    "Verbatim weakness 4: \"Deleting or privating the repository removes the anchor; only already-ingested third-party event records survive.\"",
+    "Missing: no discussion of operator publishing two different valid chains with same prev_root to different audiences, or force-pushing tag deletion (git push --delete) then recreating tag with new root but same name – GitHub push event for delete also emits ref, but mirrors may not retain delete events.",
+    "Verbatim outcome: \"ANCHOR_STALE must be neither a pass nor a failure, because honest growth is the common case and a gate that cries wolf every session gets turned off.\" – creates incentive to ignore STALE, enabling fork to hide truncation as growth."
+   ],
+   "falsifier": "Show spec requires monotonic prev_root chain verified across all tags and that delete-tag events are treated as ANCHOR_UNAVAILABLE failure, not silent.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  }
+ ],
+ "refutations": [],
+ "predicted_majority": "Other reviewers will conclude construction is cryptographically sound (domain separation, promotion, sorted leaves, JCS) and ladder violation is governance-only, recommending adoption of Rekor later but accepting this as pragmatic first anchor despite mirror retention being only Specified. They will likely rate overall as minor issues, not critical, because tests pass and limits are stated.",
+ "where_you_expect_to_be_alone": "F2 duplicate-key JCS last-value-wins leading to signature confusion, and F5 signer field excluded from signed bytes allowing signer substitution, are subtle canonicalization/signature-scope issues that other reviewers focused on Merkle tree shape will miss."
+}

@@ -17,7 +17,7 @@
 | `vector_search` | `SearchInput` (query embedding + top-k) | `Vec<SearchResult>` | Cosine-similarity search across all RoseNodes; returns top-k results with scores. Powered by `vector_ops.rs` (8/8 tests). |
 | `link_edge` | `AddEdgeInput` (from, to, relationship, confidence) | `ActionHash` | Creates a KnowledgeEdge between two nodes; links from source node. |
 | `budget_status` | `()` | `BudgetState` (remaining_ru, window_start, etc.) | Reports caller's current budget. |
-| `create_thought_credential` | `CreateThoughtCredentialInput` (connotation + embedding + provenance) | `ActionHash` | Ternary-connotation attestation per Yumeichan framework. |
+| `create_thought_credential` | `CreateThoughtCredentialInput` (connotation + embedding + provenance) | `ActionHash` | Analog-connotation attestation per Yumeichan framework (supersedes ternary). |
 | `assert_triple` | `AssertTripleInput` (subject, predicate, object, confidence) | `ActionHash` | Creates a `KnowledgeTriple`; consumes 2 RU; links into `TriplesBySubject` + `TriplesByPredicate` anchors. |
 | `query_triples` | `QueryTriplesInput` (by subject / by predicate / by both) | `Vec<TripleResult>` | Symbolic-first query — returns triples matching criteria. |
 | `get_triple_record` | `ActionHash` | `Option<Record>` | Raw record fetch by hash. |

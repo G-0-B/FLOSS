@@ -1,0 +1,88 @@
+E402 Module level import not at top of file
+  --> packages\metacoordinator_mcp\tests\test_voters.py:16:1
+   |
+14 |       sys.path.insert(0, str(_REPO_ROOT))
+15 |
+16 | / from packages.metacoordinator_mcp.voters import (
+17 | |     _CREDENTIAL_ENV_BY_PREFIX,
+18 | |     _load_builtin_registry,  # noqa: E402
+19 | |     _parse_weight,
+20 | |     build_default_voters,
+21 | |     describe_default_roster,
+22 | |     make_omo_critic_voter,
+23 | |     make_executability_voter,
+24 | |     resolve_default_voter_specs,
+25 | | )
+   | |_^
+26 |   from packages.orchestrator.claim_schema import (  # noqa: E402
+27 |       BlastRadius,
+   |
+
+E402 Module level import not at top of file
+  --> scripts\autonomous_synthesis_loop.py:61:1
+   |
+60 | from packages.activity_log import Action, append_action  # noqa: E402
+61 | from packages.source_chain.cell import CellDirectory
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+E722 Do not use bare `except`
+   --> scripts\autonomous_synthesis_loop.py:401:13
+    |
+399 |                 payload = json.loads(draft.read_text(encoding="utf-8"))
+400 |                 staged_files.add(payload.get("file_path"))
+401 |             except:
+    |             ^^^^^^
+402 |                 pass
+    |
+
+E402 Module level import not at top of file
+   --> tests\test_shared_agent_surface_mcp.py:144:1
+    |
+144 | import tomlkit
+    | ^^^^^^^^^^^^^^
+145 |
+146 | CODEX_EXISTING = """\
+    |
+
+E402 Module level import not at top of file
+   --> tests\test_shared_agent_surface_mcp.py:366:1
+    |
+366 | import io
+    | ^^^^^^^^^
+367 | import json
+368 | import os
+    |
+
+E402 Module level import not at top of file
+   --> tests\test_shared_agent_surface_mcp.py:367:1
+    |
+366 | import io
+367 | import json
+    | ^^^^^^^^^^^
+368 | import os
+    |
+
+E402 Module level import not at top of file
+   --> tests\test_shared_agent_surface_mcp.py:368:1
+    |
+366 | import io
+367 | import json
+368 | import os
+    | ^^^^^^^^^
+369 |
+370 | from ruamel.yaml import YAML
+    |
+
+E402 Module level import not at top of file
+   --> tests\test_shared_agent_surface_mcp.py:370:1
+    |
+368 | import os
+369 |
+370 | from ruamel.yaml import YAML
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+371 |
+372 | HERMES_EXISTING = """\
+    |
+
+Found 8 errors.

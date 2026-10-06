@@ -1,0 +1,30 @@
+== codex: C:\Users\kalis\.codex\skills (exists=True)
+   identical: 27
+   diverged: 0
+   missing: 0
+   unlisted-managed: 0
+   unmanaged: 6
+== claude: C:\~shit\.claude\skills (exists=True)
+   identical: 27
+   diverged: 0
+   missing: 0
+   unlisted-managed: 0
+   unmanaged: 3
+== gemini: C:\~shit\.gemini\skills (exists=True)
+   identical: 27
+   diverged: 0
+   missing: 0
+   unlisted-managed: 0
+   unmanaged: 0
+== opencode: C:\~shit\opworkers\.opencode\skills (exists=True)
+   identical: 27
+   diverged: 0
+   missing: 0
+   unlisted-managed: 0
+   unmanaged: 6
+== hermes: C:\Users\kalis\AppData\Local\hermes\skills (exists=True)
+   identical: 27
+   diverged: 0
+   missing: 0
+   unlisted-managed: 0
+   unmanaged: 33

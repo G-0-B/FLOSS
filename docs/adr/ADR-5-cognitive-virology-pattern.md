@@ -95,7 +95,7 @@ Note: ADR-0 human coherence test was previously listed as a blocker. The Recogni
 
 - `docs/adr/ADR-0-recognition-protocol.md` — Recognition Protocol (Validated, all 4 criteria passed)
 - `docs/adr/ADR-3-metaprompt-kernelization.md` — Metaprompt Kernelization
-- `FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md` — Canonical kernel
+- `FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md` — Canonical kernel
 - `docs/specs/harvest-protocol.spec.md` — HARVEST Protocol specification (minimal self-observation loop)
 - `docs/governance/HARVEST_LOG.md` — HARVEST cycle evidence and validation outputs (gate artifact)
 

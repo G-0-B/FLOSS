@@ -2,7 +2,7 @@
 
 ```yaml
 id: "2026-06-08-root-intake-digestion"
-status: "Relocated raw intake; digestions 1-3 completed"
+status: "Relocated raw intake; digestions 1-3 and 10 completed; 4-9 outstanding"
 truth_status:
   relocation: "Verified"
   canon_promotion: "Not performed"
@@ -107,3 +107,31 @@ Completed ranked digestions:
 Canonical synthesis output:
 
 - `FLOSS/docs/research/2026-06-08-instruction-and-levin-handoff-synthesis.md`
+
+## Execution status update (2026-08-31)
+
+Queue item **#10** completed:
+
+10. `reports/Navigating the Infinite  Cognitive Light Cones, Universal
+    Flourishing, and the Geometry of Intelligence.md`
+
+Digested as **Digest D** in the same canonical synthesis artifact
+(`2026-06-08-instruction-and-levin-handoff-synthesis.md`), per the follow-on
+constraint of one synthesis artifact per thematic cluster. No new document, no
+canon promotion, source left in `intake_raw/`.
+
+Two findings from that digest belong in this map rather than only in the
+synthesis, because they are about the batch and not about the report:
+
+- The report's lead definition of the cognitive light cone (perceive + model +
+  control) contradicts Levin's own spoken definition (largest goal state
+  actively pursued, explicitly excluding sensory and causal reach). Anything in
+  this batch that restates the light cone should be checked against the primary
+  before promotion.
+- Three of the report's thirteen references are expired presigned URLs to
+  chat-assistant message exports, and one of those points at a FLOSSI0ULLK
+  specification -- the report cites this project as external support for its own
+  framing. Reports in this batch sourced from assistant exports need their
+  citations verified independently, not inherited.
+
+Queue items 4-9 remain outstanding.
