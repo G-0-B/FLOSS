@@ -59,6 +59,8 @@ Phase 1 (Tasks 0 to 6) is on branch `feat/room-board-v1`, built from `4aab13e` i
 
 **Not done.** ⚠️ Nothing is pushed and no pull request is open: the base `4aab13e` is not on the remote. Not run on Linux by anyone at this revision; the required CI job will be the first Linux run. The Deployment section has not been run; the live room is still v0.1 and still down. The agent-memory projections were not regenerated. Phase 2 has not been started.
 
+**Merged locally, 2026-10-05.** At the operator's instruction (`merge it to local`), `feat/coordination-room-rebased` was fast-forwarded from `4aab13e` to `44b6a5488136d4b14650f9492221cc02ebd5bb46` in its own worktree, `C:/~shit/FLOSS/.worktrees/coordination-room-rebased`. No `git pull` was run first: that branch's configured upstream is `origin/reconcile/pr38-salvage-20260817`, which holds 40 commits this branch does not, and a pull would have merged them in. On the merged checkout, a fresh checkout written by git: the required green set gave 1,115 passed, 7 skipped, no failures; the spec gate showed the same three findings; `ruff` was clean. The implementation worktree `.worktrees/room-board-v1` and the branch `feat/room-board-v1` were then removed; every commit in the table is on `feat/coordination-room-rebased`. Where the plan below says `room-board-v1`, read it as history, with one exception that was corrected in place because it will be used: Deployment step 0 now loads the helpers from `.worktrees\coordination-room-rebased`. Still nothing is pushed, and the "Not done" list above is otherwise unchanged.
+
 **Seen while executing, not changed.** On the base, `scripts/tests/test_heartbeat_budget.py` appends to `ticks.log` under the parent of the checkout (`FLOSS/.worktrees/.agent-surface/heartbeat/` when run from a worktree) each time the green set runs. It is outside this plan's files.
 
 ## Acceptance is behaviour, not a test count
@@ -5634,7 +5636,7 @@ Run every block in **one** PowerShell session (5.1 or 7), in order. The helpers 
 $repo = 'C:\~shit\FLOSS'
 $deployCommit = '<DEPLOY_COMMIT>'
 $serve = "$repo\.worktrees\room-serve-$($deployCommit.Substring(0, 8))"
-. "$repo\.worktrees\room-board-v1\packages\coordination_room\deploy.ps1"   # for New-PinnedCheckout
+. "$repo\.worktrees\coordination-room-rebased\packages\coordination_room\deploy.ps1"   # for New-PinnedCheckout
 New-PinnedCheckout $repo $deployCommit $serve
 . "$serve\packages\coordination_room\deploy.ps1"                            # the helpers of the commit being deployed
 "log: $log"
