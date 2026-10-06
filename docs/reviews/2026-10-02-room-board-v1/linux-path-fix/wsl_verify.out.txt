@@ -1,0 +1,38 @@
+clone at: 806a999 docs(reviews): handoff for a Linux run of the room message board
+== RED (before the fix)
+FAILED packages/coordination_room/tests/test_paths.py::test_backslash_collapses_to_same_key
+FAILED packages/coordination_room/tests/test_path_separators.py::test_mixed_separators_collapse_to_one_key
+FAILED packages/coordination_room/tests/test_path_separators.py::test_backslash_dotdot_escape_is_rejected
+FAILED packages/coordination_room/tests/test_path_separators.py::test_one_file_written_two_ways_has_one_holder
+FAILED packages/coordination_room/tests/test_path_separators.py::test_a_file_ref_resolves_with_either_separator
+5 failed, 4 passed in 0.09s
+== GREEN (after the fix)
+9 passed in 0.04s
+== room package
+118 passed, 2 skipped in 13.69s
+== required green set
+pytest exit: 0
+1088 passed, 24 skipped, 1 deselected, 1 warning in 43.15s
+codex head: {'passed': 1083, 'skipped': 24, 'failure': 1} | with fix: {'passed': 1088, 'skipped': 24}
+changed outcomes: {'packages.coordination_room.tests.test_paths::test_backslash_collapses_to_same_key': ('failure', 'passed')}
+missing with fix: []
+new with fix: {'packages.coordination_room.tests.test_path_separators::test_mixed_separators_collapse_to_one_key': 'passed', 'packages.coordination_room.tests.test_path_separators::test_backslash_dotdot_escape_is_rejected': 'passed', 'packages.coordination_room.tests.test_path_separators::test_one_file_written_two_ways_has_one_holder': 'passed', 'packages.coordination_room.tests.test_path_separators::test_a_file_ref_resolves_with_either_separator': 'passed'}
+== checkout state
+ M packages/coordination_room/paths.py
+?? packages/coordination_room/tests/test_path_separators.py
+diff --git a/packages/coordination_room/paths.py b/packages/coordination_room/paths.py
+index 69cfe78..aadb0fe 100644
+--- a/packages/coordination_room/paths.py
++++ b/packages/coordination_room/paths.py
+@@ -13,7 +13,10 @@ def normalize_path(root: Path, path: str) -> str:
+     if not isinstance(path, str) or not path.strip():
+         raise PathEscape("empty path")
+     root_resolved = root.resolve()
+-    raw = Path(path.strip())
++    # A backslash is a separator here on every platform, as it already is on
++    # Windows. On POSIX it is otherwise an ordinary filename character, which
++    # made `a\b.py` and `a/b.py` two claim keys for one file.
++    raw = Path(path.strip().replace("\\", "/"))
+     candidate = raw if raw.is_absolute() else (root_resolved / raw)
+     resolved = candidate.resolve()
+     try:
