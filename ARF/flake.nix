@@ -32,7 +32,7 @@
             echo "Build:  cargo build --release --target wasm32-unknown-unknown"
             echo "Pack:   hc dna pack dnas/rose_forest/workdir/"
             echo "        hc app pack workdir/"
-            echo "Test:   cd tests/tryorama && npm test"
+            echo "Test:   cargo test  (JS Tryorama suite retired 2026-09-05; Sweettest harness is task M13)"
           '';
         };
       };
