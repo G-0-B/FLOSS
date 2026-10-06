@@ -203,7 +203,13 @@ functions. Both are verbatim in [`internal-reviews.md`](internal-reviews.md).
   convergence baseline, and the race.
 - The real loop passed on Windows and failed natively.
 
-`176c8c2` added 9 cases, and all failed on `b011298`'s code on both platforms.
+`176c8c2` added 8 cases (7 tests, one parametrized over install and update).
+*Corrected 2026-10-05, after recounting; the original read: "`176c8c2` added 9
+cases, and all failed on `b011298`'s code on both platforms." The collected
+count went from 47 to 55, and the POSIX-only case is skipped on Windows, so
+neither "9" nor "both platforms" held.* The final tests were run against
+`b011298`'s materializer: on Windows 7 of the 8 fail and the POSIX-only case is
+skipped; natively on Python 3.12.3 all 8 fail.
 The simulated unreadable case patches `os.scandir`. `b011298`'s `rglob` did
 not go through it on Windows, so that red shows only the missing `UNREADABLE`
 path. The POSIX `chmod 000` case is the real evidence.
