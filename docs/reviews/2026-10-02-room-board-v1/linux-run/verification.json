@@ -1,0 +1,57 @@
+{
+  "verified_utc": "2026-10-06T13:15:05.436777+00:00",
+  "base_cases": 1000,
+  "head_cases": 1108,
+  "new_cases": 108,
+  "new_counts": {
+    "passed": 93,
+    "skipped": 15
+  },
+  "all_existing_test_outcomes_and_messages_unchanged": true,
+  "same_shared_failure": "packages.coordination_room.tests.test_paths::test_backslash_collapses_to_same_key",
+  "v01_compat_passed": true,
+  "all_six_linux_status_receipts_empty": true,
+  "spec_gate_outputs_identical": true,
+  "both_spec_gate_exit_codes": 1,
+  "handoff_sha256_unchanged": "843e57134ef8d4a9432f19841aa3dce33fde8251cc65f7ec0b7fe2dbb2fb14e6",
+  "windows_head_before_commit": "806a99936d1dd752641d4b7d1f01e8085e156c5e",
+  "windows_changes_confined_to_receipt_folder": true,
+  "linux_to_windows_raw_receipts_sha256_match": {
+    "head-status-after.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pip-freeze.txt": "cb458db976e42fcce1535836084fa767d52b9a036ea45696a721c9547db952d9",
+    "pip-upgrade.txt": "979b1dcdb889a17f4a03412cb53be2ada7430ad030a2e19067b6d4017b61ab31",
+    "environment.json": "8a033daa294470c5586b121b0fcb5189241e0a096f50e497bc779a6385c7e0a7",
+    "base-status-before.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dependency-install.txt": "ddc7ecf057dc31991b0d2fc8f16011470f0a7ed1ae1a1cf10a07ff7d0a0b222e",
+    "command-results.json": "60f3199283cba4a88b3252b007c46e55872db18da395313441e58c85784ac215",
+    "base-status-after.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base.xml": "7de91896e70ace57e6373ca39f168f10d755ee6980d218e7a8e47a53bf2281a4",
+    "spec-gate-comparison.json": "f2f887a000794265174ba5a0b9c0a56f4ece7f13511f5a67ab5249fa88f4c6c8",
+    "clone-head.txt": "5cf96a276b90fd46cef177f30684a45daeecaaff51fdf837c356b7d3af6fd2f9",
+    "head.txt": "970aafdcce6821d8f8e6a5761ad094b0b0523420ed074730191bec6f3dc4ac30",
+    "compare.json": "ce5127488effd6e678c1739a78270da4d02bd58ed7161f71a22198dd2dac0035",
+    "head-status-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runs.json": "d29529814bc3343bc444319e27780c4e5213573c95d8e1c6426e880db7d8ff06",
+    "commands.txt": "348df94741a725a6730070494d48fe1cc16ae993e3f5b2bdabfb98fbe12dfab4",
+    "head.xml": "128232d017b797149eccd805fbb7263ffb09adc578cabfd089b237e75aa1f577",
+    "venv-create.txt": "4600b5bfbd5ee19117ee8a5b012b389c7c1240f2e75b1d00c7d22660eff7d855",
+    "checkout-base.txt": "de0984174087274ce15157d99817fb2032fc225e9aea528407286ec574fa88d2",
+    "clone-base.txt": "95006b6782b3d195bba08d41efa2f77ca813727497a3be49b0c0c91cb18724f3",
+    "base-status-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base.txt": "ac03173d86e6e5c92c245b67c5d87ead6d1d111f3ef0e0220ad549d18694d123",
+    "checkpoint-diff.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base-spec-gate.txt": "09079ada4463f2edccbfb9b6bd5b036092ea97eee995949646f9b04e0ab26e76",
+    "head-spec-gate.txt": "09079ada4463f2edccbfb9b6bd5b036092ea97eee995949646f9b04e0ab26e76",
+    "head-status-before.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "git_diff_check": {
+    "all_receipts_exit": 2,
+    "raw_pytest_files_with_trailing_whitespace": [
+      "docs/reviews/2026-10-02-room-board-v1/linux-run/base.txt",
+      "docs/reviews/2026-10-02-room-board-v1/linux-run/base.xml",
+      "docs/reviews/2026-10-02-room-board-v1/linux-run/head.txt",
+      "docs/reviews/2026-10-02-room-board-v1/linux-run/head.xml"
+    ],
+    "excluding_raw_pytest_files_exit": 0
+  }
+}

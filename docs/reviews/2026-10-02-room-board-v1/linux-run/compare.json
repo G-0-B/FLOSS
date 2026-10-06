@@ -1,0 +1,48 @@
+{
+  "base_counts": {
+    "passed": 990,
+    "skipped": 9,
+    "failure": 1
+  },
+  "head_counts": {
+    "passed": 1083,
+    "skipped": 24,
+    "failure": 1
+  },
+  "base_cases": 1000,
+  "head_cases": 1108,
+  "failing_on_base": {
+    "packages.coordination_room.tests.test_paths::test_backslash_collapses_to_same_key": "AssertionError: assert 'packages\\\\foo.py' == 'packages/foo.py'\n  \n  - packages/foo.py\n  ?         ^\n  + packages\\foo.py\n  ?         ^"
+  },
+  "failing_on_head": {
+    "packages.coordination_room.tests.test_paths::test_backslash_collapses_to_same_key": "AssertionError: assert 'packages\\\\foo.py' == 'packages/foo.py'\n  \n  - packages/foo.py\n  ?         ^\n  + packages\\foo.py\n  ?         ^"
+  },
+  "regressed": [],
+  "missing_on_head": [],
+  "changed_outcomes": {},
+  "new_cases": 108,
+  "new_not_passing": {},
+  "new_skipped": {
+    "packages.coordination_room.tests.test_deploy_helpers::test_every_helper_check_holds[]": "Windows deployment helpers",
+    "packages.coordination_room.tests.test_message_board::test_board_path_that_is_the_log_is_refused_before_any_write[EVENTS.JSONL]": "a case-distinct name is a different file off Windows",
+    "scripts.tests.test_daemon_scope::test_a_real_run_writes_nothing_where_pytest_was_started[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_a_second_bare_name_is_an_error_not_a_silent_drop[start_mcp_daemons.ps1-]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_a_second_bare_name_is_an_error_not_a_silent_drop[stop_mcp_daemons.ps1-]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_real_start_only_room_attempts_only_the_room[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_real_stop_only_room_leaves_other_records_alone[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_real_stop_with_no_arguments_keeps_its_original_success_line[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_several_names_go_in_one_comma_separated_argument[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_start_default_still_considers_every_daemon[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_start_only_room_considers_nothing_but_the_room[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_stop_default_still_considers_every_daemon[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_stop_only_room_considers_nothing_but_the_room[]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_unknown_daemon_name_is_refused_before_anything_runs[start_mcp_daemons.ps1-]": "Windows daemon scripts",
+    "scripts.tests.test_daemon_scope::test_unknown_daemon_name_is_refused_before_anything_runs[stop_mcp_daemons.ps1-]": "Windows daemon scripts"
+  },
+  "v01_compat": {
+    "packages.coordination_room.tests.test_v01_compat::test_v01_code_serves_a_log_written_by_this_version": [
+      "passed",
+      ""
+    ]
+  }
+}

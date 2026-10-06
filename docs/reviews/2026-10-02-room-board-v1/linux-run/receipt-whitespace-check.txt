@@ -1,0 +1,8 @@
+docs/reviews/2026-10-02-room-board-v1/linux-run/base.txt:23: trailing whitespace.
++E         
+docs/reviews/2026-10-02-room-board-v1/linux-run/base.xml:6: trailing whitespace.
++E         
+docs/reviews/2026-10-02-room-board-v1/linux-run/head.txt:25: trailing whitespace.
++E         
+docs/reviews/2026-10-02-room-board-v1/linux-run/head.xml:6: trailing whitespace.
++E         

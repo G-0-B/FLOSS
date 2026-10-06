@@ -1,0 +1,1 @@
+HEAD is now at 4aab13e fix(coordination-room): a Unicode line separator in a row cut it in two

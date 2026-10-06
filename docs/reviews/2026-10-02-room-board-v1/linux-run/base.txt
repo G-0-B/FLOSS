@@ -1,0 +1,38 @@
+........................................................................ [  7%]
+........................................................................ [ 14%]
+................................................ss...ss..........F...... [ 21%]
+........................................................................ [ 28%]
+........................................................................ [ 36%]
+........................................................................ [ 43%]
+........................................................................ [ 50%]
+........................................ss.............................. [ 57%]
+........................................................................ [ 64%]
+......................sss............................................... [ 72%]
+........................................................................ [ 79%]
+........................................................................ [ 86%]
+........................................................................ [ 93%]
+................................................................         [100%]
+=================================== FAILURES ===================================
+_____________________ test_backslash_collapses_to_same_key _____________________
+
+tmp_path = PosixPath('/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/tmp/pytest-of-kalis/pytest-0/test_backslash_collapses_to_sa0')
+
+    def test_backslash_collapses_to_same_key(tmp_path: Path):
+>       assert normalize_path(tmp_path, "packages\\foo.py") == "packages/foo.py"
+E       AssertionError: assert 'packages\\foo.py' == 'packages/foo.py'
+E         
+E         - packages/foo.py
+E         ?         ^
+E         + packages\foo.py
+E         ?         ^
+
+packages/coordination_room/tests/test_paths.py:27: AssertionError
+=============================== warnings summary ===============================
+../venv/lib/python3.13/site-packages/websockets/legacy/__init__.py:6
+  /home/kalis/room-board-linux-20261006-MSAjEM/venv/lib/python3.13/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED packages/coordination_room/tests/test_paths.py::test_backslash_collapses_to_same_key
+1 failed, 990 passed, 9 skipped, 1 deselected, 1 warning in 41.51s

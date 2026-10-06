@@ -1,0 +1,15 @@
+{
+  "distribution": "PRETTY_NAME=\"Ubuntu 24.04.2 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.2 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+  "kernel": "6.18.33.2-microsoft-standard-WSL2",
+  "machine": "x86_64",
+  "uid": 1000,
+  "driver_python": "3.12.3 (main, Mar  3 2026, 12:15:18) [GCC 13.3.0]",
+  "tested_python": "Python 3.13.13",
+  "versions": {
+    "mcp": "1.30.0",
+    "pytest": "9.1.1",
+    "pytest-asyncio": "1.4.0",
+    "uvicorn": "0.54.0",
+    "httpx": "0.28.1"
+  }
+}

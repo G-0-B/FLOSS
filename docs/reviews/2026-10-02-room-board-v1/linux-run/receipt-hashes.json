@@ -1,0 +1,39 @@
+{
+  "algorithm": "SHA256",
+  "excludes": [
+    "receipt-hashes.json"
+  ],
+  "files": {
+    "base-spec-gate.txt": "09079ada4463f2edccbfb9b6bd5b036092ea97eee995949646f9b04e0ab26e76",
+    "base-status-after.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base-status-before.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base-status-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "base.txt": "ac03173d86e6e5c92c245b67c5d87ead6d1d111f3ef0e0220ad549d18694d123",
+    "base.xml": "7de91896e70ace57e6373ca39f168f10d755ee6980d218e7a8e47a53bf2281a4",
+    "checkout-base.txt": "de0984174087274ce15157d99817fb2032fc225e9aea528407286ec574fa88d2",
+    "checkpoint-diff.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clone-base.txt": "95006b6782b3d195bba08d41efa2f77ca813727497a3be49b0c0c91cb18724f3",
+    "clone-head.txt": "5cf96a276b90fd46cef177f30684a45daeecaaff51fdf837c356b7d3af6fd2f9",
+    "command-results.json": "60f3199283cba4a88b3252b007c46e55872db18da395313441e58c85784ac215",
+    "commands.txt": "e014bc934fc45c76a0628b9653528caf3b87ac5e3c91485dcc0bb3f2c4d5d5d2",
+    "compare.json": "ce5127488effd6e678c1739a78270da4d02bd58ed7161f71a22198dd2dac0035",
+    "dependency-install.txt": "ddc7ecf057dc31991b0d2fc8f16011470f0a7ed1ae1a1cf10a07ff7d0a0b222e",
+    "environment.json": "8a033daa294470c5586b121b0fcb5189241e0a096f50e497bc779a6385c7e0a7",
+    "HANDOFF.md": "843e57134ef8d4a9432f19841aa3dce33fde8251cc65f7ec0b7fe2dbb2fb14e6",
+    "head-spec-gate.txt": "09079ada4463f2edccbfb9b6bd5b036092ea97eee995949646f9b04e0ab26e76",
+    "head-status-after.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "head-status-before.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "head-status-final.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "head.txt": "970aafdcce6821d8f8e6a5761ad094b0b0523420ed074730191bec6f3dc4ac30",
+    "head.xml": "128232d017b797149eccd805fbb7263ffb09adc578cabfd089b237e75aa1f577",
+    "pip-freeze.txt": "cb458db976e42fcce1535836084fa767d52b9a036ea45696a721c9547db952d9",
+    "pip-upgrade.txt": "979b1dcdb889a17f4a03412cb53be2ada7430ad030a2e19067b6d4017b61ab31",
+    "receipt-whitespace-check.txt": "5267ba602574690c52c5ef8f9a535b2478dad63b4ef03326fbc2ee6dc6cbadd3",
+    "REPORT.md": "3705f13618f5c25e2f9e584ffbc1c2db7734daa42f7117d8cb5927975221a1da",
+    "run-linux.py": "3a50a5b61e876752bfc87c9733dc8599f16b554b97d5a2e37e8b22afc202b766",
+    "runs.json": "d29529814bc3343bc444319e27780c4e5213573c95d8e1c6426e880db7d8ff06",
+    "spec-gate-comparison.json": "f2f887a000794265174ba5a0b9c0a56f4ece7f13511f5a67ab5249fa88f4c6c8",
+    "venv-create.txt": "4600b5bfbd5ee19117ee8a5b012b389c7c1240f2e75b1d00c7d22660eff7d855",
+    "verification.json": "8324572af9366e1ce6985b349fdd33a3b1012ffa312a6719126921e34c7f3262"
+  }
+}

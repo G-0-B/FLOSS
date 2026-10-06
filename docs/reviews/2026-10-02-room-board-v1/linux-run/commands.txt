@@ -1,0 +1,131 @@
+2026-10-06 — Linux comparison command journal (execution order)
+
+Windows preflight, cwd C:/~shit/FLOSS/.worktrees/coordination-room-rebased:
+git rev-parse HEAD
+  806a99936d1dd752641d4b7d1f01e8085e156c5e
+git status --porcelain
+  empty before creating receipts
+git diff --quiet 0281a47cd817efb2f2426886e3a1058c157b33eb HEAD -- . ":(exclude)docs"
+  exit 0
+SHA256 HANDOFF.md
+  843e57134ef8d4a9432f19841aa3dce33fde8251cc65f7ec0b7fe2dbb2fb14e6
+
+wsl -d Ubuntu -- sh -lc 'uv --version && uname -sr && id && df -h /home/kalis'
+  uv 0.11.6; Ubuntu 24.04.2 LTS; Linux 6.18.33.2-microsoft-standard-WSL2; uid 1000 kalis
+  Linux filesystem has 932 GiB available
+wsl -d Ubuntu -- sh -lc 'uv python list --only-installed'
+  Python 3.12.3 system and managed Python 3.11.15; no Python 3.13 yet
+
+git -C C:/~shit/FLOSS bundle create C:/Users/kalis/AppData/Local/Temp/codex-room-linux-20261006-05b4aebd/room-board.bundle feat/coordination-room-rebased
+git -C C:/~shit/FLOSS bundle list-heads <bundle>
+  806a99936d1dd752641d4b7d1f01e8085e156c5e refs/heads/feat/coordination-room-rebased
+git -C C:/~shit/FLOSS bundle verify <bundle>
+  exit 0; complete history; SHA-1
+
+Subsequent commands, paths, exit codes and environment overrides are appended by run-linux.py.
+Invocation: WSL Ubuntu system python3 run-linux.py <Linux root> <verified Windows bundle> <authorized receipt directory>
+HOME is not reassigned. Setup caches/installations are contained in the Linux root.
+
+[2026-10-06T13:09:41Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ git clone -b feat/coordination-room-rebased /mnt/c/Users/kalis/AppData/Local/Temp/codex-room-linux-20261006-05b4aebd/room-board.bundle /home/kalis/room-board-linux-20261006-MSAjEM/head
+exit=0; elapsed=15.98s; output=clone-head.txt
+
+[2026-10-06T13:09:57Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git rev-parse HEAD
+exit=0; elapsed=0.00s
+806a99936d1dd752641d4b7d1f01e8085e156c5e
+
+[2026-10-06T13:09:57Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git diff --exit-code 0281a47cd817efb2f2426886e3a1058c157b33eb 806a99936d1dd752641d4b7d1f01e8085e156c5e -- . ':(exclude)docs'
+exit=0; elapsed=0.02s; output=checkpoint-diff.txt
+
+[2026-10-06T13:09:57Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ git clone --no-hardlinks --no-checkout /home/kalis/room-board-linux-20261006-MSAjEM/head /home/kalis/room-board-linux-20261006-MSAjEM/base
+exit=0; elapsed=0.28s; output=clone-base.txt
+
+[2026-10-06T13:09:58Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ git checkout --detach 4aab13e30f3c2960da787b47c90926256b4b5b73
+exit=0; elapsed=1.89s; output=checkout-base.txt
+
+[2026-10-06T13:10:00Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git cat-file -e '4aab13e30f3c2960da787b47c90926256b4b5b73^{commit}'
+exit=0; elapsed=0.00s
+
+
+[2026-10-06T13:10:00Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/.local/bin/uv venv --python 3.13 --seed /home/kalis/room-board-linux-20261006-MSAjEM/venv
+exit=0; elapsed=5.05s; output=venv-create.txt
+
+[2026-10-06T13:10:05Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python --version
+exit=0; elapsed=0.00s
+Python 3.13.13
+
+[2026-10-06T13:10:05Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -m pip install --upgrade pip
+exit=0; elapsed=1.89s; output=pip-upgrade.txt
+
+[2026-10-06T13:10:07Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -m pip install -r /home/kalis/room-board-linux-20261006-MSAjEM/head/requirements-ci.txt
+exit=0; elapsed=46.32s; output=dependency-install.txt
+
+[2026-10-06T13:10:54Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -m pip freeze
+exit=0; elapsed=1.09s; output=pip-freeze.txt
+
+[2026-10-06T13:10:55Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -c 'import importlib.metadata,json; print(json.dumps({k:importlib.metadata.version(k) for k in ["mcp","pytest","pytest-asyncio","uvicorn","httpx"]}))'
+exit=0; elapsed=0.34s
+{"mcp": "1.30.0", "pytest": "9.1.1", "pytest-asyncio": "1.4.0", "uvicorn": "0.54.0", "httpx": "0.28.1"}
+Test environment overrides: {"PYTHONPATH": null, "COORDINATION_ROOM_BOARD": null, "PYTHONDONTWRITEBYTECODE": "1", "FLOSS_AGENT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/agent", "FLOSS_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/audit", "FLOSS_MCP_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/audit", "COORDINATION_ROOM_ROOT": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/room", "COORDINATION_ROOM_LOG": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/room/events.jsonl", "TMPDIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/tmp"}
+
+[2026-10-06T13:10:56Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.63s; output=base-status-before.txt
+
+[2026-10-06T13:10:57Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -m pytest -q -p no:cacheprovider packages/ tests/ scripts/tests/ --deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded --junitxml=/home/kalis/room-board-linux-20261006-MSAjEM/receipts/base.xml
+exit=1; elapsed=43.74s; output=base.txt
+
+[2026-10-06T13:11:41Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.02s; output=base-status-after.txt
+Test environment overrides: {"PYTHONPATH": null, "COORDINATION_ROOM_BOARD": null, "PYTHONDONTWRITEBYTECODE": "1", "FLOSS_AGENT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/agent", "FLOSS_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/audit", "FLOSS_MCP_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/audit", "COORDINATION_ROOM_ROOT": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/room", "COORDINATION_ROOM_LOG": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/room/events.jsonl", "TMPDIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/tmp"}
+
+[2026-10-06T13:11:42Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.33s; output=head-status-before.txt
+
+[2026-10-06T13:11:42Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python -m pytest -q -p no:cacheprovider packages/ tests/ scripts/tests/ --deselect scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded --junitxml=/home/kalis/room-board-linux-20261006-MSAjEM/receipts/head.xml
+exit=1; elapsed=52.71s; output=head.txt
+
+[2026-10-06T13:12:38Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.02s; output=head-status-after.txt
+
+[2026-10-06T13:12:38Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python scripts/spec_gate.py --check
+exit=1; elapsed=0.13s; output=base-spec-gate.txt
+
+[2026-10-06T13:12:38Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/base
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.02s; output=base-status-final.txt
+
+[2026-10-06T13:12:38Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ /home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python scripts/spec_gate.py --check
+exit=1; elapsed=0.13s; output=head-spec-gate.txt
+
+[2026-10-06T13:12:39Z] cwd=/home/kalis/room-board-linux-20261006-MSAjEM/head
+$ git status --porcelain=v1 --untracked-files=all
+exit=0; elapsed=0.02s; output=head-status-final.txt
+
+Windows finalization after completed runs (Python 3.13, PYTHONPATH cleared):
+Independently parsed both JUnit files and asserted every existing outcome/message unchanged, 93 new passes, 15 platform skips, compatibility pass, six empty status receipts, and byte-identical spec-gate output. Results: verification.json.
+Compared SHA256 for each raw Linux receipt against its Windows copy: all 26 matched before appending this journal. REPORT.md was then edited for readable presentation; raw test outputs were unchanged.
+git rev-parse HEAD: pinned head unchanged. git status --porcelain=v1 --untracked-files=all: all changes confined to linux-run/.
+git config --show-origin --get core.hooksPath: exit 1 (unset); default hooks directory contains only sample hooks. No controls changed.
+Generated receipt-hashes.json over all other files in this folder (including unchanged HANDOFF.md). The manifest excludes itself.
+
+Precommit git diff --cached --check: exit 2; four trailing-whitespace findings in raw pytest stdout/JUnit only. Exact output: receipt-whitespace-check.txt. Those bytes are intentionally preserved.
+git diff --cached --check excluding base.txt/base.xml/head.txt/head.xml: exit 0. No raw output normalized.

@@ -1,0 +1,42 @@
+{
+  "base": {
+    "test_exit": 1,
+    "status_before": "",
+    "status_after": "",
+    "environment_overrides": {
+      "PYTHONPATH": null,
+      "COORDINATION_ROOM_BOARD": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "FLOSS_AGENT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/agent",
+      "FLOSS_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/audit",
+      "FLOSS_MCP_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/audit",
+      "COORDINATION_ROOM_ROOT": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/room",
+      "COORDINATION_ROOM_LOG": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/room/events.jsonl",
+      "TMPDIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/base/tmp"
+    },
+    "summary": "1 failed, 990 passed, 9 skipped, 1 deselected, 1 warning in 41.51s",
+    "spec_gate_exit": 1,
+    "spec_gate_output": "SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py\nSPEC-GATE MISSING FLOSS/hooks/grok_session_register.py\nSPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)\n\nSPEC-GATE FAIL: 2 unregistered gated artifact(s) — the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\" --tier 1\n",
+    "status_final": ""
+  },
+  "head": {
+    "test_exit": 1,
+    "status_before": "",
+    "status_after": "",
+    "environment_overrides": {
+      "PYTHONPATH": null,
+      "COORDINATION_ROOM_BOARD": null,
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "FLOSS_AGENT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/agent",
+      "FLOSS_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/audit",
+      "FLOSS_MCP_AUDIT_DIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/audit",
+      "COORDINATION_ROOM_ROOT": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/room",
+      "COORDINATION_ROOM_LOG": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/room/events.jsonl",
+      "TMPDIR": "/home/kalis/room-board-linux-20261006-MSAjEM/runtime/head/tmp"
+    },
+    "summary": "1 failed, 1083 passed, 24 skipped, 1 deselected, 1 warning in 50.49s",
+    "spec_gate_exit": 1,
+    "spec_gate_output": "SPEC-GATE MISSING FLOSS/hooks/grok_pretool_st.py\nSPEC-GATE MISSING FLOSS/hooks/grok_session_register.py\nSPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)\n\nSPEC-GATE FAIL: 2 unregistered gated artifact(s) — the tier is required (an omitted tier is an exemption, not a default; use --tier 2 for architecture-class work). Register with: python FLOSS/scripts/spec_gate.py --add <path> --spec \"<one-liner>\" --tier 1\n",
+    "status_final": ""
+  }
+}

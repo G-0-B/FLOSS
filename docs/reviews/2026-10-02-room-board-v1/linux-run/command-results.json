@@ -1,0 +1,312 @@
+[
+  {
+    "command": [
+      "git",
+      "clone",
+      "-b",
+      "feat/coordination-room-rebased",
+      "/mnt/c/Users/kalis/AppData/Local/Temp/codex-room-linux-20261006-05b4aebd/room-board.bundle",
+      "/home/kalis/room-board-linux-20261006-MSAjEM/head"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:09:41Z",
+    "returncode": 0,
+    "elapsed_seconds": 15.980172222014517,
+    "receipt": "clone-head.txt"
+  },
+  {
+    "command": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:09:57Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.001762258994858712,
+    "receipt": null
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--exit-code",
+      "0281a47cd817efb2f2426886e3a1058c157b33eb",
+      "806a99936d1dd752641d4b7d1f01e8085e156c5e",
+      "--",
+      ".",
+      ":(exclude)docs"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:09:57Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.016464646032545716,
+    "receipt": "checkpoint-diff.txt"
+  },
+  {
+    "command": [
+      "git",
+      "clone",
+      "--no-hardlinks",
+      "--no-checkout",
+      "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+      "/home/kalis/room-board-linux-20261006-MSAjEM/base"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:09:57Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.279913296981249,
+    "receipt": "clone-base.txt"
+  },
+  {
+    "command": [
+      "git",
+      "checkout",
+      "--detach",
+      "4aab13e30f3c2960da787b47c90926256b4b5b73"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:09:58Z",
+    "returncode": 0,
+    "elapsed_seconds": 1.8850810959702358,
+    "receipt": "checkout-base.txt"
+  },
+  {
+    "command": [
+      "git",
+      "cat-file",
+      "-e",
+      "4aab13e30f3c2960da787b47c90926256b4b5b73^{commit}"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:10:00Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.00182529998710379,
+    "receipt": null
+  },
+  {
+    "command": [
+      "/home/kalis/.local/bin/uv",
+      "venv",
+      "--python",
+      "3.13",
+      "--seed",
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:00Z",
+    "returncode": 0,
+    "elapsed_seconds": 5.047932454035617,
+    "receipt": "venv-create.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "--version"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:05Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.0016006809892132878,
+    "receipt": null
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-m",
+      "pip",
+      "install",
+      "--upgrade",
+      "pip"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:05Z",
+    "returncode": 0,
+    "elapsed_seconds": 1.8853385529946536,
+    "receipt": "pip-upgrade.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      "/home/kalis/room-board-linux-20261006-MSAjEM/head/requirements-ci.txt"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:07Z",
+    "returncode": 0,
+    "elapsed_seconds": 46.31879614497302,
+    "receipt": "dependency-install.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-m",
+      "pip",
+      "freeze"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:54Z",
+    "returncode": 0,
+    "elapsed_seconds": 1.0864628769923002,
+    "receipt": "pip-freeze.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-c",
+      "import importlib.metadata,json; print(json.dumps({k:importlib.metadata.version(k) for k in [\"mcp\",\"pytest\",\"pytest-asyncio\",\"uvicorn\",\"httpx\"]}))"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM",
+    "started_utc": "2026-10-06T13:10:55Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.34329728299053386,
+    "receipt": null
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:10:56Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.6342294149799272,
+    "receipt": "base-status-before.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "packages/",
+      "tests/",
+      "scripts/tests/",
+      "--deselect",
+      "scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded",
+      "--junitxml=/home/kalis/room-board-linux-20261006-MSAjEM/receipts/base.xml"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:10:57Z",
+    "returncode": 1,
+    "elapsed_seconds": 43.73699710704386,
+    "receipt": "base.txt"
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:11:41Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.020590303000062704,
+    "receipt": "base-status-after.txt"
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:11:42Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.3281571939587593,
+    "receipt": "head-status-before.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-p",
+      "no:cacheprovider",
+      "packages/",
+      "tests/",
+      "scripts/tests/",
+      "--deselect",
+      "scripts/tests/test_audit_provenance_packets.py::test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_superseded",
+      "--junitxml=/home/kalis/room-board-linux-20261006-MSAjEM/receipts/head.xml"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:11:42Z",
+    "returncode": 1,
+    "elapsed_seconds": 52.71079488401301,
+    "receipt": "head.txt"
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:12:38Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.017828329000622034,
+    "receipt": "head-status-after.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "scripts/spec_gate.py",
+      "--check"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:12:38Z",
+    "returncode": 1,
+    "elapsed_seconds": 0.12803011998767033,
+    "receipt": "base-spec-gate.txt"
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/base",
+    "started_utc": "2026-10-06T13:12:38Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.022271557012572885,
+    "receipt": "base-status-final.txt"
+  },
+  {
+    "command": [
+      "/home/kalis/room-board-linux-20261006-MSAjEM/venv/bin/python",
+      "scripts/spec_gate.py",
+      "--check"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:12:38Z",
+    "returncode": 1,
+    "elapsed_seconds": 0.12655064201680943,
+    "receipt": "head-spec-gate.txt"
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all"
+    ],
+    "cwd": "/home/kalis/room-board-linux-20261006-MSAjEM/head",
+    "started_utc": "2026-10-06T13:12:39Z",
+    "returncode": 0,
+    "elapsed_seconds": 0.018940262962132692,
+    "receipt": "head-status-final.txt"
+  }
+]
