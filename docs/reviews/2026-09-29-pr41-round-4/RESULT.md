@@ -64,8 +64,15 @@ The author reads that as answers to the questions in order:
   The category is not part of the skill's identity, and `external_dirs` can
   add other roots such as `~/.agents/skills`.
 
-**So nesting installed skills in category folders would hide them from four
-of the five harnesses.** Keep installs flat. Carry the category as metadata:
+**Nesting installed skills in category folders is not safe to rely on.** The
+documentation of Claude Code, OpenCode and Gemini CLI describes `<name>/SKILL.md`
+directly under the skills root, and Gemini CLI's says deeper files are not
+discovered. None of the three was tested here. *Corrected 2026-10-05; the
+original read: "So nesting installed skills in category folders would hide
+them from four of the five harnesses." Codex is not one of the four. Its
+documentation is silent, but its loader at v0.128.0 searches each root to a
+depth of six directories; see the Codex bullet below.* Keep installs flat.
+Carry the category as metadata:
 the shared manifest already gives each skill a `category`, which the registry
 records, and the spec's `metadata` field could carry it in `SKILL.md` too. How
 the shared base's *source* is laid out is a separate choice. The materializer
@@ -81,8 +88,19 @@ Two things this research surfaced, recorded here and not acted on:
 - **Codex's documented user location is `$HOME/.agents/skills`, not the
   `~/.codex/skills` this manifest targets.** The installed Codex CLI here is
   0.128.0, and `~/.agents/skills` exists with three skills that are not ours.
-  Whether 0.128.0 still reads `~/.codex/skills` has not been checked. If it
-  does not, our Codex projections are not being discovered. Also,
+  *Checked 2026-10-05; the original read: "Whether 0.128.0 still reads
+  `~/.codex/skills` has not been checked. If it does not, our Codex projections
+  are not being discovered."* It does still read it. In Codex's source at
+  [`rust-v0.128.0`](https://github.com/openai/codex/blob/e4310be51f617f5e60382038fa9cbf53a2429ca4/codex-rs/core-skills/src/loader.rs)
+  (commit `e4310be51f617f5e60382038fa9cbf53a2429ca4`, 2026-04-30; blob
+  `d7a69e8a25166a116633dc58fef0f8c1d8743c23`), the user layer scans
+  `$CODEX_HOME/skills`, labelled "Deprecated user skills location ... kept for
+  backward compatibility" (L283-289), and `$HOME/.agents/skills` (L291-297). So
+  our Codex projections are discovered today, and the deprecation is the risk:
+  the root could be dropped in a later release. The same loader searches each
+  root breadth-first for `SKILL.md` to `MAX_SCAN_DEPTH` 6 (L120-121, L486-560),
+  skips dot-directories, and follows symlinked directories at user scope. That is
+  read from source, not run, and applies to 0.128.0 only. Also,
   `~/.agents/skills` is read by Codex, OpenCode and Gemini CLI, and by Hermes
   through `external_dirs`, so it could be the one shared user root for four
   of the five harnesses.

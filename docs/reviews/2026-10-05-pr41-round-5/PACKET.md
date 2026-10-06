@@ -316,9 +316,11 @@ disposition in that directory's `RESULT.md`. In brief:
   (the audit's O3) and **about thirty narrow `JSONDecodeError` handlers** across
   the repository. Both are separate tasks in their own worktrees. They are
   outside the files this PR touches.
-- **Codex's documented user skill root is `$HOME/.agents/skills`, not the
-  `~/.codex/skills` this manifest targets.** Recorded in the round-4 `RESULT.md`
-  and not acted on.
+- **Codex's user skill roots.** Its documentation names `$HOME/.agents/skills`,
+  and this manifest targets `~/.codex/skills`. Codex 0.128.0's source still
+  scans `$CODEX_HOME/skills`, marked deprecated, so the projections are
+  discovered today. Read from source, not run. Not acted on; see the round-4
+  `RESULT.md`.
 
 ## Still open from earlier rounds
 
