@@ -358,7 +358,8 @@ a versioned capability row and the applicable gates pass:
 | dialect precedence | OpenAI loads `.codex-plugin/plugin.json`; Agent client loads root `plugin.json` | ❌ Blocked pending direct load probes |
 | twin MCP equivalence | normalized server maps compare equal | ⚠️ Specified |
 | hook trust | hook is skipped before trust and delivered after bounded trust | ❌ Blocked pending install probe |
-| AllAgents adapter | pinned version imports and projects without clobbering unmanaged content | ❌ Blocked pending fixture probe |
+| AllAgents adapter, unmanaged content | pinned version imports and projects without clobbering content it never installed | ❌ Blocked pending fixture probe |
+| AllAgents adapter, skills changed after install | a skill edited in place, or given a new file, after install survives the next sync byte for byte; or the adapter is excluded from every skill root a harness may evolve | ❌ Fails on source review at v1.13.4 and v1.19.0 ([evidence](../../reviews/2026-09-01-polyglot-plugin-materializer-spec/EVIDENCE-2026-09-30-allagents-skill-preservation.md)); direct probe pending |
 | idempotency | second materialization produces zero-byte diff and identical receipt subject hashes | ⚠️ Specified |
 | rollback | injected mid-transaction failure restores every pre-write hash | ⚠️ Specified |
 | clean clone | package reproduces without `.toilet`, caches, or undeclared user state | ⚠️ Specified |
@@ -395,7 +396,8 @@ one.
 3. Generate the package with hooks disabled.
 4. Run schemas and local validators, then direct Agent Plugins and OpenAI loader
    probes in isolated state.
-5. Run the pinned AllAgents projection probe and compare unmanaged bytes.
+5. Run the pinned AllAgents projection probe and compare unmanaged bytes. Edit an
+   installed skill, sync again, and confirm the edit survives.
 6. Produce the capability matrix and materialization receipt.
 7. Present the exact marketplace/config/hook-trust effects for separate operator
    consent.
@@ -478,3 +480,25 @@ The probe fixture is retained as noncanonical evidence at
 `.toilet/polyglot-plugin-validator-probe-2026-09-01`. Validator success proves
 document compatibility only. It does not yet prove loader precedence, hook
 delivery, marketplace installation, or runtime safety.
+
+## Amendments
+
+**2026-09-30: AllAgents gate row split.** Source review of AllAgents at the pinned
+v1.13.4 and at v1.19.0 found that it deletes and recopies every skill directory it
+previously installed on each sync, and keeps no content record from which a later
+change could be detected ([evidence](../../reviews/2026-09-01-polyglot-plugin-materializer-spec/EVIDENCE-2026-09-30-allagents-skill-preservation.md)).
+The gate row previously read:
+
+> | AllAgents adapter | pinned version imports and projects without clobbering unmanaged content | ❌ Blocked pending fixture probe |
+
+It is now two rows: the original requirement, unchanged, and a new one for skills
+changed after install. The new row reflects the operator's 2026-09-29 requirement
+that no changed skill be overwritten. Rollout step 5 previously read "Run the
+pinned AllAgents projection probe and compare unmanaged bytes." and now also
+requires an edited installed skill to survive a second sync.
+
+The front-matter version stays `0.1.0`: the status is still pre-review and no
+component or decision changed. This amendment does not decide whether an
+AllAgents adapter is wanted. Earlier research rejected AllAgents on MCP-ownership
+grounds (`docs/research/reuse-ledger-seed.yaml`), and that rejection is
+unaffected.
