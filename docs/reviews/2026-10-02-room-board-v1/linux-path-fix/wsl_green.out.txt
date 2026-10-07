@@ -1,0 +1,14 @@
+linux clone at: dff1884dc1e7f508a996fa8a3464b2d1da147b82
+status before: []
+pytest exit: 0
+1088 passed, 24 skipped, 1 deselected, 1 warning in 41.61s
+status after: []
+codex base: {'passed': 990, 'skipped': 9, 'failure': 1}
+codex head: {'passed': 1083, 'skipped': 24, 'failure': 1}
+committed fix: {'passed': 1088, 'skipped': 24}
+vs head, changed outcomes: {'packages.coordination_room.tests.test_paths::test_backslash_collapses_to_same_key': ('failure', 'passed')}
+vs head, missing: []
+vs head, new: {'packages.coordination_room.tests.test_path_separators::test_mixed_separators_collapse_to_one_key': 'passed', 'packages.coordination_room.tests.test_path_separators::test_backslash_dotdot_escape_is_rejected': 'passed', 'packages.coordination_room.tests.test_path_separators::test_one_file_written_two_ways_has_one_holder': 'passed', 'packages.coordination_room.tests.test_path_separators::test_a_file_ref_resolves_with_either_separator': 'passed'}
+vs base, regressed: []
+failing now: []
+3

@@ -1,0 +1,11 @@
+linux clone at: 7b1bfee docs(reviews): Linux result recorded; a candidate fix for the one failure, not applied
+?? packages/coordination_room/tests/test_path_separators.py
+== Linux RED: the test on the real head, no fix
+E       Failed: DID NOT RAISE PathEscape
+E       assert False is True
+FAILED packages/coordination_room/tests/test_paths.py::test_backslash_collapses_to_same_key
+FAILED packages/coordination_room/tests/test_path_separators.py::test_mixed_separators_collapse_to_one_key
+FAILED packages/coordination_room/tests/test_path_separators.py::test_backslash_dotdot_escape_is_rejected
+FAILED packages/coordination_room/tests/test_path_separators.py::test_one_file_written_two_ways_has_one_holder
+FAILED packages/coordination_room/tests/test_path_separators.py::test_a_file_ref_resolves_with_either_separator
+5 failed, 4 passed in 0.07s

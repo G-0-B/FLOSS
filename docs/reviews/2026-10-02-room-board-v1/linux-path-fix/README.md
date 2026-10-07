@@ -1,6 +1,6 @@
-# Candidate fix for the one Linux failure (not applied)
+# Fix for the one Linux failure (applied in `dff1884`)
 
-Author evidence, 2026-10-06. Nothing in this folder is collected by the test set, and nothing here has been applied to the code.
+Author evidence, 2026-10-06 and 2026-10-07. Nothing in this folder is collected by the test set. The candidate below was applied on 2026-10-07 as commit `dff1884dc1e7f508a996fa8a3464b2d1da147b82`; see "Applied" at the end.
 
 ## The failure
 
@@ -33,8 +33,19 @@ The room on this machine runs on Windows, so none of that is live here. The requ
 
 Per test case on Linux, against Codex's head run: one outcome changed (the failing test now passes), nothing went missing, four cases were added and pass. `ruff check --isolated` is clean on both files.
 
-## Why it is not applied
+## Applied
 
-`packages/coordination_room/paths.py` is not among the paths the operator approved for this work (the plan's Task 0 Step 1). Applying it is the operator's call.
+The candidate was tried while `paths.py` was outside the paths the operator had approved, so it was first saved here unapplied. The operator then approved it ("yes", 2026-10-07, to "Apply the path fix to `feat/coordination-room-rebased`?"). The commit message of `dff1884` gives that date as 2026-10-06; that is the day the question was asked, and the message is wrong by a day.
+
+What was done, in order, on the real tree:
+
+1. The test file went into `packages/coordination_room/tests/`, byte-identical to the copy here.
+2. Linux, a clone of the then-current head `7b1bfee` plus that test file, no fix (`wsl_red.sh`, `wsl_red.out.txt`): 5 failed, 4 passed. On Windows the same nine tests pass without the fix, because Windows already treats a backslash as a separator; the fault is POSIX-only.
+3. The one line went into `paths.py`, identical to `paths.patch`, and one sentence into the spec's "Claim unit".
+4. Windows, the worktree with the fix: room package 121 passed; the required test set 1,119 passed, 7 skipped, no failures (`windows-required-set.txt`; it ran just before the commit, so its first line names the previous head, and the tree it ran on is the one that was committed).
+5. Commit `dff1884`.
+6. Linux, a clone of `dff1884` (`wsl_green.sh`, `wsl_green.out.txt`, `linux-required-set.txt`): the required test set exits 0 with 1,088 passed, 24 skipped. Against Codex's head run, one outcome changed (the failing test passes), nothing is missing, four cases are new and pass; against Codex's base run nothing regressed. The checkout was clean before and after, and the spec gate printed the same three findings.
+
+✅ Verified on this machine: with `dff1884` the required test set is green on Linux (WSL, Python 3.13.13, `mcp` 1.30.0) and on Windows. Not verified: the GitHub-hosted runner itself; nothing is pushed.
 
 Not checked: a file whose name really contains a backslash can no longer be claimed on POSIX. Git cannot check such a file out on Windows either, so the room treats it as out of scope; say so if that is wrong for this repository.
