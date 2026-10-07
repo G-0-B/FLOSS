@@ -13,7 +13,10 @@ def normalize_path(root: Path, path: str) -> str:
     if not isinstance(path, str) or not path.strip():
         raise PathEscape("empty path")
     root_resolved = root.resolve()
-    raw = Path(path.strip())
+    # A backslash is a separator here on every platform, as it already is on
+    # Windows. On POSIX it is otherwise an ordinary filename character, which
+    # made `a\b.py` and `a/b.py` two claim keys for one file.
+    raw = Path(path.strip().replace("\\", "/"))
     candidate = raw if raw.is_absolute() else (root_resolved / raw)
     resolved = candidate.resolve()
     try:

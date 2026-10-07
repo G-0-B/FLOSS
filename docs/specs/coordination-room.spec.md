@@ -20,7 +20,7 @@ Compose the computer-use **lease shape** (one exclusive holder). Do not share th
 
 ## Claim unit
 
-Normalized file path relative to the room root. One holder per path inside the room. Same-agent re-claim is idempotent. Second agent gets `conflict` plus the holder id. A claim may carry a short `intent` (max 256 bytes), recorded on the first claim only.
+Normalized file path relative to the room root. `/` and `\` both separate components on every platform, so one file has one key however a caller writes it. One holder per path inside the room. Same-agent re-claim is idempotent. Second agent gets `conflict` plus the holder id. A claim may carry a short `intent` (max 256 bytes), recorded on the first claim only.
 
 **A room claim is a coordination convention, not write authorization.** The operator confirmed this precedence on 2026-10-04 ("advisory claims"). ⚠️ Specified: the enforced mechanism it defers to is proposed, not built. No hook consults the room, so nothing stops a write to a path another agent claimed. Where an enforced claim mechanism exists (coordination-v1 proposes `refs/agent-claims/*` checked by the pre-write hook), that mechanism decides and the room does not; the two are not synchronised, and a room claim never implies the enforced one. Inside the room, the claim table, not chat, decides a room conflict: a post to topic `claims` is not a claim.
 
