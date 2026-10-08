@@ -59,6 +59,9 @@ MUTATING_TOOL_NAMES = {
     # Claim, while `hermes hooks list` reported the hook installed and allowed.
     # An installed hook that silently does nothing is worse than an absent one.
     "patch",
+    # Antigravity (AGY)
+    "write_to_file",
+    "replace_file_content",
 }
 
 
