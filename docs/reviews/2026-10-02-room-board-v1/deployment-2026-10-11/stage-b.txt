@@ -1,0 +1,34 @@
+== 2026-10-11T13:38:41.9590473-04:00 stage B, deploy commit 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+== step 4 (real): start only the room
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Started or already running: room. PID guard prevents duplicates.
+
+== step 5: assert the bus before any post
+{
+    "claims":  {
+
+               },
+    "last_seq":  5,
+    "speakers":  [
+                     "digestion-reviewer",
+                     "grok"
+                 ],
+    "root":  "C:\\~shit\\FLOSS\\.worktrees\\room-serve-9cbe61cd",
+    "log":  "C:\\~shit\\.agent-surface\\rooms\\default\\events.jsonl",
+    "board":  "C:\\~shit\\.agent-surface\\rooms\\default\\BOARD.md",
+    "board_as_of":  null,
+    "board_last_error":  null,
+    "log_skipped_lines":  0,
+    "ok":  true
+}
+== step 6: smoke
+{
+    "ok":  true,
+    "seq":  6,
+    "topic":  "announcements",
+    "evidence_status":  "resolved"
+}
+deployed; smoke post is seq 6; board as of 2026-10-11T17:38:47Z
+STAGE B COMPLETE

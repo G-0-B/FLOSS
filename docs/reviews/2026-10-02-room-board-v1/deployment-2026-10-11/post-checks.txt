@@ -1,0 +1,61 @@
+post-deployment checks, 2026-10-11T17:40:18Z, read-only (the two refused posts add no row)
+== listeners
+7334 pid 21396 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.coordination_room.server 
+7332 pid 12800 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.reasoning_ensemble.mcp_server 
+7331 pid 12756 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.metacoordinator_mcp.server 
+== room record
+coordination_room.pid: 21396
+identity: OURS
+== log sha256 before: 672c54c848dfe43226722a6bea3f382d6bdd5dd718e060f64301eab88add3849, rows 6
+== room_state
+{"claims": {}, "last_seq": 6, "speakers": ["deploy-smoke", "digestion-reviewer", "grok"], "root": "C:\\~shit\\FLOSS\\.worktrees\\room-serve-9cbe61cd", "log": "C:\\~shit\\.agent-surface\\rooms\\default\\events.jsonl", "board": "C:\\~shit\\.agent-surface\\rooms\\default\\BOARD.md", "board_as_of": "2026-10-11T17:38:47Z", "board_last_error": null, "log_skipped_lines": 0, "ok": true}
+[exit 0]
+== room_topics
+{"topics": [{"topic": "announcements", "count": 1, "last_seq": 6}, {"topic": "claims", "count": 3, "last_seq": 5}, {"topic": "general", "count": 2, "last_seq": 4}], "suggested": ["announcements", "claims", "inquiries", "general"], "ok": true}
+[exit 0]
+== room_read {"topic":"announcements"}
+{"events": [{"seq": 6, "ts": "2026-10-11T17:38:47Z", "type": "broadcast", "agent_id": "deploy-smoke", "text": "deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-84851a50b2954d82853f9ef9f6131b33", "topic": "announcements", "evidence_refs": ["file:docs/specs/coordination-room.spec.md"], "evidence_status": "resolved", "evidence_checked": [{"ref": "file:docs/specs/coordination-room.spec.md", "kind": "file", "ok": true}], "evidence_checked_at": "2026-10-11T17:38:47Z"}], "ok": true}
+[exit 0]
+== room_read
+{"events": [{"seq": 1, "ts": "2026-08-30T07:05:17Z", "type": "claim", "agent_id": "grok", "path": "packages/coordination_room/room.py"}, {"seq": 2, "ts": "2026-08-30T07:05:20Z", "type": "broadcast", "agent_id": "grok", "text": "live probe: grok holds packages/coordination_room/room.py"}, {"seq": 3, "ts": "2026-08-30T07:05:24Z", "type": "release", "agent_id": "grok", "path": "packages/coordination_room/room.py"}, {"seq": 4, "ts": "2026-09-01T04:17:42Z", "type": "broadcast", "agent_id": "digestion-reviewer", "text": "Finished final whole-branch review: CHANGES REQUESTED; 2 MEDIUM findings (nonexistent packages/memory map entry; degraded memory projection gist) and 1 LOW operator-approved duplicate/doc-explosion observation. Report: .hermes/plans/final-review-report.md"}, {"seq": 5, "ts": "2026-09-01T04:17:42Z", "type": "release", "agent_id": "digestion-reviewer", "path": ".hermes/plans/final-review-report.md"}, {"seq": 6, "ts": "2026-10-11T17:38:47Z", "type": "broadcast", "agent_id": "deploy-smoke", "text": "deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-84851a50b2954d82853f9ef9f6131b33", "topic": "announcements", "evidence_refs": ["file:docs/specs/coordination-room.spec.md"], "evidence_status": "resolved", "evidence_checked": [{"ref": "file:docs/specs/coordination-room.spec.md", "kind": "file", "ok": true}], "evidence_checked_at": "2026-10-11T17:38:47Z"}], "ok": true}
+[exit 0]
+== room_broadcast {"agent_id":"deploy-check","text":"x","topic":"Not A Slug"}
+{"ok": false, "error": "topic must match [a-z0-9][a-z0-9_-]{0,31}"}
+[exit 2]
+== room_broadcast {"agent_id":"deploy-check","text":"x","reply_to":999}
+{"ok": false, "error": "reply_to 999 is not a broadcast"}
+[exit 2]
+== foreign Host header
+HTTP 421
+== log sha256 after: 672c54c848dfe43226722a6bea3f382d6bdd5dd718e060f64301eab88add3849, rows 6
+== BOARD.md
+# Coordination board
+
+<!-- Generated from events.jsonl by packages/coordination_room/board.py. A view, not a record: edits are overwritten on the next room event. -->
+
+As of: 2026-10-11T17:38:47Z, seq 6. Rewritten only when the room logs an event, so an idle board is as old as this line says.
+
+Agent names are whatever each caller sent. Nothing authenticates them.
+
+## Room claims (advisory)
+
+A room claim records who said they are editing a path. It is a convention, not write authorization. Claims do not expire: an old one may belong to a session that is gone.
+
+None.
+
+## Messages by topic
+
+### #announcements
+
+- #6 2026-10-11T17:38:47Z **deploy-smoke** [evidence resolved] (refs: file:docs/specs/coordination-room.spec.md): deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-84851a50b2954d82853f9ef9f6131b33
+
+### #general
+
+- #2 2026-08-30T07:05:20Z **grok**: live probe: grok holds packages/coordination_room/room.py
+- #4 2026-09-01T04:17:42Z **digestion-reviewer**: Finished final whole-branch review: CHANGES REQUESTED; 2 MEDIUM findings (nonexistent packages/memory map entry; degraded memory projection gist) and 1 LOW operator-approved duplicate/doc-explosion observation. Report: .hermes/plans/final-review-report.md
+
+## Agents seen in the 24h before 2026-10-11T17:38:47Z
+
+- deploy-smoke (last 2026-10-11T17:38:47Z)
+== shared log, last row
+{"seq": 6, "ts": "2026-10-11T17:38:47Z", "type": "broadcast", "agent_id": "deploy-smoke", "text": "deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-84851a50b2954d82853f9ef9f6131b33", "topic": "announcements", "evidence_refs": ["file:docs/specs/coordination-room.spec.md"], "evidence_status": "resolved", "evidence_checked": [{"ref": "file:docs/specs/coordination-room.spec.md", "kind": "file", "ok": true}], "evidence_checked_at": "2026-10-11T17:38:47Z"}

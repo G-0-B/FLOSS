@@ -1,0 +1,54 @@
+== 2026-10-11T13:38:18.1724484-04:00 stage A, deploy commit 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c
+== step 0: pinned checkout
+Preparing worktree (detached HEAD 9cbe61c)
+Updating files:  42% (708/1660)Updating files:  43% (714/1660)Updating files:  44% (731/1660)Updating files:  45% (747/1660)Updating files:  46% (764/1660)Updating files:  47% (781/1660)Updating files:  48% (797/1660)Updating files:  49% (814/1660)Updating files:  50% (830/1660)Updating files:  51% (847/1660)Updating files:  52% (864/1660)Updating files:  52% (871/1660)Updating files:  53% (880/1660)Updating files:  54% (897/1660)Updating files:  55% (913/1660)Updating files:  56% (930/1660)Updating files:  57% (947/1660)Updating files:  58% (963/1660)Updating files:  59% (980/1660)Updating files:  60% (996/1660)Updating files:  61% (1013/1660)Updating files:  62% (1030/1660)Updating files:  63% (1046/1660)Updating files:  64% (1063/1660)Updating files:  65% (1079/1660)Updating files:  66% (1096/1660)Updating files:  67% (1113/1660)Updating files:  68% (1129/1660)Updating files:  69% (1146/1660)Updating files:  70% (1162/1660)Updating files:  71% (1179/1660)Updating files:  72% (1196/1660)Updating files:  73% (1212/1660)Updating files:  74% (1229/1660)Updating files:  75% (1245/1660)Updating files:  76% (1262/1660)Updating files:  76% (1263/1660)Updating files:  77% (1279/1660)Updating files:  78% (1295/1660)Updating files:  79% (1312/1660)Updating files:  80% (1328/1660)Updating files:  81% (1345/1660)Updating files:  82% (1362/1660)Updating files:  83% (1378/1660)Updating files:  84% (1395/1660)Updating files:  85% (1411/1660)Updating files:  86% (1428/1660)Updating files:  87% (1445/1660)Updating files:  88% (1461/1660)Updating files:  89% (1478/1660)Updating files:  90% (1494/1660)Updating files:  91% (1511/1660)Updating files:  92% (1528/1660)Updating files:  93% (1544/1660)Updating files:  94% (1561/1660)Updating files:  95% (1577/1660)Updating files:  96% (1594/1660)Updating files:  97% (1611/1660)Updating files:  98% (1627/1660)Updating files:  99% (1644/1660)Updating files: 100% (1660/1660)Updating files: 100% (1660/1660), done.
+HEAD is now at 9cbe61c docs(reviews): the path fix is applied; red and green receipts, record updated
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+agent dir: C:\Users\kalis\.floss_agent
+python: C:\Python313\python.exe
+== step 1: record what is running (the room is down, so no room_state)
+31076
+== step 2: stop only the room (preview, then real)
+[FLOSS MCP] WOULD_STOP coordination_room.pid (only if its identity check says OURS)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 11 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 32912 (parent 30888)
+[FLOSS MCP]   PID 32628 (parent 32912)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Dry run: nothing was stopped (selected: room).
+
+[FLOSS MCP] coordination_room.pid PID 31076 is NOT our daemon - stale record cleared, killed nothing
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 11 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 32912 (parent 30888)
+[FLOSS MCP]   PID 32628 (parent 32912)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Stopped: room. PID files cleaned.
+
+== step 3: slot and port free, settled log
+settled seq: 5
+== step 4 (preview only): start only the room
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] WOULD_START packages.coordination_room.server (coordination room (:7334))
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Dry run: nothing was started (selected: room).
+
+STAGE A COMPLETE settled=5
