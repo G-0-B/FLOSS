@@ -10,7 +10,7 @@
 
 **Goal:** Prove the six substrate-bridge criteria and separate consent-zome behavior against a freshly built four-zome Rose Forest DNA using Rust Sweettest and two distinct agents.
 
-**Architecture:** Add one standalone native-only Rust child workspace at `ARF/tests/sweettest`. Two integration-test binaries share typed wire representations and a two-conductor fixture but create independent conductor state; production zomes remain unchanged.
+**Architecture:** Add one standalone native-only Rust child workspace at `ARF/tests/sweettest`. Two integration-test binaries share typed wire representations and a two-conductor fixture but create independent conductor state; production zome behavior is unchanged, with the source-cleanup exceptions recorded in Task 4, Step 5.
 
 **Tech Stack:** Rust 2021, Holochain/Sweettest from the official immutable Git pin resolving to the 0.6.1 line, parent HDK `=0.6.1`, Tokio multi-thread runtime, Serde, Holonix `main-0.6`.
 
@@ -18,7 +18,7 @@
 
 ## Global Constraints
 
-- Do not modify `ARF/dnas/rose_forest/zomes/integrity/` or `consent_integrity/`; those are governed Layer 0 surfaces.
+- Do not make additional changes to `ARF/dnas/rose_forest/zomes/integrity/` or `consent_integrity/`; those are governed Layer 0 surfaces. The two existing equivalent Rose Forest range-check rewrites are the sole exception recorded in the 2026-09-09 amendment under Task 4, Step 5.
 - Do not modify coordinator-zome behavior, ADRs, canonical status, consensus-gateway logic, or unrelated user files.
 - Load only a freshly packed `ARF/dnas/rose_forest/workdir/rose_forest.dna` built from all four current release WASM files.
 - Use two distinct agent keys and assert they differ before provenance or privilege checks.
@@ -438,7 +438,23 @@ git status --short
 git diff --name-only origin/main...HEAD
 ```
 
-Expected changed paths: design/plan docs, `ARF/.cargo/config.toml`, and `ARF/tests/sweettest/**`. The parent workspace manifest and lock remain unchanged by the child workspace. The packed `.dna` artifact should not be committed unless it was already tracked and changed by the required pack; if changed, report it separately and leave it unstaged pending operator direction.
+Expected changed paths for the final PR61 diff against `main`:
+
+- `.github/workflows/rust-ci.yml`
+- `ARF/.cargo/config.toml`
+- `ARF/dnas/rose_forest/zomes/coordinator/src/lib.rs`
+- `ARF/dnas/rose_forest/zomes/coordinator/src/vector_ops.rs`
+- `ARF/dnas/rose_forest/zomes/integrity/src/lib.rs`
+- `ARF/tests/sweettest/Cargo.lock`
+- `ARF/tests/sweettest/Cargo.toml`
+- `ARF/tests/sweettest/run.sh`
+- `ARF/tests/sweettest/src/lib.rs`
+- `ARF/tests/sweettest/tests/consent_zome_test.rs`
+- `ARF/tests/sweettest/tests/substrate_bridge_test.rs`
+- `docs/superpowers/plans/2026-08-24-rust-sweettest-substrate-bridge.md`
+- `docs/superpowers/specs/2026-08-23-rust-sweettest-substrate-bridge-design.md`
+
+The parent workspace manifest and lock remain unchanged by the child workspace. The packed `.dna` artifact should not be committed unless it was already tracked and changed by the required pack; if changed, report it separately and leave it unstaged pending operator direction.
 
 **Amended 2026-09-09, operator-authorized, two paths added.** CodeRabbit correctly
 flagged that the diff had grown beyond this list and that the Global Constraint
@@ -463,9 +479,22 @@ because the changes were requested:
   `cargo clippy -p rose_forest_integrity --all-targets --all-features -- -D
   warnings` now exits 0.
 
+**Scope-record completion, 2026-10-12, operator-directed.** The operator
+requested this documentation-only correction during PR61 review cleanup to
+account for both existing coordinator paths and their complete changes:
+
+- `ARF/dnas/rose_forest/zomes/coordinator/src/lib.rs` — remove the unused
+  `BudgetEngine` import and document the existing `query_triples` contract:
+  subject takes precedence when both subject and predicate are supplied.
+  The executable query implementation is unchanged.
+- `ARF/dnas/rose_forest/zomes/coordinator/src/vector_ops.rs` — change the
+  introductory outer doc comments (`///`) into module doc comments (`//!`).
+  The vector implementations are unchanged.
+
 Coordinator-zome behaviour, ADRs, canonical status and consensus-gateway logic
-remain untouched. The coordinator changes in this range are a `///` → `//!`
-module-doc correction and one unused import; neither alters behaviour.
+remain unchanged. These entries record the existing source cleanup; they do
+not authorize additional zome implementation changes. The scope above and
+this completion account for the complete 13-file PR diff.
 
 - [ ] **Step 6: Commit final generated resolution if needed**
 
