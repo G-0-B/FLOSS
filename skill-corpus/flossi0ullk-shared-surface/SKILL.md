@@ -36,6 +36,10 @@ The shared surface is generated, not hand-curated per client.
 
 - Do not hand-edit generated projections when the canonical source can be changed instead.
 - **`.mcp.json` is the single source of truth for MCP servers.** Never hand-edit a harness config (Codex, Hermes, OpenCode, Gemini, Vibe) — change `.mcp.json` and re-run the runner. Hand-editing is what produced the 2026-07-24 six-surface drift, after the propagator had been silently crashing for a week.
+- **Materializers resolve the wrong root from a worktree.** They derive the workspace root as the script checkout's parent. From a worktree nested under `FLOSS/.worktrees/` or a sibling at the workspace root, the root is wrong and canonical sources may be absent.
+  - From a worktree, run a materializer only with `--check` or `--dry-run`, never to write.
+  - On reported DRIFT, read the path column before regenerating. Paths outside the expected workspace, or inside another checkout, mean wrong root, not drift.
+  - The memory materializer treats a missing canonical source as zero entries and plans to overwrite the user-wide memory index with a heading-only file. As of 2026-10-12 it has no `--include-user-scope` gate (the check was a grep of `scripts/materialize_shared_agent_memory.py`), so it always writes user scope. Re-check this before relying on it.
 - Keep shared surface changes additive and reversible.
 - Prefer portable markdown and JSON manifests over agent-specific one-offs.
 - Agent memory is shared-surface state: write durable learnings to `FLOSS/docs/agent-memory/`, then materialize projections. Do not treat Claude/Codex/Gemini private memory dirs as canonical.

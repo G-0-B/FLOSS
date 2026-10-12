@@ -74,6 +74,9 @@ digraph brainstorming {
 
 **Exploring approaches:**
 
+- Run the prior-art check with two questions, not one:
+  1. What does this reuse? (libraries, primitives, existing mechanisms)
+  2. Where does the user or caller meet it, and does something already exist there that they already reach? A reused component saves implementation effort; a reused entry point inherits an audience. An unadopted feature is worth nothing regardless of what it was built from.
 - Propose 2-3 different approaches with trade-offs
 - Present options conversationally with your recommendation and reasoning
 - Lead with your recommended option and explain why

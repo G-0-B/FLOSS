@@ -60,6 +60,7 @@ You MUST complete each phase before proceeding to the next.
    - What are the exact steps?
    - Does it happen every time?
    - If not reproducible → gather more data, don't guess
+   - If one environment reproduces and another does not: diff the full recorded invocation first (cwd, temp and basetemp paths, env overrides) and try the failing environment's paths before forming code hypotheses. The same code can pass or fail by path alone. On Windows, include "which processes watch this tree" (indexers, file watchers, antivirus) as a candidate.
 
 3. **Check Recent Changes**
    - What changed that could cause this?
@@ -80,6 +81,9 @@ You MUST complete each phase before proceeding to the next.
      - Check state at each layer
 
    Run once to gather evidence showing WHERE it breaks
+   (Keep identification runs and timing runs separate. A heavyweight call
+   in the failure path perturbs the timing: measure durations with the
+   lightest possible probe in a run with no diagnostics.)
    THEN analyze evidence to identify failing component
    THEN investigate that specific component
    ```

@@ -109,6 +109,8 @@ Vague name, tests mock not code
 - One behavior
 - Clear name
 - Real code (no mocks unless unavoidable)
+- Asserts behavior given an input, not a fact about the world right now. If the test reads anything the process does not create itself (a shared file, a directory another task fills, live state), inject the input. In shared or multi-agent environments the state may be another task's deliverable, giving the test a hidden dependency on work invisible from the file it lives in.
+- If the test source must spell an invisible or line-breaking character, write it as an escape, then check the saved bytes (file type, or a scan for bytes above 127) before running. An edit layer can decode escapes into raw characters, and the test will still run and fail for the right reason.
 
 ### Verify RED - Watch It Fail
 
@@ -125,7 +127,11 @@ Confirm:
 
 **Test passes?** You're testing existing behavior. Fix test.
 
+**Passes against the unfixed code, and you can't see why?** A regression test that does not fail against the unfixed code is misleading, not merely unverified. Change the INPUT until it discriminates; do not accept the green. Diagnostic question: for this specific fixture, what answer would the old code give? If it is the same answer, the fixture is the problem.
+
 **Test errors?** Fix error, re-run until it fails correctly.
+
+**Mutation checks fail for the wrong reason too.** Read the assertion output, not the pass/fail count. Build escape-sensitive replacements from code points, not escape sequences, and back up and restore with byte-level I/O or from version control.
 
 ### GREEN - Minimal Code
 
@@ -202,6 +208,14 @@ Next failing test for next feature.
 | **Minimal** | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
 | **Clear** | Name describes behavior | `test('test1')` |
 | **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+**Fix must preserve behavior outside the bug?** Add a guard test on those inputs. It passes before the fix, which is expected. Name the plausible wrong fix it catches, then apply that wrong fix once and watch the guard fail.
+
+**Sweeping a list of sites (a handed-over defect list, or a reference fix reused site to site):**
+- Re-run the generating search on the stated base and diff it against the list before starting. If line numbers do not match, find which ref they came from and ask which base to use.
+- Per site, before the red test: read the code, record the actual input source, and state what a well-formed input HERE can look like (including legitimate shapes the pattern would reject). Treat provenance labels in the list as unverified.
+- Trace whether each canonical bad shape can actually reach the handler. Drop any that cannot, and say why, rather than writing a test that passes vacuously. Keep a guard test for any legitimate shape the pattern would otherwise reject.
+- If a fix converts an exception to a different type, check every caller's handler for the OLD type as well as the new one. Converting `JSONDecodeError` into a plain `ValueError` silently escapes a caller that caught `JSONDecodeError`.
 
 When writing or changing any test, read [writing-good-tests.md](writing-good-tests.md) for the rules that keep tests honest:
 - Name the production change that would make the test fail — before writing it

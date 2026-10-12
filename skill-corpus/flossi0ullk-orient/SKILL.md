@@ -1,7 +1,7 @@
 ---
 name: flossi0ullk-orient
 description: Use when starting work in the FLOSSI0ULLK workspace, re-orienting after context loss, or deciding which canonical docs and corpora to load first before deeper research or code changes.
-version: 0.3.4
+version: 0.3.5
 ---
 
 # FLOSSI0ULLK Orientation
@@ -15,7 +15,7 @@ conclusion may be returned, until these slots are present.
 ```text
 Evidence envelope
 cwd: <absolute cwd | Unknown>
-commit: <full SHA | not a Git worktree | Unknown>
+commit: <full SHA | not a Git worktree | Unknown>  (one line per repository the conclusion depends on: session worktree, nested FLOSS checkout, remote default branch)
 command: <exact command | not run>
 output: <relevant observed output | not observed>
 truth status: <✅ Verified | ⚠️ Specified | 🔮 Aspirational | ❌ Blocked | Unknown>
@@ -80,12 +80,26 @@ Stop at the lowest tier that answers the task. Do not pre-fetch.
 Run the probe to get a deterministic orientation packet. No mutation, no network.
 
 ```bash
-python FLOSS/scripts/orient_probe.py --query "<task in one line>"
+# In a worktree of the root repo, FLOSS/ is a nested repo and is absent from cwd.
+if [ -f FLOSS/scripts/orient_probe.py ]; then
+  python FLOSS/scripts/orient_probe.py --query "<task in one line>"
+else
+  MAIN=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
+  python "$MAIN/FLOSS/scripts/orient_probe.py" --root "$MAIN" --query "<task in one line>"
+fi
 ```
 
 The packet reports: presence, mtime, size, and sha256 prefix for each canonical file; `.agent-surface/events/` queue depth; whether `context_router.py` is runnable; and a routed-corpus shortlist (if the router is present).
 
-If the probe script itself is missing, fall back to the **Manual probe ladder** at the bottom of this file.
+If the probe script is absent from cwd AND from the main checkout, fall back to the **Manual probe ladder** at the bottom of this file. Absent from cwd alone means wrong working directory, not a missing tool.
+
+### Step 0.5 — Plan intake (a pasted or foreign-agent plan)
+
+A plan written outside this repo's gate history is a hypothesis about the repo. Before treating any of its tasks as unstarted:
+
+1. Resolve which git repo and branch each named path lives in (root repo vs nested `FLOSS/`).
+2. Grep `docs/superpowers/plans/` for an existing plan touching the same package, and read its Global Constraints.
+3. Diff the plan's `[NEW]` / `[MODIFY]` claims against branches that already carry them.
 
 ### Step 1 — Canon (T1)
 
@@ -162,7 +176,7 @@ For tasks touching intake, filewatch, consolidation, or cross-agent update flow,
 
 | Missing artifact         | Fallback                                                              |
 | ------------------------ | --------------------------------------------------------------------- |
-| `orient_probe.py`        | Use Manual probe ladder below. Then open a P1 issue to restore probe. |
+| `orient_probe.py`        | Confirm it is absent from the main checkout too (Step 0), not only cwd. Then use Manual probe ladder below and open a P1 issue to restore probe. |
 | `CONTEXT_L0.md`          | Read `INDEX.md` + `FLOSS/CLAUDE.md` only.                             |
 | `INDEX.md`               | Use `references/entry-points.md` in this skill as the map.            |
 | `context_router.py`      | Use `references/entry-points.md`; flag the regression.                |
@@ -204,6 +218,9 @@ Before closing the task, answer:
 
 ## Changelog
 
+- **0.3.5** — Step 0 resolves the main checkout when run from a worktree of the
+  root repo (probe was present, cwd was wrong). Added Step 0.5 plan intake.
+  Evidence envelope allows one commit line per repository.
 - **0.3.4** — Split classification hygiene into required project-input and
   documentation-example slots after injected pressure testing found a combined
   alternative omitted explicit Quick Start exclusion.

@@ -145,6 +145,32 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 
+**4. Executed, not typed:** If the plan contains code, treat that code as a claim about the repo and make it true by running it once.
+- Run the code and tests in a scratch copy of the base, preferably a real checkout (a throwaway worktree is enough) so version control can see side effects. `git status --porcelain` must be empty after the test run; treat any untracked path as a test defect.
+- Compose the plan's code blocks by script from the files that ran. Do not retype them.
+- Check each "replace X with Y" edit: X must occur exactly once in the base.
+- Put measured counts (tests, lint) and the base commit in the plan header.
+- Run the repository's required gate on the base and on a reconstruction of the plan, compare per test case, and put the numbers in the header. Run once yourself every step the plan tells the executor to run as a gate.
+- Grep the repository's tests for every literal string the change removes or rewrites.
+- Run on the platform the gate runs on, or say plainly it was not.
+- Before importing files whose hashes are published, check the repository's line-ending attributes for every file type in the folder.
+- A subprocess a test launches with a reduced environment gets its working directory set explicitly to the test's temp directory.
+
+**5. Prescribed commands:** For every step that runs an existing script in a mutating mode, read its argument parser and target list, and run its dry-run or check mode from the exact directory the plan prescribes. Ask what the prescribed command resolves to from that directory. Never write "if the check reports drift, re-run without --check" as a remedy: a drift report is not an instruction to regenerate.
+
+**6. Adversarial pass** (plans that add state or processes). Ask:
+- What is written at import or construction, before ownership is established?
+- Can any configurable output path equal an input or record path?
+- Do fixtures clear every environment variable the code reads?
+- Does each label claim more than the check that produced it, including the gap between check and write?
+- Does any persisted view depend on the clock?
+- Failure injection: for every write path, what is true in memory if the write raises, and what does the caller see? Where do failure signals go, and can anyone see them there?
+- Mutation spot-check: every default and every ordering the spec promises has a test that fails when the promise is broken.
+- Each acceptance check identifies the specific artifact it produced (a unique marker, the returned id, the exact row), never a count or tail that concurrent actors also move, and tolerates legitimate interleaving.
+- Each conversion of external input states which types it accepts and refuses the rest explicitly, with the surprising coercions (bool, float, infinity, non-ASCII digits) as test cases.
+
+**Convergence rule:** When two successive reviews find defects only in the previous round's additions, stop revising the document. Land the stable part as commits and review the diff, with tests and CI as the gate. Rotate the reviewer's method as well as the reviewer.
+
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
 ## Execution Handoff

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.5 — 2026-10-12
+
+- Step 0 resolves the main checkout when run from a worktree of the root repo
+  (probe was present, cwd was wrong).
+- Added Step 0.5 plan intake for pasted or foreign-agent plans.
+- Evidence envelope allows one commit line per repository.
+
 ## 0.3.4 — 2026-07-30
 
 - Split classification hygiene into required project-input and documentation-example

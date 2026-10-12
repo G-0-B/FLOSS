@@ -44,6 +44,10 @@ Has the user already indicated their worktree preference in your instructions? I
 
 Honor any existing declared preference without asking. If the user declines consent, work in place and skip to Step 2.
 
+## Inspecting Other Checkouts
+
+When you need to read another worktree or checkout, use `git -C <path>` and absolute paths. Never `cd` into a checkout you were told not to work in, even for reads: the shell's working directory persists between commands, so a later relative-path write lands there. If a `cd` was unavoidable, end that same command by returning to the session directory.
+
 ## Step 1: Create Isolated Workspace
 
 **You have two mechanisms. Try them in this order.**
