@@ -1,0 +1,87 @@
+== 2026-10-12T18:30:30.9370891-04:00 stage R
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+== rollback 1: stop the bridge if it runs, stop the room, prove both ports free, read the settled log
+[FLOSS MCP] WOULD_STOP coordination_room.pid (only if its identity check says OURS)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 43960 (parent 43388)
+[FLOSS MCP]   PID 25928 (parent 43960)
+[FLOSS MCP]   PID 21144 (parent 46700)
+[FLOSS MCP]   PID 7380 (parent 21144)
+[FLOSS MCP]   PID 32076 (parent 9412)
+[FLOSS MCP]   PID 37128 (parent 32076)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Dry run: nothing was stopped (selected: room).
+
+[FLOSS MCP] Killed coordination_room.pid (PID 21396)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 43960 (parent 43388)
+[FLOSS MCP]   PID 25928 (parent 43960)
+[FLOSS MCP]   PID 21144 (parent 46700)
+[FLOSS MCP]   PID 7380 (parent 21144)
+[FLOSS MCP]   PID 32076 (parent 9412)
+[FLOSS MCP]   PID 37128 (parent 32076)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Stopped: room. PID files cleaned.
+
+settled seq: 15
+== rollback 2: archive the board, never delete it
+  BOARD.superseded-20261012T223033Z.md  1725
+  events.jsonl  3926
+== rollback 3: check out the rollback point and serve v0.1 from it, room only
+Preparing worktree (detached HEAD e0b2216)
+Updating files:  48% (776/1596)Updating files:  49% (783/1596)Updating files:  50% (798/1596)Updating files:  51% (814/1596)Updating files:  52% (830/1596)Updating files:  53% (846/1596)Updating files:  54% (862/1596)Updating files:  55% (878/1596)Updating files:  56% (894/1596)Updating files:  57% (910/1596)Updating files:  58% (926/1596)Updating files:  59% (942/1596)Updating files:  60% (958/1596)Updating files:  60% (965/1596)Updating files:  61% (974/1596)Updating files:  62% (990/1596)Updating files:  63% (1006/1596)Updating files:  64% (1022/1596)Updating files:  65% (1038/1596)Updating files:  66% (1054/1596)Updating files:  67% (1070/1596)Updating files:  68% (1086/1596)Updating files:  69% (1102/1596)Updating files:  70% (1118/1596)Updating files:  71% (1134/1596)Updating files:  72% (1150/1596)Updating files:  73% (1166/1596)Updating files:  74% (1182/1596)Updating files:  75% (1197/1596)Updating files:  76% (1213/1596)Updating files:  77% (1229/1596)Updating files:  78% (1245/1596)Updating files:  79% (1261/1596)Updating files:  80% (1277/1596)Updating files:  81% (1293/1596)Updating files:  82% (1309/1596)Updating files:  83% (1325/1596)Updating files:  84% (1341/1596)Updating files:  85% (1357/1596)Updating files:  86% (1373/1596)Updating files:  87% (1389/1596)Updating files:  88% (1405/1596)Updating files:  89% (1421/1596)Updating files:  90% (1437/1596)Updating files:  91% (1453/1596)Updating files:  92% (1469/1596)Updating files:  93% (1485/1596)Updating files:  94% (1501/1596)Updating files:  95% (1517/1596)Updating files:  96% (1533/1596)Updating files:  97% (1549/1596)Updating files:  98% (1565/1596)Updating files:  99% (1581/1596)Updating files: 100% (1596/1596)Updating files: 100% (1596/1596), done.
+HEAD is now at e0b2216 feat(daemons): -Only and -DryRun on the start and stop scripts
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-rollback-e0b22169)
+[FLOSS MCP] WOULD_START packages.coordination_room.server (coordination room (:7334))
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Dry run: nothing was started (selected: room).
+
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-rollback-e0b22169)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Started or already running: room. PID guard prevents duplicates.
+
+== rollback 4: accept v0.1 by what it can report, then prove a post of ours is in the shared log
+{
+    "claims":  {
+
+               },
+    "last_seq":  15,
+    "speakers":  [
+                     "claude-deploy",
+                     "codex-pr61-review-01a12965",
+                     "deploy-smoke",
+                     "digestion-reviewer",
+                     "grok"
+                 ],
+    "ok":  true
+}
+{
+    "ok":  true,
+    "seq":  16
+}
+rolled back; smoke post is seq 16
+STAGE R COMPLETE

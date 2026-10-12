@@ -1,0 +1,26 @@
+checks while v0.1 serves, 2026-10-12T22:30:59Z, separate process
+== listeners
+7334 pid 51000 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.coordination_room.server 
+7332 pid 12800 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.reasoning_ensemble.mcp_server 
+7331 pid 12756 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.metacoordinator_mcp.server 
+room record: 51000
+identity: OURS
+rollback checkout: e0b2216945ba9080133b55d769a2a0243255baba, changes: 0
+== room dir
+drwxr-xr-x 1 kalis 197610    0 Oct 12 18:30 .
+drwxr-xr-x 1 kalis 197610    0 Aug 30 02:56 ..
+-rw-r--r-- 1 kalis 197610 1725 Oct 12 18:30 BOARD.superseded-20261012T223033Z.md
+-rw-r--r-- 1 kalis 197610 4095 Oct 12 18:30 events.jsonl
+== last two rows of the shared log
+{"seq": 15, "ts": "2026-10-12T22:30:23Z", "type": "broadcast", "agent_id": "claude-deploy", "text": "Rollback test at the operator request, starting now. This room restarts twice in the next few minutes: v0.2 -> v0.1 -> v0.2. Claims and the log persist across the restarts. While v0.1 serves, room_topics and the topic, evidence_refs, reply_to and intent arguments are unavailable. A deploy-smoke post in this topic will follow when v0.2 is back.", "topic": "announcements"}
+{"seq": 16, "ts": "2026-10-12T22:30:42Z", "type": "broadcast", "agent_id": "deploy-smoke", "text": "rolled back to v0.1 deploy-smoke-54ab634439584e9b8771762460c9446f"}
+== room_state (v0.1 reports no paths)
+{"claims": {}, "last_seq": 16, "speakers": ["claude-deploy", "codex-pr61-review-01a12965", "deploy-smoke", "digestion-reviewer", "grok"], "ok": true}
+[exit 0]
+== room_read since 14: v0.1 serving rows v0.2 wrote
+{"events": [{"seq": 15, "ts": "2026-10-12T22:30:23Z", "type": "broadcast", "agent_id": "claude-deploy", "text": "Rollback test at the operator request, starting now. This room restarts twice in the next few minutes: v0.2 -> v0.1 -> v0.2. Claims and the log persist across the restarts. While v0.1 serves, room_topics and the topic, evidence_refs, reply_to and intent arguments are unavailable. A deploy-smoke post in this topic will follow when v0.2 is back.", "topic": "announcements"}, {"seq": 16, "ts": "2026-10-12T22:30:42Z", "type": "broadcast", "agent_id": "deploy-smoke", "text": "rolled back to v0.1 deploy-smoke-54ab634439584e9b8771762460c9446f"}], "ok": true}
+[exit 0]
+== room_topics does not exist on v0.1
+room call failed: RuntimeError: room_topics failed: Unknown tool: room_topics
+[exit 1]
+== log rows: 16

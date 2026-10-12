@@ -1,0 +1,93 @@
+== 2026-10-12T18:31:14.9211951-04:00 stage D
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+== redeploy 0: the pinned serving checkout from 2026-10-11 is reused only if it is still that commit, unmodified
+serving checkout: C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd at 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c, clean
+== redeploy 2: stop only the room (v0.1 is serving)
+[FLOSS MCP] WOULD_STOP coordination_room.pid (only if its identity check says OURS)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 43960 (parent 43388)
+[FLOSS MCP]   PID 25928 (parent 43960)
+[FLOSS MCP]   PID 21144 (parent 46700)
+[FLOSS MCP]   PID 7380 (parent 21144)
+[FLOSS MCP]   PID 32076 (parent 9412)
+[FLOSS MCP]   PID 37128 (parent 32076)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Dry run: nothing was stopped (selected: room).
+
+[FLOSS MCP] Killed coordination_room.pid (PID 51000)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 23184 (parent 28496)
+[FLOSS MCP]   PID 18168 (parent 23184)
+[FLOSS MCP]   PID 4304 (parent 9000)
+[FLOSS MCP]   PID 41688 (parent 4304)
+[FLOSS MCP]   PID 25664 (parent 33112)
+[FLOSS MCP]   PID 21484 (parent 25664)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 43960 (parent 43388)
+[FLOSS MCP]   PID 25928 (parent 43960)
+[FLOSS MCP]   PID 21144 (parent 46700)
+[FLOSS MCP]   PID 7380 (parent 21144)
+[FLOSS MCP]   PID 32076 (parent 9412)
+[FLOSS MCP]   PID 37128 (parent 32076)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Stopped: room. PID files cleaned.
+
+== redeploy 3: slot and port free, settled log
+settled seq: 16
+== redeploy 4: start only the room
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] WOULD_START packages.coordination_room.server (coordination room (:7334))
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Dry run: nothing was started (selected: room).
+
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Started or already running: room. PID guard prevents duplicates.
+
+== redeploy 5: assert the bus before any post
+{
+    "claims":  {
+
+               },
+    "last_seq":  16,
+    "speakers":  [
+                     "claude-deploy",
+                     "codex-pr61-review-01a12965",
+                     "deploy-smoke",
+                     "digestion-reviewer",
+                     "grok"
+                 ],
+    "root":  "C:\\~shit\\FLOSS\\.worktrees\\room-serve-9cbe61cd",
+    "log":  "C:\\~shit\\.agent-surface\\rooms\\default\\events.jsonl",
+    "board":  "C:\\~shit\\.agent-surface\\rooms\\default\\BOARD.md",
+    "board_as_of":  null,
+    "board_last_error":  null,
+    "log_skipped_lines":  0,
+    "ok":  true
+}
+== redeploy 6: smoke
+{
+    "ok":  true,
+    "seq":  17,
+    "topic":  "announcements",
+    "evidence_status":  "resolved"
+}
+deployed; smoke post is seq 17; board as of 2026-10-12T22:31:22Z
+STAGE D COMPLETE

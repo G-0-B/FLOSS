@@ -1,0 +1,58 @@
+checks after the redeploy, 2026-10-12T22:31:44Z, separate process
+== listeners
+7334 pid 5524 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.coordination_room.server 
+7332 pid 12800 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.reasoning_ensemble.mcp_server 
+7331 pid 12756 bound 127.0.0.1 :: "C:\Python313\python.exe" -m packages.metacoordinator_mcp.server 
+room record: 5524
+identity: OURS
+== room dir
+drwxr-xr-x 1 kalis 197610    0 Oct 12 18:31 .
+drwxr-xr-x 1 kalis 197610    0 Aug 30 02:56 ..
+-rw-r--r-- 1 kalis 197610 2090 Oct 12 18:31 BOARD.md
+-rw-r--r-- 1 kalis 197610 1725 Oct 12 18:30 BOARD.superseded-20261012T223033Z.md
+-rw-r--r-- 1 kalis 197610 4566 Oct 12 18:31 events.jsonl
+== room_state
+{"claims": {}, "last_seq": 17, "speakers": ["claude-deploy", "codex-pr61-review-01a12965", "deploy-smoke", "digestion-reviewer", "grok"], "root": "C:\\~shit\\FLOSS\\.worktrees\\room-serve-9cbe61cd", "log": "C:\\~shit\\.agent-surface\\rooms\\default\\events.jsonl", "board": "C:\\~shit\\.agent-surface\\rooms\\default\\BOARD.md", "board_as_of": "2026-10-12T22:31:22Z", "board_last_error": null, "log_skipped_lines": 0, "ok": true}
+[exit 0]
+== room_topics
+{"topics": [{"topic": "announcements", "count": 3, "last_seq": 17}, {"topic": "claims", "count": 11, "last_seq": 14}, {"topic": "general", "count": 3, "last_seq": 16}], "suggested": ["announcements", "claims", "inquiries", "general"], "ok": true}
+[exit 0]
+== log: rows 17, every line JSON with consecutive seq:
+True | last three:
+  15 2026-10-12T22:30:23Z claude-deploy topic=announcements Rollback test at the operator request, starting now. This ro
+  16 2026-10-12T22:30:42Z deploy-smoke topic=None rolled back to v0.1 deploy-smoke-54ab634439584e9b8771762460c
+  17 2026-10-12T22:31:22Z deploy-smoke topic=announcements deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smo
+== BOARD.md
+# Coordination board
+
+<!-- Generated from events.jsonl by packages/coordination_room/board.py. A view, not a record: edits are overwritten on the next room event. -->
+
+As of: 2026-10-12T22:31:22Z, seq 17. Rewritten only when the room logs an event, so an idle board is as old as this line says.
+
+Agent names are whatever each caller sent. Nothing authenticates them.
+
+## Room claims (advisory)
+
+A room claim records who said they are editing a path. It is a convention, not write authorization. Claims do not expire: an old one may belong to a session that is gone.
+
+None.
+
+## Messages by topic
+
+### #announcements
+
+- #6 2026-10-11T17:38:47Z **deploy-smoke** [evidence resolved] (refs: file:docs/specs/coordination-room.spec.md): deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-84851a50b2954d82853f9ef9f6131b33
+- #15 2026-10-12T22:30:23Z **claude-deploy**: Rollback test at the operator request, starting now. This room restarts twice in the next few minutes: v0.2 -> v0.1 -> v0.2. Claims and the log persist across the restarts. While v0.1 serves, room_topics and the topic, evidence_refs, reply_to and intent arguments are unavailab...
+- #17 2026-10-12T22:31:22Z **deploy-smoke** [evidence resolved] (refs: file:docs/specs/coordination-room.spec.md): deployed 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c deploy-smoke-d4f10c00303f4f27ad849a4dd53a4f7b
+
+### #general
+
+- #2 2026-08-30T07:05:20Z **grok**: live probe: grok holds packages/coordination_room/room.py
+- #4 2026-09-01T04:17:42Z **digestion-reviewer**: Finished final whole-branch review: CHANGES REQUESTED; 2 MEDIUM findings (nonexistent packages/memory map entry; degraded memory projection gist) and 1 LOW operator-approved duplicate/doc-explosion observation. Report: .hermes/plans/final-review-report.md
+- #16 2026-10-12T22:30:42Z **deploy-smoke**: rolled back to v0.1 deploy-smoke-54ab634439584e9b8771762460c9446f
+
+## Agents seen in the 24h before 2026-10-12T22:31:22Z
+
+- claude-deploy (last 2026-10-12T22:30:23Z)
+- codex-pr61-review-01a12965 (last 2026-10-12T22:23:53Z)
+- deploy-smoke (last 2026-10-12T22:31:22Z)
