@@ -3,7 +3,7 @@ use holochain::sweettest::{
     await_consistency, SweetCell, SweetConductorBatch, SweetDnaFile, SweetZome,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const ROSE_ZOME: &str = "rose_forest";
 pub const CONSENT_ZOME: &str = "consent";
@@ -23,35 +23,12 @@ pub async fn setup_two_agent_app() -> TestApp {
         bundle_path.display()
     );
 
-    // Verify the four release WASMs exist and are nonzero.  Without this
-    // check, a stale gitignored .dna bundle silently passes tests against
-    // outdated zome code.  The WASMs are built by run.sh before packing.
     let wasm_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../target/wasm32-unknown-unknown/release");
-    let expected_wasms = [
-        "rose_forest_integrity.wasm",
-        "rose_forest.wasm",
-        "consent_integrity.wasm",
-        "consent.wasm",
-    ];
-    for wasm_name in &expected_wasms {
-        let wasm_path = wasm_dir.join(wasm_name);
-        let metadata = std::fs::metadata(&wasm_path).unwrap_or_else(|_| {
-            panic!(
-                "release WASM missing: {} — run ./tests/sweettest/run.sh to build+pack fresh DNA, not bare cargo test",
-                wasm_path.display()
-            )
-        });
-        assert!(
-            metadata.len() > 0,
-            "release WASM is empty: {} — rebuild via ./tests/sweettest/run.sh",
-            wasm_path.display()
-        );
-    }
-
     let dna: DnaFile = SweetDnaFile::from_bundle(&bundle_path)
         .await
         .expect("DNA bundle must load");
+    verify_release_wasms(&dna, &wasm_dir).unwrap_or_else(|error| panic!("{error}"));
     let integrity_zomes: Vec<_> = dna
         .dna_def()
         .integrity_zomes
@@ -86,6 +63,42 @@ pub async fn setup_two_agent_app() -> TestApp {
         alice,
         bob,
     }
+}
+
+fn verify_release_wasms(dna: &DnaFile, wasm_dir: &Path) -> Result<(), String> {
+    let expected_zomes = [
+        "rose_forest_integrity",
+        ROSE_ZOME,
+        "consent_integrity",
+        CONSENT_ZOME,
+    ];
+    for zome_name in expected_zomes {
+        let wasm_path = wasm_dir.join(format!("{zome_name}.wasm"));
+        let release_bytes = std::fs::read(&wasm_path).map_err(|error| {
+            format!(
+                "release WASM missing or unreadable: {} ({error}) — run ./tests/sweettest/run.sh to build+pack fresh DNA, not bare cargo test",
+                wasm_path.display()
+            )
+        })?;
+        if release_bytes.is_empty() {
+            return Err(format!(
+                "release WASM is empty: {} — rebuild via ./tests/sweettest/run.sh",
+                wasm_path.display()
+            ));
+        }
+        let packed_wasm = dna
+            .get_wasm_for_zome(&zome_name.into())
+            .map_err(|error| format!("DNA bundle WASM unavailable for {zome_name}: {error}"))?;
+        // Both integrity and coordinator code must match, including when tests
+        // are invoked directly against an existing gitignored DNA bundle.
+        if packed_wasm.code.as_ref() != release_bytes.as_slice() {
+            return Err(format!(
+                "DNA bundle WASM differs from release WASM for {zome_name}: {} — repack via ./tests/sweettest/run.sh",
+                wasm_path.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub fn rose_zome(cell: &SweetCell) -> SweetZome {
@@ -152,11 +165,11 @@ pub async fn await_two_agent_consistency(app: &TestApp) {
 pub fn mutated_missing_hash(
     real: &holochain::prelude::ActionHash,
 ) -> holochain::prelude::ActionHash {
-    let mut bytes = real.get_raw_39().to_vec();
-    for byte in &mut bytes[3..35] {
+    let mut bytes = real.get_raw_32().to_vec();
+    for byte in &mut bytes {
         *byte ^= 0xa5;
     }
-    holochain::prelude::ActionHash::from_raw_39(bytes)
+    holochain::prelude::ActionHash::from_raw_32(bytes)
 }
 
 impl AssertTripleInput {
@@ -288,4 +301,86 @@ pub struct ConsentDecision {
     pub counter_frame_ref: Option<holochain::prelude::ActionHash>,
     pub expires_at: Option<Timestamp>,
     pub decided_at: Timestamp,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use holochain::prelude::{
+        ActionHash, CoordinatorZome, DnaWasm, IntegrityZome, WasmHash, WasmZome, ZomeDef,
+    };
+
+    const ZOME_NAMES: [&str; 4] = [
+        "rose_forest_integrity",
+        "consent_integrity",
+        "rose_forest",
+        "consent",
+    ];
+
+    async fn bundle_fixture() -> (DnaFile, PathBuf) {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let wasm_dir =
+            std::env::temp_dir().join(format!("rose-sweettest-{}-{unique}", std::process::id()));
+        std::fs::create_dir_all(&wasm_dir).unwrap();
+        let mut wasms = Vec::new();
+        let mut definitions = Vec::new();
+        for (index, name) in ZOME_NAMES.iter().enumerate() {
+            // Minimal valid WASM, with a distinct custom-section name per zome.
+            let bytes = vec![0, 97, 115, 109, 1, 0, 0, 0, 0, 2, 1, b'a' + index as u8];
+            std::fs::write(wasm_dir.join(format!("{name}.wasm")), &bytes).unwrap();
+            let wasm = DnaWasm::from(bytes);
+            let hash = WasmHash::with_data(&wasm).await;
+            definitions.push(ZomeDef::Wasm(WasmZome::new(hash, None)));
+            wasms.push(wasm);
+        }
+        let integrity: Vec<IntegrityZome> = (0..2)
+            .map(|index| {
+                IntegrityZome::new(ZOME_NAMES[index].into(), definitions[index].clone().into())
+            })
+            .collect();
+        let coordinator: Vec<CoordinatorZome> = (2..4)
+            .map(|index| {
+                CoordinatorZome::new(ZOME_NAMES[index].into(), definitions[index].clone().into())
+            })
+            .collect();
+        let (dna, _, _) = SweetDnaFile::unique_from_zomes(integrity, coordinator, wasms).await;
+        (dna, wasm_dir)
+    }
+
+    #[tokio::test]
+    async fn matching_bundle_and_release_wasms_are_accepted() {
+        let (dna, wasm_dir) = bundle_fixture().await;
+        assert_eq!(verify_release_wasms(&dna, &wasm_dir), Ok(()));
+    }
+
+    #[tokio::test]
+    async fn stale_bundle_is_rejected_for_each_integrity_and_coordinator_zome() {
+        for name in ZOME_NAMES {
+            let (dna, wasm_dir) = bundle_fixture().await;
+            let path = wasm_dir.join(format!("{name}.wasm"));
+            let mut updated = std::fs::read(&path).unwrap();
+            *updated.last_mut().unwrap() = b'z';
+            std::fs::write(&path, updated).unwrap();
+            let error = verify_release_wasms(&dna, &wasm_dir)
+                .expect_err("stale packed WASM must fail before conductor startup");
+            assert!(
+                error.contains(name),
+                "diagnostic must identify {name}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_hash_recomputes_canonical_dht_location() {
+        let real = ActionHash::from_raw_32(vec![0; 32]);
+        let missing = mutated_missing_hash(&real);
+        assert_eq!(real.get_raw_32(), &[0; 32]);
+        assert_eq!(missing.get_raw_32(), &[0xa5; 32]);
+        assert_eq!(&missing.get_raw_39()[..3], &real.get_raw_39()[..3]);
+        // Independent known vector: BLAKE2b-128([0xa5; 32]), XOR-folded to four bytes.
+        assert_eq!(&missing.get_raw_39()[35..], &[0x12, 0xa5, 0x20, 0xbf]);
+    }
 }
