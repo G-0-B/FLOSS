@@ -1,0 +1,14 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\wording",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round4-20260929\\wording-before",
+  "exit_code": 1
+}

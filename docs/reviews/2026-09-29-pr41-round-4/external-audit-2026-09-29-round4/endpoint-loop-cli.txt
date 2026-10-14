@@ -1,0 +1,34 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/pathlib.py", line 1252, in resolve
+    p.stat()
+  File "/usr/lib/python3.12/pathlib.py", line 842, in stat
+    return os.stat(self, follow_symlinks=follow_symlinks)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 40] Too many levels of symbolic links: '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 754, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 738, in main
+    results, drift_found = materialize(
+                           ^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 690, in materialize
+    messages, changed = prune_stale_projections(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 527, in prune_stale_projections
+    if not projection_owned_by(child, owner_root):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 462, in projection_owned_by
+    recorded = recorded_workspace(marker)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/materialize_shared_skill_surface.py", line 486, in recorded_workspace
+    return Path(recorded).resolve()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1254, in resolve
+    check_eloop(e)
+  File "/usr/lib/python3.12/pathlib.py", line 1239, in check_eloop
+    raise RuntimeError("Symlink loop from %r" % e.filename)
+RuntimeError: Symlink loop from '/mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-loop/owner/loop'

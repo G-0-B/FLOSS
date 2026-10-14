@@ -1,0 +1,23 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-replace-recheck",
+    "packages/activity_log/tests/test_provenance.py::test_prior_chain_longer_than_recursion_limit_still_validates",
+    "packages/metacoordinator_mcp/tests/test_voter_context_rendering.py::test_render_voter_context_fails_closed_when_packet_headers_exceed_bound"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round3-20260929\\snapshot-42e4d05",
+  "exit_code": 1,
+  "env_overrides": {
+    "PYTHONPATH": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "TEMP": "C:\\~shit\\_audit\\pr41-round3-20260929\\temp",
+    "TMP": "C:\\~shit\\_audit\\pr41-round3-20260929\\temp"
+  }
+}

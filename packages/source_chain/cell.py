@@ -77,11 +77,41 @@ class CellDirectory:
         """Append a new entry to the source chain under an exclusive file lock.
 
         The entry filename is the SHA256 hex digest of the entry's canonical
-        serialization. This is the same hash that Holochain uses as the
-        action address, ensuring zero rework at migration time.
+        serialization.
+
+        That is NOT the hash Holochain uses as an action address. Holochain
+        hashes with Blake2b to 32 bytes, prepends a 3-byte multihash type tag,
+        appends 4 location bytes, and renders the result base64url — an
+        ActionHash reads `uhCkk…` and is about 53 characters. This function
+        returns 64 lowercase hex. The two differ in algorithm, encoding, length
+        and type tagging, and will never coincide for the same entry.
+
+        An earlier version of this docstring claimed they were the same hash,
+        "ensuring zero rework at migration time". They are not, and the claim
+        was load-bearing: it stood as the standing justification for treating a
+        digest returned here as interchangeable with a Holochain action address.
+        On 2026-09-01 a provenance packet was written whose
+        `consent_ref.decision_action_hash` is one of these digests
+        (`.agent-surface/provenance/2026-09-01/EdTWdhoEwrD6uIsqyf6OqZ8LOvnZqk5p_1i0I4YRzZt8.json`).
+        See `docs/research/2026-09-06-consent-anchor-lane-a-probe.md`.
+
+        This chain is a deliberate offline stand-in for the Holochain substrate,
+        which is not implemented yet (operator, 2026-09-06). The structure is
+        intentionally 1:1 — genesis, previous-hash linkage, canonical
+        serialization, one writer under lock — so that porting is a substitution
+        of the commit mechanism rather than a redesign. What does NOT carry
+        across is the identifier: every stored reference to an entry digest,
+        including any `consent_ref` written while this stand-in is in use, has
+        to be remapped when real actions are committed. Budget migration for
+        that translation; only the shape is free.
 
         Args:
-            entry_type: One of "genesis", "claim", "vote", "decision", "memory".
+            entry_type: Conventionally one of "genesis", "claim", "vote",
+                "decision", "memory" — but this list is documentation, not a
+                constraint. Nothing here validates it, and entries typed
+                "consent_payload" and "consent_decision" exist on disk from the
+                consent stand-in. Treat the set as open until something enforces
+                it.
             author_did: The DID of the authoring agent (e.g. "did:key:z...").
             content: Arbitrary JSON-serializable dict.
             previous_hash: Override automatic previous_hash. Use only for genesis

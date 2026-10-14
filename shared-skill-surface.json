@@ -1,141 +1,295 @@
 {
-  "manifest_version": "0.1.0",
-  "workspace_id": "flossi0ullk",
-  "workspace_name": "FLOSSI0ULLK",
-  "portable_skill_root": "FLOSS/skill-corpus",
-  "rules": [
-    "Keep the source of truth for shared skills inside the repository.",
-    "Materialize agent-native views from the canonical skill corpus; do not hand-edit generated projections.",
-    "Prefer small, task-shaped skills that point back into canon, code, and the shared context surface.",
-    "Import external skill ideas selectively; preserve FLOSSI0ULLK-specific provenance and architecture rules."
-  ],
-  "upstream_candidates": [
-    {
-      "id": "OpenViking",
-      "repo": "kalisam/OpenViking",
-      "role": "Filesystem-native context, memory, and selective retrieval patterns."
-    },
-    {
-      "id": "context-engineering-kit",
-      "repo": "kalisam/context-engineering-kit",
-      "role": "Portable low-token skill and context packaging patterns."
-    },
-    {
-      "id": "holochain-agent-skill",
-      "repo": "kalisam/holochain-agent-skill",
-      "role": "Holochain-specific workflow and implementation references."
-    },
-    {
-      "id": "ExtendingSkillX",
-      "repo": "kalisam/ExtendingSkillX",
-      "role": "Later-stage skill distillation and hierarchical skill knowledge base design."
-    }
-  ],
-  "targets": {
-    "codex": {
-      "enabled": true,
-      "mode": "materialized-copy",
-      "install_path": "~/.codex/skills"
-    },
-    "claude": {
-      "enabled": true,
-      "mode": "materialized-copy",
-      "install_path": ".claude/skills"
-    },
-    "gemini": {
-      "enabled": true,
-      "mode": "materialized-copy",
-      "install_path": ".gemini/skills"
-    },
-    "opencode": {
-      "enabled": true,
-      "mode": "materialized-copy",
-      "install_path": "opworkers/.opencode/skills"
-    },
-    "cowork": {
-      "enabled": false,
-      "mode": "skill-zip-manual",
-      "install_path": "(not filesystem-addressable)",
-      "note": "Cowork/Claude-desktop skill store cannot be written directly. Distribution: zip the corpus skill dir as <name>.skill and install via the Save-skill button (Settings > Capabilities). Disabled so the materializer skips it; documented here per one-canonical-manifest rule. First materialized: flossi0ullk-orient v0.2.0, 2026-06-11."
-    }
+ "manifest_version": "0.1.0",
+ "workspace_id": "flossi0ullk",
+ "workspace_name": "FLOSSI0ULLK",
+ "portable_skill_root": "FLOSS/skill-corpus",
+ "rules": [
+  "Keep the source of truth for shared skills inside the repository.",
+  "Materialize agent-native views from the canonical skill corpus; do not hand-edit generated projections.",
+  "Prefer small, task-shaped skills that point back into canon, code, and the shared context surface.",
+  "Import external skill ideas selectively; preserve FLOSSI0ULLK-specific provenance and architecture rules."
+ ],
+ "upstream_candidates": [
+  {
+   "id": "OpenViking",
+   "repo": "kalisam/OpenViking",
+   "role": "Filesystem-native context, memory, and selective retrieval patterns."
   },
-  "skills": [
-    {
-      "path": "FLOSS/skill-corpus/flossi0ullk-orient",
-      "category": "orientation",
-      "summary": "Startup and re-orientation flow for canonical FLOSSI0ULLK work.",
-      "upstreams": [
-        "OpenViking",
-        "context-engineering-kit"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/flossi0ullk-shared-surface",
-      "category": "coordination",
-      "summary": "Canonical workflow for shared MCP, context, skills, and materialized agent surfaces.",
-      "upstreams": [
-        "context-engineering-kit",
-        "OpenViking"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/flossi0ullk-consensus-gateway",
-      "category": "execution",
-      "summary": "Workflow for the local consensus gateway, voter rosters, hooks, and source-chain evidence.",
-      "upstreams": [
-        "OpenViking"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/flossi0ullk-radicle-stack",
-      "category": "architecture",
-      "summary": "Architecture workflow for Radicle, the local source-chain bridge, and Holochain provenance.",
-      "upstreams": [
-        "holochain-agent-skill"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/reasoning-ensemble",
-      "category": "reasoning",
-      "summary": "Selective Router/Synthesizer workflow for multi-model deliberation on substantive FLOSSI0ULLK decisions.",
-      "upstreams": [
-        "context-engineering-kit",
-        "OpenViking",
-        "atomic-agents"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/recent-open-distributed-intelligence-research",
-      "category": "research",
-      "summary": "Live-source research workflow for recent open distributed intelligence, agent-centric substrates, decentralized MAS, federated learning, and agent interoperability protocols.",
-      "upstreams": [
-        "context-engineering-kit",
-        "OpenViking"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/remember",
-      "category": "continuity",
-      "summary": "Cross-session handoff note at .remember/remember.md so any next session (same or different harness) picks up cleanly. Forward-looking, under 20 lines.",
-      "upstreams": [
-        "claude-plugins-official/remember"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/session-report",
-      "category": "observability",
-      "summary": "HTML retrospective of Claude Code session token usage, cache, subagents, skills, and expensive prompts. Includes FLOSSI0ULLK-specific anomaly checks (heartbeat spend, voter diversity, synthesis backpressure).",
-      "upstreams": [
-        "claude-plugins-official/session-report"
-      ]
-    },
-    {
-      "path": "FLOSS/skill-corpus/claude-reflect",
-      "category": "continuity",
-      "summary": "Two-stage self-learning capture: hooks queue corrections, /reflect promotes to CLAUDE.md or FLOSS/docs/agent-memory/. Substrate-level learnings route through consensus + provenance instead of silent overwrite.",
-      "upstreams": [
-        "community/claude-reflect"
-      ]
-    }
-  ]
+  {
+   "id": "context-engineering-kit",
+   "repo": "kalisam/context-engineering-kit",
+   "role": "Portable low-token skill and context packaging patterns."
+  },
+  {
+   "id": "holochain-agent-skill",
+   "repo": "kalisam/holochain-agent-skill",
+   "role": "Holochain-specific workflow and implementation references."
+  },
+  {
+   "id": "ExtendingSkillX",
+   "repo": "kalisam/ExtendingSkillX",
+   "role": "Later-stage skill distillation and hierarchical skill knowledge base design."
+  }
+ ],
+ "targets": {
+  "codex": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": "~/.codex/skills",
+   "scope": "user"
+  },
+  "claude": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": ".claude/skills",
+   "scope": "repo"
+  },
+  "gemini": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": ".gemini/skills",
+   "scope": "repo"
+  },
+  "opencode": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": "opworkers/.opencode/skills",
+   "scope": "repo"
+  },
+  "cowork": {
+   "enabled": false,
+   "mode": "skill-zip-manual",
+   "install_path": "(not filesystem-addressable)",
+   "note": "Cowork/Claude-desktop skill store cannot be written directly. Distribution: zip the corpus skill dir as <name>.skill and install via the Save-skill button (Settings > Capabilities). Disabled so the materializer skips it; documented here per one-canonical-manifest rule. First materialized: flossi0ullk-orient v0.2.0, 2026-06-11."
+  },
+  "hermes": {
+   "enabled": true,
+   "mode": "materialized-copy",
+   "install_path": "%LOCALAPPDATA%/hermes/skills",
+   "scope": "user"
+  }
+ },
+ "skills": [
+  {
+   "path": "FLOSS/skill-corpus/flossi0ullk-orient",
+   "category": "orientation",
+   "summary": "Startup and re-orientation flow for canonical FLOSSI0ULLK work.",
+   "upstreams": [
+    "OpenViking",
+    "context-engineering-kit"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/flossi0ullk-shared-surface",
+   "category": "coordination",
+   "summary": "Canonical workflow for shared MCP, context, skills, and materialized agent surfaces.",
+   "upstreams": [
+    "context-engineering-kit",
+    "OpenViking"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/flossi0ullk-consensus-gateway",
+   "category": "execution",
+   "summary": "Workflow for the local consensus gateway, voter rosters, hooks, and source-chain evidence.",
+   "upstreams": [
+    "OpenViking"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/flossi0ullk-radicle-stack",
+   "category": "architecture",
+   "summary": "Architecture workflow for Radicle, the local source-chain bridge, and Holochain provenance.",
+   "upstreams": [
+    "holochain-agent-skill"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/reasoning-ensemble",
+   "category": "reasoning",
+   "summary": "Selective Router/Synthesizer workflow for multi-model deliberation on substantive FLOSSI0ULLK decisions.",
+   "upstreams": [
+    "context-engineering-kit",
+    "OpenViking",
+    "atomic-agents"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/recent-open-distributed-intelligence-research",
+   "category": "research",
+   "summary": "Live-source research workflow for recent open distributed intelligence, agent-centric substrates, decentralized MAS, federated learning, and agent interoperability protocols.",
+   "upstreams": [
+    "context-engineering-kit",
+    "OpenViking"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/remember",
+   "category": "continuity",
+   "summary": "Cross-session handoff note at .remember/remember.md so any next session (same or different harness) picks up cleanly. Forward-looking, under 20 lines.",
+   "upstreams": [
+    "claude-plugins-official/remember"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/session-report",
+   "category": "observability",
+   "summary": "HTML retrospective of Claude Code session token usage, cache, subagents, skills, and expensive prompts. Includes FLOSSI0ULLK-specific anomaly checks (heartbeat spend, voter diversity, synthesis backpressure).",
+   "upstreams": [
+    "claude-plugins-official/session-report"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/claude-reflect",
+   "category": "continuity",
+   "summary": "Two-stage self-learning capture: hooks queue corrections, /reflect promotes to CLAUDE.md or FLOSS/docs/agent-memory/. Substrate-level learnings route through consensus + provenance instead of silent overwrite.",
+   "upstreams": [
+    "community/claude-reflect"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/recall",
+   "category": "continuity",
+   "summary": "Hybrid BM25 + vector + graph search over agentmemory's past observations, sessions, and learnings. Plane A, trust-tier 4 \u2014 never overrides repo canon.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/recall)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/agentmemory-remember",
+   "category": "continuity",
+   "summary": "Save an insight, decision, or learning to agentmemory's long-term store with searchable concept tags. Renamed from upstream's bare `remember` to avoid colliding with this corpus's existing cross-session handoff-note skill of the same name.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/remember)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/forget",
+   "category": "continuity",
+   "summary": "Delete specific agentmemory observations after showing them and getting explicit confirmation. Destructive; delete-by-id only, never a bare session.",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/forget)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/session-history",
+   "category": "observability",
+   "summary": "Clean reverse-chronological timeline of recent agentmemory sessions for this project. Distinct from this corpus's `session-report` (Claude Code token-usage retrospective).",
+   "upstreams": [
+    "rohitg00/agentmemory (plugin/skills/session-history)"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-brainstorming",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-dispatching-parallel-agents",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-executing-plans",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-finishing-a-development-branch",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-receiving-code-review",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-requesting-code-review",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-subagent-driven-development",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-systematic-debugging",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-test-driven-development",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-using-git-worktrees",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-using-superpowers",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-verification-before-completion",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-writing-plans",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  },
+  {
+   "path": "FLOSS/skill-corpus/superpowers-writing-skills",
+   "category": "superpowers",
+   "summary": "Superpowers agentic framework skill.",
+   "upstreams": [
+    "obra/superpowers"
+   ]
+  }
+ ]
 }

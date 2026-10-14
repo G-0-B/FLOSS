@@ -12,7 +12,6 @@ import base64
 import json
 import os
 import re
-import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -24,6 +23,8 @@ import jcs
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
+from packages.orchestrator.claim_schema import EVIDENCE_TYPES
+
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 
 VERSION_PREFIX = "FLOSSI10JSON"
@@ -32,7 +33,30 @@ SAID_PLACEHOLDER = "#" * 44
 SIGNATURE_PLACEHOLDER = "0B" + ("A" * 86)
 
 _AUTO_PRIOR = object()
-_LOCK_TIMEOUT_SECONDS = 5.0
+# Re-exported from the stdlib-only lock module. The implementation moved there
+# because importing it from HERE dragged blake3, jcs and PyNaCl into the intake
+# watcher -- defeating the lazy-provenance guard this package's __init__ exists
+# to provide, and breaking `watch_intake.py --help` on a lean install.
+from packages.activity_log.filelock import (  # noqa: E402,F401
+    # Used here.
+    _acquire_lock,
+    _release_lock,
+    # Re-exported, not used here: anchor.py and the tests import the lock API
+    # from this module, and moving the implementation must not move the import
+    # path out from under them. F401 is suppressed deliberately -- these names
+    # are this module's public lock surface, not leftovers.
+    #
+    # `_lock_owner_is_alive` is gone with the ownership machinery: an OS lock
+    # has no owner to probe, because the kernel releases it when the holder
+    # dies. `_LOCK_STALE_SECONDS` survives only as the ignored parameter's
+    # default.
+    _LOCK_STALE_SECONDS,
+    _lock_token,
+)
+
+# A lock older than this is treated as abandoned and reclaimed. The critical
+# section it guards is a couple of small local file writes -- milliseconds -- so
+# an order of magnitude above the acquire timeout cannot be a live slow holder.
 
 
 @dataclass
@@ -53,6 +77,17 @@ class PacketValidation:
     packet_digest: str | None = None
     narrative_lines: list[str] = field(default_factory=list)
     packet: dict[str, Any] | None = None
+    warnings: list[str] = field(default_factory=list)
+    """Non-fatal findings, chiefly from ANCESTOR packets.
+
+    A packet attests to a state that was true when it was signed. Requiring an
+    ancestor's artifact to still exist conflates history with current state: it
+    means deleting or renaming any file that was ever hook-touched permanently
+    poisons every later packet in that agent's chain. Ancestor artifact-absence
+    and unreachable ancestors are therefore recorded here rather than in
+    `errors`. A HASH MISMATCH stays fatal at any depth — a file that still
+    exists but differs is a real tamper signal, not history.
+    """
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -129,29 +164,6 @@ def load_or_create_identity(identity_dir: Path | str) -> Identity:
         return Identity(signing_key=signing_key, verify_key=verify_key, aid=aid)
     finally:
         _release_lock(lock_path, token)
-
-
-def _acquire_lock(lock_path: Path) -> str:
-    deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
-    while True:
-        token = _b64url_encode(os.urandom(18))
-        try:
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            with lock_path.open("x", encoding="utf-8") as f:
-                f.write(token)
-            return token
-        except FileExistsError:
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f"timed out acquiring provenance lock {lock_path}")
-            time.sleep(0.05)
-
-
-def _release_lock(lock_path: Path, token: str) -> None:
-    try:
-        if lock_path.read_text(encoding="utf-8") == token:
-            lock_path.unlink(missing_ok=True)
-    except FileNotFoundError:
-        pass
 
 
 def _state_path(identity_dir: Path, aid: str) -> Path:
@@ -317,7 +329,17 @@ def create_packet(
 
         packet_path = Path(output_root) / _packet_date(entries) / f"{packet['d']}.json"
         packet_path.parent.mkdir(parents=True, exist_ok=True)
-        packet_path.write_bytes(canonical_bytes(packet) + b"\n")
+        # ATOMIC: temp file then os.replace, the same idiom _write_state uses.
+        #
+        # A direct write_bytes leaves the packet observable half-written. The
+        # anchor scan enumerates this tree holding a lock no writer takes, so it
+        # read torn packets and recorded them as unreadable damage in a signed
+        # anchor -- damage to a store that was fine. Under os.replace a reader
+        # sees the old state or the new one, never a prefix, which fixes it for
+        # every reader of this tree rather than for the one that complained.
+        tmp_path = packet_path.with_suffix(".json.tmp")
+        tmp_path.write_bytes(canonical_bytes(packet) + b"\n")
+        os.replace(tmp_path, packet_path)
         _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
     return packet, packet_path
 
@@ -349,6 +371,196 @@ def _find_packet_by_digest(provenance_root: Path | None, digest: str) -> Path | 
     return matches[0] if matches else None
 
 
+def _build_packet_index(provenance_root: Path | None) -> dict[str, Path]:
+    """Map digest -> packet path in one directory scan.
+
+    `_find_packet_by_digest` falls back to a full `rglob` whenever a packet is
+    not directly under `provenance_root`, which is the normal case since packets
+    are filed into dated subdirectories. One scan per lookup is fine for a
+    single call and quadratic for a chain walk: measured at 10 s to validate a
+    200-link chain and 90 s for 600 links — 3x the length for 9x the cost.
+    Building the index once turns the walk's lookups into O(1) each.
+
+    Deliberately not cached across calls: a stale index would silently fail to
+    find a packet written since the last scan, which for a chain walk means a
+    spurious `E_PROVENANCE_PRIOR_UNAVAILABLE` on a chain that is actually
+    intact. Rebuilding per walk keeps the cost linear without that risk.
+    """
+    if provenance_root is None or not provenance_root.exists():
+        return {}
+    try:
+        return {p.stem: p for p in provenance_root.rglob("*.json")}
+    except OSError:
+        return {}
+
+
+def _build_position_index(
+    provenance_root: Path | None,
+) -> dict[tuple[Any, Any, Any], list[tuple[Path, Any]]]:
+    """Map chain position (i, p, s) -> [(path, digest)] in one pass.
+
+    The fork check needs "is there another packet at my exact chain position",
+    which previously meant reading EVERY packet on EVERY check. Since the check
+    runs once per validated packet, walking an n-link chain read n packets n
+    times: profiling a 300-link chain showed 90 000 file reads and 28.2 s of a
+    29.1 s validation — 97 % of total runtime — and the cost is quadratic, so
+    600 links took 90 s and 1200 took 365 s.
+
+    Packets are content-addressed and immutable once written, so indexing them
+    once per validation is safe and turns each check into a dict lookup.
+    """
+    index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] = {}
+    if provenance_root is None or not provenance_root.exists():
+        return index
+    try:
+        candidates = sorted(
+            provenance_root.rglob("*.json"), key=lambda path: path.as_posix()
+        )
+    except OSError:
+        return index
+    for candidate_path in candidates:
+        try:
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(candidate, dict):
+            continue
+        position = (candidate.get("i"), candidate.get("p"), candidate.get("s"))
+        # A packet is arbitrary JSON until it has been validated, and this index
+        # is built BEFORE validation. A list or dict in `i`, `p` or `s` makes the
+        # tuple unhashable, so one malformed or half-written file under the
+        # provenance root would raise TypeError out of setdefault and take every
+        # chain validation down with it. Skip it instead — it will be reported
+        # as invalid on its own account if anything references it.
+        try:
+            index.setdefault(position, []).append((candidate_path, candidate.get("d")))
+        except TypeError:
+            continue
+    return index
+
+
+def _slot_is_genuinely_occupied(
+    occupant_paths: list[Path] | None,
+    *,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    seen: set[str],
+    depth: int,
+    max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> bool:
+    """True only when a VALID signed packet holds the sequence slot.
+
+    `_build_position_index` reads every JSON file under the provenance root
+    before anything has been validated, so an unsigned object that merely names
+    an identity and a sequence lands in the index. Declaring a fork on that
+    basis let unrelated corruption -- or one hand-written file -- convert an
+    enumerable gap into a fatal error on every later packet of a chain that is
+    otherwise sound.
+
+    A fork is a claim that someone signed a competing history. Only a signature
+    can establish it.
+    """
+    for occupant_path in occupant_paths or []:
+        if _packet_validates(
+            occupant_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            seen=seen,
+            depth=depth,
+            max_depth=max_depth,
+            ignored_chain_position=ignored_chain_position,
+            position_index=position_index,
+        ):
+            return True
+    return False
+
+
+def _packet_validates(
+    occupant_path: Path,
+    *,
+    workspace_root: Path,
+    provenance_root: Path | None,
+    seen: set[str],
+    depth: int,
+    max_depth: int,
+    ignored_chain_position: tuple[Any, Any, Any] | None,
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> bool:
+    try:
+        result = validate_packet(
+            occupant_path,
+            workspace_root=workspace_root,
+            provenance_root=provenance_root,
+            # A copy: this is a side probe, and marking digests in the caller's
+            # traversal set would make a later legitimate visit look like a cycle.
+            _seen=set(seen),
+            _depth=depth,
+            max_depth=max_depth,
+            _is_ancestor=True,
+            _ignored_chain_position=ignored_chain_position,
+            _follow_prior=False,
+            _position_index=position_index,
+        )
+    except (OSError, ValueError):
+        return False
+    return result.ok
+
+
+def _walk_sequence(value: Any) -> int | None:
+    """Parse a chain position for the walk, or None if it cannot be trusted.
+
+    `int()` accepts any decimal, and the walk sizes loops and gap lists from
+    what it parses -- so an implausible `s` turns "produce a verdict" into
+    "iterate a trillion times". The bound was added to the missing-predecessor
+    branch and NOT to the non-adjacent-predecessor branch beside it, which
+    reaches the same expansion by a different route. One parser, every site,
+    so the next branch that reads a sequence cannot miss it.
+    """
+
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    if number < 0 or number > MAX_SEQUENCE:
+        return None
+    return number
+
+
+def _sequence_index(
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None,
+) -> tuple[dict[Any, dict[int, list[Path]]], dict[Any, dict[int, list[Any]]]]:
+    """Per-identity sequence -> (path, digest) maps, from the position index.
+
+    Used by the prior walk to tell a genuine gap (nothing occupies the expected
+    sequence number) from a fork or rewrite (something does, and the child
+    points elsewhere). Derived rather than rescanned: the position index has
+    already read every packet once.
+    """
+    paths: dict[Any, dict[int, list[Path]]] = {}
+    digests: dict[Any, dict[int, list[Any]]] = {}
+    for (identity, _prior, sequence), entries in (position_index or {}).items():
+        try:
+            slot = int(sequence)
+        except (TypeError, ValueError):
+            continue
+        if slot > MAX_SEQUENCE or slot < 0:
+            # Same bound as the walk above and the anchor scan. An implausible
+            # slot is not indexed, so nothing downstream can be sized by it.
+            continue
+        for path, digest in entries:
+            # EVERY occupant, not the first one found. The index walks candidates
+            # in path order, so keeping one entry per slot let an unsigned file
+            # whose name sorts earlier become the sole occupant: the validity
+            # probe then checked only the decoy, the slot read as empty, and a
+            # child bypassing the real signed packet escaped the fork check. The
+            # question is whether ANY valid packet holds the slot.
+            paths.setdefault(identity, {}).setdefault(slot, []).append(path)
+            digests.setdefault(identity, {}).setdefault(slot, []).append(digest)
+    return paths, digests
+
+
 def _has_valid_same_position_competitor(
     packet: dict[str, Any],
     *,
@@ -356,6 +568,7 @@ def _has_valid_same_position_competitor(
     workspace_root: Path,
     provenance_root: Path | None,
     max_depth: int,
+    position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None = None,
 ) -> bool:
     """Return whether another independently valid packet occupies this position."""
 
@@ -365,26 +578,19 @@ def _has_valid_same_position_competitor(
     current_path = packet_path.resolve() if packet_path is not None else None
     chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
     packet_digest = packet.get("d")
-    candidates = sorted(
-        provenance_root.rglob("*.json"), key=lambda path: path.as_posix()
-    )
-    for candidate_path in candidates:
+
+    if position_index is None:
+        position_index = _build_position_index(provenance_root)
+    # Only packets sharing this exact position can possibly compete; everything
+    # else was filtered by the index rather than by reading it again here.
+    for candidate_path, candidate_digest in position_index.get(chain_position, ()):
         try:
             if current_path is not None and candidate_path.resolve() == current_path:
                 continue
-            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
+        except OSError:
             continue
-        if not isinstance(candidate, dict):
-            continue
-        if candidate.get("d") == packet_digest:
+        if candidate_digest == packet_digest:
             # Exact-digest copies are duplicate evidence, not competing successors.
-            continue
-        if (
-            candidate.get("i"),
-            candidate.get("p"),
-            candidate.get("s"),
-        ) != chain_position:
             continue
         competitor = validate_packet(
             candidate_path,
@@ -392,6 +598,7 @@ def _has_valid_same_position_competitor(
             provenance_root=provenance_root,
             max_depth=max_depth,
             _ignored_chain_position=chain_position,
+            _position_index=position_index,
         )
         if competitor.ok:
             return True
@@ -474,7 +681,31 @@ _ENTRY_REQUIRED_LIST_FIELDS = (
 )
 _SHA256_RE = re.compile(r"^[a-f0-9]{64}\Z")
 _SEQUENCE_RE = re.compile(r"^(?:0|[1-9][0-9]*)\Z")
-_EVIDENCE_REF_TYPES = {"spec", "test", "adr", "url", "commit", "provenance_packet"}
+# The envelope's SAID shape: 'E' plus 43 base64url characters. `d` is checked
+# against its own recomputation, but `p` was only ever tested for `is None` --
+# so a schema-invalid prior like "bogus" or 123 was stringified into the lookup,
+# missed, and handed to GAP RECOVERY, which resumed further down the chain and
+# could return ok=True carrying only E_PROVENANCE_CHAIN_GAP. A pointer that is
+# not a digest is not a hole in the chain; it is a packet that does not name a
+# prior at all.
+_SAID_RE = re.compile(r"^E[A-Za-z0-9_-]{43}\Z")
+
+# A per-identity chain position, not an arbitrary integer. `int()` accepts any
+# decimal, and both this module's gap walk and the anchor's summary enumerate
+# the span below the value they are handed -- so a single validly signed packet
+# claiming s=1000000000000 turns "produce a verdict" into "iterate a trillion
+# times". The live store's deepest chain is single digits.
+#
+# Defined HERE, in the lower layer, and imported by anchor.py: bounding the
+# anchor scan and leaving this walk unbounded is how the same defect got found
+# twice in two files.
+MAX_SEQUENCE = 1_000_000
+# D-A1 (ADR-20). This used to restate the evidence vocabulary as a literal, which
+# made it a fourth allow-list nobody knew existed: the v1.5 D3 widening was applied
+# to the spec, the schema and claim_schema.EVIDENCE_TYPES, but not here — and this
+# is the set actually enforced, so schema-valid packets were rejected. One
+# authority now. Widen EVIDENCE_TYPES and every enforcement point follows.
+_EVIDENCE_REF_TYPES = EVIDENCE_TYPES
 
 
 def _payload_entry_errors(entries: list[Any]) -> list[str]:
@@ -572,7 +803,22 @@ def validate_packet(
     max_depth: int = 8,
     _seen: set[str] | None = None,
     _depth: int = 0,
+    # Two independent recursion flags kept side by side (merge 2026-08-17):
+    #   _is_ancestor            — ours: this packet is a `p` ancestor, not the one
+    #                             under validation. Skips the artifact pass
+    #                             entirely per D-B3 (ADR-20); see the note there.
+    #   _ignored_chain_position — PR38's: exclude one chain position from the
+    #                             duplicate-position check.
+    _is_ancestor: bool = False,
     _ignored_chain_position: tuple[Any, Any, Any] | None = None,
+    #   _follow_prior           — internal. False validates this packet alone and
+    #                             leaves the prior chain to the caller's loop.
+    #                             Set only by that loop; see the note there.
+    _follow_prior: bool = True,
+    #   _position_index         — internal. Chain-position index shared across a
+    #                             whole validation so the fork check does not
+    #                             re-read every packet per link.
+    _position_index: dict[tuple[Any, Any, Any], list[tuple[Path, Any]]] | None = None,
 ) -> PacketValidation:
     """Validate packet signature, SAID, artifacts, prior chain, and evidence DAG."""
 
@@ -601,6 +847,7 @@ def validate_packet(
             )
 
     errors: list[str] = []
+    warnings: list[str] = []
     digest = packet.get("d")
     # Branch-local copy of the traversal path: cycle detection must reject only
     # cycles on the CURRENT path, not shared evidence reached via sibling
@@ -647,10 +894,36 @@ def validate_packet(
         errors.append("E_PROVENANCE_TYPE_INVALID")
     if not isinstance(packet.get("a"), list) or not packet["a"]:
         errors.append("E_PROVENANCE_PAYLOAD_EMPTY")
-    else:
+    elif not _is_ancestor:
+        # Per-entry field contract is checked on the packet under validation
+        # only — see the D-B3 note below. A signed ancestor cannot be repaired:
+        # correcting a malformed field would break its signature, so enforcing
+        # this contract against history means one bad packet blocks its whole
+        # chain forever. Found in the wild at chain position 51, which carries a
+        # 63-character sha256 (a dropped leading zero) and by itself accounted
+        # for every remaining rejection after the artifact pass was scoped.
         errors.extend(_payload_entry_errors(packet["a"]))
 
-    errors.extend(_artifact_errors(packet, root))
+    # D-B3 (ADR-20). Artifact refs are checked on the packet under validation
+    # only, never on a `p` ancestor.
+    #
+    # The spec's obligation for `p` is existence and continuity — it says
+    # explicitly that the prior pointer "does not consume the evidence-DAG
+    # recursion budget" — while this code used to run the full artifact pass on
+    # every ancestor, downgrading a missing artifact to a warning but keeping a
+    # hash mismatch fatal. That asymmetry killed the spine: editing any file
+    # twice permanently invalidated every earlier packet naming it, those
+    # packets stayed in the chain, and so every future packet from the same
+    # agent failed too. 100% of pilot submissions were rejected this way.
+    #
+    # An ancestor's artifact refs describe the workspace as it was. The
+    # descendant makes no claim about their current state, and nothing
+    # downstream reads them as current evidence. Historical artifact state is
+    # the audit view's job (D-B1, spec "Audit Disposition"), not the gate's.
+    # Ancestors are still validated for signature, SAID, payload shape,
+    # evidence DAG and chain continuity — see the walk below.
+    if not _is_ancestor:
+        errors.extend(_artifact_errors(packet, root))
 
     prov_root = explicit_provenance_root or _infer_provenance_root(packet_path)
     prior_digest = packet.get("p")
@@ -663,46 +936,353 @@ def validate_packet(
     elif prior_digest is None and sequence != "0":
         errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
 
-    if prior_digest is not None:
-        prior_path = _find_packet_by_digest(prov_root, str(prior_digest))
-        if prior_path is None:
-            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
-        else:
+    # Shape-check `p` BEFORE anything downstream can interpret its absence as a
+    # gap. Ordering matters: gap recovery treats a lookup miss as evidence that
+    # the named prior is missing, which is only meaningful if the name was a
+    # well-formed digest in the first place.
+    prior_shape_invalid = prior_digest is not None and (
+        not isinstance(prior_digest, str) or _SAID_RE.fullmatch(prior_digest) is None
+    )
+    if prior_shape_invalid:
+        errors.append("E_PROVENANCE_PRIOR_INVALID")
+
+    if (
+        prior_digest is not None
+        and _follow_prior
+        and not prior_shape_invalid
+        and _position_index is None
+    ):
+        # Build once per validation, here rather than at function entry so a
+        # single-packet validation with no chain never pays for the scan.
+        # Reused by every ancestor below AND by the fork check; building it per
+        # call was what kept the walk quadratic after the recursion fix.
+        _position_index = _build_position_index(prov_root)
+
+    if prior_digest is not None and _follow_prior and not prior_shape_invalid:
+        # D-B3 addendum (ADR-20, operator-approved 2026-08-24). A hole in the
+        # prior chain is DETECTED AND ENUMERATED - not silently truncated, and
+        # not blanket-fatal.
+        #
+        # Both earlier behaviours were wrong in opposite directions. Truncating
+        # on an unreachable ancestor let anyone hide a packet by deleting it:
+        # remove the file and every descendant validates again, with nothing in
+        # the result saying anything was gone. Making it fatal at every depth
+        # made concealment impossible but also made an honest chain with a hole
+        # permanently unable to submit - and a hole cannot be repaired, because
+        # the missing packets are signed and cannot be re-derived. This
+        # workspace already had four (identity DkuYPguG98HM2nyR, sequence
+        # numbers 3, 36, 37 and 39 absent from a 0..98 range), so the fatal rule
+        # rejected 100% of submissions the day it landed.
+        #
+        # What actually matters for concealment is that the hole be UNDENIABLE.
+        # Sequence numbers are per-agent and monotonic, so a deleted packet
+        # leaves an arithmetically visible gap whether or not its file exists.
+        # The walk therefore consults the per-identity sequence index at every
+        # break:
+        #
+        #   * another packet already occupies the expected position - the child
+        #     points somewhere else, which is a fork or a rewrite, and stays
+        #     FATAL (E_PROVENANCE_CHAIN_FORK);
+        #   * the position is empty - a genuine gap. It is recorded by exact
+        #     sequence number, the walk RESUMES below it, and the rest of
+        #     history is still verified down to genesis.
+        #
+        # The chain must still reach sequence 0. A gap plus an unreachable
+        # remainder is a truncated chain and stays fatal. What this buys is the
+        # honest middle: the deleted content cannot be recovered, but its
+        # absence is enumerated in the validation result instead of passing
+        # unmentioned, and a chain with a known hole can still carry current
+        # work.
+        seq_paths, seq_digests = _sequence_index(_position_index)
+        gap_sequences: list[int] = []
+        reached_genesis = False
+        # Derived from the position index above -- no second scan.
+        # EVERY path per digest, for the same reason the sequence index keeps
+        # every occupant per slot. This was a dict comprehension, so it was
+        # last-write-wins: a malformed file copying a genuine ancestor's `d` and
+        # sorting after it replaced that ancestor's path, and the walk validated
+        # the decoy while the correctly named signed packet sat untouched on
+        # disk. Two readers of one scan; fixing only the first was the same
+        # mistake twice.
+        chain_index: dict[str, list[Path]] = {}
+        for entries in (_position_index or {}).values():
+            for path, digest in entries:
+                if isinstance(digest, str):
+                    chain_index.setdefault(digest, []).append(path)
+
+        # The prior chain is walked ITERATIVELY, not recursively.
+        #
+        # `_depth` is deliberately not incremented for prior links -
+        # `max_depth` bounds the evidence DAG, while a linear prior chain is
+        # bounded by cycle detection - but that left the chain bounded only by
+        # Python's own stack. Measured: ~1.1 stack frames per link, so a
+        # ~900-link chain exhausted the default 1000 limit, and a 1000-link
+        # honest chain reproducibly raised RecursionError instead of returning
+        # a PacketValidation. Provenance validation gates substrate claims, so
+        # past that length the gate stopped returning verdicts at all rather
+        # than returning a negative one.
+        #
+        # Each ancestor is validated with `_follow_prior=False` so it checks
+        # its own signature/SAID/evidence but leaves its prior to this loop.
+        def _cursor_for(digest: str) -> Path | None:
+            """Pick the packet for `digest`, preferring one that validates.
+
+            A digest is a SAID over the packet's own content, so a file merely
+            claiming one cannot also satisfy it -- which is what makes
+            validation the right tiebreaker when several files claim the same
+            digest. Fall back to the first claimant so a genuinely broken
+            ancestor still reports its own errors instead of vanishing, and to
+            the filename lookup for a packet the index never saw.
+
+            This exists as a function because it was written once, for the
+            loop's later hops, while the INITIAL cursor kept using the bare
+            filename lookup -- and that lookup prefers a root-level
+            `<digest>.json` deterministically, so a decoy placed there won the
+            first hop every time and an otherwise valid child inherited the
+            decoy's errors. One reader of a structure fixed and not its
+            sibling, for the third time in this module; the shared helper is
+            the fix, not another copy of the selection logic.
+            """
+
+            candidates = chain_index.get(digest) or []
+            return next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if _packet_validates(
+                        candidate,
+                        workspace_root=root,
+                        provenance_root=prov_root,
+                        seen=seen,
+                        depth=_depth,
+                        max_depth=max_depth,
+                        ignored_chain_position=_ignored_chain_position,
+                        position_index=_position_index,
+                    )
+                ),
+                candidates[0] if candidates else None,
+            ) or _find_packet_by_digest(prov_root, digest)
+
+        child_packet: dict[str, Any] = packet
+        child_sequence: Any = sequence
+        cursor: Path | None = _cursor_for(str(prior_digest))
+        walked: set[str] = {str(prior_digest)}
+        # True for the one link immediately after a gap, where the adjacency
+        # assertion must not fire: non-adjacency IS the gap, already recorded.
+        skip_adjacency = False
+
+        while True:
+            if cursor is None:
+                identity = child_packet.get("i")
+                child_number = _walk_sequence(child_sequence)
+                if child_number is None:
+                    # Refuse before materialising any span. A chain position
+                    # that will not parse, or one large enough to size a loop,
+                    # is damage or a hostile signer -- and either way the honest
+                    # answer is a verdict, not an allocation.
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                    break
+                expected_sequence = child_number - 1
+                if expected_sequence < 0:
+                    # Sequence 0 is genesis and must carry `p: null`. A packet
+                    # that names a prior while sitting at 0 is pointing at
+                    # something that cannot exist, not reaching the bottom.
+                    errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+                    break
+                occupants = seq_digests.get(identity, {}).get(expected_sequence)
+                occupant_paths = seq_paths.get(identity, {}).get(expected_sequence)
+                if occupants and _slot_is_genuinely_occupied(
+                    occupant_paths,
+                    workspace_root=root,
+                    provenance_root=prov_root,
+                    seen=seen,
+                    depth=_depth,
+                    max_depth=max_depth,
+                    ignored_chain_position=_ignored_chain_position,
+                    position_index=_position_index,
+                ):
+                    # Something VALID is signed into that slot and the child
+                    # does not point at it. A rewrite or a fork, never a prune.
+                    errors.append("E_PROVENANCE_CHAIN_FORK")
+                    break
+                below = [
+                    s for s in seq_paths.get(identity, {}) if s < expected_sequence
+                ]
+                if not below:
+                    # Nothing survives beneath the gap: the chain is truncated
+                    # rather than holed, and genesis is unreachable.
+                    gap_sequences.append(expected_sequence)
+                    errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+                    break
+                resume_sequence = max(below)
+                # The WHOLE skipped span, not just its first slot. Consecutive
+                # holes (this workspace has 36 and 37 adjacent) otherwise
+                # collapsed into a single report and under-stated the loss.
+                gap_sequences.extend(range(resume_sequence + 1, expected_sequence + 1))
+                # A slot can hold several files now that the index retains every
+                # occupant. Resume on one that actually validates; fall back to
+                # the first so the walk still reports its errors rather than
+                # silently stopping.
+                resume_candidates = seq_paths[identity][resume_sequence]
+                cursor = next(
+                    (
+                        candidate
+                        for candidate in resume_candidates
+                        if _packet_validates(
+                            candidate,
+                            workspace_root=root,
+                            provenance_root=prov_root,
+                            seen=seen,
+                            depth=_depth,
+                            max_depth=max_depth,
+                            ignored_chain_position=_ignored_chain_position,
+                            position_index=_position_index,
+                        )
+                    ),
+                    resume_candidates[0],
+                )
+                child_packet = {"i": identity, "s": resume_sequence + 1}
+                child_sequence = resume_sequence + 1
+                skip_adjacency = True
+                continue
+
             prior_result = validate_packet(
-                prior_path,
+                cursor,
                 workspace_root=root,
                 provenance_root=prov_root,
                 _seen=seen,
                 _depth=_depth,
                 max_depth=max_depth,
+                _is_ancestor=True,
                 _ignored_chain_position=_ignored_chain_position,
+                _follow_prior=False,
+                _position_index=_position_index,
             )
             if not prior_result.ok:
                 errors.extend(prior_result.errors)
+            warnings.extend(prior_result.warnings)
+
             # Per-agent chain continuity: the prior must belong to the same
-            # author and its sequence must directly precede this one. Without
+            # author and its sequence must directly precede its child. Without
             # this, a signed packet could point at another agent's packet or
             # skip/fork its sequence while still validating.
             prior_packet = prior_result.packet or {}
-            if prior_packet.get("i") != packet.get("i"):
+            if prior_packet.get("i") != child_packet.get("i"):
                 errors.append("E_PROVENANCE_PRIOR_AGENT_MISMATCH")
-            try:
-                if int(prior_packet.get("s")) != int(sequence) - 1:
-                    errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
-            except (TypeError, ValueError):
-                errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+            if skip_adjacency:
+                skip_adjacency = False
+            else:
+                prior_sequence = _walk_sequence(prior_packet.get("s"))
+                child_number = _walk_sequence(child_sequence)
+                if prior_sequence is None or child_number is None:
+                    # Same parser as the branch above. This one reaches the very
+                    # same expansion -- range(prior + 1, child) -- by a different
+                    # route, and the bound had been added only to the other.
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                else:
+                    if prior_sequence >= child_number:
+                        # Sequence must strictly decrease toward genesis. A
+                        # prior at or above its child is a loop or a rewrite,
+                        # and no amount of enumeration makes that walkable.
+                        errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                    elif prior_sequence < child_number - 1:
+                        # The prior EXISTS but sits further back than one step.
+                        # Whether that is acceptable turns on ONE question: are
+                        # the skipped slots empty, or occupied?
+                        #
+                        # Empty means those packets are gone. Nothing can point
+                        # at what does not exist, so this is the same
+                        # unavoidable loss as an unreachable prior: enumerate it
+                        # and keep walking.
+                        #
+                        # Occupied means the child skipped a packet sitting
+                        # right there on disk. There is no honest reason to do
+                        # that -- the link was available and was not taken --
+                        # and accepting it would turn the chain into a partial
+                        # order any writer could route around. Fatal, and
+                        # deliberately so. The rule is: enumerate what is LOST,
+                        # refuse what is merely BYPASSED.
+                        skipped = range(prior_sequence + 1, child_number)
+                        # Same standard as the gap branch: a slot counts as
+                        # occupied only if something VALID sits in it.
+                        occupied = [
+                            s
+                            for s in skipped
+                            if _slot_is_genuinely_occupied(
+                                seq_paths.get(child_packet.get("i"), {}).get(s),
+                                workspace_root=root,
+                                provenance_root=prov_root,
+                                seen=seen,
+                                depth=_depth,
+                                max_depth=max_depth,
+                                ignored_chain_position=_ignored_chain_position,
+                                position_index=_position_index,
+                            )
+                        ]
+                        if occupied:
+                            errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                        else:
+                            gap_sequences.extend(skipped)
 
-    errors.extend(
-        _recursive_evidence_errors(
-            packet,
-            workspace_root=root,
-            provenance_root=prov_root,
-            seen=seen,
-            depth=_depth,
-            max_depth=max_depth,
-            ignored_chain_position=_ignored_chain_position,
+            next_digest = prior_packet.get("p")
+            if next_digest is None:
+                # Genesis has no prior. It must also be sequence 0, or the
+                # chain claims to start somewhere it did not.
+                # Third reader of a sequence in this walk. It only compares
+                # against 0, so it cannot size a loop -- but routing it through
+                # the same parser is the point: a branch that parses its own is
+                # exactly where the bound went missing the first two times.
+                genesis_sequence = _walk_sequence(prior_packet.get("s"))
+                if genesis_sequence is None:
+                    errors.append("E_PROVENANCE_SEQUENCE_INVALID")
+                elif genesis_sequence != 0:
+                    errors.append("E_PROVENANCE_SEQUENCE_DISCONTINUOUS")
+                else:
+                    reached_genesis = True
+                break
+            key = str(next_digest)
+            if key in walked:
+                # Defensive: a cycle among priors would otherwise spin forever
+                # now that the stack no longer bounds this walk.
+                errors.append("E_PROVENANCE_PRIOR_CYCLE")
+                break
+            walked.add(key)
+            child_packet = prior_packet
+            child_sequence = prior_packet.get("s")
+            cursor = _cursor_for(key)
+
+        if gap_sequences:
+            # Enumerated, not summarised. An auditor reading this result can
+            # name exactly which packets are missing and go looking for them.
+            warnings.append(
+                "E_PROVENANCE_CHAIN_GAP:"
+                + ",".join(str(s) for s in sorted(gap_sequences))
+            )
+        if not reached_genesis and not errors:
+            errors.append("E_PROVENANCE_PRIOR_NOT_FOUND")
+
+    # Evidence-DAG recursion, likewise depth-0 only (D-B3). An ancestor's
+    # evidence DAG resolves packet files that may since have been pruned,
+    # relocated, or written before a contract change; walking it from a
+    # descendant re-litigates history the descendant is not asserting.
+    if not _is_ancestor:
+        errors.extend(
+            _recursive_evidence_errors(
+                packet,
+                workspace_root=root,
+                provenance_root=prov_root,
+                seen=seen,
+                depth=_depth,
+                max_depth=max_depth,
+                ignored_chain_position=_ignored_chain_position,
+            )
         )
-    )
+        # Depth 0 only: an ancestor's consent state is history, and re-reporting
+        # it on every descendant would bury the packet actually under
+        # submission. A governed claim now carries a visible marker that its
+        # consent reference was never resolved, instead of the gate silently
+        # accepting any non-empty string.
+        warnings.extend(consent_resolution_problems(packet))
 
     chain_position = (packet.get("i"), packet.get("p"), packet.get("s"))
     if (
@@ -714,6 +1294,7 @@ def validate_packet(
             workspace_root=root,
             provenance_root=prov_root,
             max_depth=max_depth,
+            position_index=_position_index,
         )
     ):
         errors.append("E_PROVENANCE_CHAIN_FORK")
@@ -721,6 +1302,7 @@ def validate_packet(
     return PacketValidation(
         ok=not errors,
         errors=sorted(set(errors)),
+        warnings=sorted(set(warnings)),
         packet_digest=digest if isinstance(digest, str) else None,
         narrative_lines=narrative_lines(packet) if not errors else [],
         packet=packet,
@@ -818,14 +1400,61 @@ def validated_non_packet_evidence_refs(
     return refs, truncated
 
 
+CONSENT_UNRESOLVED = "E_CONSENT_GATE_UNRESOLVED"
+
+
 def entry_has_consent(entry: dict[str, Any]) -> bool:
-    """Return True when a payload entry carries a consent decision reference."""
+    """Return True when a payload entry carries a consent decision reference.
+
+    WHAT THIS DOES NOT DO: resolve the hash. It checks that
+    `consent_ref.decision_action_hash` is a non-empty string and nothing more.
+    Any non-empty string satisfies it -- there is no lookup against a real
+    `ConsentDecision` action, no existence check, no signature check.
+
+    That is the whole consent gate today. A governed System/Substrate claim is
+    admitted on the strength of a string somebody typed. Four independent audits
+    rated this Critical; it is ADR-12's to close, and until it is closed the
+    word "governed" in this codebase means "carries a consent-shaped field",
+    not "was consented to".
+
+    The boolean contract is deliberately unchanged -- packages/metacoordinator_mcp
+    depends on it and is under a do-not-modify rule. `consent_resolution_problems`
+    below is the honest companion: it reports the unresolved state so a caller
+    that wants to know can, rather than the hole staying silent.
+    """
 
     consent_ref = entry.get("consent_ref")
     if not isinstance(consent_ref, dict):
         return False
     decision_hash = consent_ref.get("decision_action_hash")
     return isinstance(decision_hash, str) and bool(decision_hash.strip())
+
+
+def consent_resolution_problems(packet: dict[str, Any]) -> list[str]:
+    """Report that a packet's consent references were never resolved.
+
+    Returns one `E_CONSENT_GATE_UNRESOLVED` marker per entry claiming consent.
+    Emitted as a WARNING rather than an error on purpose: making it fatal today
+    would block every governed claim in the repository, which is the same
+    mistake as `b0de2fe` -- correct by the letter of the contract, and it bricks
+    the system. The point is that the hole stops being invisible.
+
+    Remove this function when ADR-12 lands real resolution. Its presence in a
+    validation result is the marker that ADR-12 has NOT landed.
+    """
+
+    problems: list[str] = []
+    for index, entry in enumerate(packet.get("a", []) or []):
+        if not entry_has_consent(entry):
+            continue
+        consent_ref = entry.get("consent_ref") or {}
+        digest = str(consent_ref.get("decision_action_hash", "")).strip()
+        problems.append(
+            f"{CONSENT_UNRESOLVED}: a[{index}].consent_ref.decision_action_hash "
+            f"{digest[:24]!r} was accepted without being resolved against any "
+            f"ConsentDecision record (ADR-12 unimplemented)"
+        )
+    return problems
 
 
 def packet_has_consent(packet: dict[str, Any]) -> bool:

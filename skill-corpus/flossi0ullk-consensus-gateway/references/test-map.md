@@ -8,8 +8,8 @@
 - `FLOSS/packages/orchestrator/claim_schema.py`
 - `FLOSS/packages/orchestrator/consensus_gate.py`
 - `FLOSS/packages/source_chain/cell.py`
-- `FLOSS/scripts/hook_bg_round.py`
-- `FLOSS/scripts/hook_post_write.py`
+- `FLOSS/hooks/hook_bg_round.py`
+- `FLOSS/hooks/hook_post_write.py`
 
 ## Verification commands
 

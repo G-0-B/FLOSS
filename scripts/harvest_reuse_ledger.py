@@ -214,8 +214,6 @@ def check_prereqs() -> None:
 
 def fetch_upstream_metadata(target: ForkTarget) -> dict:
     """Use `gh api` to fetch upstream repo metadata. License, primary lang, etc."""
-    fields = ("name,description,license,stargazers_count,forks_count,"
-              "pushed_at,language,topics,homepage,default_branch,size")
     cmd = ["gh", "api", f"repos/{target.owner}/{target.repo}",
            "--jq", "{name, description, license: .license.spdx_id, "
                    "stars: .stargazers_count, forks: .forks_count, "

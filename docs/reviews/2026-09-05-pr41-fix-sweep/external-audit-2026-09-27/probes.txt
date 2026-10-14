@@ -1,0 +1,26 @@
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+F1_REAL_DISPATCH {"tier": "degraded", "success": false, "responses_retained": 6, "failed": 2, "transports": {"audit-groq": "litellm", "audit-mistral": "litellm", "granite-code-3b": "ollama", "llama3.2-3b": "ollama", "phi4-mini": "ollama", "qwen2.5-coder-3b": "ollama"}}
+CHECKER_CRASH {"tier": "tier2", "success": true, "responses_retained": 6, "failed": 2, "transports": {"audit-groq": "litellm", "audit-mistral": "litellm", "granite-code-3b": "ollama", "llama3.2-3b": "ollama", "phi4-mini": "ollama", "qwen2.5-coder-3b": "ollama"}}
+PID bad-json {"refused": true, "later_target_checked": true, "drift": true}
+PID list {"refused": true, "later_target_checked": true, "drift": true}
+PID null {"refused": true, "later_target_checked": true, "drift": true}
+PID utf8 {"refused": true, "later_target_checked": true, "drift": true}
+PID bool {"refused": true, "later_target_checked": true, "drift": true}
+PID zero {"refused": true, "later_target_checked": true, "drift": true}
+PID negative {"refused": true, "later_target_checked": true, "drift": true}
+PID posix-overflow {"refused": true, "later_target_checked": true, "drift": true}
+PID missing-pid {"refused": true, "later_target_checked": true, "drift": true}
+PID string-pid {"refused": true, "later_target_checked": true, "drift": true}
+PID float-pid {"refused": true, "later_target_checked": true, "drift": true}
+PID huge-integer UNHANDLED ValueError Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+PID deep-json {"refused": true, "later_target_checked": true, "drift": true}
+F2_WRITE_REFUSAL config_bytes_unchanged=True
+PID_SIMULATED_POSIX overflow_and_value_error_fail_closed=True
+OWNER nested-live True
+OWNER sibling-live False
+OWNER own-stale True
+NESTED_WORKSPACE_FULL_MATERIALIZE {"plans": ["would remove audit-shared: nested-live (stale)", "would remove audit-shared: own-stale (stale)"], "drift": true}
+RELATIVE_MARKER_OWNER True
+SKILL_PROBES no_pruning_executed=True

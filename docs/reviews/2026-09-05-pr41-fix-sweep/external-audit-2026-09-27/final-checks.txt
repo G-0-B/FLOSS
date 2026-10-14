@@ -1,0 +1,9 @@
+warning: unable to access 'C:\Users\kalis/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\kalis/.config/git/ignore': Permission denied
+PINNED_TRACKED_TEXT 1246 files; NUL offenders: []
+COMMITTED_EVIDENCE_NORMALIZED_FILES ["baseline-tests-final.xml", "full-suite-final.xml"]
+CHANGED_PYTHON_PARSE 7 passed
+PINNED_CHANGED_FILES_UNMODIFIED True
+LIVE_HEAD_END 5e52d40a3e42499dc6360638a9c50f5f71d401f8
+LIVE_STATUS_END
+

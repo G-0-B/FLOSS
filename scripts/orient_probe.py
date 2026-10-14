@@ -39,7 +39,7 @@ CANONICAL_FILES: list[tuple[str, str, str]] = [
     (".agent-surface/context/CONTEXT_L1.md", "T2", "Deeper re-orientation context"),
     ("INDEX.md", "T1", "Repo-root map"),
     ("FLOSS/CLAUDE.md", "T1", "Agent operating notes"),
-    ("FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md", "T1*", "Governing principles (only if relevant)"),
+    ("FLOSS/FLOSSI0ULLK_Master_Metaprompt_v1_4_0_Kernel.md", "T1*", "Governing principles (only if relevant)"),
     ("FLOSS/scripts/context_router.py", "T1.5", "Query -> corpus roots"),
     ("FLOSS/docs/architecture/CONTEXT_DAEMON_ARCHITECTURE.md", "T2", "Intake/filewatch arch"),
     ("FLOSS/docs/superpowers/plans/2026-04-19-filewatch-metaharness.md", "T2", "Filewatch metaharness plan"),

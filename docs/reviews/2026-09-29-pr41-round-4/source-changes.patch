@@ -1,0 +1,158 @@
+=== COMMIT 9a23477: fix: a marker the OS cannot resolve aborted the refresh on POSIX
+
+
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index 49536ce..46ee86d 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -450,23 +450,42 @@ def projection_owned_by(child: Path, owner_root: Path) -> bool:
+     the installing workspace's root, and only an exact match is ours.
+ 
+     Anything that cannot prove ownership -- unreadable, not an object, wrong
+-    `managed_by`, no `workspace_root`, or a relative one, which would resolve
+-    against whatever directory the run started in -- is not ours. Leaving a
+-    stale directory is recoverable; deleting a live one is not.
++    `managed_by`, no `workspace_root`, a relative one (which would resolve
++    against whatever directory the run started in), or one the OS cannot
++    resolve -- is not ours. Leaving a stale directory is recoverable; deleting
++    a live one is not.
+     """
+ 
+     marker = read_managed_marker(child)
+     if marker is None:
+         return False
+-    recorded = marker.get("workspace_root")
+-    if not isinstance(recorded, str) or not Path(recorded).is_absolute():
++    recorded = recorded_workspace(marker)
++    if recorded is None:
+         return False
+     try:
+-        return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(
+-            str(owner_root.resolve())
+-        )
+-    except OSError:
++        owner = owner_root.resolve()
++    except (OSError, ValueError):
+         return False
++    return os.path.normcase(str(recorded)) == os.path.normcase(str(owner))
++
++
++def recorded_workspace(marker: dict[str, Any]) -> Path | None:
++    """The installing workspace a marker names, resolved; None if unusable.
++
++    ValueError as well as OSError: on POSIX an absolute identity containing a
++    NUL raises ValueError from resolve(), and catching only OSError let one
++    such marker abort the pruner and the materializer around it, `--check`
++    included. Windows resolves the same string without raising, which is why
++    the Windows suite never saw it. Found by the third external audit (F4).
++    """
++
++    recorded = marker.get("workspace_root")
++    if not isinstance(recorded, str) or not Path(recorded).is_absolute():
++        return None
++    try:
++        return Path(recorded).resolve()
++    except (OSError, ValueError):
++        return None
+ 
+ 
+ def prune_stale_projections(
+@@ -510,18 +529,34 @@ def prune_stale_projections(
+             # existence, so on a shared user-scope root it planned to remove
+             # another workspace's live projection whenever this manifest
+             # happened not to list that skill. Found by the external audit.
++            #
++            # Two kinds of foreign projection are never removed but ARE said
++            # out loud, because a withdrawn skill lingering in silence is the
++            # defect this pruner exists for, and either kind may be this
++            # workspace's own:
++            #   - no usable identity: written before markers recorded one, or
++            #     recording something that is not an absolute, resolvable
++            #     path. No workspace can prove it owns this.
++            #   - an identity naming a workspace that no longer exists: moved
++            #     or deleted, so no run will ever prune it.
++            # A live other workspace's projection is simply someone else's,
++            # and silence is right.
+             marker = read_managed_marker(child)
+-            if marker is not None and "workspace_root" not in marker:
+-                # Written before markers recorded who installed them, so no
+-                # workspace can prove it owns this. Never removed -- but said
+-                # out loud, because a withdrawn skill lingering in silence is
+-                # the defect this pruner exists for, and one of these may be
+-                # this workspace's own.
+-                results.append(
+-                    f"KEEP  {target_name}: {child.name} has a managed marker with "
+-                    f"no installing-workspace identity; ownership unknown, not "
+-                    f"removed (delete it by hand if it is stale)"
+-                )
++            if marker is not None:
++                recorded = recorded_workspace(marker)
++                if recorded is None:
++                    results.append(
++                        f"KEEP  {target_name}: {child.name} has a managed marker "
++                        f"with no usable installing-workspace identity (missing "
++                        f"or invalid); ownership unknown, left in place (delete "
++                        f"it by hand if it is stale)"
++                    )
++                elif not os.path.exists(recorded):
++                    results.append(
++                        f"KEEP  {target_name}: {child.name} was installed by "
++                        f"{recorded}, which no longer exists; left in place "
++                        f"(delete it by hand if it is stale)"
++                    )
+             continue
+         drift_found = True
+         if check:
+@@ -575,6 +610,25 @@ def install_skill_projection(
+     if not changed:
+         return ([f"OK    {target_dir}"], False)
+ 
++    def without_marker(snapshot: dict[str, str]) -> dict[str, str]:
++        return {rel: text for rel, text in snapshot.items() if rel != MANAGED_MARKER}
++
++    if without_marker(actual_snapshot) == without_marker(expected_snapshot):
++        # ONLY THE MARKER DIFFERS: rewrite it in place, never take the skill
++        # away. The path below deletes the projection before copying the source
++        # back, so a run interrupted between the two leaves the skill missing
++        # until the next one. That ordering predates the `workspace_root`
++        # field, but adding the field changed every installed marker and so
++        # put every unchanged skill through that window once. Found by the
++        # third external audit (O1). A plain write, not a temp-and-replace:
++        # a marker torn mid-write reads as unowned, which is safe, and the
++        # next run rewrites it.
++        (target_dir / MANAGED_MARKER).write_text(
++            expected_snapshot[MANAGED_MARKER],
++            encoding="utf-8",
++        )
++        return ([f"WROTE {target_dir} (marker only)"], True)
++
+     remove_path(target_dir)
+     shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
+     (target_dir / MANAGED_MARKER).write_text(
+
+=== COMMIT 69c4cbd: fix: a missing workspace is "cannot be found", not "no longer exists"
+
+
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index 46ee86d..53c490f 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -552,10 +552,15 @@ def prune_stale_projections(
+                         f"it by hand if it is stale)"
+                     )
+                 elif not os.path.exists(recorded):
++                    # "Cannot be found", not "no longer exists": exists() is
++                    # also False for an unmounted drive or an unreachable
++                    # network path, and a line inviting deletion would then
++                    # point an operator at a live workspace's skill.
+                     results.append(
+                         f"KEEP  {target_name}: {child.name} was installed by "
+-                        f"{recorded}, which no longer exists; left in place "
+-                        f"(delete it by hand if it is stale)"
++                        f"{recorded}, which cannot be found from here (moved, "
++                        f"deleted, or not mounted); left in place. Remove it by "
++                        f"hand only once that workspace is known to be gone"
+                     )
+             continue
+         drift_found = True
+

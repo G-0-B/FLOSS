@@ -1,0 +1,220 @@
+{
+  "endpoint": "5a1a2b1655274d4d37bba9e27a3bb2d11f2e35f6",
+  "base": "aee4745b62caf2e1d6f217b76dcb17a44bc885df",
+  "start": "e747a751ae8c778389e359ee5906e60306342f93",
+  "live_head_at_export": "5a1a2b1655274d4d37bba9e27a3bb2d11f2e35f6",
+  "live_status_at_export": " M packages/reasoning_ensemble/synthesizer.py\n M packages/reasoning_ensemble/tests/test_survivor_independence.py\n",
+  "archive_sha256": "83b41027f386c35fff8d1a970606b129883cdf6f97305b9c34b6275b7d66c364",
+  "files": [
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/RESULT.md",
+      "git_sha256": "463df45b9170ecfb5ca0a16c6a4c6696e3eabbbaaebee8e2ad7512913c4cd4be",
+      "export_sha256": "463df45b9170ecfb5ca0a16c6a4c6696e3eabbbaaebee8e2ad7512913c4cd4be",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/REVIEW.md",
+      "git_sha256": "ed5080c3d000ac18e21b1b387d62b00e9c53381ece74dea2972162f3a76846cf",
+      "export_sha256": "ed5080c3d000ac18e21b1b387d62b00e9c53381ece74dea2972162f3a76846cf",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/audit_probes.py",
+      "git_sha256": "9a3ed1171ac880d1fe507fad0d830b8ae3b6430261139943091c8beb0a84c3d5",
+      "export_sha256": "9a3ed1171ac880d1fe507fad0d830b8ae3b6430261139943091c8beb0a84c3d5",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/audited-files.json",
+      "git_sha256": "a0bacecf4be44a6bfaa46c6920dbdcf9b269e82bcbcb363cc8eec514518d84d4",
+      "export_sha256": "a0bacecf4be44a6bfaa46c6920dbdcf9b269e82bcbcb363cc8eec514518d84d4",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-passing-complements.txt",
+      "git_sha256": "5f12190ac00f58e0c4940fb0e622acb7ba381c1329eff53d87c1586ea38a1fb2",
+      "export_sha256": "5f12190ac00f58e0c4940fb0e622acb7ba381c1329eff53d87c1586ea38a1fb2",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-tests-final.txt",
+      "git_sha256": "a5f1a40569541c75117766b07a380769ae7278c4c04f3a4b3e6d3c3266488d39",
+      "export_sha256": "a5f1a40569541c75117766b07a380769ae7278c4c04f3a4b3e6d3c3266488d39",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/baseline-tests-final.xml",
+      "git_sha256": "57c0010af34f6b89f2b3ea8e6ad5c778837ec1aac5e1a776f88db701bdffbf4e",
+      "export_sha256": "57c0010af34f6b89f2b3ea8e6ad5c778837ec1aac5e1a776f88db701bdffbf4e",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/codex-header-readback.txt",
+      "git_sha256": "b2b80f0951cdfc89df164231b8ad05f20cfcbae18885ac239bdbc85e0d614b7a",
+      "export_sha256": "b2b80f0951cdfc89df164231b8ad05f20cfcbae18885ac239bdbc85e0d614b7a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/environment.json",
+      "git_sha256": "f2a93305f6d82df15d09020985cf39b6ee192dcc52e553c886ad8415d356b2ac",
+      "export_sha256": "f2a93305f6d82df15d09020985cf39b6ee192dcc52e553c886ad8415d356b2ac",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/full-suite-final.txt",
+      "git_sha256": "529810cd7724e27221625ca38ebdd9292ef16dc79d85c42abea246bfe15456f6",
+      "export_sha256": "529810cd7724e27221625ca38ebdd9292ef16dc79d85c42abea246bfe15456f6",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/full-suite-final.xml",
+      "git_sha256": "26cc314579821fa9b479497f4269b73f1fbd2db7edca3ca1be41ecb9569688f0",
+      "export_sha256": "26cc314579821fa9b479497f4269b73f1fbd2db7edca3ca1be41ecb9569688f0",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/new-test-nodes.json",
+      "git_sha256": "c7ac5907a32c82225a8de1f2e0f1b02c0909c7cc5b2714647b90abd73f52642f",
+      "export_sha256": "c7ac5907a32c82225a8de1f2e0f1b02c0909c7cc5b2714647b90abd73f52642f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/patch-fidelity.txt",
+      "git_sha256": "926b6605eaefd7fa776862281ff45c6aacd679a8b88486db20e377ae429998d5",
+      "export_sha256": "926b6605eaefd7fa776862281ff45c6aacd679a8b88486db20e377ae429998d5",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/powershell-dispatch.ps1",
+      "git_sha256": "75e6d8bd3ef2df51333527b24392c6f8a18867355834a66c65b902251e3edbb4",
+      "export_sha256": "1ddc4ffdd4c90b71a865507c711ea242a6f54d85225b189e3eb50757aeb1c877",
+      "exact": false,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/powershell-results.txt",
+      "git_sha256": "331f95b0ed28a2881f1debd4da3d88a953e8490ccc66d1984bf9c0f86369c7fa",
+      "export_sha256": "331f95b0ed28a2881f1debd4da3d88a953e8490ccc66d1984bf9c0f86369c7fa",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/prepare_baseline.py",
+      "git_sha256": "b8376dc02d7626dc01039b98235b19d3474498986741b35deaacc94a3be24580",
+      "export_sha256": "b8376dc02d7626dc01039b98235b19d3474498986741b35deaacc94a3be24580",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/probe-results.txt",
+      "git_sha256": "0aea80d6625342f0fd7bd13af1e093bf097a672cb16eadf866349b7a3f5380c7",
+      "export_sha256": "0aea80d6625342f0fd7bd13af1e093bf097a672cb16eadf866349b7a3f5380c7",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/process-check.txt",
+      "git_sha256": "3e6705d9b482122c846b6953a52e1b922c210e610c0b10a149bce6dad46ffa7e",
+      "export_sha256": "3e6705d9b482122c846b6953a52e1b922c210e610c0b10a149bce6dad46ffa7e",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/ruff-baseline.txt",
+      "git_sha256": "6226f0c29c4b4e24d9ff34090cd3f8162c58cc4470d430aec9564407dd80020b",
+      "export_sha256": "6226f0c29c4b4e24d9ff34090cd3f8162c58cc4470d430aec9564407dd80020b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/ruff.txt",
+      "git_sha256": "6f306b08068b0227b26ccab6db65b3e598f77f16f15692789b7c18201ae5656f",
+      "export_sha256": "6f306b08068b0227b26ccab6db65b3e598f77f16f15692789b7c18201ae5656f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/snapshot-text-check.txt",
+      "git_sha256": "f21a659b022bfb7e4bdfec5d290d153e7aae328365f677d190e962a91d499b4b",
+      "export_sha256": "f21a659b022bfb7e4bdfec5d290d153e7aae328365f677d190e962a91d499b4b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-05-pr41-fix-sweep/external-audit-2026-09-18/spec-gate.txt",
+      "git_sha256": "b47113a00f596e2e512d9f87b5471c4260668e63f27d0b954f4432c914459b64",
+      "export_sha256": "b47113a00f596e2e512d9f87b5471c4260668e63f27d0b954f4432c914459b64",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/README.md",
+      "git_sha256": "ea813e5426f2339e85b7934dc76c55c3f50bd6f2a2cfe4aa85cb1b0c714994fd",
+      "export_sha256": "ea813e5426f2339e85b7934dc76c55c3f50bd6f2a2cfe4aa85cb1b0c714994fd",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "packages/reasoning_ensemble/synthesizer.py",
+      "git_sha256": "75edc41e4d9362b22b8253972018cd5facfa14608ba7e0607fe260dc6afae21b",
+      "export_sha256": "75edc41e4d9362b22b8253972018cd5facfa14608ba7e0607fe260dc6afae21b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "packages/reasoning_ensemble/tests/test_survivor_independence.py",
+      "git_sha256": "f346f82f2394242ef35cf082a435c844a00456d5c7763e4bfe06861e4c17f6a3",
+      "export_sha256": "f346f82f2394242ef35cf082a435c844a00456d5c7763e4bfe06861e4c17f6a3",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_agent_surface.py",
+      "git_sha256": "4adaa19b5912bf61e30c3357bf2e92103d76dd5f66e9342fb44d244e40a74d64",
+      "export_sha256": "4adaa19b5912bf61e30c3357bf2e92103d76dd5f66e9342fb44d244e40a74d64",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_hook_surface.py",
+      "git_sha256": "21117bd318102ab876fd32ca04417e4c6f55325b4882b31a8835a5046e1deec3",
+      "export_sha256": "21117bd318102ab876fd32ca04417e4c6f55325b4882b31a8835a5046e1deec3",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_skill_surface.py",
+      "git_sha256": "31a62ca7e5c82f9b876e7f773f2b437a1b4d7d836c16d4ecfebd2212c5dcb698",
+      "export_sha256": "31a62ca7e5c82f9b876e7f773f2b437a1b4d7d836c16d4ecfebd2212c5dcb698",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/tests/test_shared_skill_surface_scope.py",
+      "git_sha256": "ef1bf38d0bd364c3b10de52af35d2cf04a99282c0b26d61a5c90baa0cfda5b57",
+      "export_sha256": "ef1bf38d0bd364c3b10de52af35d2cf04a99282c0b26d61a5c90baa0cfda5b57",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "tests/test_shared_agent_surface_mcp.py",
+      "git_sha256": "201d408748fbc7c3d1215540f4da965d6a910959d307411594ef673bc105951b",
+      "export_sha256": "201d408748fbc7c3d1215540f4da965d6a910959d307411594ef673bc105951b",
+      "exact": true,
+      "same_lf": true
+    }
+  ]
+}

@@ -665,9 +665,7 @@ def test_public_eight_wrapper_root_uses_independent_competitor_depth(
 
     wrapped_path = first_path
     for index in range(8):
-        wrapped_ref = (
-            wrapped_path.resolve().relative_to(tmp_path.resolve()).as_posix()
-        )
+        wrapped_ref = wrapped_path.resolve().relative_to(tmp_path.resolve()).as_posix()
         _wrapper, wrapped_path = provenance.create_packet(
             [
                 entry(
@@ -980,6 +978,190 @@ def test_payload_entry_malformed_artifact_ref_is_invalid(tmp_path, monkeypatch):
     assert "E_PROVENANCE_ARTIFACT_REF_INVALID" in result.errors
 
 
+def test_deleted_ancestor_artifact_warns_but_does_not_fail_descendant(
+    tmp_path, monkeypatch
+):
+    """A packet attests to a past state; deleting that artifact later must not
+    poison every descendant on the chain.
+
+    Regression for the 2026-08-10 finding: a throwaway probe file
+    (`packages/_hook_live_probe.py`) was hook-touched, packeted, then deleted.
+    Because ancestor artifact-existence was re-checked on every descendant
+    validation, `submit_claim` failed with
+    E_PROVENANCE_INVALID/E_PROVENANCE_ARTIFACT_MISSING for every later edit —
+    the hook generated packets that could never be accepted.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    identity_dir = tmp_path / "identity"
+    output_root = tmp_path / "packets"
+
+    def entry(artifact):
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": "2026-08-10T00:00:00Z",
+            "human_collision_node": "anthony",
+            "artifact_refs": [
+                provenance.artifact_ref(artifact, workspace_root=tmp_path)
+            ],
+            "evidence_refs": [{"type": "test", "ref": "unit"}],
+            "risks": [],
+            "benefits": [],
+            "next_action": "none",
+        }
+
+    doomed = tmp_path / "scratch_probe.py"
+    doomed.write_text("# temporary probe\n", encoding="utf-8")
+    provenance.create_packet(
+        [entry(doomed)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    survivor = tmp_path / "real_module.py"
+    survivor.write_text("VALUE = 1\n", encoding="utf-8")
+    _child, child_path = provenance.create_packet(
+        [entry(survivor)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    # The ancestor's artifact goes away, as scratch files do.
+    doomed.unlink()
+
+    result = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is True, f"descendant must stay valid, got {result.errors}"
+    # D-B3 (ADR-20): ancestor artifacts are not inspected at all any more, so the
+    # missing scratch probe produces neither an error nor a warning. Before D-B3
+    # this raised a warning, because ancestors ran the full artifact pass with
+    # only absence downgraded — the same pass whose fatal hash-mismatch branch
+    # rejected 100% of pilot submissions.
+    assert "E_PROVENANCE_ARTIFACT_MISSING" not in result.errors
+    assert "E_PROVENANCE_ARTIFACT_MISSING" not in result.warnings
+
+    # The descendant's OWN missing artifact is still fatal.
+    survivor.unlink()
+    own = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+    assert own.ok is False
+    assert "E_PROVENANCE_ARTIFACT_MISSING" in own.errors
+
+
+def test_edited_ancestor_artifact_does_not_fail_descendant(tmp_path, monkeypatch):
+    """D-B3 (ADR-20): re-editing a file must not kill the chain.
+
+    This is the defect that produced a 100% rejection rate across the entire
+    provenance pilot. An ancestor packet records the hash a file had when it was
+    written; the next edit makes that hash stale forever. Ancestors stay in the
+    `p` chain, so before D-B3 one re-edit invalidated every future packet the
+    same agent could ever produce.
+
+    Distinct from the deleted-artifact case above: deletion was already
+    downgraded to a warning, mutation was fatal, and mutation is what ordinary
+    work does constantly.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    identity_dir = tmp_path / "identity"
+    output_root = tmp_path / "packets"
+
+    def entry(artifact):
+        return {
+            "claim_type": "proposal",
+            "truth_status": "specified",
+            "source_systems": ["unit-test"],
+            "created_at": "2026-08-24T00:00:00Z",
+            "human_collision_node": "anthony",
+            "artifact_refs": [
+                provenance.artifact_ref(artifact, workspace_root=tmp_path)
+            ],
+            "evidence_refs": [{"type": "test", "ref": "unit"}],
+            "risks": [],
+            "benefits": [],
+            "next_action": "none",
+        }
+
+    module = tmp_path / "module_under_work.py"
+    module.write_text("VALUE = 1\n", encoding="utf-8")
+    provenance.create_packet(
+        [entry(module)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    # Second edit to the same file, then a second packet — the exact shape of a
+    # hook firing twice on one module during a work session.
+    module.write_text("VALUE = 2\n", encoding="utf-8")
+    _child, child_path = provenance.create_packet(
+        [entry(module)], identity_dir=identity_dir, output_root=output_root
+    )
+
+    result = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+
+    assert result.ok is True, f"descendant must stay valid, got {result.errors}"
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" not in result.errors
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" not in result.warnings
+
+    # Depth 0 stays strict: the packet under validation must still hash true.
+    module.write_text("VALUE = 3\n", encoding="utf-8")
+    own = provenance.validate_packet(
+        child_path, workspace_root=tmp_path, provenance_root=output_root
+    )
+    assert own.ok is False
+    assert "E_PROVENANCE_ARTIFACT_HASH_MISMATCH" in own.errors
+
+
+@pytest.mark.parametrize("evidence_type", ["file", "log", "activity", "source_chain"])
+def test_d3_evidence_types_are_accepted(tmp_path, monkeypatch, evidence_type):
+    """D-A1 (ADR-20): one evidence-type authority, so D3 actually takes effect.
+
+    The v1.5 D3 widening reached the spec, the schema and
+    claim_schema.EVIDENCE_TYPES but missed the literal in provenance.py, which
+    is the set validate_packet enforces. Packets using a D3 type were
+    schema-valid and then rejected with E_PROVENANCE_EVIDENCE_REF_INVALID.
+    """
+    from packages.activity_log import provenance
+    from packages.orchestrator.claim_schema import EVIDENCE_TYPES
+
+    assert evidence_type in EVIDENCE_TYPES
+    assert provenance._EVIDENCE_REF_TYPES is EVIDENCE_TYPES
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.py"
+    artifact.write_text("VALUE = 1\n", encoding="utf-8")
+
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-24T00:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": evidence_type, "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+
+    result = provenance.validate_packet(
+        packet_path, workspace_root=tmp_path, provenance_root=tmp_path / "packets"
+    )
+    assert result.ok is True, f"{evidence_type} rejected: {result.errors}"
+    assert "E_PROVENANCE_EVIDENCE_REF_INVALID" not in result.errors
+
+
 @pytest.mark.parametrize(
     ("field_name", "expected_error"),
     [
@@ -1021,3 +1203,772 @@ def test_signed_packet_with_non_list_reference_field_returns_structured_invalid(
 
     assert result.ok is False
     assert expected_error in result.errors
+
+
+def _build_chain(provenance, tmp_path, length):
+    """Create `length` linked packets and return the tip's path."""
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    packet_path = None
+    for index in range(length):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-05-24T10:00:{index % 60:02d}Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+    return packet_path
+
+
+def test_prior_chain_longer_than_recursion_limit_still_validates(tmp_path, monkeypatch):
+    """A chain longer than Python's recursion limit must validate, not crash.
+
+    The prior walk deliberately does not increment `_depth` (max_depth bounds
+    the evidence DAG, not a linear chain), which left the chain bounded only by
+    the interpreter stack: measured ~1.1 frames per link, so a ~900-link chain
+    exhausted the default 1000 limit and a 1000-link honest chain raised
+    RecursionError instead of returning a PacketValidation. Provenance
+    validation gates substrate claims, so past that length the gate stopped
+    producing verdicts at all rather than producing a negative one.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    limit = sys.getrecursionlimit()
+    packet_path = _build_chain(provenance, tmp_path, limit + 200)
+
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+
+    assert result.ok is True, result.errors
+    assert "E_PROVENANCE_RECURSION_DEPTH_EXCEEDED" not in result.errors
+
+
+def test_chain_validation_cost_stays_roughly_linear(tmp_path, monkeypatch):
+    """Guard the fork check against going quadratic again.
+
+    _has_valid_same_position_competitor used to read EVERY packet on EVERY
+    validated packet, so an n-link walk performed n^2 file reads: profiling a
+    300-link chain showed 90k reads and 97% of runtime there, and wall time went
+    10s -> 90s -> 365s for 200 -> 600 -> 1200 links. Sharing one chain-position
+    index across the walk made it linear. Asserting a generous ratio rather than
+    absolute timings so this does not turn into a flaky benchmark.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+
+    short_dir = tmp_path / "short"
+    short_dir.mkdir()
+    long_dir = tmp_path / "long"
+    long_dir.mkdir()
+
+    short_tip = _build_chain(provenance, short_dir, 60)
+    long_tip = _build_chain(provenance, long_dir, 240)
+
+    start = time.perf_counter()
+    assert provenance.validate_packet(short_tip, workspace_root=short_dir).ok
+    short_elapsed = max(time.perf_counter() - start, 1e-4)
+
+    start = time.perf_counter()
+    assert provenance.validate_packet(long_tip, workspace_root=long_dir).ok
+    long_elapsed = time.perf_counter() - start
+
+    # 4x the links. Linear would be ~4x; quadratic would be ~16x. Allow a wide
+    # margin for CI noise while still catching a return to quadratic behaviour.
+    assert long_elapsed < short_elapsed * 10, (
+        f"chain validation looks superlinear: {short_elapsed:.3f}s for 60 links "
+        f"vs {long_elapsed:.3f}s for 240"
+    )
+
+
+def test_a_hole_below_the_head_is_enumerated_not_concealed(tmp_path, monkeypatch):
+    """Deleting a mid-chain packet must leave an undeniable, named trace.
+
+    Three behaviours have been tried here. Truncating the walk on an
+    unreachable ancestor made pruning a way to CONCEAL a break: remove the link
+    and every descendant validates with nothing in the result mentioning it.
+    Making it fatal at every depth stopped concealment but bricked honest
+    chains, because a signed packet cannot be re-derived once lost, so a hole is
+    permanent and every future packet inherits it.
+
+    The D-B3 addendum (ADR-20, operator-approved 2026-08-24) keeps the property
+    that actually matters: the hole is DETECTED AND ENUMERATED by sequence
+    number. Sequence numbers are per-agent and monotonic, so a deleted packet
+    leaves an arithmetic gap whether or not its file survives. The walk resumes
+    below the gap and still verifies the rest of history down to genesis.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+
+    paths = []
+    for index in range(5):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-24T10:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    # Prune a packet two links below the head -- deep enough that the old code
+    # took the "truncate the walk" path rather than the immediate-prior path.
+    paths[2].unlink()
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    # The head still carries current work...
+    assert result.ok is True, result.errors
+    # ...but the loss is named, by the exact sequence number, so an auditor can
+    # go looking for what is missing. Silence here would be the actual defect.
+    assert "E_PROVENANCE_CHAIN_GAP:2" in result.warnings
+
+    # A fork is a different animal and stays fatal: something IS signed into
+    # the vacated slot and the child points elsewhere, which is a rewrite, not
+    # a loss. Build one by re-signing a surviving packet into sequence 2.
+    forged = json.loads(paths[1].read_text(encoding="utf-8"))
+    forged["s"] = "2"
+    forged["a"][0]["next_action"] = "substituted"
+    forged_bytes = _resign_packet(forged, identity_dir=identity_dir)
+    (output_root / "forged.json").write_bytes(forged_bytes)
+
+    forked = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert forked.ok is False
+    assert "E_PROVENANCE_CHAIN_FORK" in forked.errors
+
+
+def test_a_lock_whose_holder_died_is_available_again(tmp_path):
+    """A lock nobody will ever release must not wedge the chain forever.
+
+    This used to require reclamation -- age, then liveness, then a creation
+    token, then an atomic rename, each fixing the previous one's failure. None
+    of that exists now: the kernel drops an OS lock when its holder's process
+    exits, so a killed writer leaves nothing to expire.
+
+    Driven with a real subprocess and a real kill, because the whole claim is
+    about what the OS does on process death, and no in-process fixture can
+    stand in for that.
+    """
+    import subprocess
+    import textwrap
+    import sys as _sys
+    import time as _time
+
+    repo = Path(__file__).resolve().parents[3]
+    holder_src = tmp_path / "holder.py"
+    holder_src.write_text(
+        textwrap.dedent("""
+            import sys, time, pathlib
+            sys.path.insert(0, sys.argv[2])
+            from packages.activity_log import provenance
+            provenance._acquire_lock(pathlib.Path(sys.argv[1]))
+            print('HELD', flush=True)
+            time.sleep(60)
+            """),
+        encoding="utf-8",
+    )
+    lock_path = tmp_path / ".identity.lock"
+
+    from packages.activity_log import provenance
+
+    holder = subprocess.Popen(
+        [_sys.executable, str(holder_src), str(lock_path), str(repo)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "HELD"
+        with pytest.raises(TimeoutError):
+            provenance._acquire_lock(lock_path, timeout_seconds=0.3)
+    finally:
+        holder.kill()
+        holder.wait()
+
+    _time.sleep(0.3)
+    token = provenance._acquire_lock(lock_path, timeout_seconds=5.0)
+    assert token, "a killed holder's lock was never released"
+    provenance._release_lock(lock_path, token)
+
+
+def test_a_fresh_lock_is_not_stolen(tmp_path):
+    """A lock held by a LIVE process is not walked through.
+
+    The fixture is a real holder now, not a file with a token in it. Under an
+    OS lock a leftover file is not a lock at all, so writing bytes to a path
+    can no longer simulate a holder -- and a test that still did would be
+    asserting the mechanism this module deliberately stopped using.
+    """
+    from packages.activity_log import provenance
+
+    lock_path = tmp_path / ".identity.lock"
+    held = provenance._acquire_lock(lock_path)
+    try:
+        with pytest.raises(TimeoutError):
+            provenance._acquire_lock(lock_path, timeout_seconds=0.3)
+    finally:
+        provenance._release_lock(lock_path, held)
+
+
+def test_garbage_in_a_vacated_slot_does_not_declare_a_fork(tmp_path, monkeypatch):
+    """A fork claim needs a VALID occupant, not any JSON that names the slot.
+
+    `_build_position_index` reads every JSON file under the provenance root
+    before anything is validated, so an unsigned object asserting some agent's
+    identity and sequence lands in the index. Treating that as an occupant let
+    unrelated corruption -- or a hand-written file -- turn an enumerable gap
+    into a fatal fork on every later packet in a chain that is otherwise fine.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+
+    paths = []
+    for index in range(5):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-25T10:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+
+    head = paths[-1]
+    identity = json.loads(head.read_text(encoding="utf-8"))["i"]
+
+    # Vacate slot 2, then drop unsigned garbage that claims it.
+    paths[2].unlink()
+    (output_root / "garbage.json").write_text(
+        json.dumps(
+            {"t": "prov", "i": identity, "s": "2", "p": None, "d": "E" + "z" * 43}
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert (
+        "E_PROVENANCE_CHAIN_FORK" not in result.errors
+    ), "unsigned garbage must not establish that a slot is occupied"
+    assert result.ok is True, result.errors
+    assert "E_PROVENANCE_CHAIN_GAP:2" in result.warnings
+
+
+def _chain(provenance, tmp_path, identity_dir, output_root, count):
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    paths = []
+    for index in range(count):
+        _packet, packet_path = provenance.create_packet(
+            [
+                {
+                    "claim_type": "proposal",
+                    "truth_status": "specified",
+                    "source_systems": ["unit-test"],
+                    "created_at": f"2026-08-25T12:{index:02d}:00Z",
+                    "human_collision_node": "anthony",
+                    "artifact_refs": [
+                        provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                    ],
+                    "evidence_refs": [{"type": "test", "ref": "unit"}],
+                    "risks": [],
+                    "benefits": [],
+                    "next_action": "none",
+                }
+            ],
+            identity_dir=identity_dir,
+            output_root=output_root,
+        )
+        paths.append(packet_path)
+    return paths
+
+
+def test_KNOWN_LIMIT_head_truncation_is_undetectable(tmp_path, monkeypatch):
+    """F-01, rated Critical by the 2026-08-25 external meta-audit.
+
+    This test asserts a LIMITATION, not a guarantee. It exists so the limit is
+    reproducible and so the day an external anchor lands, this test fails loudly
+    and has to be rewritten rather than quietly continuing to pass.
+
+    Gap enumeration finds holes relative to the highest sequence number still
+    present. An adversary who can write to the packet store deletes everything
+    above sequence n and presents n as current; there is no gap to find, because
+    the evidence that higher sequences existed was in the deleted packets.
+    Nothing inside a self-signed chain distinguishes this from an agent that
+    simply has not written since n.
+
+    Closing it requires a periodically published, externally observed commitment
+    to the chain head. See docs/specs/provenance-packet.spec.md, "Known Limits
+    Of Gap Enumeration", and ADR-20's trust boundary section.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 6)
+
+    assert provenance.validate_packet(paths[-1], workspace_root=tmp_path).ok is True
+
+    # The adversary rolls the store back to sequence 2.
+    for path in paths[3:]:
+        path.unlink()
+
+    truncated = provenance.validate_packet(paths[2], workspace_root=tmp_path)
+    assert truncated.ok is True, truncated.errors
+    assert (
+        truncated.warnings == []
+    ), "no warning is raised, and that is the finding: truncation is silent"
+
+
+def test_KNOWN_LIMIT_bypass_then_delete_downgrades_a_refusal(tmp_path, monkeypatch):
+    """F-02, rated High by the 2026-08-25 external meta-audit.
+
+    Also asserts a LIMITATION. The fatal/enumerated distinction is evaluated
+    against occupancy at VALIDATION time, so the ordering matters: bypass a live
+    packet (refused) and delete it afterwards (enumerated). Closing this needs a
+    second, append-only occupancy record that deletion cannot reach.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 2)
+    genesis = json.loads(paths[0].read_text(encoding="utf-8"))
+
+    # Sequence 2 points past the live sequence-1 packet, straight at genesis.
+    _bypass, bypass_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T12:09:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest=genesis["d"],
+    )
+
+    refused = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert refused.ok is False
+    assert "E_PROVENANCE_SEQUENCE_DISCONTINUOUS" in refused.errors
+
+    # Same packet, unchanged and still signed. Only the store changed.
+    paths[1].unlink()
+
+    downgraded = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert downgraded.ok is True, downgraded.errors
+    assert "E_PROVENANCE_CHAIN_GAP:1" in downgraded.warnings
+
+
+def test_invalid_file_sorting_first_does_not_hide_a_valid_occupant(
+    tmp_path, monkeypatch
+):
+    """The index kept only the FIRST path per slot, so garbage could mask a fork.
+
+    `_build_position_index` walks candidates sorted by path. Retaining one entry
+    per (identity, sequence) meant an unsigned file whose name sorts earlier
+    became the sole occupant of that slot; the validity probe then checked only
+    that file, read the slot as empty, and a child bypassing the real signed
+    packet escaped E_PROVENANCE_CHAIN_FORK.
+
+    The occupancy question is "does ANY valid packet hold this slot", not "is
+    the first thing I happened to find valid".
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 2)
+    genesis = json.loads(paths[0].read_text(encoding="utf-8"))
+    live = json.loads(paths[1].read_text(encoding="utf-8"))
+
+    # Unsigned decoy at the same (identity, sequence) as the live packet, named
+    # so it sorts before the digest-named real one.
+    (output_root / "0000-decoy.json").write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": live["i"],
+                "s": live["s"],
+                "p": live["p"],
+                "d": "E" + "z" * 43,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # A child at sequence 2 whose prior digest resolves to nothing, so the walk
+    # takes the GAP path and consults the sequence index for slot 1. A valid
+    # packet holds that slot, so this must be a FORK, not an enumerated gap.
+    assert genesis["d"]  # genesis exists; the child simply does not point at it
+    _bypass, bypass_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "proposal",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T13:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=identity_dir,
+        output_root=output_root,
+        prior_digest="E" + ("q" * 43),
+    )
+
+    result = provenance.validate_packet(bypass_path, workspace_root=tmp_path)
+    assert (
+        "E_PROVENANCE_CHAIN_GAP:1" not in result.warnings
+    ), "a decoy sorting first must not make an occupied slot read as a gap"
+    assert "E_PROVENANCE_CHAIN_FORK" in result.errors, result.errors
+
+
+def test_decoy_claiming_an_ancestor_digest_does_not_poison_the_walk(
+    tmp_path, monkeypatch
+):
+    """The digest index was last-write-wins where the slot index was fixed.
+
+    `_sequence_index` was taught to retain every occupant, but `chain_index` --
+    built from the same scan, keyed on each packet's internal `d` -- kept only
+    the last entry seen. A malformed file that copies a genuine ancestor's `d`
+    and sorts after it replaced that ancestor's path, so the walk validated the
+    decoy and every descendant inherited its errors, while the correctly named
+    signed packet sat untouched on disk.
+
+    Fixing one reader of a scan and not its sibling is the same mistake twice.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 3)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    # Genesis rather than the immediate prior. This used to be forced: the
+    # first hop resolved by FILENAME and never consulted chain_index at all.
+    # Both hops now share `_cursor_for`, and
+    # test_root_level_decoy_does_not_win_the_first_hop covers the other end.
+    middle = json.loads(paths[0].read_text(encoding="utf-8"))
+
+    # Same claimed digest, garbage content, name sorts last.
+    (output_root / "zzzz-decoy.json").write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": middle["i"],
+                "s": middle["s"],
+                "p": middle["p"],
+                "d": middle["d"],
+                "v": middle["v"],
+                "a": [],
+                "sigs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert result.ok is True, (
+        f"a decoy copying an ancestor digest must not poison the walk: "
+        f"{result.errors}"
+    )
+
+
+def test_root_level_decoy_does_not_win_the_first_hop(tmp_path, monkeypatch):
+    """The immediate prior was resolved by a different path than every other hop.
+
+    The loop's later hops picked a candidate that VALIDATES out of chain_index,
+    but the initial cursor called `_find_packet_by_digest`, which checks
+    `provenance_root / f"{digest}.json"` first and returns it deterministically.
+    So a decoy dropped at the root under the parent's digest won the first hop
+    every time, and an otherwise valid child inherited the decoy's errors --
+    the same structure fixed at one reader and not its sibling, a third time.
+
+    Aimed at the IMMEDIATE prior on purpose: that is the hop the earlier decoy
+    test had to avoid.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 3)
+
+    head = paths[-1]
+    assert provenance.validate_packet(head, workspace_root=tmp_path).ok is True
+
+    parent = json.loads(paths[-2].read_text(encoding="utf-8"))
+    head_packet = json.loads(head.read_text(encoding="utf-8"))
+    assert head_packet["p"] == parent["d"], "test aims at the immediate prior"
+
+    # Exactly the path _find_packet_by_digest probes before any glob.
+    decoy = output_root / f"{parent['d']}.json"
+    assert not decoy.exists(), "real packets are filed into dated subdirectories"
+    decoy.write_text(
+        json.dumps(
+            {
+                "t": "prov",
+                "i": parent["i"],
+                "s": parent["s"],
+                "p": parent["p"],
+                "d": parent["d"],
+                "v": parent["v"],
+                "a": [],
+                "sigs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = provenance.validate_packet(head, workspace_root=tmp_path)
+    assert (
+        result.ok is True
+    ), f"a root-level decoy must not win the first hop: {result.errors}"
+
+
+def test_unresolved_consent_is_reported_not_silent(tmp_path, monkeypatch):
+    """The consent gate accepts any non-empty string. Say so, in the result.
+
+    `entry_has_consent()` checks that `decision_action_hash` is a non-empty
+    string and never resolves it against a real ConsentDecision, so a governed
+    System/Substrate claim is admitted on the strength of a string somebody
+    typed. Four independent audits rated this Critical.
+
+    It stays a WARNING rather than an error deliberately: making it fatal today
+    would block every governed claim in the repository, which is the b0de2fe
+    mistake -- correct by the letter of the contract, and it bricks the system.
+    The point is that the hole is no longer invisible.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "AdrChange",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T14:00:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "consent_ref": {"decision_action_hash": "totally-made-up"},
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+
+    # The gate still admits it -- that is the defect being made visible.
+    assert result.ok is True, result.errors
+    assert any(
+        provenance.CONSENT_UNRESOLVED in warning for warning in result.warnings
+    ), result.warnings
+
+
+def test_a_packet_without_consent_raises_no_consent_warning(tmp_path, monkeypatch):
+    """Only packets CLAIMING consent get the marker; ordinary ones stay quiet."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+    _packet, packet_path = provenance.create_packet(
+        [
+            {
+                "claim_type": "CodeChange",
+                "truth_status": "specified",
+                "source_systems": ["unit-test"],
+                "created_at": "2026-08-25T14:01:00Z",
+                "human_collision_node": "anthony",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "unit"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "none",
+            }
+        ],
+        identity_dir=tmp_path / "identity",
+        output_root=tmp_path / "packets",
+    )
+    result = provenance.validate_packet(packet_path, workspace_root=tmp_path)
+    assert not any(
+        provenance.CONSENT_UNRESOLVED in warning for warning in result.warnings
+    ), result.warnings
+
+
+def test_a_malformed_prior_is_rejected_not_treated_as_a_gap(tmp_path, monkeypatch):
+    """`p` was only ever tested for `is None`.
+
+    A schema-invalid prior — "bogus", 123, "" — was stringified into the lookup,
+    missed, and handed to GAP RECOVERY, which resumed further down the chain and
+    could return ok=True carrying only E_PROVENANCE_CHAIN_GAP. A packet whose
+    prior pointer is not a digest does not have a hole in its chain; it does not
+    name a prior at all, and the two must not report the same way.
+
+    The packet has to be SIGNED over the malformed value — editing `p` after the
+    fact trips the signature check first, which is what made a naive repro of
+    this look like it was already handled.
+    """
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    artifact = tmp_path / "artifact.txt"
+    artifact.write_text("content", encoding="utf-8")
+
+    def entries():
+        return [
+            {
+                "claim_type": "CodeChange",
+                "summary": "s",
+                "body": "b",
+                "created_at": "2026-08-30T00:00:00Z",
+                "human_collision_node": "h",
+                "source_systems": ["test"],
+                "truth_status": "Verified",
+                "artifact_refs": [
+                    provenance.artifact_ref(artifact, workspace_root=tmp_path)
+                ],
+                "evidence_refs": [{"type": "test", "ref": "t"}],
+                "risks": [],
+                "benefits": [],
+                "next_action": "n",
+            }
+        ]
+
+    provenance.create_packet(
+        entries=entries(), identity_dir=identity_dir, output_root=output_root
+    )
+    _, middle = provenance.create_packet(
+        entries=entries(), identity_dir=identity_dir, output_root=output_root
+    )
+    middle.unlink()  # a real hole, so gap recovery is reachable
+
+    for bogus in ("bogus", "", "Xnotasaid", "E" + "z" * 42):
+        _, path = provenance.create_packet(
+            entries=entries(),
+            identity_dir=identity_dir,
+            output_root=output_root,
+            prior_digest=bogus,
+        )
+        result = provenance.validate_packet(path, workspace_root=tmp_path)
+        assert result.ok is False, f"p={bogus!r} was accepted"
+        assert (
+            "E_PROVENANCE_PRIOR_INVALID" in result.errors
+        ), f"p={bogus!r} produced {result.errors}"
+        assert not any(
+            "CHAIN_GAP" in w for w in result.warnings
+        ), f"p={bogus!r} was routed into gap recovery"
+        path.unlink()
+
+
+def test_a_wellformed_prior_still_reaches_gap_recovery(tmp_path, monkeypatch):
+    """The shape check must not swallow the case gap recovery exists for."""
+    from packages.activity_log import provenance
+
+    monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    output_root = tmp_path / "packets"
+    identity_dir = tmp_path / "identity"
+    paths = _chain(provenance, tmp_path, identity_dir, output_root, 4)
+
+    paths[1].unlink()  # interior hole, prior pointers all well-formed
+    result = provenance.validate_packet(paths[-1], workspace_root=tmp_path)
+    assert "E_PROVENANCE_PRIOR_INVALID" not in result.errors
+    assert any(
+        "CHAIN_GAP" in w for w in result.warnings
+    ), "a genuine hole must still be enumerated"

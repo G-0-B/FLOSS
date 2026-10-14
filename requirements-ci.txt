@@ -31,3 +31,30 @@ python-dotenv
 requests>=2.32.0
 websockets>=10.0
 PyYAML>=6.0
+
+# tests/test_shared_agent_surface_mcp.py imports it directly. It was missing
+# here, so the required green-set job failed with ModuleNotFoundError the
+# first time PR41 ran against this file -- green locally because tomlkit was
+# already installed, red on a clean runner. Same shape as the jsonschema
+# format-extras gap: a dependency that only exists by accident on the
+# developer machine.
+tomlkit>=0.13
+
+# Hard, unguarded imports in the green-set scope. Found by walking the AST of
+# every module under packages/, tests/ and scripts/tests/ and diffing the
+# third-party imports against this file -- rather than adding them one CI
+# failure at a time, which is how tomlkit and ruamel were each discovered.
+#
+#   httpx   packages/omniroute_client.py imports it at module level.
+#   ruamel  tests/test_shared_agent_surface_mcp.py does `from ruamel.yaml
+#           import YAML` unguarded. Note scripts/tests/test_shared_hook_surface.py
+#           reaches for the same library via pytest.importorskip and so was
+#           always safe; declaring it means both actually run instead of one
+#           silently skipping.
+#
+# msgpack is deliberately still absent: it appears only in docstrings and
+# comments in packages/orchestrator/holochain_connector.py, and it is not
+# installed on the development machine either, so the green set has never
+# needed it. Re-checked, not assumed.
+httpx>=0.27
+ruamel.yaml>=0.18

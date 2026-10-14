@@ -1,0 +1,22 @@
+{
+  "command": [
+    "wsl.exe",
+    "-d",
+    "Ubuntu",
+    "--exec",
+    "env",
+    "PYTHONPATH=/mnt/c/~shit/_audit/pr41-round4-20260929/posix-deps",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+    "python3",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=/mnt/c/~shit/_audit/pr41-round4-20260929/temp/native-complete",
+    "/mnt/c/~shit/_audit/pr41-round4-20260929/snapshot-0472ce1/scripts/tests/test_shared_skill_surface_scope.py"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round4-20260929\\snapshot-0472ce1",
+  "exit_code": 0
+}

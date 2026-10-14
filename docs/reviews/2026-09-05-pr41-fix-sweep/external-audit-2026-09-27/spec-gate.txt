@@ -1,0 +1,2 @@
+SPEC-GATE STALE   FLOSS/scripts/research_log.py (registered but absent — prune or restore)
+SPEC-GATE OK: 107 registered, 0 missing, 0 reuse violations, 1 stale (non-fatal)

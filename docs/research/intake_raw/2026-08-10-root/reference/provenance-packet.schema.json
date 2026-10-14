@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flossi0ullk/specs/provenance-packet-v1.schema.json",
+  "title": "ProvenancePacketV1",
+  "description": "Signed, self-addressing cross-agent handoff record. Spec version 1.4.0. truth_status of this schema itself: specified (not implemented).",
+  "type": "object",
+  "required": ["v", "t", "d", "i", "s", "p", "a", "sigs"],
+  "additionalProperties": false,
+  "properties": {
+    "v": {
+      "type": "string",
+      "pattern": "^FLOSSI10JSON[0-9a-f]{6}_$",
+      "description": "Format id + hex byte length of final JCS serialization. Placeholder FLOSSI10JSON000000_ during digest computation."
+    },
+    "t": {
+      "type": "string",
+      "const": "prov"
+    },
+    "d": {
+      "type": "string",
+      "pattern": "^(E[A-Za-z0-9_-]{43}|#{44})$",
+      "description": "SAID. BLAKE3-256 digest, CESR 'E' code + 43 base64url chars. 44 '#' chars only as placeholder during computation. Code correctness UNVERIFIED — see spec section 9.2."
+    },
+    "i": {
+      "type": "string",
+      "pattern": "^D[A-Za-z0-9_-]{43}$",
+      "description": "Agent identifier: 'D' + base64url raw Ed25519 verify key. Code correctness UNVERIFIED — see spec section 9.1."
+    },
+    "s": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Per-i monotonic sequence, decimal string."
+    },
+    "p": {
+      "type": ["string", "null"],
+      "pattern": "^E[A-Za-z0-9_-]{43}$",
+      "description": "Prior packet SAID in the SAME i chain. null at genesis. NOT for cross-agent lineage — use evidence_refs[type=provenance_packet]."
+    },
+    "a": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/payloadEntry" }
+    },
+    "sigs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^0B[A-Za-z0-9_-]{86}$",
+        "description": "Detached Ed25519 signature, CESR '0B' code + 86 base64url chars. Code correctness UNVERIFIED — see spec section 9.4."
+      },
+      "description": "Empty array during digest and signing-payload computation."
+    }
+  },
+  "$defs": {
+    "payloadEntry": {
+      "type": "object",
+      "required": [
+        "claim_type",
+        "truth_status",
+        "created_at",
+        "source_systems",
+        "artifact_refs",
+        "evidence_refs",
+        "summary",
+        "next_action"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "claim_type": {
+          "type": "string",
+          "enum": ["observed_fact", "repo_assumption", "proposal", "target", "consent_grant"]
+        },
+        "truth_status": {
+          "type": "string",
+          "enum": ["verified", "specified", "aspirational", "unverified"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Self-asserted UTC timestamp. No trusted timestamping in v1.4; backdating is possible."
+        },
+        "source_systems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "human_collision_node": { "type": ["string", "null"] },
+        "action_ref": { "type": ["string", "null"] },
+        "consent_ref": {
+          "type": ["string", "null"],
+          "description": "ConsentDecision action hash. Required for governed System/Substrate bindings unless bootstrap exemption is active."
+        },
+        "consent_payload_ref": { "type": ["string", "null"] },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "ref"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "spec", "test", "adr", "url", "commit",
+                  "file", "log", "activity", "source_chain", "provenance_packet"
+                ]
+              },
+              "ref": { "type": "string" },
+              "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "description": "DAG. Max packet-ref depth 8. Cycles invalid. Every chain must terminate in a non-packet type."
+        },
+        "summary": { "type": "string", "maxLength": 2000 },
+        "risks": { "type": "array", "items": { "type": "string" } },
+        "benefits": { "type": "array", "items": { "type": "string" } },
+        "next_action": { "type": "string" },
+        "keri_event_ref": { "type": "null" },
+        "a2a_entity_card_ref": { "type": "null" },
+        "in_toto_predicate_type": { "type": "null" },
+        "prov_o_activity_id": { "type": "null" }
+      }
+    }
+  }
+}

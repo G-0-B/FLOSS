@@ -1,0 +1,4 @@
+CHECK DRIFT /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out/skill-registry.json
+CHECK DRIFT /mnt/c/~shit/_audit/pr41-round4-20260929/fixtures-posix/cli-nul/owner/out/SKILL_INDEX.md
+KEEP  first: a-unusable has a managed marker with no usable installing-workspace identity (missing or invalid); ownership unknown, left in place (delete it by hand if it is stale)
+DRIFT first: z-withdrawn is an installed managed projection with no skill in the manifest (withdrawn or renamed)

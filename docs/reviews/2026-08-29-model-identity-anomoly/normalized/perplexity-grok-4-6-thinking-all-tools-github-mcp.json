@@ -1,0 +1,168 @@
+{
+ "reviewer": {
+  "model_selected": "perplexity-grok-4-6-thinking-all-tools-github-mcp",
+  "harness": "perplexity",
+  "model_vendor_states": null,
+  "model_self_reported": "claude-sonnet-4-5",
+  "self_reported_harness": "Perplexity MCP + github_mcp_direct + execute_code",
+  "tools_used": [
+   "github",
+   "execution"
+  ],
+  "saw_prior_reviews": false
+ },
+ "findings": [
+  {
+   "id": "F1",
+   "claim": "verify_anchor() never checks prev_root chain continuity, contradicting the spec's own step 2 of verification, so an anchor-file replacement attack is invisible to the CLI verifier without key pinning.",
+   "severity": "critical",
+   "location": "packages/activity_log/anchor.py:verify_anchor (lines ~270-350); docs/specs/provenance-anchor.spec.md section 'Verify', step 2",
+   "evidence": [
+    "anchor.py verify_anchor(): full function body — no code references anchor['prev_root'] at all; the dict result is built from current_root vs anchored_root only.",
+    "spec: 'Walk `prev_root` backwards and confirm the series is unbroken.' (provenance-anchor.spec.md, Verify section, step 2)",
+    "scripts/provenance_anchor.py _verify(): 'result = anchor_lib.verify_anchor(args.provenance_root, stored, expected_signer=args.expect_signer)' — sole call; no post-processing of prev_root.",
+    "Consequence: an operator with write access to .anchors/anchor.json who has not been key-pinned can replace the file with a fresh genesis anchor (prev_root=null, new keypair, store-consistent root) and the CLI exits 0 VERIFIED with no chain-break signal."
+   ],
+   "falsifier": "Show a code path in verify_anchor() or _verify() that reads and validates prev_root against a historical record.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F2",
+   "claim": "The `signer` AID field is excluded from the signed bytes, meaning the binding between the signing key and the identity claim is not attested by the signature itself — any key that can produce a valid sig can substitute its own AID without detection when expected_signer is not pinned.",
+   "severity": "major",
+   "location": "packages/activity_log/anchor.py:sign_anchor (line ~230); anchor_signing_bytes (line ~220)",
+   "evidence": [
+    "anchor.py anchor_signing_bytes(): 'clone = {k: v for k, v in anchor.items() if k not in (\"sig\", \"signer\")}' — signer is excluded.",
+    "anchor.py sign_anchor(): 'signed[\"signer\"] = identity.aid; signature = identity.signing_key.sign(anchor_signing_bytes(anchor)).signature' — signs the pre-signer dict; signer field added after signing and not re-signed.",
+    "anchor.py anchor_signature_problem(): 'if expected_signer is not None and signer != expected_signer: return ...' — without pinning, the signer field is accepted on faith and used to look up the verification key.",
+    "Attack: write anchor.json, replace signer with attacker AID, replace sig with attacker signature over same content; verifier with no expected_signer sees valid sig, trusts attacker AID. No forgery of packet data needed."
+   ],
+   "falsifier": "Show that anchor_signing_bytes includes the signer field, or that the verification path enforces a pinned key regardless of signer field value.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F3",
+   "claim": "The default --max-output cap of 8000 characters in the CLI verify path silently truncates the findings JSON mid-document on a live 99-identity store with multiple findings, producing malformed JSON output while the exit code remains correct.",
+   "severity": "major",
+   "location": "scripts/provenance_anchor.py:_verify line ~130: 'print(json.dumps(result, indent=2, ensure_ascii=False)[:args.max_output])'",
+   "evidence": [
+    "scripts/provenance_anchor.py _verify(): 'print(json.dumps(result, indent=2, ensure_ascii=False)[: args.max_output])' — hard slice at 8000 chars.",
+    "parser.add_argument('--max-output', type=int, default=8000) — default is 8000.",
+    "A TRUNCATION_DETECTED result over 99 identities with per-identity head_saids, interior_gaps, duplicate_seqs, and findings dict will routinely exceed 8000 chars (spec records 4 holes on DkuY… and duplicates on DVpMe…). The printed string will be syntactically incomplete JSON.",
+    "Exit code is derived from result['status'] (not the sliced string), so the process exit is correct but any downstream pipeline parsing stdout via json.loads() will raise JSONDecodeError — a silent false pass at the pipeline level if errors are swallowed."
+   ],
+   "falsifier": "Show that a 99-identity anchor result with findings fits within 8000 characters, or that all documented CI integrations use --max-output with a sufficient value.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F4",
+   "claim": "The 'ADR-18 adopt-before-build' ladder is not satisfied: OpenTimestamps anchors an arbitrary hash to Bitcoin's blockchain with zero new dependencies, zero network egress at verify time, and permanent operator-independent timestamping — it does what the git-tag firehose argument aspires to do, but verifiably.",
+   "severity": "major",
+   "location": "docs/specs/provenance-anchor.spec.md: 'Building a small Merkle commitment on existing dependencies ... was preferred to adopting a transparency-log service because it adds no dependency and no network egress.'",
+   "evidence": [
+    "OpenTimestamps client (https://opentimestamps.org) is a single Python file with no runtime network egress at verify time; verification uses Bitcoin block headers only, obtainable from any node or public API.",
+    "The root string produced by _encode_root() is a 44-character ASCII string that fits trivially in an OTS submission; OTS would produce a .ots proof file that any verifier can check against Bitcoin without trusting the operator or GitHub.",
+    "The author's stated reason for not using OTS/Rekor is 'no dependency and no network egress' (spec, Composition section). OTS verification requires fetching a Bitcoin block header — a single HTTP call to any public node — which is weaker than the claim but not equivalent to 'no network egress' at publish time. The publish step ALREADY requires a network push (git push), making the 'no network egress' argument internally inconsistent.",
+    "What would specifically be lost by OTS: the per-identity head_saids / max_seq / interior_gaps metadata anchoring, which OTS does not capture. The ROOT could be OTS-anchored while the metadata lives in the commit. The artifact builds both halves but anchors neither externally."
+   ],
+   "falsifier": "Show that OTS imposes a dependency or network requirement that the current git-push step does not, or that the ADR-18 prior-art gate was explicitly waived for OTS.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F5",
+   "claim": "A concurrent or partial write that produces syntactically valid JSON with a plausible packet structure but an incomplete or wrong SAID will be committed as a real leaf, causing a false ANCHOR_MISMATCH on the next run after the write completes correctly.",
+   "severity": "minor",
+   "location": "packages/activity_log/anchor.py:scan_packets lines ~150-200",
+   "evidence": [
+    "scan_packets: only catches OSError and json.JSONDecodeError. A valid JSON dict with t='prov' and a truncated-but-string d field passes all isinstance checks and is committed as a PacketLeaf with the wrong SAID.",
+    "scan_packets comment: 'a half-written packet must not be able to wedge the anchor run' — the code prevents crashes and silent disappearance, but does not prevent inclusion of semantically wrong leaves.",
+    "On the next run after the write completes, the SAID will be correct; the previously-anchored root will differ; the head_saids check will find the CORRECT SAID absent from the prior anchor → TRUNCATION_DETECTED, misclassified.",
+    "Frequency on Windows: NTFS does not guarantee atomic rename; write-then-rename is not used by provenance.py (speculative — provenance.py not retrieved); if in-place write is used, partial-valid JSON is reachable."
+   ],
+   "falsifier": "Show provenance.py writes packets atomically (write-to-temp + rename) making partial-valid JSON unreachable, or that SAID validation is applied in scan_packets.",
+   "confidence": "likely",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F6",
+   "claim": "The spec's 'Verified behaviour' table claims 'packet moved to the store root → VERIFIED' validates the rglob depth argument, but the corresponding test moves a file to store root and checks VERIFIED — it does not test that a fixed-depth glob would have returned ANCHOR_MISMATCH, so the test does not falsify the bug it claims to guard against.",
+   "severity": "minor",
+   "location": "packages/activity_log/tests/test_anchor.py:test_a_packet_moved_to_the_store_root_stays_in_the_set (line ~175); docs/specs/provenance-anchor.spec.md: Verified behaviour table row 7",
+   "evidence": [
+    "test_anchor.py test_a_packet_moved_to_the_store_root_stays_in_the_set: moves file, calls _status(), asserts VERIFIED. Docstring: 'A fixed `*/*.json` glob would have dropped it silently.'",
+    "The test never instantiates a fixed-depth scanner and asserts it produces a DIFFERENT result. It proves rglob works, but not that the alternative would have failed — the test is a one-armed comparative, not a differential.",
+    "This is a test quality issue, not a logic defect: the production code is correct, but the guard rail does not prove the counterfactual it claims to guard."
+   ],
+   "falsifier": "Add a second assertion using a hypothetical fixed-depth scanner on the same moved-packet store and confirm it produces ANCHOR_MISMATCH.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F7",
+   "claim": "The threat model omits the case where the anchor repository is forked or mirrored by the operator to a second account they control before the anchor is published, allowing the operator to pre-stage a tampered anchor history that post-dates the honest one while appearing to be a third-party copy.",
+   "severity": "minor",
+   "location": "docs/specs/provenance-anchor.spec.md: Limits section",
+   "evidence": [
+    "Limits section lists: operator key rotation, self-asserted timestamps, no repair, mirror retention unverified, no validity check, no window defense, no retained-root guarantees. No mention of operator-controlled mirror pre-staging.",
+    "The firehose argument relies on 'third parties with no write path back' — GitHub mirrors of public repos operated by the same GitHub account are controlled by the same operator. GH Archive ingests all public events including from operator-owned forks.",
+    "speculative — no evidence that such a fork exists or that GH Archive is indexing this repo."
+   ],
+   "falsifier": "Show that the third-party mirror requirement explicitly excludes operator-controlled accounts, or that the pinned-key requirement makes pre-staged tampered anchors detectable regardless.",
+   "confidence": "speculative",
+   "novel_vs_prior": "novel"
+  },
+  {
+   "id": "F8",
+   "claim": "The prior-art survey for the anchor itself was conducted by a single model family (stated in the spec), meaning the ADR-18 independence bar (≥3 provider surfaces, ≥4 model families) was not met for the anchor's own prior art, not merely for the reuse review — the artifact is self-reporting its own survey as inadequate.",
+   "severity": "minor",
+   "location": "docs/specs/provenance-anchor.spec.md: Outstanding section: 'The prior-art survey ... was conducted by a single model family, which does not satisfy the ≥3 provider surfaces / ≥4 model families independence bar.'",
+   "evidence": [
+    "provenance-anchor.spec.md Outstanding section verbatim: 'The prior-art survey (Rekor, SCITT, Trillian, git tags, Holochain) was conducted by a single model family, which does not satisfy the ≥3 provider surfaces / ≥4 model families independence bar.'",
+    "The artifact prompt states the survey document at docs/research/2026-08-26-ensemble-aggregation-prior-art.md 'is about a different subsystem' — meaning no correctly-scoped multi-family survey document exists for this artifact at all.",
+    "This means F4 (the ladder question) cannot be answered by the artifact's own prior-art record; this review is simultaneously the reuse review AND filling the prior-art gap."
+   ],
+   "falsifier": "Show a separate prior-art survey document scoped to the provenance anchor, produced by ≥4 model families.",
+   "confidence": "verified",
+   "novel_vs_prior": "novel"
+  }
+ ],
+ "refutations": [
+  {
+   "id": "R1",
+   "author_claim": "Sequence gaps operate at chain scale; truncation attacks set scale; therefore no amount of gap enumeration can ever detect it, and a commitment at set scale is not a better version of the same check but the first check at the right scale.",
+   "verdict": "verified_correct",
+   "evidence": [
+    "The mathematical argument is sound: gap enumeration requires at least one surviving packet to measure against. With zero surviving packets (single-identity wipe) or all survivors below the truncation point (head truncation), no arithmetic hole exists. This is not a design trade-off but a logical ceiling on what any sequence-gap check can see.",
+    "Measured live: 96/99 identities are single-packet chains (stated in anchor.py module docstring, provenance-anchor.spec.md Purpose section). The existing gap check covers ~3% of identities and 0% of head truncations. The claim is verified by the store's own statistics.",
+    "The 'first check at the right scale' framing is justified: a Merkle SET commitment over all packets operates on the cardinality of the full set, not on gaps within a subset. These are non-overlapping domains."
+   ]
+  },
+  {
+   "id": "R2",
+   "author_claim": "The root must ride in the git tag name and commit message rather than only in file contents, because the operator controls both the store and the remote — so a ref they can rewrite constrains nobody.",
+   "verdict": "partially_correct_mechanism_unverified_in_practice",
+   "evidence": [
+    "The mechanism is technically correct: GitHub PushEvent carries head_commit.message and CreateEvent carries ref (tag name) into the public events firehose. GitHub API documentation confirms this at https://docs.github.com/en/developers/webhooks-and-events/events/github-event-types.",
+    "GH Archive (gharchive.org) archives these events. GH Archive is a real, operated service used by researchers, confirmed at https://www.gharchive.org/.",
+    "HOWEVER: the spec correctly labels this ⚠️ Specified. No confirmation that GH Archive has indexed G-0-B/FLOSS. The events are transient in GitHub's own API (90-day retention). If the repo was not indexed before the API window closed for a given event, the root in the tag name is only in GitHub's own storage — which is operator-reachable via force-push or repo deletion.",
+    "The 'operator cannot rewrite' claim is therefore correct FOR events already ingested by GH Archive, and ⚠️ Specified for whether ingestion occurred."
+   ]
+  },
+  {
+   "id": "R3",
+   "author_claim": "ANCHOR_STALE must be neither a pass nor a failure, because honest growth is the common case and a gate that cries wolf every session gets turned off.",
+   "verdict": "verified_correct",
+   "evidence": [
+    "anchor.py EXIT_CODES: ANCHOR_STALE maps to exit 1, VERIFIED to 0, TRUNCATION_DETECTED/ANCHOR_MISMATCH to 2. The separation is implemented and tested.",
+    "test_anchor.py test_stale_is_not_a_pass: 'assert anchor_lib.EXIT_CODES[result[\"status\"]] != 0' and asserts it differs from TRUNCATION_DETECTED exit code.",
+    "The operational reasoning is sound: a store that receives new packets every session will produce ANCHOR_STALE on every verify run between anchors. Mapping that to exit 2 (the failure code) would cause every CI run to fail until a new anchor is published, exactly the 'cry wolf' failure mode described. The distinct exit code 1 allows a pipeline to distinguish 'nothing was lost but re-anchor soon' from 'something is gone'."
+   ]
+  }
+ ],
+ "predicted_majority": "Other reviewers will likely converge on: (1) the mirror-retention Specified/Verified gap as the dominant threat (already flagged by the author as ⚠️), (2) the signing key / key-rotation limit as the dominant crypto weakness, and (3) the ADR-18 ladder question producing a finding that Rekor or OTS should have been adopted first. The overall verdict will likely be 'sound for what it claims to be, insufficient for what it needs to become, and correctly honest about its own limits.'",
+ "where_you_expect_to_be_alone": "F1 — the prev_root chain is specified as a verification step but never implemented in verify_anchor() or the CLI. This is a gap between the written spec and the running code that produces a silent false VERIFIED when an anchor-file replacement attack is executed against an unpinned verifier. Other reviewers will note the key-pinning limit (already author-acknowledged) but are unlikely to trace it to the specific missing code path in verify_anchor()."
+}

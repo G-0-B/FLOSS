@@ -7,8 +7,8 @@ applies_to:
 - any-agent
 source: legacy_claude_memory
 legacy_filename: project_omo_momus_voter.md
-title: omo-momus persona voter is wired and approved in production
-legacy_description: oh-my-openagent's Momus reviewer persona is now a consensus-gateway
+title: executability-reviewer voter (ex omo-momus) — persona rewritten clean-room 2026-08-12
+legacy_description: SUPERSEDED IN PART — see the 2026-08-12 update at the end of this file. Originally oh-my-openagent's Momus reviewer persona became a consensus-gateway
   voter. Adds cognitive-style diversity (blocker-finder, approve-by-default) to model-family
   diversity. Two voters in diverse-max use Momus on top of groq/openai/gpt-oss-120b
   and groq/llama-3.3-70b-versatile. Validated by consensus round 019e1d61 APPROVED
@@ -55,3 +55,26 @@ Consensus round 019e1d61-24fa-753d-bdce-1444ba0a1d1e (2026-05-12): "Was wiring M
 
 - Default heartbeat profile is `diverse-max` (16-voter, includes 2 omo-momus). For tighter polls, use `diverse` (6-voter, no omo). For dev/quick tests, use `fast` (2-voter).
 - To add a new omo persona voter: extract the agent's system prompt from `~/.cache/opencode/node_modules/oh-my-opencode/dist/index.js`, add a `<NAME>_PERSONA_SYSTEM` constant + `make_omo_<name>_voter` factory in voters.py mirroring the Momus pattern, register `omo-<name>-<model>` entries in voter_registry.json, and update the prefix dispatch in `build_default_voters`.
+
+
+---
+
+## Update 2026-08-12 — persona rewritten clean-room, voter renamed
+
+**The derivation is gone.** `MOMUS_PERSONA_SYSTEM` was adapted from oh-my-opencode v4.0.0's `MOMUS_DEFAULT_PROMPT`. That upstream is **SUL-1.0** — source-available, not OSI-approved — and incompatible with this project's AGPL-3.0-or-later grant under ADR-7. The prompt was replaced with a clean-room rewrite derived from this repo's own consensus schema, not from the upstream text.
+
+| Was | Now |
+|---|---|
+| `MOMUS_PERSONA_SYSTEM` | `EXECUTABILITY_REVIEWER_SYSTEM` |
+| `make_omo_momus_voter()` | `make_executability_voter()` (old name kept as an alias) |
+| `omo-momus-*` registry keys | `exec-review-*` (old prefix still routes) |
+
+**What the new persona does differently.** The old text was generic plan-review advice. The replacement is written against our actual schema, so it can check things the original could not name: evidence-ref *types* (including the `file`/`log`/`activity`/`source_chain` values added by the v1.5 D3 widening), truth labels doing more work than their evidence supports, negatives that fail to state their search scope, and calibration against the per-radius approval thresholds (Local 0.30 / Module 0.50 / System 0.60 / Substrate 0.85) rather than one flat band. It also states explicitly that the voter is an input to a router and that preserved disagreement surfacing a CONFLICT beats false agreement.
+
+**Unchanged:** the architectural reason this voter exists — style diversity on top of model-family diversity — and its lane discipline: executability and reference-resolution only, leaving optimality and architecture to other voters.
+
+**`CRITIC_PERSONA_SYSTEM` was never affected.** It is original FLOSSI0ULLK text encoding the UTN "Don't Force Machinery" constraint; only its `omo-critic-` registry prefix was borrowed naming, which carries no licence implication.
+
+**Governance note.** ADR-12 classifies voter persona prompts as *Governed* — persona injection shapes voter behaviour, so per CFIS LSM-Override a change requires explicit binding. This change was operator-directed on 2026-08-12; that instruction is the binding.
+
+**Consensus round `019e1d61` (APPROVED 2026-05-12) validated the original persona, not this one.** Treat the clean-room replacement as ⚠️ Specified until a fresh round exercises it.

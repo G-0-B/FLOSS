@@ -1,0 +1,360 @@
+{
+  "base": "42e4d05d1ddfcc696e19c5b91a08e5e7d48f618c",
+  "endpoint": "0472ce104a6a1f55ec707c1242689f62d3dfde3c",
+  "live_head": "6ea76202efce3ac85dc68bbbdc99ac21b6925ac4",
+  "live_status": "",
+  "files": [
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/PACKET.md",
+      "sha256": "f2f755302cdabbeda79e1773a48048115726de25f59b47b9d9548a19761b1754",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/RESULT.md",
+      "sha256": "89525bc145c1e2287190d77603b651163980ac70b6f8e82b95ebb54da59d263b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/REVIEW.md",
+      "sha256": "21222f15da6942a023facdaa82d1ea3ad4c6e4ed12164e9f3bca31a11bbc90ca",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/baseline.command.json",
+      "sha256": "6c33a1b81261fbf1448964c7d788c44fbaefdbd2e1d4cf749294edc093b1e173",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/baseline.txt",
+      "sha256": "b29a8f78ec2bbcd28ac08fb29aed2d67e133f3689519eae18c7f31c85a385d93",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/baseline.xml",
+      "sha256": "40ec8cf0ab4d4ecd3708838974afcc8cb61ec64354bb21b209ed1dc2c2ea4f19",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/default-worktree-root.txt",
+      "sha256": "27afa4ccd2873fa60644d819907491ed4eecc429d0fcb28f827100b37b1d1eaa",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/discrimination.py",
+      "sha256": "8573d71cd26afb88711ae896acd7271dcd79dda245a85b9f17a45255bed7ca31",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/environment.json",
+      "sha256": "f69df43cb848f65988b88245c4a61119543c25795af01356ebf5be233f084fde",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/file-replace-recheck.command.json",
+      "sha256": "9b98915bfdb28115632bf76161d529b26a0c3a176681f0e06e8f6bfaaf59d51a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/file-replace-recheck.txt",
+      "sha256": "d4cfa697a2ba3f7c9aef5ab503286c73d1b8ca18c8f1c07a065150a45c4cfa91",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/final-checks.command.json",
+      "sha256": "90ba7840b04839b0620ee5d97bec33faf3378072ae3922de7944f9c87c33a282",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/final-checks.txt",
+      "sha256": "b84a79bf4b5daaa9d7e1b7592f870681d0bac81296b56b80ea45e82c49c59417",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/final_checks.py",
+      "sha256": "ab1ea2006daf6cfbfe28be27831e0112133588ea95b30a9e3af5bde451089391",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/focused.command.json",
+      "sha256": "803ddebc8cf2da65629aac3e47a6656d8e06a0ac7ec26ca323579b69931550f1",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/focused.txt",
+      "sha256": "a42a49ec4db216297bbe61414cb33e77819c576b29f352c7dd9bff0ac73fefa4",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/focused.xml",
+      "sha256": "4f25c5e54731f73a006c89121f4e59e7449759bf5ca2db21ac19754eebdae5c9",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/full-suite.command.json",
+      "sha256": "58855f204a33fd6c24ae72bef83c62cc9b547d72e1660caeb96ef07312ef203d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/full-suite.txt",
+      "sha256": "53d6526f199e86d3e102693ba6d009a1fb3c8cef9f0dc9f6367d82d987e242b4",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/full-suite.xml",
+      "sha256": "6c6e19d6d4195c482ce01ad1d208ef385ca3ceae4f3bedffd9e6047ca06d8f03",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/identity.json",
+      "sha256": "a269cc1da6f3e4cae6e39a06601f17b65d8f8631d183d95f33e0fa06e6bd9f14",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/lint.command.json",
+      "sha256": "3e13e8569e06652617c190d36c55a233a92bc6b272ae577fbd16b7544d82d875",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/lint.txt",
+      "sha256": "ea144460ef757a971eb618fd6e06cc3fc1ba9df38031d6ca2551140617b91c30",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix-full-baseline.command.json",
+      "sha256": "f8922491ba2e4023fe6fcad16b4808d59b0b19e22cfced8b8fab327bcf983759",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix-full-baseline.txt",
+      "sha256": "c8aa8d8ed3f2d0733e5898225caee89724284773ab9706ed5459feabe6b2f5de",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix-full-endpoint.command.json",
+      "sha256": "ed45cace90a241c80457863395f25fb48e0ad33d7280d649afcdf4c071907eff",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix-full-endpoint.txt",
+      "sha256": "21c754808a5c7df71ac1347a85d8b78ccb58e0d676fc28c2ae3f3497882795f8",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix-full.txt",
+      "sha256": "30c8591ab66080ea95afa106fbf5776cdc5010db6bf5630dae6535f26c64111e",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix.command.json",
+      "sha256": "e178b16dbdf7ac961832a6e9d47da0f31f620922200965218a2115000926b4bd",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix.txt",
+      "sha256": "1a08d88310190d62674fd188af3ea1eadf9b37bc581e5d67ce0d17c7a73af61f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix_full_probe.py",
+      "sha256": "9c9052a8f930f5783958c268c6f93c5aa831aecb4ab0e462a6912e4597f5e8c7",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/posix_probe.py",
+      "sha256": "a9f6ecf9dc94ee44fa0b875e76af73508911b59aecb2ec6af457e65d902bdae2",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/prepare.py",
+      "sha256": "c597b85629d618933981caaffbbc77ce04e010810ab0375b598084583af8b3f0",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/probes.command.json",
+      "sha256": "719ef002e9a0f238fa04f059622b4889240ad6739105e8662f9ccfed63b978f3",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/probes.py",
+      "sha256": "d8814a1bb5fe2b93fd7b10717c5dcefd4e3d64dd37127fd75e9fddb93f6cfcc8",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/probes.txt",
+      "sha256": "f3bc8aaad3f730ea2555e0b09ed85e08af6dbe47a96b02d38728116623e4254d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/report-readback.json",
+      "sha256": "2eca7ec503a5dd3bbc765f945eafd103c2f33e89176940cf0768b8339d3d020d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/run_check.py",
+      "sha256": "9a7a74ad2d1d86617b20800222a978f02f8062969ad24b92a60fd646a1405195",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/run_posix.py",
+      "sha256": "a4fc1e6824a0c949230711cda01be924afe4024e52909f5b5b9689688bc1dd7b",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/run_posix_full.py",
+      "sha256": "f637c1143ae5ad9876221dc2a035f5b35aeea44c572c97aa3e1e370346ba1c0a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/spec-gate.command.json",
+      "sha256": "10eb9e5d527076028b8fd9cb77c082f653d15f66b100ceec11bbf2a5a52b472f",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/spec-gate.txt",
+      "sha256": "b47113a00f596e2e512d9f87b5471c4260668e63f27d0b954f4432c914459b64",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/external-audit-2026-09-29/verify_report.py",
+      "sha256": "7811a4ff402975d2533adb8ad5a788a60a4049b938434f842ef7401d24cb7bc7",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/internal-reviews.md",
+      "sha256": "d9085c5eb64a37633c895fd446a80b2f0fe74cc09a0e49475293e32fed269fa3",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/o2-skill-inventory/skill_inventory.py",
+      "sha256": "c2dde4e6d6946b1e4f38da9e3e96f0878552e4e6d0a05dda926ecc6bcb7a8ca5",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/o2-skill-inventory/skill_inventory.txt",
+      "sha256": "d47b93b0e56792b73e3f7a18a595694240c71bcebdd60b6f5bb96e04f88e384d",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/posix-f4-check/output.txt",
+      "sha256": "c8e1134b54825440a025ea97b478b788e28f437f7959f974f978c7352a48b8c1",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/posix-f4-check/probe.py",
+      "sha256": "e84612e8b13b06d5b26dc5df2f06f4f39288facd61b17ec857041f7a0a302a2a",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/source-changes.patch",
+      "sha256": "281a9e08c0cb4239f9eef6a2f3e88b7ac8d4501f3a25e938bc4c1cbca08c1e25",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/2026-09-29-pr41-audit-response/test-changes.patch",
+      "sha256": "08cd1a0e9806261022ecb7b627a46f6bc77992057043793807f913928a130b19",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "docs/reviews/README.md",
+      "sha256": "abf2645b8992b14114726ab5cbd9b4ab7b07765c01ca250a8e3843f8f6aea648",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/materialize_shared_skill_surface.py",
+      "sha256": "4ba045521fbcb59a205bc6fff90ccc82d3cefe0965ae60bdb420afe68a516ca2",
+      "exact": true,
+      "same_lf": true
+    },
+    {
+      "path": "scripts/tests/test_shared_skill_surface_scope.py",
+      "sha256": "dbbaeca7977189b7ca32601b2d82d56080379619ee600610ddffaee9c083ad58",
+      "exact": true,
+      "same_lf": true
+    }
+  ],
+  "patch_fidelity": [
+    {
+      "packet": "source-changes.patch",
+      "commit": "9a23477",
+      "files": [
+        "scripts/materialize_shared_skill_surface.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "source-changes.patch",
+      "commit": "69c4cbd",
+      "files": [
+        "scripts/materialize_shared_skill_surface.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "9a23477",
+      "files": [
+        "scripts/tests/test_shared_skill_surface_scope.py"
+      ],
+      "matches": true
+    },
+    {
+      "packet": "test-changes.patch",
+      "commit": "69c4cbd",
+      "files": [
+        "scripts/tests/test_shared_skill_surface_scope.py"
+      ],
+      "matches": true
+    }
+  ]
+}
