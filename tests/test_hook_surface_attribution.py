@@ -243,3 +243,42 @@ def test_the_declaration_survives_materialization_for_every_target():
             f"{target}: the declared surface did not survive materialization; "
             "every edit on this surface would be attributed by inference"
         )
+
+
+def test_antigravity_write_tools_are_attributed_to_antigravity():
+    """Antigravity (AGY) writes through `write_to_file` and
+    `replace_file_content`; neither name is used by another harness here."""
+    hook = load_hook()
+
+    assert hook.infer_surface("write_to_file", "") == "antigravity"
+    assert hook.infer_surface("replace_file_content", "") == "antigravity"
+
+
+def test_antigravity_write_tools_are_gated_by_both_hooks():
+    """A tool missing from either set is a write the hooks silently skip."""
+    post = load_hook()
+    spec = importlib.util.spec_from_file_location(
+        "hook_pre_write", REPO_ROOT / "hooks" / "hook_pre_write.py"
+    )
+    pre = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(pre)
+
+    for name in ("write_to_file", "replace_file_content"):
+        assert name in post.MUTATING_TOOL_NAMES
+        assert name in pre.MUTATING_TOOL_NAMES
+
+
+def test_antigravity_change_sections_carry_the_edit():
+    """The voters see the replacement and the full new file, not a JSON dump."""
+    hook = load_hook()
+
+    replaced = hook._render_change_section(
+        "replace_file_content",
+        {"TargetContent": "old line", "ReplacementContent": "new line", "Instruction": "rename"},
+    )
+    assert "--- replacement ---\nnew line" in replaced
+    assert "old line" in replaced and "rename" in replaced
+
+    written = hook._render_change_section("write_to_file", {"CodeContent": "print(1)"})
+    assert "full new file content):\nprint(1)" in written
