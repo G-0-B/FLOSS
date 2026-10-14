@@ -1312,6 +1312,80 @@ def test_a_guard_that_cannot_be_taken_is_not_a_reclaim(tmp_path, monkeypatch, ca
     assert pid_path.exists()
 
 
+def test_reclaim_removes_both_records_while_holding_the_guard(
+    tmp_path, monkeypatch, capsys
+):
+    """Spec LSI-B1: the removals are inside the guard, not only the snapshots.
+    Moving them out of the `with` left the snapshot test green."""
+    from contextlib import contextmanager
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"stale-record")
+    sidecar = mcp_daemon._identity_path(pid_path)
+    sidecar.write_bytes(b"stale-identity")
+    held = {"now": False}
+    outside: list[str] = []
+
+    @contextmanager
+    def guard(path, *, timeout_seconds=None):
+        held["now"] = True
+        try:
+            yield
+        finally:
+            held["now"] = False
+
+    real_cleared = mcp_daemon._sidecar_cleared
+    real_reclaim = mcp_daemon._reclaim_claim_if_unchanged
+
+    def cleared(*args, **kwargs):
+        if not held["now"]:
+            outside.append("sidecar removal")
+        return real_cleared(*args, **kwargs)
+
+    def reclaim(*args, **kwargs):
+        if not held["now"]:
+            outside.append("claim removal")
+        return real_reclaim(*args, **kwargs)
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", guard)
+    monkeypatch.setattr(mcp_daemon, "_sidecar_cleared", cleared)
+    monkeypatch.setattr(mcp_daemon, "_reclaim_claim_if_unchanged", reclaim)
+    monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--reclaim-claim", str(pid_path)])
+
+    code = mcp_daemon._reclaim_claim_cli()
+
+    assert outside == []
+    assert code == 0
+    assert capsys.readouterr().out.strip().endswith("RECLAIMED")
+    assert not pid_path.exists()
+    assert not sidecar.exists()
+
+
+@pytest.mark.parametrize("error", [OSError("disk"), ImportError("no module")])
+def test_a_guard_failure_that_is_not_a_timeout_is_not_a_reclaim(
+    tmp_path, monkeypatch, capsys, error
+):
+    """Spec LSI-B1: any failure to take the guard is NOT_RECLAIMED."""
+    from contextlib import contextmanager
+
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"stale-record")
+
+    @contextmanager
+    def broken(path, *, timeout_seconds=None):
+        raise error
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", broken)
+    monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--reclaim-claim", str(pid_path)])
+
+    code = mcp_daemon._reclaim_claim_cli()
+
+    assert code == 1
+    assert capsys.readouterr().out.strip().endswith("NOT_RECLAIMED")
+    assert pid_path.exists()
+
+
 def test_an_unreadable_sidecar_stops_the_claim_from_being_freed(tmp_path):
     """Absent and unreadable are different answers. Absent is ordinary -- most
     stale claims never had a sidecar. Unreadable means we cannot tell whose

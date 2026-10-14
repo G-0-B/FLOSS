@@ -589,6 +589,104 @@ def test_a_collision_among_events_the_target_does_not_declare_is_not_an_error():
     assert set(mapped) == {"tool_call"}
 
 
+def test_an_event_with_no_hooks_takes_no_part_in_the_collision_check():
+    """Spec LSI-A2: an empty definition list neither raises nor replaces a
+    non-empty one mapped to the same native name, in either order."""
+    surface = load_hook_surface_module()
+    real = [{"matcher": "*", "hooks": []}]
+
+    for hooks in (
+        {"PreToolUse": [], "PostToolUse": real},
+        {"PostToolUse": real, "PreToolUse": []},
+    ):
+        mapped = surface.resolve_target_hooks(
+            {
+                "event_map": {"PreToolUse": "tool_call", "PostToolUse": "tool_call"},
+                "hooks": hooks,
+            }
+        )
+        assert mapped == {"tool_call": real}
+
+
+def test_an_empty_event_is_still_emitted_when_nothing_else_claims_its_name():
+    """Spec LSI-A2: generated configs rely on empty arrays to clear an event."""
+    surface = load_hook_surface_module()
+
+    mapped = surface.resolve_target_hooks(
+        {"event_map": {"PreToolUse": "pre_tool_call"}, "hooks": {"PreToolUse": []}}
+    )
+
+    assert mapped == {"pre_tool_call": []}
+
+
+def test_a_scope_check_that_cannot_resolve_refuses():
+    """Spec LSI-A1 c: a check that cannot resolve a path refuses, as the skill
+    and agent materializers do. It used to return, and the write went ahead."""
+    surface = load_hook_surface_module()
+
+    class Unresolvable:
+        def resolve(self):
+            raise OSError("symlink loop")
+
+    with pytest.raises(surface.HookSurfaceError):
+        surface.assert_repo_scope_stays_inside(
+            "t", {"scope": "repo"}, Unresolvable(), Path("/workspace")
+        )
+
+
+def test_a_refused_target_leaves_the_registry_unwritten(tmp_path):
+    """Spec LSI-A1 a: every target is checked before anything is written. The
+    registry, the index and earlier targets were written first, so a refusal
+    left a half-written surface."""
+    surface = load_hook_surface_module()
+    workspace = tmp_path / "workspace"
+    _write_hook_script(workspace, "FLOSS/scripts/hook_pre_write.py")
+    outside = tmp_path / "elsewhere" / "settings.json"
+    manifest_path = workspace / "FLOSS" / "shared-hook-surface.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    hooks = {
+        "PreToolUse": [
+            {"matcher": "*", "hooks": [{"type": "command", "command": "python h.py"}]}
+        ]
+    }
+    manifest = {
+        "manifest_version": "0.1.0",
+        "workspace_id": "test-workspace",
+        "workspace_name": "Test Workspace",
+        "rules": [],
+        "hook_scripts": ["FLOSS/scripts/hook_pre_write.py"],
+        "targets": {
+            "inside": {
+                "enabled": True,
+                "scope": "repo",
+                "settings_path": ".claude/settings.json",
+                "hooks": hooks,
+            },
+            "escapes": {
+                "enabled": True,
+                "scope": "repo",
+                "settings_path": str(outside),
+                "hooks": hooks,
+            },
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    output_dir = workspace / ".agent-surface" / "hooks"
+
+    with pytest.raises(surface.HookSurfaceError):
+        surface.materialize(
+            workspace_root=workspace,
+            manifest_path=manifest_path,
+            output_dir=output_dir,
+            check=False,
+            dry_run=False,
+        )
+
+    assert not (output_dir / "hook-registry.json").exists()
+    assert not (workspace / ".claude" / "settings.json").exists()
+    assert not outside.exists()
+
+
 def test_no_event_map_preserves_events_unchanged():
     surface = load_hook_surface_module()
 

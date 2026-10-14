@@ -1540,3 +1540,272 @@ def test_a_copy_stranded_aside_is_pruned_like_any_withdrawn_projection(tmp_path)
     assert drift is True
     assert any("removed" in m and unchanged.name in m for m in messages), messages
     assert any(m.startswith("KEEP") and changed.name in m for m in messages), messages
+
+
+def _withdrawn_projection(module, tmp_path):
+    """A withdrawn, unchanged projection `retired-skill` with its baseline."""
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill", installed=stale), encoding="utf-8"
+    )
+    return workspace, root, stale
+
+
+def _aside_names(root: Path, module) -> list[str]:
+    return [p.name for p in root.iterdir() if p.name.startswith(module.REMOVING_PREFIX)]
+
+
+def test_a_blocked_rename_on_update_is_reported_as_in_use_not_evolved(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A4 c. A refused rename says nothing about whether a harness
+    changed the skill, and EVOLVED sends the operator to reconcile a change
+    that never happened."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    skill = _set_source(module, workspace, _V2)
+    real_rename = os.rename
+
+    def refuse(src, dst, *args, **kwargs):
+        if Path(src) == installed:
+            raise PermissionError(5, "Access is denied", str(src))
+        return real_rename(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "rename", refuse)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V1
+    assert drift is False
+    assert any("IN_USE" in m for m in lines), lines
+    assert not any("EVOLVED" in m for m in lines), lines
+
+
+def test_an_unreadable_copy_is_reported_as_unreadable_not_changed(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A4 c. A copy that cannot be read after it was taken aside is put
+    back and called unreadable, not "changed while being checked"."""
+    module = load_module()
+    workspace, root, stale = _withdrawn_projection(module, tmp_path)
+    real = module.payload_digests
+
+    def unreadable(path):
+        if Path(path).name.startswith(module.REMOVING_PREFIX):
+            raise PermissionError(13, "Permission denied", str(path))
+        return real(path)
+
+    monkeypatch.setattr(module, "payload_digests", unreadable)
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert (stale / "SKILL.md").is_file()
+    assert _aside_names(root, module) == []
+    assert drift is False
+    assert any("could not be read" in m for m in messages), messages
+    assert not any("changed while being checked" in m for m in messages), messages
+
+
+def test_check_and_dry_run_never_rename(tmp_path, monkeypatch):
+    """Spec LSI-A4: --check and --dry-run write nothing, so they take nothing
+    aside. A guard: this held before and has to keep holding."""
+    module = load_module()
+    workspace, root, stale = _withdrawn_projection(module, tmp_path / "prune")
+    uworkspace, source, skill, target_root = _one_skill(module, tmp_path / "update")
+    installed = _install_as(
+        target_root, source, _marker_for(uworkspace, source, source)
+    )
+    skill = _set_source(module, uworkspace, _V2)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("check or dry-run renamed something")
+
+    monkeypatch.setattr(module.os, "rename", forbidden)
+
+    for check, dry in ((True, False), (False, True)):
+        messages, drift = module.prune_stale_projections(
+            "codex", root, set(), check=check, dry_run=dry, owner_root=workspace
+        )
+        assert drift is True
+        assert (stale / "SKILL.md").is_file()
+        lines, drift = _run(
+            module, skill, target_root, uworkspace, check=check, dry_run=dry
+        )
+        assert drift is True
+        assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V1
+
+
+def test_a_copy_that_cannot_be_put_back_is_kept_and_named(tmp_path, monkeypatch):
+    """Spec LSI-A4 e. When the restore rename fails the copy stays where it is,
+    hidden, and the message names where. A guard for behavior that was untested."""
+    module = load_module()
+    workspace, root, stale = _withdrawn_projection(module, tmp_path)
+    _write_lands_after_first_digest(module, monkeypatch, stale)
+    real_rename = os.rename
+    calls = {"n": 0}
+
+    def flaky(src, dst, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:  # the rename back
+            raise PermissionError(5, "Access is denied", str(dst))
+        return real_rename(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "rename", flaky)
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    asides = _aside_names(root, module)
+    assert len(asides) == 1
+    assert any(asides[0] in m for m in messages), messages
+    assert drift is False
+
+
+def test_an_interrupted_verification_puts_the_copy_back(tmp_path, monkeypatch):
+    """Spec LSI-A4 e. An exception of any kind, an interruption included,
+    between the rename and the end of verification restores the copy."""
+    module = load_module()
+    directory = tmp_path / "skills" / "s"
+    directory.mkdir(parents=True)
+    (directory / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+    baseline = module.payload_digests(directory)
+    real = module.payload_digests
+
+    def interrupted(path):
+        if Path(path).name.startswith(module.REMOVING_PREFIX):
+            raise KeyboardInterrupt
+        return real(path)
+
+    monkeypatch.setattr(module, "payload_digests", interrupted)
+
+    with pytest.raises(KeyboardInterrupt):
+        module.remove_if_unchanged(directory, baseline)
+
+    assert (directory / "SKILL.md").is_file()
+    assert _aside_names(directory.parent, module) == []
+
+
+def test_a_copy_that_cannot_be_fully_deleted_is_reported_not_raised(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A4 e. A verified copy that then cannot be fully deleted is
+    reported with where the remainder is, and the run continues."""
+    module = load_module()
+    workspace, root, stale = _withdrawn_projection(module, tmp_path)
+    real_remove = module.remove_path
+
+    def stuck(path):
+        if Path(path).name.startswith(module.REMOVING_PREFIX):
+            raise PermissionError(5, "Access is denied", str(path))
+        return real_remove(path)
+
+    monkeypatch.setattr(module, "remove_path", stuck)
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert any(
+        "retired-skill" in m and "could not be fully deleted" in m for m in messages
+    ), messages
+
+
+def test_a_stranded_copy_of_a_listed_skill_is_put_back_before_install(tmp_path):
+    """Spec LSI-A4 d. A crash between the rename and the restore leaves the live
+    name absent and a learned copy hidden. The next run must put it back, not
+    report it as a withdrawn skill and install a fresh one beside it."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    (installed / "SKILL.md").write_text(_V1 + "a learned line\n", encoding="utf-8")
+    aside = target_root / (module.REMOVING_PREFIX + "0123456789abcdef-s")
+    installed.rename(aside)
+
+    check_messages, check_drift = module.prune_stale_projections(
+        "t", target_root, {"s"}, check=True, dry_run=False, owner_root=workspace
+    )
+    assert check_drift is True
+    assert aside.is_dir(), "--check must not move anything"
+
+    messages, drift = module.prune_stale_projections(
+        "t", target_root, {"s"}, check=False, dry_run=False, owner_root=workspace
+    )
+
+    restored = target_root / "s" / "SKILL.md"
+    assert restored.read_text(encoding="utf-8").endswith("a learned line\n")
+    assert not aside.exists()
+    assert any("put back" in m for m in messages), messages
+
+
+@pytest.mark.parametrize(
+    "name", ["../escape", "a/b", "/abs/path", "..", ".hidden", "has space"]
+)
+def test_a_skill_name_that_is_not_a_single_path_component_is_refused(tmp_path, name):
+    """Spec LSI-A5. The frontmatter name becomes <target root>/<name>, so a name
+    with a separator, `..` or an absolute path installs outside the target root."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    skill_dir = workspace / "skills" / "s"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        '---\nname: "' + name + '"\ndescription: d\n---\nbody\n', encoding="utf-8"
+    )
+
+    with pytest.raises(module.SkillSurfaceError) as raised:
+        module.resolve_skill_entry(workspace, {"path": "skills/s"})
+
+    assert "name" in str(raised.value)
+
+
+def test_a_failed_marker_publish_does_not_delete_what_a_harness_wrote(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A6. The cleanup assumed everything under the directory came
+    from the copy it had just made. A harness can write into a fresh install
+    before the marker is published, and removing the directory deleted that."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+
+    def failing(directory, content):
+        (Path(directory) / "learned.md").write_text(
+            "a harness wrote this\n", encoding="utf-8"
+        )
+        raise OSError("disk full")
+
+    monkeypatch.setattr(module, "publish_marker", failing)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert (target_root / "s" / "learned.md").is_file()
+    assert any("PARTIAL" in m for m in lines), lines
+
+
+def test_a_failed_marker_publish_with_nothing_extra_leaves_nothing_behind(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A6: the cleanup still happens when everything in the directory
+    is the shared base, so the next run installs again."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+
+    def failing(directory, content):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(module, "publish_marker", failing)
+
+    lines, drift = _run(module, skill, target_root, workspace)
+
+    assert not (target_root / "s").exists()
+    assert any(m.startswith("FAILED") for m in lines), lines

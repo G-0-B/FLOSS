@@ -282,6 +282,22 @@ def test_a_fragment_well_under_the_ratio_is_still_flagged():
     assert set(flagged) == {"cut"}
 
 
+def test_a_whitespace_only_response_is_not_flagged_as_truncated():
+    """Spec SYN-D4: whitespace-only counts as empty, and empty is named elsewhere.
+
+    `if not text` only caught the empty string, so "   " reached the truncation
+    check and was reported as ending mid-sentence at 0 chars.
+    """
+    flagged = degenerate_voters(
+        [
+            _resp("blank", "   \n  "),
+            _resp("real-a", "The answer is Substrate. " * 10),
+            _resp("real-b", "The answer is System. " * 10),
+        ]
+    )
+    assert flagged == {}
+
+
 def test_a_closed_reasoning_block_is_fine():
     flagged = degenerate_voters(
         [

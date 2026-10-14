@@ -851,6 +851,114 @@ def test_a_repo_scoped_hermes_target_may_not_resolve_outside_the_workspace(
     assert "hermes_workspace" in str(raised.value)
 
 
+@pytest.mark.parametrize("form", ["relative", "tilde", "env"])
+def test_every_written_form_of_an_outside_path_is_refused(tmp_path, monkeypatch, form):
+    """Spec LSI-A1: the declaration is checked against the resolved path, however
+    the path is written."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside_dir = tmp_path / "elsewhere"
+    outside_dir.mkdir()
+    if form == "relative":
+        raw = "../elsewhere/config.toml"
+    elif form == "tilde":
+        monkeypatch.setenv("HOME", str(outside_dir))
+        monkeypatch.setenv("USERPROFILE", str(outside_dir))
+        raw = "~/config.toml"
+    else:
+        monkeypatch.setenv("LSI_OUTSIDE_DIR", str(outside_dir))
+        raw = "${LSI_OUTSIDE_DIR}/config.toml"
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": raw,
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError):
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert not (outside_dir / "config.toml").exists()
+
+
+@pytest.mark.parametrize(
+    "where", ["mirror", "context_pack", "gemini", "opencode", "vibe"]
+)
+def test_unscoped_manifest_paths_may_not_leave_the_workspace(
+    tmp_path, monkeypatch, where
+):
+    """Spec LSI-A1 b: a manifest path with no scope field is repo scope. These
+    were `workspace_root / raw`, and an absolute raw replaced the base."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "elsewhere" / "out.json"
+    # It exists, so a materializer that does not refuse has something to rewrite:
+    # opencode stops on a missing file before it writes, which would pass this
+    # test for the wrong reason.
+    outside.parent.mkdir()
+    outside.write_text("{}", encoding="utf-8")
+    targets: dict = {}
+    extra: dict = {}
+    if where == "mirror":
+        extra = {"mcp_mirrors": [str(outside)]}
+    elif where == "context_pack":
+        extra = {"context_pack_path": str(outside)}
+    elif where == "gemini":
+        targets = {"gemini": {"settings_path": str(outside)}}
+    elif where == "opencode":
+        targets = {"opencode": {"settings_path": str(outside)}}
+    else:
+        targets = {"vibe": {"config_path": str(outside)}}
+    manifest_path = _write_synthetic_manifest(workspace, targets)
+    if extra:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data.update(extra)
+        manifest_path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(mas.SharedSurfaceError) as raised:
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert "outside" in str(raised.value)
+    assert outside.read_text(encoding="utf-8") == "{}"
+
+
+def test_a_refused_target_leaves_every_other_target_unwritten(tmp_path, monkeypatch):
+    """Spec LSI-A1 a: the mirrors, the context pack and the other targets were
+    written before the codex and hermes checks ran, so a refusal left the
+    surface half written."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "elsewhere" / "config.toml"
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": str(outside),
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    data["mcp_mirrors"] = ["mirror.json"]
+    manifest_path.write_text(json.dumps(data), encoding="utf-8")
+
+    with pytest.raises(mas.SharedSurfaceError):
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert not (workspace / "mirror.json").exists()
+    assert not outside.exists()
+
+
 def test_a_repo_scoped_target_inside_the_workspace_is_still_written(
     tmp_path, monkeypatch
 ):

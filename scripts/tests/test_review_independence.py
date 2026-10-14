@@ -178,3 +178,20 @@ def test_a_panel_with_exactly_zero_mean_correlation_is_measured_not_refused(caps
     code = module.report(reviews, None)
     assert code == 0
     assert "n_eff" in capsys.readouterr().out
+
+
+def test_a_mean_that_is_zero_up_to_rounding_is_measured_not_refused(monkeypatch):
+    """Spec MRP-K1: a mean within 1e-12 of zero counts as zero.
+
+    0.3 + -0.1 + -0.2 is about -2.8e-17 in floating point although the mean is
+    zero, and a bare `< 0` refused that panel as if it were anti-correlated.
+    """
+    module = load_module()
+    values = iter([0.3, -0.1, -0.2])
+    monkeypatch.setattr(module, "phi", lambda a, b: next(values))
+
+    n_eff, mean_phi, pairs = module.kish_neff([[1, 0], [0, 1], [1, 1]])
+
+    assert pairs == 3
+    assert abs(mean_phi) < 1e-12
+    assert abs(n_eff - 3.0) < 1e-9
