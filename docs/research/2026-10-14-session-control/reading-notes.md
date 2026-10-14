@@ -119,6 +119,8 @@ Why it matters beyond the gate: crypto-verifiable authorship of room posts, cros
 - signatures on JCS-canonicalised payloads;
 - every chain with exactly one writer.
 
+**Traced the same day** (`provenance-trace.md`): the guess above is only half right. Five harnesses do share the hook's one identity, but the gate fails because that identity's chain forked on its second day (2026-05-25) and the validator has walked the whole ancestry since 2026-08-25: s=0 and s=1 pass, every later packet fails.
+
 ## What this changes in the drafts
 
 - ADR-21 D3 gains the four separations from document 2 and "a message is never authority" from document 3.
