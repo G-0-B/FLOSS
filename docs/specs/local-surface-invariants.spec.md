@@ -102,10 +102,15 @@ match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. A name containing a path separator or `..`
 an absolute path, is refused before anything is written, because the name becomes
 `<target root>/<name>`.
 
-**LSI-A6. A failed install removes only what is provably the shared base.** After a
-failed copy or a failed marker publish, the directory is removed only if every file in
-it equals the shared base's file at that path. Anything else, such as a file a
-harness wrote into the fresh copy in the meantime, is kept and surfaced.
+**LSI-A6. A failed install removes only what is provably its own.**
+
+- a. After a failed copy the directory is removed whole. This call created it (the
+  copy refuses an existing destination), and a file the failed write left truncated
+  is its own, so it is not required to equal the shared base.
+- b. After a failed marker publish the copy had completed, so the directory is
+  removed only if every file in it equals the shared base's file at that path.
+  Anything else, such as a file a harness wrote into the fresh copy in the
+  meantime, is kept and surfaced.
 
 ## Part B. MCP daemon claims
 
@@ -132,7 +137,8 @@ daemon's identity record.
 | LSI-A4 e | `scripts/tests/test_shared_skill_surface_scope.py::test_an_interrupted_verification_puts_the_copy_back`, `::test_a_copy_that_cannot_be_put_back_is_kept_and_named`, `::test_a_copy_that_cannot_be_fully_deleted_is_reported_not_raised` |
 | LSI-A4 check | `scripts/tests/test_shared_skill_surface_scope.py::test_check_and_dry_run_never_rename` |
 | LSI-A5 | `scripts/tests/test_shared_skill_surface_scope.py::test_a_skill_name_that_is_not_a_single_path_component_is_refused` |
-| LSI-A6 | `scripts/tests/test_shared_skill_surface_scope.py::test_a_failed_marker_publish_does_not_delete_what_a_harness_wrote` |
+| LSI-A6 a | `scripts/tests/test_shared_skill_surface_scope.py::test_a_copy_that_fails_midway_leaves_nothing_half_installed` |
+| LSI-A6 b | `scripts/tests/test_shared_skill_surface_scope.py::test_a_failed_marker_publish_does_not_delete_what_a_harness_wrote`, `::test_a_failed_marker_publish_with_nothing_extra_leaves_nothing_behind` |
 | LSI-B1 | `packages/tests/test_mcp_daemon.py::test_the_reclaim_cli_takes_both_snapshots_under_the_claim_guard`, `::test_reclaim_removes_both_records_while_holding_the_guard`, `::test_a_guard_that_cannot_be_taken_is_not_a_reclaim`, `::test_a_guard_failure_that_is_not_a_timeout_is_not_a_reclaim` |
 
 ## Not covered by this spec
