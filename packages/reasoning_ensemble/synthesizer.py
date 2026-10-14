@@ -1293,6 +1293,24 @@ def write_synthesis(
 # ---------------------------------------------------------------------------
 
 
+def _override_mode(pool: list[dict]) -> str:
+    """The mode label of a caller-supplied pool, derived from its transports.
+
+    An override used to be labelled `local` unconditionally, which exempted it
+    from the survivor independence re-check even when every voter in it was
+    online (spec SYN-P1). Only a pool that is entirely on `ollama` is narrow by
+    construction; anything with an online voter gets the same bar a resolved
+    pool does.
+    """
+
+    transports = {transport.transport_name(voter) for voter in pool}
+    if transports == {"ollama"}:
+        return "local"
+    if "ollama" not in transports:
+        return "online"
+    return "mixed"
+
+
 def synthesize(
     prompt: str, voter_pool: Optional[list[dict]] = None, stage_artifact: bool = True
 ) -> EnsembleSynthesis:
@@ -1303,11 +1321,14 @@ def synthesize(
     headroom. The embedder is resolved once per run (local mxbai preferred, cloud
     fallback) so all voter responses share one vector space.
     """
-    resolved_mode = "local" if voter_pool is not None else None
     if voter_pool is not None:
         pool = voter_pool
+        # Derived, not assumed local (spec SYN-P1).
+        resolved_mode = _override_mode(pool)
     else:
         pool, resolved_mode = transport.resolve_voter_pool()
+    # A configuration error is raised before any prompt is sent (spec SYN-T1).
+    transport.validate_pool_transports(pool)
     if len(pool) < MIN_VOTERS:
         raise ValueError(f"Voter pool too small: {len(pool)} < {MIN_VOTERS}")
 

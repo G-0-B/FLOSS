@@ -381,7 +381,34 @@ def transport_name(voter: dict) -> str:
     Two agreeing defaults are a coincidence; one function is a coupling. The
     default itself is documented at the bottom of this module in `generate`.
     """
-    return str(voter.get("transport") or "ollama")
+    return str(voter.get("transport") or "ollama").strip().lower()
+
+
+# The three wires a voter can go over (spec SYN-T1). Anything else is a
+# configuration error: the old catch-all sent an unrecognised value to
+# LiteLLM, so a misspelled `ollama` could send a prompt the caller meant to
+# keep local to a cloud provider, or just look like a provider failure.
+SUPPORTED_TRANSPORTS = ("ollama", "flowith", "litellm")
+
+
+def validate_pool_transports(pool: list[dict]) -> None:
+    """Refuse a pool that names a transport this module does not route.
+
+    Called before anything is dispatched, and names every offending voter so
+    the configuration can be fixed in one pass.
+    """
+
+    bad = [
+        f"{voter.get('voter_id', '?')}={transport_name(voter)!r}"
+        for voter in pool
+        if transport_name(voter) not in SUPPORTED_TRANSPORTS
+    ]
+    if bad:
+        raise ValueError(
+            "Unknown voter transport(s): "
+            + ", ".join(bad)
+            + f". Expected one of {list(SUPPORTED_TRANSPORTS)}."
+        )
 
 
 def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
@@ -412,7 +439,12 @@ def generate(voter: dict, prompt: str, timeout: int, ollama_generate) -> str:
         return ollama_generate(voter["model"], prompt, timeout)
     if transport == "flowith":
         return _flowith_generate(voter["model"], prompt, timeout)
-    return _litellm_generate(voter["model"], prompt, timeout)
+    if transport == "litellm":
+        return _litellm_generate(voter["model"], prompt, timeout)
+    # No fall-through (spec SYN-T1): an unrecognised value is refused rather
+    # than sent to whichever backend happened to be last.
+    validate_pool_transports([voter])
+    raise ValueError(f"Unroutable voter transport {transport!r}")
 
 
 # ---------------------------------------------------------------------------
