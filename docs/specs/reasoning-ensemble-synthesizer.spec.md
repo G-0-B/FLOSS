@@ -122,6 +122,15 @@ Coherence proxy v0.1 implementation: response length normalized + within-cluster
 - Synthesizer MUST NOT modify the prompt or voter responses
 - Synthesizer MUST NOT route through the consensus gateway (that's decision-grade; ensemble is reasoning-grade)
 
+### 2.10 Degenerate-voter flagging
+
+A response can be present, long, and still carry no position. The synthesizer FLAGS such voters in its output and never excludes them: a wrong exclusion loses a real vote, and a wrong flag costs one line.
+
+- **SYN-D1 (unclosed reasoning block).** A response that opens with a reasoning-block opener (`<think>`, `<thinking>`, `<reasoning>`) and contains no closing tag is flagged as prompt restatement, whatever its length.
+- **SYN-D2 (truncation).** A response is flagged as truncated only when BOTH hold: it does not end in a sentence-ending mark (`.` `!` `?` `` ` `` `)` `]` `"` `'`), AND its length is below `DEGENERATE_TRUNCATION_RATIO` times the median length of the panel's non-empty, non-errored responses. A whole answer that is merely shorter than the median, or that ends in a letter, a colon or an emoji but is at least that fraction of the median, is NOT flagged.
+- **SYN-D3 (brevity is not a defect).** A short response that ends in a sentence-ending mark is never flagged for its length.
+- **SYN-D4 (no double reporting).** Errored and empty responses are not flagged here; they are already named as dropped voters.
+
 ---
 
 ## 3. Configuration
@@ -142,6 +151,7 @@ Coherence proxy v0.1 implementation: response length normalized + within-cluster
 | `EMBED_TIMEOUT_SECONDS` | 90 | Embedding call budget |
 | `CLUSTER_SIMILARITY_THRESHOLD` | 0.75 | Greedy clustering join threshold |
 | `COHERENCE_THRESHOLD` | 0.6 | Tier-4 dissent surfacing guard |
+| `DEGENERATE_TRUNCATION_RATIO` | 0.4 | Fraction of the panel median below which an unterminated response is called truncated (SYN-D2) |
 
 ---
 

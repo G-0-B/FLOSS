@@ -311,6 +311,11 @@ over that set: 1 if they raised it. `scripts/review_independence.py` computes:
 - **Overlap matrix** — pairwise φ across reviewers.
 - **Kish n_eff** = `k / (1 + (k−1)·φ̄)`, plus the eigenvalue variant `k / λ_max`.
   Report both; agreement between them validates the exchangeability assumption.
+  **(MRP-K1)** `n_eff` is reported for a non-negative mean φ̄. A mean of exactly
+  zero is a valid measurement: the denominator is 1 and `n_eff = k`. The
+  measurement is refused (reported as unmeasurable) only for φ̄ < 0 or a
+  non-positive denominator, because near-disjoint finding sets anti-correlate by
+  construction, which is a matcher artefact and not a property of the panel.
 - **Independence ratio** `n_eff / k`. Below 0.5, treat the panel's agreement with
   caution (the threshold recommended in arXiv:2605.29800).
 - **Solo-find rate per reviewer** — findings only they raised, that survived

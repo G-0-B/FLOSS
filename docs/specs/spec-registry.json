@@ -480,6 +480,9 @@
       "spec": "GRANDFATHERED 2026-06-12 (Self-Perceptual Evolution (n+1) Specification)",
       "grandfathered": true
     },
+    "FLOSS/docs/specs/local-surface-invariants.spec.md": {
+      "spec": "Clause-numbered invariants of the local materializers and MCP daemon claim transitions, each naming its test"
+    },
     "FLOSS/docs/specs/spec-gate.spec.md": {
       "spec": "Spec for the -1-layer spec-gate check (D7, adopted 2026-06-12)"
     },
