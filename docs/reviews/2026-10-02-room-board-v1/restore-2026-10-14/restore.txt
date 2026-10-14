@@ -1,0 +1,96 @@
+== 2026-10-14T02:03:19.3629540-04:00
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+== 0: the serving checkout is still exactly the deploy commit
+serving checkout: C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd at 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c, clean
+== 2: stop only the room (it is down; this clears its stale record)
+[FLOSS MCP] WOULD_STOP coordination_room.pid (only if its identity check says OURS)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 32596 (parent 13308)
+[FLOSS MCP]   PID 17848 (parent 32596)
+[FLOSS MCP]   PID 51380 (parent 4076)
+[FLOSS MCP]   PID 22924 (parent 51380)
+[FLOSS MCP]   PID 49452 (parent 23160)
+[FLOSS MCP]   PID 31484 (parent 49452)
+[FLOSS MCP]   PID 32216 (parent 45760)
+[FLOSS MCP]   PID 46980 (parent 32216)
+[FLOSS MCP]   PID 46140 (parent 53140)
+[FLOSS MCP]   PID 19044 (parent 46140)
+[FLOSS MCP]   PID 42232 (parent 9504)
+[FLOSS MCP]   PID 23600 (parent 42232)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Dry run: nothing was stopped (selected: room).
+
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 32596 (parent 13308)
+[FLOSS MCP]   PID 17848 (parent 32596)
+[FLOSS MCP]   PID 51380 (parent 4076)
+[FLOSS MCP]   PID 22924 (parent 51380)
+[FLOSS MCP]   PID 49452 (parent 23160)
+[FLOSS MCP]   PID 31484 (parent 49452)
+[FLOSS MCP]   PID 32216 (parent 45760)
+[FLOSS MCP]   PID 46980 (parent 32216)
+[FLOSS MCP]   PID 46140 (parent 53140)
+[FLOSS MCP]   PID 19044 (parent 46140)
+[FLOSS MCP]   PID 42232 (parent 9504)
+[FLOSS MCP]   PID 23600 (parent 42232)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Stopped: room. PID files cleaned.
+
+== 3: slot and port free, settled log
+settled seq: 17
+== 4: preview the start, then register the task and start the room through it
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] WOULD_START packages.coordination_room.server (coordination room (:7334))
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Dry run: nothing was started (selected: room).
+
+registered: \FLOSS-Coordination-Room
+  action: powershell -WindowStyle Hidden -File C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd\scripts\start_mcp_daemons.ps1 -Only room
+  trigger: MSFT_TaskLogonTrigger; principal: kalis Interactive Limited
+  settings: timelimit=PT72H multiple=IgnoreNew battery=True/True
+task run: last run 10/14/2026 02:03:03, result 0, state Ready
+== 5: assert the bus before any post
+{
+    "claims":  {
+
+               },
+    "last_seq":  17,
+    "speakers":  [
+                     "claude-deploy",
+                     "codex-pr61-review-01a12965",
+                     "deploy-smoke",
+                     "digestion-reviewer",
+                     "grok"
+                 ],
+    "root":  "C:\\~shit\\FLOSS\\.worktrees\\room-serve-9cbe61cd",
+    "log":  "C:\\~shit\\.agent-surface\\rooms\\default\\events.jsonl",
+    "board":  "C:\\~shit\\.agent-surface\\rooms\\default\\BOARD.md",
+    "board_as_of":  null,
+    "board_last_error":  null,
+    "log_skipped_lines":  0,
+    "ok":  true
+}
+== the daemon's ancestry: it must not descend from an agent harness
+daemon pid 4288: "C:\Python313\python.exe" -m packages.coordination_room.server 
+  ancestor pid 45584: gone
+== 6: smoke
+{
+    "ok":  true,
+    "seq":  18,
+    "topic":  "announcements",
+    "evidence_status":  "resolved"
+}
+restored; smoke post is seq 18; board as of 2026-10-14T06:03:33Z
+RESTORE COMPLETE

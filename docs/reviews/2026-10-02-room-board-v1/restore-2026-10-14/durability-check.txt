@@ -1,0 +1,8 @@
+checked 2026-10-14T02:07:17.3888594-04:00
+room daemon 4288 in a job: True | "C:\Python313\python.exe" -m packages.coordination_room.server 
+this shell 22296 (launched from the Claude desktop app) in a job: True
+consensus 12756 (logon task, 2026-10-06) in a job: True | started 2026-10-06T21:22:07
+claude desktop processes started: 2026-10-13T15:03:47
+task \FLOSS-Coordination-Room: Ready, last run 10/14/2026 02:03:03, result 0
+  action: powershell -WindowStyle Hidden -File C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd\scripts\start_mcp_daemons.ps1 -Only room
+  trigger user: MSI\kalis; principal: kalis Interactive Limited

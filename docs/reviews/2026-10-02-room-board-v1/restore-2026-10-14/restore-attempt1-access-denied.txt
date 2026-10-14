@@ -1,0 +1,68 @@
+== 2026-10-14T02:02:47.3739450-04:00
+log: C:\~shit\.agent-surface\rooms\default\events.jsonl
+== 0: the serving checkout is still exactly the deploy commit
+serving checkout: C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd at 9cbe61cd3e2bb143b1ed3b380f0b631e056eb90c, clean
+== 2: stop only the room (it is down; this clears its stale record)
+[FLOSS MCP] WOULD_STOP coordination_room.pid (only if its identity check says OURS)
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 32596 (parent 13308)
+[FLOSS MCP]   PID 17848 (parent 32596)
+[FLOSS MCP]   PID 51380 (parent 4076)
+[FLOSS MCP]   PID 22924 (parent 51380)
+[FLOSS MCP]   PID 49452 (parent 23160)
+[FLOSS MCP]   PID 31484 (parent 49452)
+[FLOSS MCP]   PID 32216 (parent 45760)
+[FLOSS MCP]   PID 46980 (parent 32216)
+[FLOSS MCP]   PID 46140 (parent 53140)
+[FLOSS MCP]   PID 19044 (parent 46140)
+[FLOSS MCP]   PID 42232 (parent 9504)
+[FLOSS MCP]   PID 23600 (parent 42232)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Dry run: nothing was stopped (selected: room).
+
+[FLOSS MCP] coordination_room.pid PID 5524 is NOT our daemon - stale record cleared, killed nothing
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] 17 agentmemory/JanuScope node process(es) present. NOT killed - they may belong to a live agent session.
+[FLOSS MCP]   PID 37216 (parent 9400)
+[FLOSS MCP]   PID 37064 (parent 20012)
+[FLOSS MCP]   PID 18112 (parent 37064)
+[FLOSS MCP]   PID 34472 (parent 35600)
+[FLOSS MCP]   PID 24684 (parent 34472)
+[FLOSS MCP]   PID 32596 (parent 13308)
+[FLOSS MCP]   PID 17848 (parent 32596)
+[FLOSS MCP]   PID 51380 (parent 4076)
+[FLOSS MCP]   PID 22924 (parent 51380)
+[FLOSS MCP]   PID 49452 (parent 23160)
+[FLOSS MCP]   PID 31484 (parent 49452)
+[FLOSS MCP]   PID 32216 (parent 45760)
+[FLOSS MCP]   PID 46980 (parent 32216)
+[FLOSS MCP]   PID 46140 (parent 53140)
+[FLOSS MCP]   PID 19044 (parent 46140)
+[FLOSS MCP]   PID 42232 (parent 9504)
+[FLOSS MCP]   PID 23600 (parent 42232)
+[FLOSS MCP] Run scripts/sweep_mcp_orphans.ps1 to reap genuinely orphaned ones - it checks parent liveness and protects the daemons.
+[FLOSS MCP] Stopped: room. PID files cleaned.
+
+== 3: slot and port free, settled log
+settled seq: 17
+== 4: preview the start, then register the task and start the room through it
+[FLOSS MCP] coordination room log: C:\~shit\.agent-surface\rooms\default\events.jsonl (root C:\~shit\FLOSS\.worktrees\room-serve-9cbe61cd)
+[FLOSS MCP] WOULD_START packages.coordination_room.server (coordination room (:7334))
+[FLOSS MCP] OmniRoute not selected (-Only) - left as it is
+[FLOSS MCP] Dry run: nothing was started (selected: room).
+
+Register-ScheduledTask : Access is denied.
+At C:\Users\kalis\AppData\Local\Temp\claude\C---shit--claude-worktrees-coordination-room-a2a-board-52f403\65c498a8-9fc5
+-4cc9-b4dd-9d13f2820568\scratchpad\restore\restore_run.ps1:56 char:1
++ Register-ScheduledTask -TaskName $taskName -Description $description  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (PS_ScheduledTask:Root/Microsoft/...S_ScheduledTask) [Register-Schedul 
+   edTask], CimException
+    + FullyQualifiedErrorId : HRESULT 0x80070005,Register-ScheduledTask
+ 
