@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cross-harness-request.schema.json",
+  "title": "Cross-harness request envelope, version 0.1 (draft)",
+  "description": "The JSON object carried in a room row whose text starts with 'xhr/0.1 '. A request row and its result row share request_id; the result row's reply_to is the request row's seq. Draft: lives in docs/research until promoted (see ADR-21 draft).",
+  "type": "object",
+  "required": ["xhr", "kind", "request_id", "from", "to"],
+  "properties": {
+    "xhr": { "const": "0.1" },
+    "kind": { "enum": ["request", "result"] },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Version-4 UUID, lower case. Also sent as the Codex turn's clientUserMessageId."
+    },
+    "from": {
+      "type": "object",
+      "required": ["agent_id", "harness"],
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": { "type": "string", "minLength": 1, "maxLength": 128, "description": "The room name the requester posts under. Not authenticated." },
+        "harness": { "enum": ["claude", "codex", "hermes", "antigravity", "grok", "other"] }
+      }
+    },
+    "to": {
+      "type": "object",
+      "required": ["harness", "mode", "session"],
+      "additionalProperties": false,
+      "properties": {
+        "harness": { "const": "codex", "description": "Version 0.1 has one recipient harness." },
+        "mode": { "enum": ["existing", "new"] },
+        "session": { "type": ["string", "null"], "maxLength": 128, "description": "Codex thread id; null when mode is new." }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["type", "target", "instructions_preview", "instructions_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "review" },
+        "target": {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["commit", "baseBranch", "uncommittedChanges", "custom"] },
+            "value": { "type": "string", "maxLength": 256 }
+          }
+        },
+        "instructions_preview": { "type": "string", "maxLength": 500 },
+        "instructions_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["sandbox", "approval_policy", "approvals_reviewer", "timeout_seconds"],
+      "additionalProperties": false,
+      "properties": {
+        "sandbox": { "const": "read-only" },
+        "approval_policy": { "const": "never" },
+        "approvals_reviewer": { "const": "user" },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+      }
+    },
+    "requested_at": { "type": "string", "format": "date-time" },
+    "outcome": { "enum": ["completed", "declined", "busy", "failed", "cancelled", "timed_out", "undeliverable"] },
+    "recipient": {
+      "type": "object",
+      "required": ["session", "turn", "turn_status", "new_session"],
+      "additionalProperties": false,
+      "properties": {
+        "session": { "type": ["string", "null"], "maxLength": 128 },
+        "turn": { "type": ["string", "null"], "maxLength": 128 },
+        "turn_status": { "enum": ["completed", "interrupted", "failed", "inProgress", null] },
+        "new_session": { "type": "boolean" },
+        "settings_changed": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 128 },
+          "description": "Thread settings that differ after the request (spec Q2). Empty when none."
+        }
+      }
+    },
+    "approval_requests_refused": { "type": "integer", "minimum": 0 },
+    "summary": { "type": "string", "maxLength": 1500 },
+    "answer": {
+      "type": ["object", "null"],
+      "required": ["bytes", "sha256", "saved_to"],
+      "additionalProperties": false,
+      "properties": {
+        "bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "saved_to": { "type": ["string", "null"], "maxLength": 512, "description": "Where the requester saved the full answer, in its own workspace." }
+      }
+    },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "error": { "type": ["string", "null"], "maxLength": 500 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "request" } } },
+      "then": {
+        "required": ["task", "constraints", "requested_at"],
+        "not": { "anyOf": [
+          { "required": ["outcome"] }, { "required": ["recipient"] }, { "required": ["answer"] },
+          { "required": ["approval_requests_refused"] }, { "required": ["finished_at"] }
+        ] }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "result" } } },
+      "then": { "required": ["outcome", "recipient", "approval_requests_refused", "summary", "answer", "started_at", "finished_at", "error"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "result" }, "outcome": { "enum": ["busy", "undeliverable"] } }, "required": ["kind", "outcome"] },
+      "then": { "properties": { "recipient": { "properties": { "turn": { "const": null } } }, "answer": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "to": { "properties": { "mode": { "const": "new" } } } } },
+      "then": { "properties": { "to": { "properties": { "session": { "const": null } } } } },
+      "else": { "properties": { "to": { "properties": { "session": { "type": "string", "minLength": 1 } } } } }
+    }
+  ],
+  "additionalProperties": false
+}
