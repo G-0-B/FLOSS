@@ -76,6 +76,26 @@ Legacy local pool (`DEFAULT_VOTER_POOL` / `transport.LOCAL_VOTER_POOL`): 4 local
 
 Voter pool can be overridden via `voter_pool` parameter or `FLOSS_ENSEMBLE_VOTER_POOL` env (future; not yet wired).
 
+**SYN-P1 (mode of an overridden pool).** A caller-supplied `voter_pool` is not a request for
+local mode. Its resolved mode is derived from its voters' transports
+(`transport.transport_name`, a missing value meaning `ollama`): `local` when every voter is
+on `ollama`, `online` when none is, `mixed` otherwise. Only `local` is exempt from the
+survivor independence re-check, because only a local pool is narrow by construction. An
+online or mixed override gets the same bar as a resolved pool, so an outage that leaves a
+correlated subset degrades the run instead of reporting a consensus tier.
+Tests: `packages/reasoning_ensemble/tests/test_survivor_independence.py::test_the_mode_of_an_override_comes_from_its_transports`,
+`::test_a_correlated_online_override_does_not_get_a_consensus_tier`.
+
+**SYN-T1 (transports).** A voter's transport is one of `ollama`, `flowith` or `litellm`. A
+missing value means `ollama`, and case and surrounding whitespace are ignored. Any other
+value is a configuration error, raised before any voter is dispatched and naming the
+voters. It never falls back to LiteLLM, because that fallback can send a prompt to a cloud
+provider that the caller meant to keep local. `generate()` enforces the same rule for a
+voter that reaches it directly.
+Tests: `packages/reasoning_ensemble/tests/test_transport.py::test_an_unknown_transport_is_refused_not_routed_to_litellm`,
+`::test_a_pool_with_an_unknown_transport_is_refused_before_any_dispatch`,
+`::test_every_supported_transport_is_accepted_and_case_is_normalized`.
+
 ### 2.2 Minimum voters
 
 `MIN_VOTERS = 3`. If fewer voters respond successfully than this threshold, the Synthesizer MUST degrade to single-strong behavior (use the most-coherent single response) and flag in the result with `tier="tier_degraded"`.
