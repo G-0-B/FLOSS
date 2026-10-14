@@ -1,8 +1,8 @@
-/// Pure-Rust vector operations for Rose Forest semantic search.
-///
-/// Extracted from `archive/old_project/src/core/vector.rs` with Holochain
-/// dependencies removed.  This module provides only the math needed by the
-/// coordinator zome's `vector_search` function.
+//! Pure-Rust vector operations for Rose Forest semantic search.
+//!
+//! Extracted from `archive/old_project/src/core/vector.rs` with Holochain
+//! dependencies removed.  This module provides only the math needed by the
+//! coordinator zome's `vector_search` function.
 
 /// A thin wrapper around `Vec<f32>` that provides distance and similarity
 /// operations used by the Rose Forest knowledge graph.
