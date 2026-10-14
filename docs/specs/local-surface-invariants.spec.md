@@ -34,13 +34,22 @@ anything is written. A `scope: "user"` target is unaffected and stays gated by
 `--include-user-scope`. Applies to every materializer that writes a path named in a
 manifest.
 
+- a. The refusal is made before any write. Every target is resolved and checked first,
+  so a refused run leaves nothing half written.
+- b. A manifest path with no `scope` field (the agent surface's mirrors, context
+  pack, gemini, opencode and vibe targets) is treated as repo scope.
+- c. A check that cannot resolve a path refuses. It does not skip.
+
 *Why:* `scope` is a declaration and the path is a fact. Trusting the first lets a
 repo-scope run rewrite machine-wide configuration that nobody opted into.
 
 **LSI-A2. Event-map injectivity.** Within one target, two source events that both
 carry hooks must not map to the same native event name. Resolution fails and names
 both source events and the native name. A source event with no hooks, and an event
-absent from the map, take no part in the check.
+absent from the map, take no part in the check: an empty definition list neither
+raises nor replaces a non-empty one mapped to the same name. An empty list is still
+emitted when nothing else claims the name, because generated configs rely on empty
+arrays to clear an event.
 
 *Why:* assigning the second over the first drops one set of hooks from the generated
 file with nothing reporting it.
@@ -51,6 +60,10 @@ a materializer run. It is kept, surfaced as a `KEEP` line, and not counted as dr
 by `--check`. (The operator's rule of 2026-09-29: skills a harness evolved are to be
 propagated back to the shared base, not replaced by it.)
 
+Equality with the baseline proves that no harness changed the copy. It does not
+preserve source revisions: a revision the operator replaced in the source without
+committing it is the operator's to keep.
+
 **LSI-A4. Verified removal.** The comparison with the baseline that licenses an
 update or a removal is made on the copy *after* it has been taken out of its
 discoverable position, and not before. Concretely:
@@ -58,22 +71,49 @@ discoverable position, and not before. Concretely:
 - a. The projection is renamed to a sibling name nobody writes to, and the renamed
   copy is compared with the baseline.
 - b. If it equals the baseline it is deleted. If it differs, it is renamed back, kept
-  and surfaced, and the run reports no drift for it.
+  and surfaced as changed, and the run reports no drift for it.
 - c. If it cannot be renamed (an open file on Windows, for example) it is kept and
-  surfaced. A copy that cannot be verified in isolation is not removed.
-- d. A copy stranded aside by a crash is an ordinary withdrawn projection to the next
-  run: removed if unchanged, reported if not.
+  surfaced as in use. If the renamed copy cannot be read it is put back and surfaced
+  as unreadable. Changed, in use and unreadable are reported distinctly, because the
+  operator's next step differs for each. A copy that cannot be verified in isolation
+  is not removed.
+- d. A copy stranded aside by a crash is picked up by the next run. If its base name
+  is a listed skill and the live name is absent, it is put back before anything is
+  installed. Otherwise it is an ordinary withdrawn projection: removed if unchanged,
+  reported if not.
+- e. An exception of any kind between the rename and the end of verification,
+  including an interruption, puts the copy back. A copy that was verified and then
+  could not be fully deleted is reported with the location of what remains, and does
+  not abort the run.
+- f. The window is narrowed, not closed. On POSIX a process that holds a file open
+  across the rename still writes into the renamed copy, and a write landing between
+  verification and deletion is deleted with it. Windows refuses to rename a directory
+  with open files (c). `--check` cannot know that a rename would be refused, so it
+  reports the content drift that a write run may then keep.
+- g. The aside name begins with a dot. Codex's loader skips dot-directories (read in
+  `rust-v0.128.0`); the other harnesses' scanners have not been read, so a copy
+  stranded by a crash may be discovered by them as a second skill.
 
 *Why:* comparing and then removing leaves a window in which a harness can write a
 learning that no longer matches the baseline, after the decision was already taken.
+
+**LSI-A5. Skill names are single path components.** A skill's frontmatter `name` must
+match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. A name containing a path separator or `..`, or
+an absolute path, is refused before anything is written, because the name becomes
+`<target root>/<name>`.
+
+**LSI-A6. A failed install removes only what is provably the shared base.** After a
+failed copy or a failed marker publish, the directory is removed only if every file in
+it equals the shared base's file at that path. Anything else, such as a file a
+harness wrote into the fresh copy in the meantime, is kept and surfaced.
 
 ## Part B. MCP daemon claims
 
 **LSI-B1. Reclaim holds the guard across the pair.** `--reclaim-claim` takes the
 claim snapshot and the identity-sidecar snapshot, and performs both removals, while
 holding the claim guard that `--release-claim` and `--record-identity` hold. If the
-guard cannot be taken, the verdict is `NOT_RECLAIMED`, the exit status is 1, and
-nothing is removed.
+guard cannot be taken, for any reason, the verdict is `NOT_RECLAIMED`, the exit status
+is 1, and nothing is removed.
 
 *Why:* two snapshots taken outside the guard can pair the old claim with a
 replacement launcher's sidecar, and the removal that follows can delete a live
@@ -83,13 +123,17 @@ daemon's identity record.
 
 | Clause | Test |
 |---|---|
-| LSI-A1 | `tests/test_shared_agent_surface_mcp.py::test_a_repo_scoped_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_antigravity_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_hermes_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_target_inside_the_workspace_is_still_written`; hook and skill: `scripts/tests/test_shared_hook_surface.py`, `scripts/tests/test_shared_skill_surface_scope.py` |
-| LSI-A2 | `scripts/tests/test_shared_hook_surface.py::test_two_events_mapped_to_one_native_name_are_refused_not_overwritten`, `::test_a_collision_among_events_the_target_does_not_declare_is_not_an_error` |
+| LSI-A1 | `tests/test_shared_agent_surface_mcp.py::test_a_repo_scoped_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_antigravity_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_hermes_target_may_not_resolve_outside_the_workspace`, `::test_a_repo_scoped_target_inside_the_workspace_is_still_written`, `::test_every_written_form_of_an_outside_path_is_refused` (relative, `~`, env variable), `::test_unscoped_manifest_paths_may_not_leave_the_workspace`, `::test_a_refused_target_leaves_every_other_target_unwritten`; hook: `scripts/tests/test_shared_hook_surface.py::test_a_refused_target_leaves_the_registry_unwritten`, `::test_a_scope_check_that_cannot_resolve_refuses`; skill: `scripts/tests/test_shared_skill_surface_scope.py` |
+| LSI-A2 | `scripts/tests/test_shared_hook_surface.py::test_two_events_mapped_to_one_native_name_are_refused_not_overwritten`, `::test_a_collision_among_events_the_target_does_not_declare_is_not_an_error`, `::test_an_event_with_no_hooks_takes_no_part_in_the_collision_check` |
 | LSI-A3 | `scripts/tests/test_shared_skill_surface_scope.py`: the `EVOLVED`, `CONFLICT`, `DIVERGED`, foreign, unmanaged and withdrawn-with-changes tests |
 | LSI-A4 a, b | `scripts/tests/test_shared_skill_surface_scope.py::test_a_learning_written_after_the_pruner_digests_is_not_deleted`, `::test_a_learning_written_after_the_update_comparison_is_not_deleted` |
-| LSI-A4 c | `scripts/tests/test_shared_skill_surface_scope.py::test_an_installed_copy_that_cannot_be_taken_aside_is_kept` |
-| LSI-A4 d | `scripts/tests/test_shared_skill_surface_scope.py::test_a_copy_stranded_aside_is_pruned_like_any_withdrawn_projection` |
-| LSI-B1 | `packages/tests/test_mcp_daemon.py::test_the_reclaim_cli_takes_both_snapshots_under_the_claim_guard`, `::test_a_guard_that_cannot_be_taken_is_not_a_reclaim` |
+| LSI-A4 c | `scripts/tests/test_shared_skill_surface_scope.py::test_an_installed_copy_that_cannot_be_taken_aside_is_kept`, `::test_a_blocked_rename_on_update_is_reported_as_in_use_not_evolved`, `::test_an_unreadable_copy_is_reported_as_unreadable_not_changed` |
+| LSI-A4 d | `scripts/tests/test_shared_skill_surface_scope.py::test_a_copy_stranded_aside_is_pruned_like_any_withdrawn_projection`, `::test_a_stranded_copy_of_a_listed_skill_is_put_back_before_install` |
+| LSI-A4 e | `scripts/tests/test_shared_skill_surface_scope.py::test_an_interrupted_verification_puts_the_copy_back`, `::test_a_copy_that_cannot_be_put_back_is_kept_and_named`, `::test_a_copy_that_cannot_be_fully_deleted_is_reported_not_raised` |
+| LSI-A4 check | `scripts/tests/test_shared_skill_surface_scope.py::test_check_and_dry_run_never_rename` |
+| LSI-A5 | `scripts/tests/test_shared_skill_surface_scope.py::test_a_skill_name_that_is_not_a_single_path_component_is_refused` |
+| LSI-A6 | `scripts/tests/test_shared_skill_surface_scope.py::test_a_failed_marker_publish_does_not_delete_what_a_harness_wrote` |
+| LSI-B1 | `packages/tests/test_mcp_daemon.py::test_the_reclaim_cli_takes_both_snapshots_under_the_claim_guard`, `::test_reclaim_removes_both_records_while_holding_the_guard`, `::test_a_guard_that_cannot_be_taken_is_not_a_reclaim`, `::test_a_guard_failure_that_is_not_a_timeout_is_not_a_reclaim` |
 
 ## Not covered by this spec
 

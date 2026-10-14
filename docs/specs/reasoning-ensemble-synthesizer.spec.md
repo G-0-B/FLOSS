@@ -129,7 +129,7 @@ A response can be present, long, and still carry no position. The synthesizer FL
 - **SYN-D1 (unclosed reasoning block).** A response that opens with a reasoning-block opener (`<think>`, `<thinking>`, `<reasoning>`) and contains no closing tag is flagged as prompt restatement, whatever its length.
 - **SYN-D2 (truncation).** A response is flagged as truncated only when BOTH hold: it does not end in a sentence-ending mark (`.` `!` `?` `` ` `` `)` `]` `"` `'`), AND its length is below `DEGENERATE_TRUNCATION_RATIO` times the median length of the panel's non-empty, non-errored responses. A whole answer that is merely shorter than the median, or that ends in a letter, a colon or an emoji but is at least that fraction of the median, is NOT flagged.
 - **SYN-D3 (brevity is not a defect).** A short response that ends in a sentence-ending mark is never flagged for its length.
-- **SYN-D4 (no double reporting).** Errored and empty responses are not flagged here; they are already named as dropped voters.
+- **SYN-D4 (no double reporting).** Errored and empty responses are not flagged here; they are already named as dropped voters. A response that is only whitespace counts as empty.
 
 ---
 

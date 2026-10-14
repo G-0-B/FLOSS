@@ -315,7 +315,9 @@ over that set: 1 if they raised it. `scripts/review_independence.py` computes:
   zero is a valid measurement: the denominator is 1 and `n_eff = k`. The
   measurement is refused (reported as unmeasurable) only for φ̄ < 0 or a
   non-positive denominator, because near-disjoint finding sets anti-correlate by
-  construction, which is a matcher artefact and not a property of the panel.
+  construction, which is a matcher artefact and not a property of the panel. A mean
+  within 1e-12 of zero counts as zero: a panel whose mean is mathematically zero can
+  sum to a few parts in 1e17 below it in floating point.
 - **Independence ratio** `n_eff / k`. Below 0.5, treat the panel's agreement with
   caution (the threshold recommended in arXiv:2605.29800).
 - **Solo-find rate per reviewer** — findings only they raised, that survived
