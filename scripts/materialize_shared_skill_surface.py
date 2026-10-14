@@ -21,6 +21,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import sys
@@ -43,6 +44,10 @@ MANAGED_BY = "FLOSSI0ULLK shared skill surface"
 # into place; it is never part of a skill's payload.
 MARKER_TEMP_PREFIX = ".flossi0ullk-marker-"
 REMOVING_PREFIX = ".flossi0ullk-removing-"
+# A skill's name becomes `<target root>/<name>`, so it is one path component
+# (LSI-A5): no separator, no `..`, no absolute path.
+SKILL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_ASIDE_RE = re.compile(re.escape(REMOVING_PREFIX) + r"[0-9a-f]{16}-(?P<base>.+)$")
 # Files that USING a skill generates rather than changing it: running a skill's
 # Python script writes __pycache__ into the installed copy, and desktop shells
 # drop folder metadata. Counted as payload, they marked a skill EVOLVED for
@@ -125,6 +130,12 @@ def resolve_skill_entry(workspace_root: Path, entry: dict[str, Any]) -> dict[str
     if not skill_dir.is_dir():
         raise SkillSurfaceError(f"Skill path is not a directory: {skill_dir}")
     frontmatter = parse_frontmatter(skill_md)
+    if not SKILL_NAME_RE.match(frontmatter["name"]) or ".." in frontmatter["name"]:
+        raise SkillSurfaceError(
+            f"{skill_md}: skill `name` {frontmatter['name']!r} must be a single path "
+            "component (letters, digits, `.`, `_`, `-`; no separator, no `..`): it "
+            "becomes <target root>/<name>"
+        )
     resolved = dict(entry)
     resolved["resolved_path"] = str(skill_dir)
     resolved["skill_name"] = frontmatter["name"]
@@ -563,49 +574,117 @@ def remove_path(path: Path) -> None:
     path.unlink()
 
 
-def remove_if_unchanged(directory: Path, baseline: dict[str, str]) -> str | None:
+def _put_back(aside: Path, directory: Path) -> bool:
+    """Rename a copy taken aside back to its own name. False if it cannot be."""
+
+    try:
+        os.rename(aside, directory)
+    except OSError:
+        return False
+    return True
+
+
+def remove_if_unchanged(
+    directory: Path, baseline: dict[str, str]
+) -> tuple[str, str] | None:
     """Remove `directory` only if it is STILL exactly `baseline`, checked after
-    it has been taken away. Returns None when removed, else why it was kept.
+    it has been taken away. Returns None when removed, else `(status, why)`.
 
     Comparing and then removing leaves a window: a harness that writes a
     learning between the two matches the baseline no longer, but the decision
     was already taken, and the learning is deleted (PR41 review, P2). So the
     directory is renamed to a name nobody writes to, and only the renamed copy
     is verified and deleted. A late write by path now fails or lands outside
-    it. If the copy changed, it is renamed back.
+    it. If the copy changed, or could not be read, it is renamed back.
+
+    The window is NARROWED, not closed (LSI-A4 f). On POSIX a process that
+    holds a file open across the rename still writes into the renamed copy,
+    and a write landing between the verification and the deletion is deleted
+    with it. Windows refuses to rename a directory with open files, which is
+    the IN_USE outcome.
+
+    Statuses, kept distinct because the operator's next step differs:
+      IN_USE      the rename was refused; nothing moved
+      CHANGED     it no longer equals the baseline; put back
+      UNREADABLE  the renamed copy could not be read; put back
+      STUCK       verified, then could not be fully deleted; the remainder is
+                  named, and the run continues
 
     The aside name is a sibling carrying the same marker, so a copy stranded by
-    a crash is an ordinary withdrawn projection to the next run: removed if
-    unchanged, reported if not. It starts with a dot, which the harnesses'
-    skill scanners that have been read skip; the window is a rename and a read.
+    a crash is picked up by the next run (put back if it belongs to a listed
+    skill, otherwise an ordinary withdrawn projection). It starts with a dot.
+    Codex's loader skips dot-directories (read in rust-v0.128.0); the other
+    harnesses' scanners have not been read, so a stranded copy may be
+    discovered by them as a second skill until the next run.
     """
 
-    aside = directory.with_name(
-        f"{REMOVING_PREFIX}{secrets.token_hex(8)}-{directory.name}"
-    )
+    already_aside = directory.name.startswith(REMOVING_PREFIX)
+    aside = directory
+    if not already_aside:
+        aside = directory.with_name(
+            f"{REMOVING_PREFIX}{secrets.token_hex(8)}-{directory.name}"
+        )
+        try:
+            os.rename(directory, aside)
+        except OSError as exc:
+            # Open files block a rename on Windows. A copy that cannot be taken
+            # aside cannot be verified in isolation, so it is left alone.
+            return ("IN_USE", f"it could not be taken aside to be checked ({exc})")
+    problem: OSError | None = None
     try:
-        os.rename(directory, aside)
-    except OSError as exc:
-        # Open files block a rename on Windows. A copy that cannot be taken
-        # aside cannot be verified in isolation, so it is left alone.
-        return f"it could not be taken aside to be checked ({exc})"
-    try:
-        unchanged = payload_digests(aside) == baseline
-    except OSError:
-        unchanged = False
+        try:
+            unchanged = payload_digests(aside) == baseline
+        except OSError as exc:
+            unchanged = False
+            problem = exc
+    except BaseException:
+        # Anything else, an interruption included: the copy goes back.
+        if not already_aside:
+            _put_back(aside, directory)
+        raise
     if unchanged:
-        remove_path(aside)
+        try:
+            remove_path(aside)
+        except OSError as exc:
+            return (
+                "STUCK",
+                f"its verified copy could not be fully deleted ({exc}); the "
+                f"remainder is at {aside}",
+            )
+        return None
+    restored = already_aside or _put_back(aside, directory)
+    if problem is not None:
+        status, why = "UNREADABLE", f"the copy taken aside could not be read ({problem})"
+    else:
+        status, why = "CHANGED", "it changed while being checked"
+    if not restored:
+        why += f", and could not be put back at {directory}; kept as {aside}"
+    return (status, why)
+
+
+def _discard_failed_install(target_dir: Path, source: dict[str, str]) -> str | None:
+    """Remove a directory a failed install left, but only what is provably the
+    shared base (LSI-A6). None when removed or already gone, else why not.
+
+    The cleanup used to assume everything under the directory came from the
+    copy it had just made. A harness can write into a fresh install before the
+    marker is published, and removing the directory deleted that.
+    """
+
+    if not target_dir.exists():
         return None
     try:
-        os.rename(aside, directory)
-    except OSError:
-        # Something took the name in the meantime. The copy stays where it is,
-        # hidden, with its marker, and the next run reports it.
-        return (
-            f"it changed while being checked, and could not be put back at "
-            f"{directory}; kept as {aside}"
+        present = payload_digests(target_dir)
+    except OSError as exc:
+        return f"it could not be read ({exc})"
+    foreign = sorted(rel for rel, digest in present.items() if source.get(rel) != digest)
+    if foreign:
+        shown = ", ".join(foreign[:5]) + (
+            f" and {len(foreign) - 5} more" if len(foreign) > 5 else ""
         )
-    return "it changed while being checked"
+        return f"it holds files that are not the shared base ({shown})"
+    remove_path(target_dir)
+    return None
 
 
 def read_managed_marker(child: Path) -> dict[str, Any] | None:
@@ -714,6 +793,44 @@ def prune_stale_projections(
         # skill folders as a supported way to install a skill.
         if _is_link(child) or not child.is_dir() or child.name in expected:
             continue
+        # A COPY STRANDED ASIDE BY AN INTERRUPTED RUN (LSI-A4 d). If it belongs
+        # to a skill that is listed and the live name is absent, it is that
+        # skill's own installed copy, possibly with learnings in it. It goes
+        # back before anything is installed beside it; reporting it as a
+        # withdrawn skill and installing a fresh one would strand the learning.
+        stranded = _ASIDE_RE.match(child.name)
+        if stranded is not None:
+            base = stranded.group("base")
+            live = target_root / base
+            if (
+                base in expected
+                and not live.exists()
+                and not _is_link(live)
+                and (child / MANAGED_MARKER).is_file()
+                and projection_owned_by(child, owner_root)
+            ):
+                if check:
+                    drift_found = True
+                    results.append(
+                        f"DRIFT {target_name}: {base} was left aside by an "
+                        f"interrupted run and would be put back"
+                    )
+                elif dry_run:
+                    drift_found = True
+                    results.append(f"would put back {target_name}: {base}")
+                elif _put_back(child, live):
+                    drift_found = True
+                    results.append(
+                        f"put back {target_name}: {base} (left aside by an "
+                        f"interrupted run)"
+                    )
+                else:
+                    results.append(
+                        f"KEEP  {target_name}: {base} was left aside by an "
+                        f"interrupted run and could not be put back; it is at "
+                        f"{child}"
+                    )
+                continue
         if not (child / MANAGED_MARKER).is_file():
             # Unmanaged. Not ours, and silence is the correct behaviour.
             continue
@@ -765,6 +882,10 @@ def prune_stale_projections(
         # ownership check as no baseline: never remove on the strength of a
         # marker that is gone.
         owned_marker = read_managed_marker(child) or {}
+        if owned_marker and not projection_owned_by(child, owner_root):
+            # The marker changed hands since the ownership check above. A
+            # baseline that is not this workspace's proves nothing about it.
+            owned_marker = {}
         baseline = _valid_baseline(owned_marker.get("installed_files"))
         try:
             installed = payload_digests(child)
@@ -797,14 +918,17 @@ def prune_stale_projections(
         else:
             # Verified again at the moment it is taken away, not on the
             # strength of the comparison above.
-            kept = remove_if_unchanged(child, baseline)
-            if kept is None:
+            outcome = remove_if_unchanged(child, baseline)
+            if outcome is None:
                 drift_found = True
                 results.append(f"removed {target_name}: {child.name} (stale)")
             else:
+                status, why = outcome
+                if status == "STUCK":
+                    drift_found = True  # part of it is gone
                 results.append(
                     f"KEEP  {target_name}: {child.name} is withdrawn from the "
-                    f"manifest, but {kept}; kept for review rather than deleted"
+                    f"manifest, but {why}; kept for review rather than deleted"
                 )
     return results, drift_found
 
@@ -968,14 +1092,21 @@ def install_skill_projection(
     if action == "UPDATE":
         # Verified at the moment it is taken away, not before: an edit that
         # lands between the comparison and the replacement must not be lost.
-        # Byte for byte what this workspace installed is safe to remove, since
-        # the shared base's history holds it.
+        # Byte for byte what this workspace installed carries nothing a harness
+        # learned. It is NOT an archive of source revisions: one the operator
+        # replaced without committing is theirs to keep (LSI-A3).
         assert baseline is not None
-        kept = remove_if_unchanged(target_dir, baseline)
-        if kept is not None:
+        outcome = remove_if_unchanged(target_dir, baseline)
+        if outcome is not None:
+            status, why = outcome
             return keep(
-                "EVOLVED",
-                f"{kept}; the update was abandoned and the installed copy kept",
+                {
+                    "CHANGED": "EVOLVED",
+                    "IN_USE": "IN_USE",
+                    "UNREADABLE": "UNREADABLE",
+                    "STUCK": "PARTIAL",
+                }[status],
+                f"{why}; the update was abandoned and the installed copy kept",
             )
 
     try:
@@ -988,10 +1119,11 @@ def install_skill_projection(
             "a directory with this name appeared during the refresh; left in place",
         )
     except OSError as exc:
-        # Everything under target_dir was created by this copy and is exactly
-        # the shared base; a partial copy has no marker, would read as
-        # UNMANAGED on every later run and never be repaired. Remove it, and
-        # the next run installs again.
+        # A partial copy has no marker, would read as UNMANAGED on every later
+        # run and never be repaired, so it is removed whole (LSI-A6 a). This
+        # call created the directory -- copytree refuses an existing one -- and
+        # a file the failed write left truncated is its own, so it is not
+        # required to equal the shared base.
         remove_path(target_dir)
         return (
             [f"FAILED {target_name}: {name} not installed ({exc}); nothing left behind"],
@@ -1000,9 +1132,19 @@ def install_skill_projection(
     try:
         publish_marker(target_dir, expected)
     except OSError as exc:
-        # The same reasoning: a fresh copy without a marker would never be
-        # adopted, and removing it loses nothing.
-        remove_path(target_dir)
+        # A fresh copy without a marker would never be adopted. The copy had
+        # completed, so every file should equal the shared base, and anything
+        # that does not is a harness's (LSI-A6 b): removed only if it is still
+        # exactly the shared base.
+        left = _discard_failed_install(target_dir, source)
+        if left is not None:
+            return (
+                [
+                    f"KEEP  {target_name}: {name} PARTIAL: the marker could not "
+                    f"be published ({exc}) and {left}; left in place"
+                ],
+                True,
+            )
         return (
             [f"FAILED {target_name}: {name} not installed ({exc}); nothing left behind"],
             True,

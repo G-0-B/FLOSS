@@ -1783,6 +1783,101 @@ def assert_repo_scope_stays_inside(
         ) from None
 
 
+def assert_manifest_writes_stay_inside(
+    manifest: dict[str, Any], workspace_root: Path
+) -> None:
+    """Refuse, before anything is written, every manifest path that leaves the workspace.
+
+    Two gaps in one place (LSI-A1). A `scope: "repo"` target is checked against
+    its resolved path, and the per-target checks run in the middle of the write
+    sequence, so a refusal on the codex or hermes target came after the mirrors,
+    the context pack, gemini, opencode and vibe had already been written. And
+    the targets that carry no `scope` field at all (mirrors, the context pack,
+    gemini, opencode, vibe) were `workspace_root / raw`, where an absolute raw
+    replaces the base: they were never checked. Those are repo scope, since
+    nothing declares them otherwise.
+
+    A path that cannot be resolved refuses. It does not skip.
+    """
+
+    root = workspace_root.resolve()
+
+    def inside(label: str, candidate: Path) -> None:
+        try:
+            candidate.resolve().relative_to(root)
+        except ValueError:
+            raise SharedSurfaceError(
+                f"{label} resolves to {candidate}, outside the workspace {root}. "
+                "Writing outside the repository is user scope: declare a target "
+                'with `"scope": "user"` and pass --include-user-scope.'
+            ) from None
+        except (OSError, RuntimeError) as exc:
+            raise SharedSurfaceError(
+                f"{label} could not be resolved ({type(exc).__name__}: {exc}); "
+                "refusing to write to a path whose location is unknown."
+            ) from exc
+
+    def text(value: Any) -> str | None:
+        return value if isinstance(value, str) and value.strip() else None
+
+    mirrors = manifest.get("mcp_mirrors", [])
+    for mirror in mirrors if isinstance(mirrors, list) else []:
+        if text(mirror):
+            inside("mcp_mirrors entry", workspace_root / mirror)
+    if text(manifest.get("context_pack_path")):
+        inside("context_pack_path", workspace_root / manifest["context_pack_path"])
+
+    targets = manifest.get("targets", {})
+    if not isinstance(targets, dict):
+        return
+
+    for key, cfg in targets.items():
+        if not isinstance(cfg, dict):
+            continue
+        # Targets that declare a scope: only repo scope is contained.
+        if key in {"antigravity", "codex", "codex_user", "hermes_workspace", "hermes_user"}:
+            raw = text(cfg.get("config_path"))
+            if raw is None or str(cfg.get("scope", "")).strip().lower() != "repo":
+                continue
+            try:
+                resolved = resolve_manifest_path(workspace_root, raw)
+            except SharedSurfaceError:
+                continue  # an undefined variable: the target's own block says so
+            assert_repo_scope_stays_inside(key, cfg, resolved, workspace_root)
+
+    gemini = targets.get("gemini")
+    if isinstance(gemini, dict) and text(gemini.get("settings_path")):
+        inside("gemini settings_path", workspace_root / gemini["settings_path"])
+
+    opencode = targets.get("opencode")
+    if isinstance(opencode, dict):
+        if text(opencode.get("settings_path")):
+            inside("opencode settings_path", workspace_root / opencode["settings_path"])
+            if text(opencode.get("agent_instruction_path")):
+                inside(
+                    "opencode agent_instruction_path",
+                    workspace_root / opencode["agent_instruction_path"],
+                )
+
+    vibe = targets.get("vibe")
+    if isinstance(vibe, dict) and text(vibe.get("config_path")):
+        inside("vibe config_path", workspace_root / str(vibe["config_path"]))
+        for field in ("startup_prompt_path", "launcher_path"):
+            if text(vibe.get(field)):
+                inside(f"vibe {field}", workspace_root / vibe[field])
+        agents_dir_raw = vibe.get("agents_dir")
+        agents_dir = workspace_root / (
+            agents_dir_raw if isinstance(agents_dir_raw, str) and agents_dir_raw else ".vibe/agents"
+        )
+        inside("vibe agents_dir", agents_dir)
+        for spec in vibe.get("agents", []) if isinstance(vibe.get("agents"), list) else []:
+            if isinstance(spec, dict) and str(spec.get("name", "")).strip():
+                inside(
+                    f"vibe agent {str(spec['name']).strip()!r}",
+                    agents_dir / f"{str(spec['name']).strip()}.toml",
+                )
+
+
 def materialize(
     workspace_root: Path,
     manifest_path: Path,
@@ -1792,6 +1887,9 @@ def materialize(
     include_user_scope: bool = False,
 ) -> tuple[list[str], bool]:
     manifest = resolve_manifest(workspace_root, manifest_path)
+    # Before any write: a refusal on a later target must not leave an earlier
+    # one rewritten (LSI-A1 a).
+    assert_manifest_writes_stay_inside(manifest, workspace_root)
     shared_mcp = manifest["_resolved_mcp"]["mcpServers"]
     results: list[str] = []
     drift_found = False

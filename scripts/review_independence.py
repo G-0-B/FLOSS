@@ -149,7 +149,10 @@ def kish_neff(vectors: list[list[int]]) -> tuple[float, float, int]:
     if not values:
         return float("nan"), float("nan"), 0
     mean_phi = sum(values) / len(values)
-    if mean_phi < 0:
+    # A tolerance, not a bare `< 0` (MRP-K1): a mean that is mathematically
+    # zero can sum a few parts in 1e17 below it (0.3 + -0.1 + -0.2), and was
+    # then refused as if the panel were anti-correlated.
+    if mean_phi < -1e-12:
         # Kish assumes non-negative mean correlation. A mean of exactly zero is
         # a valid measurement (the denominator is 1 and n_eff is k), so only a
         # NEGATIVE mean is refused -- an earlier `<= 0` refused three reviewers

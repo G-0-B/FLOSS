@@ -431,7 +431,14 @@ def resolve_target_hooks(target_cfg: dict[str, Any]) -> dict[str, Any]:
         mapped_name = event_map.get(event_name)
         if mapped_name is None:
             continue
-        if mapped_name in mapped:
+        if not definitions:
+            # An event with no hooks takes no part in the collision check (LSI-A2):
+            # it neither raises nor replaces hooks another event mapped here. It is
+            # still emitted when nothing else claims the name, because generated
+            # configs rely on empty arrays to clear an event.
+            mapped.setdefault(mapped_name, definitions)
+            continue
+        if mapped_name in sources:
             # Assigning here would silently replace the first event's hooks
             # with the second's: materialization would succeed and one set of
             # hooks would be absent from the generated file with nothing
@@ -838,8 +845,15 @@ def assert_repo_scope_stays_inside(
     try:
         resolved_root = workspace_root.resolve()
         resolved_target = target_path.resolve()
-    except OSError:  # pragma: no cover -- unresolvable path, let the write fail
-        return
+    except (OSError, ValueError, RuntimeError) as exc:
+        # A check that cannot resolve a path REFUSES (LSI-A1 c). This returned,
+        # which let the write go ahead to a path whose location was unknown,
+        # while the skill and agent materializers refused the same case.
+        raise HookSurfaceError(
+            f"Target {target_name!r} declares scope 'repo' but its settings_path "
+            f"{target_path} could not be resolved ({type(exc).__name__}: {exc}); "
+            "refusing to write to a path whose location is unknown."
+        ) from exc
     if resolved_root == resolved_target or resolved_root in resolved_target.parents:
         return
     raise HookSurfaceError(
@@ -1032,6 +1046,24 @@ def materialize(
     variables = resolve_variables(manifest, workspace_root)
     registry = build_registry(manifest, workspace_root, variables)
     index = build_index(registry)
+
+    # EVERY TARGET IS CHECKED BEFORE ANYTHING IS WRITTEN (LSI-A1 a). The registry,
+    # the index and earlier targets were written first, so a refusal on a later
+    # target left a half-written surface behind.
+    for target_name, target_cfg in manifest["targets"].items():
+        if not isinstance(target_cfg, dict) or not target_cfg.get("enabled"):
+            continue
+        if not hook_target_in_scope(target_name, target_cfg, include_user_scope):
+            continue
+        raw_settings_path = target_cfg.get("settings_path")
+        if not isinstance(raw_settings_path, str) or not raw_settings_path.strip():
+            continue  # the write loop below refuses it with its own message
+        assert_repo_scope_stays_inside(
+            target_name,
+            target_cfg,
+            resolve_target_path(workspace_root, raw_settings_path),
+            workspace_root,
+        )
 
     results: list[str] = []
     drift_found = False

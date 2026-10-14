@@ -849,7 +849,9 @@ def degenerate_voters(responses: list[VoterResponse]) -> dict[str, str]:
     Returns voter_id -> reason. Empty when every response looks substantive.
     """
 
-    scored = [r for r in responses if r.response and not r.error]
+    # Whitespace-only is empty (SYN-D4): `if r.response` only caught "", so
+    # "   " reached the truncation check and was called a 0-char fragment.
+    scored = [r for r in responses if r.response and r.response.strip() and not r.error]
     if not scored:
         return {}
     lengths = sorted(len(r.response) for r in scored)
