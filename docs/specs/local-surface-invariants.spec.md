@@ -9,6 +9,7 @@ governs:
   - "FLOSS/scripts/materialize_shared_hook_surface.py"
   - "FLOSS/scripts/materialize_shared_skill_surface.py"
   - "FLOSS/packages/mcp_daemon.py"
+  - "FLOSS/skill-corpus/superpowers-brainstorming/scripts/server.cjs"
 registry: "FLOSS/docs/specs/spec-registry.json"
 ```
 
@@ -124,6 +125,26 @@ is 1, and nothing is removed.
 replacement launcher's sidecar, and the removal that follows can delete a live
 daemon's identity record.
 
+## Part C. Local companion servers
+
+**LSI-C1. The bootstrap page reflects no request-supplied value, and its embedded
+JSON cannot close its script element.** The brainstorming companion's
+`server.cjs` serves a bootstrap page that stores the session key in
+`sessionStorage`.
+
+- a. The page embeds the server's own token, not the `key` query value. The two are
+  equal once the check has passed, so behavior is unchanged, but no string taken
+  from the request reaches the response.
+- b. The embedded JSON is escaped for HTML: `<`, `>`, `&`, U+2028 and U+2029 are
+  written as `\uXXXX` escapes, so no key value can end the script element or the
+  string literal.
+
+*Why:* CodeQL (`js/reflected-xss`, high) reported the reflection on PR #41. The
+earlier triage (`72f0240`) judged it unreachable by an attacker, because the value
+must equal the secret token, and that still holds. This is hardening, not a
+vulnerability fix: it makes the sink safe on its own terms instead of depending on
+a guard a few lines above it.
+
 ## Conformance
 
 | Clause | Test |
@@ -139,6 +160,7 @@ daemon's identity record.
 | LSI-A5 | `scripts/tests/test_shared_skill_surface_scope.py::test_a_skill_name_that_is_not_a_single_path_component_is_refused` |
 | LSI-A6 a | `scripts/tests/test_shared_skill_surface_scope.py::test_a_copy_that_fails_midway_leaves_nothing_half_installed` |
 | LSI-A6 b | `scripts/tests/test_shared_skill_surface_scope.py::test_a_failed_marker_publish_does_not_delete_what_a_harness_wrote`, `::test_a_failed_marker_publish_with_nothing_extra_leaves_nothing_behind` |
+| LSI-C1 | `scripts/tests/test_brainstorm_bootstrap_page.py::test_a_key_cannot_close_the_script_element`, `::test_line_separators_are_escaped`, `::test_an_ordinary_key_round_trips` (skipped when `node` is absent) |
 | LSI-B1 | `packages/tests/test_mcp_daemon.py::test_the_reclaim_cli_takes_both_snapshots_under_the_claim_guard`, `::test_reclaim_removes_both_records_while_holding_the_guard`, `::test_a_guard_that_cannot_be_taken_is_not_a_reclaim`, `::test_a_guard_failure_that_is_not_a_timeout_is_not_a_reclaim` |
 
 ## Not covered by this spec
