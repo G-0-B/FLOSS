@@ -46,7 +46,20 @@ None of these is what fails the gate today.
    - `grok-computer-use-2026-08-25`
    - one more at the folder's root.
 
-## What would fix it (for the operator to choose; nothing done)
+## Done: identity rotated, 2026-10-14
+
+The operator gave the go-ahead. The audit packet of 2026-08-24 had already found these defects, and ADR-20 had already accepted the remedy: "identity rotation with a signed lineage statement", as an operator action not yet taken. `identity-rotation-2026-10-14/rotate_identity.py` carried it out:
+
+- **Lock and rename.** It held the identity's own locks, then renamed `~/.floss_agent/identity` to `identity.retired-2026-10-14`. Nothing was deleted: the old key, its chain state, a `RETIRED.md` and a copy of the lineage statement are there.
+- **New identity.** It created `D_i3_ZgrQ1H79zLZ8dI4V_p3knBbf69NPt2kZMJxmcGM` at the original path, with the same function the hook uses. It has no chain yet; the hook's next packet is its sequence 0.
+- **Lineage statement.** It wrote one naming both identities, the old head (s=163), the last valid position (s=1), the defects, the reason and the decision, and signed it with both keys over its JCS canonical bytes. Both signatures verified. It lives at `C:/~shit/.agent-surface/identity-lineage/`, outside the packet store so no validator reads it as a packet; a copy is in `identity-rotation-2026-10-14/lineage.json`. Its format (`floss-identity-lineage/0.1-draft`) is new and has no spec yet.
+- **Old packets.** All 160 stay in the store as the audit record.
+
+Still to do: watch the hook log for the first claim under the new identity; update ADR-20's "accepted but not implemented" list; explain the July use of the old key. Any packet signed by `DkuYPguG98HM2nyRTGm1iSyaNhocBmlsbnkxfN89msG0` after 2026-10-14 would be evidence of an unknown writer.
+
+## Still open from the trace
+
+### What would fix it (for the operator to choose; nothing done)
 
 1. **Re-anchor the hook's identity.** Move `~/.floss_agent/identity` aside (never delete it) so the next packet starts a new, clean chain under a new key. Record the old identity, the break at s=2, and why. The old chain stays verifiable as history, and new claims stop inheriting the fork. A KERI-style rotation event that links the two keys would carry continuity over formally; a plain restart is simpler and honest if recorded.
 2. **One writer per chain.** Give each harness, or better each session, its own identity, delegated from one root the operator holds. One harness's bug then breaks its own chain, not every harness's. Five harnesses currently share one chain.

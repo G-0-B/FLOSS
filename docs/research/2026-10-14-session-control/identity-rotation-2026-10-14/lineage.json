@@ -1,0 +1,31 @@
+{
+  "created_at": "2026-10-14T14:34:09Z",
+  "decision": "ADR-20, 'identity rotation with a signed lineage statement' (accepted, not implemented until now); operator go-ahead 2026-10-14",
+  "from": {
+    "aid": "DkuYPguG98HM2nyRTGm1iSyaNhocBmlsbnkxfN89msG0",
+    "defects": [
+      "s=2 names s=0 as its prior while s=1 exists (a fork, 2026-05-25)",
+      "s=4 and s=5 carry no prior although they are not s=0 (false origins, 2026-05-25)",
+      "s=3, 36, 37 and 39 are absent from the store",
+      "s=36, 37 and 39 were signed between 2026-07-17 and 2026-07-30 by a writer that is not the post-write hook; unidentified"
+    ],
+    "head": {
+      "d": "EjgH3X3kfCl99tzP40Hs06JsxpF1H9M0Yjfec8pzZQ6g",
+      "s": "163"
+    },
+    "kept_at": "C:\\Users\\kalis\\.floss_agent\\identity.retired-2026-10-14",
+    "valid_through_s": "1"
+  },
+  "reason": "Every packet after s=1 fails the validator's whole-ancestry check (E_PROVENANCE_SEQUENCE_DISCONTINUOUS), so no claim from the post-write hook has landed since 2026-08-25. Signed packets cannot be repaired.",
+  "sigs": {
+    "from": "0BrZkRQQkedkaU2iZPQZ_mtT7xZziJnulKM75q7prlzIV-GRgJ-0LpHgc8YKuNM5MhgRTEkwWjycSoNfPyCaMhCg",
+    "to": "0BiiW2JQ-ke-2T19LzFpi2YQjWd99DWGkkkH5VoJXAozuloGtHQZdXoMi2wZs8o-H2rz3Z51UsWKYfJp52eoDpAg"
+  },
+  "t": "lineage",
+  "to": {
+    "aid": "D_i3_ZgrQ1H79zLZ8dI4V_p3knBbf69NPt2kZMJxmcGM",
+    "starts_at_s": "0"
+  },
+  "trace": "docs/research/2026-10-14-session-control/provenance-trace.md (branch feat/coordination-room-rebased)",
+  "v": "floss-identity-lineage/0.1-draft"
+}
