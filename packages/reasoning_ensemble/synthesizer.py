@@ -865,7 +865,13 @@ def degenerate_voters(responses: list[VoterResponse]) -> dict[str, str]:
                 "restatement, not an answer"
             )
             continue
-        if not text.endswith(SENTENCE_ENDINGS) and len(text) < median:
+        # The ratio is what separates "cut off" from "a little shorter than
+        # its peers". Comparing against the bare median called any whole answer
+        # below it truncated whenever it ended in a letter, a colon or an emoji.
+        if (
+            not text.endswith(SENTENCE_ENDINGS)
+            and len(text) < median * DEGENERATE_TRUNCATION_RATIO
+        ):
             flagged[response.voter_id] = (
                 f"ends mid-sentence at {len(text)} chars against a "
                 f"{median}-char median -- truncated, not concluded"

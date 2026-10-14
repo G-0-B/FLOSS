@@ -1113,6 +1113,26 @@ def _reclaim_claim_cli() -> int:
         print("usage: --reclaim-claim <pid_file>", file=sys.stderr)
         return 2
     pid_path = Path(sys.argv[2])
+    try:
+        # BOTH SNAPSHOTS AND BOTH REMOVALS UNDER ONE GUARD, as release and
+        # record do (PR41 review, P2). Taken outside it, a launcher replacing
+        # the claim and its sidecar between the two snapshots left this caller
+        # holding the OLD claim next to the NEW launcher's sidecar, and the
+        # sidecar removal could delete a live replacement's identity before
+        # the instance check refused to touch its claim.
+        with _claim_guard(pid_path):
+            return _reclaim_claim_guarded(pid_path)
+    except TimeoutError:
+        # Could not act, which is not the same as "reclaimed". The scripts
+        # read NOT_RECLAIMED as "leave the record", the conservative answer.
+        print("NOT_RECLAIMED")
+        return 1
+    except (OSError, ImportError):
+        print("NOT_RECLAIMED")
+        return 1
+
+
+def _reclaim_claim_guarded(pid_path: Path) -> int:
     observed = _inspect_claim(pid_path)
     observed_sidecar = _inspect_sidecar(pid_path)
     if observed is None:

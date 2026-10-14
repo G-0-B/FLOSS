@@ -21,6 +21,7 @@ import contextlib
 import hashlib
 import json
 import os
+import secrets
 import shutil
 import sys
 import tempfile
@@ -41,6 +42,7 @@ MANAGED_BY = "FLOSSI0ULLK shared skill surface"
 # A marker being published is first written under this prefix and then swapped
 # into place; it is never part of a skill's payload.
 MARKER_TEMP_PREFIX = ".flossi0ullk-marker-"
+REMOVING_PREFIX = ".flossi0ullk-removing-"
 # Files that USING a skill generates rather than changing it: running a skill's
 # Python script writes __pycache__ into the installed copy, and desktop shells
 # drop folder metadata. Counted as payload, they marked a skill EVOLVED for
@@ -561,6 +563,51 @@ def remove_path(path: Path) -> None:
     path.unlink()
 
 
+def remove_if_unchanged(directory: Path, baseline: dict[str, str]) -> str | None:
+    """Remove `directory` only if it is STILL exactly `baseline`, checked after
+    it has been taken away. Returns None when removed, else why it was kept.
+
+    Comparing and then removing leaves a window: a harness that writes a
+    learning between the two matches the baseline no longer, but the decision
+    was already taken, and the learning is deleted (PR41 review, P2). So the
+    directory is renamed to a name nobody writes to, and only the renamed copy
+    is verified and deleted. A late write by path now fails or lands outside
+    it. If the copy changed, it is renamed back.
+
+    The aside name is a sibling carrying the same marker, so a copy stranded by
+    a crash is an ordinary withdrawn projection to the next run: removed if
+    unchanged, reported if not. It starts with a dot, which the harnesses'
+    skill scanners that have been read skip; the window is a rename and a read.
+    """
+
+    aside = directory.with_name(
+        f"{REMOVING_PREFIX}{secrets.token_hex(8)}-{directory.name}"
+    )
+    try:
+        os.rename(directory, aside)
+    except OSError as exc:
+        # Open files block a rename on Windows. A copy that cannot be taken
+        # aside cannot be verified in isolation, so it is left alone.
+        return f"it could not be taken aside to be checked ({exc})"
+    try:
+        unchanged = payload_digests(aside) == baseline
+    except OSError:
+        unchanged = False
+    if unchanged:
+        remove_path(aside)
+        return None
+    try:
+        os.rename(aside, directory)
+    except OSError:
+        # Something took the name in the meantime. The copy stays where it is,
+        # hidden, with its marker, and the next run reports it.
+        return (
+            f"it changed while being checked, and could not be put back at "
+            f"{directory}; kept as {aside}"
+        )
+    return "it changed while being checked"
+
+
 def read_managed_marker(child: Path) -> dict[str, Any] | None:
     """The marker, if it is one this materializer wrote; otherwise None."""
 
@@ -738,17 +785,27 @@ def prune_stale_projections(
                 f"but {why}; kept for review rather than deleted"
             )
             continue
-        drift_found = True
         if check:
+            drift_found = True
             results.append(
                 f"DRIFT {target_name}: {child.name} is an installed managed "
                 f"projection with no skill in the manifest (withdrawn or renamed)"
             )
         elif dry_run:
+            drift_found = True
             results.append(f"would remove {target_name}: {child.name} (stale)")
         else:
-            remove_path(child)
-            results.append(f"removed {target_name}: {child.name} (stale)")
+            # Verified again at the moment it is taken away, not on the
+            # strength of the comparison above.
+            kept = remove_if_unchanged(child, baseline)
+            if kept is None:
+                drift_found = True
+                results.append(f"removed {target_name}: {child.name} (stale)")
+            else:
+                results.append(
+                    f"KEEP  {target_name}: {child.name} is withdrawn from the "
+                    f"manifest, but {kept}; kept for review rather than deleted"
+                )
     return results, drift_found
 
 
@@ -909,21 +966,17 @@ def install_skill_projection(
         return ([f"WROTE {target_dir} (marker only: {action})"], True)
 
     if action == "UPDATE":
-        # Read again immediately before anything is removed: an edit that
+        # Verified at the moment it is taken away, not before: an edit that
         # lands between the comparison and the replacement must not be lost.
-        try:
-            unchanged = payload_digests(target_dir) == baseline
-        except OSError:
-            unchanged = False
-        if not unchanged:
+        # Byte for byte what this workspace installed is safe to remove, since
+        # the shared base's history holds it.
+        assert baseline is not None
+        kept = remove_if_unchanged(target_dir, baseline)
+        if kept is not None:
             return keep(
                 "EVOLVED",
-                "changed during this refresh; the update was abandoned and the "
-                "installed copy kept",
+                f"{kept}; the update was abandoned and the installed copy kept",
             )
-        # Safe to remove: it is byte for byte what this workspace installed,
-        # so nothing learned is lost. The shared base's history holds it.
-        remove_path(target_dir)
 
     try:
         _copy_payload(source_dir, target_dir)

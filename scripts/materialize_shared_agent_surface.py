@@ -1758,6 +1758,31 @@ def target_in_scope(target_cfg: dict[str, Any], include_user_scope: bool) -> boo
     return scope == "repo" or include_user_scope
 
 
+def assert_repo_scope_stays_inside(
+    target_name: str, target_cfg: dict[str, Any], resolved: Path, workspace_root: Path
+) -> None:
+    """A `scope: "repo"` target must resolve inside the workspace.
+
+    target_in_scope() trusts the declared scope, and resolve_manifest_path()
+    deliberately returns an absolute or `~`-expanded path as it is. Together
+    they let `scope: "repo"` plus an external path rewrite machine-wide
+    configuration from a run that never passed --include-user-scope. The hook
+    and skill materializers refuse this; so does this one (PR41 review, P2).
+    """
+    if str(target_cfg.get("scope", "")).strip().lower() != "repo":
+        return
+    root = workspace_root.resolve()
+    try:
+        resolved.resolve().relative_to(root)
+    except ValueError:
+        raise SharedSurfaceError(
+            f"Target {target_name!r} declares scope 'repo' but its path "
+            f"resolves to {resolved}, outside {root}. Writing outside the "
+            'repository is user scope: declare `"scope": "user"` and pass '
+            "--include-user-scope."
+        ) from None
+
+
 def materialize(
     workspace_root: Path,
     manifest_path: Path,
@@ -1799,6 +1824,9 @@ def materialize(
         if target_in_scope(antigravity_cfg, include_user_scope):
             antigravity_path = resolve_manifest_path(
                 workspace_root, str(antigravity_cfg["config_path"])
+            )
+            assert_repo_scope_stays_inside(
+                "antigravity", antigravity_cfg, antigravity_path, workspace_root
             )
             existing = load_json(antigravity_path) if antigravity_path.exists() else {}
             payload = build_antigravity_payload(existing, shared_mcp)
@@ -1922,6 +1950,9 @@ def materialize(
         codex_path = resolve_manifest_path(
             workspace_root, str(codex_cfg["config_path"])
         )
+        assert_repo_scope_stays_inside(
+            codex_key, codex_cfg, codex_path, workspace_root
+        )
         tomlkit = require_module("tomlkit", codex_key)
         # A malformed hand-edited config or a config_path that resolves to a
         # directory (`.exists()` is True for both a file and a directory, so
@@ -2012,6 +2043,9 @@ def materialize(
                 f"SKIP  {hermes_key} (user scope; pass --include-user-scope)"
             )
             continue
+        assert_repo_scope_stays_inside(
+            hermes_key, hermes_cfg, hermes_path, workspace_root
+        )
         if not hermes_path.exists():
             results.append(f"SKIP  {hermes_key} (no config at {hermes_path})")
             continue

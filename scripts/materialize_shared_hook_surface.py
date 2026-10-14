@@ -426,11 +426,23 @@ def resolve_target_hooks(target_cfg: dict[str, Any]) -> dict[str, Any]:
         raise HookSurfaceError("Target `event_map` field must be an object if present")
 
     mapped: dict[str, Any] = {}
+    sources: dict[str, str] = {}
     for event_name, definitions in target_hooks.items():
         mapped_name = event_map.get(event_name)
         if mapped_name is None:
             continue
+        if mapped_name in mapped:
+            # Assigning here would silently replace the first event's hooks
+            # with the second's: materialization would succeed and one set of
+            # hooks would be absent from the generated file with nothing
+            # saying so. Two events landing on one native name is a manifest
+            # error, so it is one.
+            raise HookSurfaceError(
+                f"Events {sources[mapped_name]!r} and {event_name!r} both map to "
+                f"native event {mapped_name!r}; one would overwrite the other"
+            )
         mapped[mapped_name] = definitions
+        sources[mapped_name] = event_name
     return mapped
 
 

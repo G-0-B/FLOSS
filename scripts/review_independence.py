@@ -149,8 +149,11 @@ def kish_neff(vectors: list[list[int]]) -> tuple[float, float, int]:
     if not values:
         return float("nan"), float("nan"), 0
     mean_phi = sum(values) / len(values)
-    if mean_phi <= 0:
-        # Kish assumes non-negative mean correlation. Below zero the formula
+    if mean_phi < 0:
+        # Kish assumes non-negative mean correlation. A mean of exactly zero is
+        # a valid measurement (the denominator is 1 and n_eff is k), so only a
+        # NEGATIVE mean is refused -- an earlier `<= 0` refused three reviewers
+        # who each raised one shared and one distinct finding. Below zero the formula
         # still returns a finite number and that number is garbage: on the
         # first real corpus, phi_bar = -0.096 with k = 10 produced
         # n_eff = 71.33 and an "independence ratio" of 713%, printed as if it
