@@ -252,6 +252,36 @@ def test_a_short_but_finished_answer_is_not_flagged():
     assert flagged == {}
 
 
+def test_a_whole_answer_near_the_median_length_is_not_called_truncated():
+    """Spec SYN-D2: the declared truncation ratio has to be applied (PR41 review, P2).
+
+    The check flagged anything shorter than the median that ended in a mark the
+    sentence list does not contain. A complete answer that is merely a little
+    shorter than its peers, and ends in a letter or a colon, was persisted and
+    presented as a voter that "returned no position". The ratio is the line
+    between "a bit shorter" and "cut off".
+    """
+    peer = "word " * 79 + "end."  # 399 chars, ends in a listed mark
+    near = "word " * 71 + "end"  # 358 chars: 0.9 of the median, ends in a letter
+    flagged = degenerate_voters(
+        [_resp("near", near), _resp("peer-a", peer), _resp("peer-b", peer)]
+    )
+    assert flagged == {}
+
+
+def test_a_fragment_well_under_the_ratio_is_still_flagged():
+    """Spec SYN-D2: below the ratio and unterminated is truncated."""
+    peer = "word " * 79 + "end."
+    flagged = degenerate_voters(
+        [
+            _resp("cut", "word " * 10 + "and"),  # ~53 chars, well under 0.4 of 399
+            _resp("peer-a", peer),
+            _resp("peer-b", peer),
+        ]
+    )
+    assert set(flagged) == {"cut"}
+
+
 def test_a_closed_reasoning_block_is_fine():
     flagged = degenerate_voters(
         [

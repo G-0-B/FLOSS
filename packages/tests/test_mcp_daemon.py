@@ -875,7 +875,7 @@ def test_every_slot_release_removes_the_identity_sidecar_first():
     from packages import mcp_daemon
 
     source = Path(mcp_daemon.__file__).read_text(encoding="utf-8")
-    for func in ("_release_claim_guarded", "_reclaim_claim_cli"):
+    for func in ("_release_claim_guarded", "_reclaim_claim_guarded"):
         body = source.split(f"def {func}(", 1)[1].split(chr(10) + "def ", 1)[0]
         sidecar = body.index("_sidecar_cleared(")
         claim = body.index("_reclaim_claim_if_unchanged(")
@@ -1169,7 +1169,7 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     )
     body = source.split("def _claim_singleton_guarded(", 1)[1].split("\ndef ", 1)[0]
     reserve = source.split("def _reserve_slot_guarded(", 1)[1].split("\ndef ", 1)[0]
-    cli = source.split("def _reclaim_claim_cli(", 1)[1].split("\ndef ", 1)[0]
+    cli = source.split("def _reclaim_claim_guarded(", 1)[1].split("\ndef ", 1)[0]
 
     # Only the RECLAIM and RELEASE paths are in scope. The two remaining plain
     # unlinks tidy up a claim this process created microseconds earlier and has
@@ -1177,7 +1177,7 @@ def test_no_reclaim_site_removes_a_record_by_pathname():
     # holder could own.
     for name, section in (
         ("_reserve_slot_guarded", reserve),
-        ("_reclaim_claim_cli", cli),
+        ("_reclaim_claim_guarded", cli),
     ):
         assert (
             "unlink(missing_ok=True)" not in section
@@ -1236,6 +1236,80 @@ def test_the_reclaim_cli_reports_its_verdict_on_stdout(tmp_path):
 
     # Already gone is success, not an error: the slot is free either way.
     assert run().stdout.strip().splitlines()[-1] == "RECLAIMED"
+
+
+def test_the_reclaim_cli_takes_both_snapshots_under_the_claim_guard(
+    tmp_path, monkeypatch, capsys
+):
+    """Spec LSI-B1 (PR41 review, P2). --reclaim-claim snapshotted the claim and its sidecar
+    with no guard held. A launcher replacing both between the two snapshots left
+    the sidecar of the NEW launcher paired with the claim of the OLD one, and
+    the removal that followed could delete the live replacement's sidecar before
+    the instance check refused to touch its claim. Release and record already
+    hold the guard across the pair; reclaim has to as well.
+    """
+    pid_path = tmp_path / "omniroute.pid"
+    held = {"now": False, "entered": 0}
+    snapshots_outside_guard: list[str] = []
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def guard(path, *, timeout_seconds=None):
+        held["now"] = True
+        held["entered"] += 1
+        try:
+            yield
+        finally:
+            held["now"] = False
+
+    real_claim = mcp_daemon._inspect_claim
+    real_sidecar = mcp_daemon._inspect_sidecar
+
+    def claim(path):
+        if not held["now"]:
+            snapshots_outside_guard.append("claim")
+        return real_claim(path)
+
+    def sidecar(path):
+        if not held["now"]:
+            snapshots_outside_guard.append("sidecar")
+        return real_sidecar(path)
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", guard)
+    monkeypatch.setattr(mcp_daemon, "_inspect_claim", claim)
+    monkeypatch.setattr(mcp_daemon, "_inspect_sidecar", sidecar)
+    monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--reclaim-claim", str(pid_path)])
+
+    code = mcp_daemon._reclaim_claim_cli()
+
+    assert held["entered"] == 1, "the claim guard was never taken"
+    assert snapshots_outside_guard == []
+    assert code == 0
+    assert capsys.readouterr().out.strip().endswith("RECLAIMED")
+
+
+def test_a_guard_that_cannot_be_taken_is_not_a_reclaim(tmp_path, monkeypatch, capsys):
+    """Spec LSI-B1: fail closed, as release does: not acting is NOT_RECLAIMED, and the
+    scripts already treat that as "leave the record"."""
+    pid_path = tmp_path / "omniroute.pid"
+    pid_path.write_bytes(b"stale-record")
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def busy(path, *, timeout_seconds=None):
+        raise TimeoutError("another launcher holds the guard")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(mcp_daemon, "_claim_guard", busy)
+    monkeypatch.setattr(sys, "argv", ["mcp_daemon", "--reclaim-claim", str(pid_path)])
+
+    code = mcp_daemon._reclaim_claim_cli()
+
+    assert code == 1
+    assert capsys.readouterr().out.strip().endswith("NOT_RECLAIMED")
+    assert pid_path.exists()
 
 
 def test_an_unreadable_sidecar_stops_the_claim_from_being_freed(tmp_path):

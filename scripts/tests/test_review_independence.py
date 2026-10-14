@@ -147,3 +147,34 @@ def test_a_measurable_panel_still_reports(capsys):
 
     assert code == 0
     assert "n_eff" in out
+
+
+def test_a_panel_with_exactly_zero_mean_correlation_is_measured_not_refused(capsys):
+    """Spec MRP-K1 (PR41 review, P2): the refusal is for a NEGATIVE mean, not a zero one.
+
+    Three reviewers who each raise one shared finding and one of their own are
+    exactly uncorrelated: every pairwise phi is 0, the Kish denominator is 1,
+    and n_eff is k. The refusal's rationale (near-disjoint sets anti-correlate
+    by construction) applies below zero only.
+    """
+    module = load_module()
+
+    reviews = [
+        _review("a", ["shared", "only-a"]),
+        _review("b", ["shared", "only-b"]),
+        _review("c", ["shared", "only-c"]),
+        # Extra keys that nobody raises would be constant columns; the three
+        # distinct ones above are what make the vectors vary.
+    ]
+
+    n_eff, mean_phi, pairs = module.kish_neff(
+        module.build_matrix(reviews)[1]
+    )
+
+    assert mean_phi == 0
+    assert pairs == 3
+    assert n_eff == 3
+
+    code = module.report(reviews, None)
+    assert code == 0
+    assert "n_eff" in capsys.readouterr().out

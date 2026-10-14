@@ -1160,37 +1160,6 @@ def test_an_unmanaged_directory_with_a_listed_name_is_never_replaced(tmp_path):
     assert not (theirs / module.MANAGED_MARKER).exists(), "adopted without a policy"
 
 
-def test_an_update_is_abandoned_if_the_install_changes_during_the_refresh(
-    tmp_path, monkeypatch
-):
-    """Fourth audit, design point 4: an edit landing between the comparison
-    and the replacement must not be lost. The installed copy is read again
-    immediately before anything is removed."""
-    module = load_module()
-    workspace, source, skill, target_root = _one_skill(module, tmp_path)
-    installed = _install_as(
-        target_root, source, _marker_for(workspace, source, source)
-    )
-    skill = _set_source(module, workspace, _V2)
-    real = module.payload_digests
-    reads = {"n": 0}
-
-    def racing(directory):
-        result = real(directory)
-        if Path(directory) == installed:
-            reads["n"] += 1
-            if reads["n"] == 2:
-                result = {**result, "SKILL.md": "0" * 64}
-        return result
-
-    monkeypatch.setattr(module, "payload_digests", racing)
-
-    lines, _drift = _run(module, skill, target_root, workspace)
-
-    assert (installed / "SKILL.md").read_text(encoding="utf-8") == _V1
-    assert any(m.startswith("KEEP") for m in lines), lines
-
-
 def test_a_withdrawn_skill_with_local_changes_is_kept_and_surfaced(tmp_path):
     """Learnings in a retracted skill are still learnings. The pruner removes
     only what it can prove is exactly what was installed."""
@@ -1440,3 +1409,134 @@ def test_a_really_unreadable_directory_is_not_silently_left_out(tmp_path):
 
     assert (private / "lesson.md").exists(), "removed unseen content"
     assert any(m.startswith("KEEP") and "UNREADABLE" in m for m in lines), lines
+
+
+def _write_lands_after_first_digest(module, monkeypatch, directory: Path):
+    """Simulate a harness writing a learning immediately after the comparison.
+
+    The first digest of `directory` is taken as normal; then a lesson is
+    appended to its SKILL.md, as a running harness would. Anything that removes
+    on the strength of that first digest alone loses the lesson.
+    """
+    real = module.payload_digests
+    state = {"fired": False}
+
+    def racing(path):
+        result = real(path)
+        if not state["fired"] and Path(path) == directory:
+            state["fired"] = True
+            with (directory / "SKILL.md").open("a", encoding="utf-8") as stream:
+                stream.write("a lesson written after the comparison\n")
+        return result
+
+    monkeypatch.setattr(module, "payload_digests", racing)
+
+
+def test_a_learning_written_after_the_pruner_digests_is_not_deleted(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A4 a, b (PR41 review, P2). The pruner compared the installed copy with its baseline
+    and then removed it. A harness write landing in between matched the
+    baseline no longer, but the decision had already been taken, and the lesson
+    was deleted: exactly what the preservation rule exists to prevent."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill", installed=stale), encoding="utf-8"
+    )
+    _write_lands_after_first_digest(module, monkeypatch, stale)
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert "a lesson written after the comparison" in (stale / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert drift is False, "nothing was removed, so there is no drift to report"
+    assert any(m.startswith("KEEP") and "retired-skill" in m for m in messages), messages
+    assert not any("removed" in m for m in messages), messages
+
+
+def test_a_learning_written_after_the_update_comparison_is_not_deleted(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A4 a, b: the same window on the UPDATE path, with a real write rather than a
+    doctored digest: the installed copy is verified at the moment it is taken
+    away, not before."""
+    module = load_module()
+    workspace, source, skill, target_root = _one_skill(module, tmp_path)
+    installed = _install_as(
+        target_root, source, _marker_for(workspace, source, source)
+    )
+    skill = _set_source(module, workspace, _V2)
+    _write_lands_after_first_digest(module, monkeypatch, installed)
+
+    lines, _drift = _run(module, skill, target_root, workspace)
+
+    text = (installed / "SKILL.md").read_text(encoding="utf-8")
+    assert "a lesson written after the comparison" in text
+    assert any(m.startswith("KEEP") for m in lines), lines
+
+
+def test_an_installed_copy_that_cannot_be_taken_aside_is_kept(tmp_path, monkeypatch):
+    """Spec LSI-A4 c: on Windows a directory with an open file cannot be renamed. A copy that
+    cannot be verified in isolation is not removed."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    stale = root / "retired-skill"
+    stale.mkdir(parents=True)
+    (stale / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+    (stale / module.MANAGED_MARKER).write_text(
+        _owned_marker(workspace, "retired-skill", installed=stale), encoding="utf-8"
+    )
+    real_rename = os.rename
+
+    def refuse(src, dst, *args, **kwargs):
+        if Path(src) == stale:
+            raise PermissionError(5, "Access is denied", str(src))
+        return real_rename(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "rename", refuse)
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert (stale / "SKILL.md").is_file()
+    assert drift is False
+    assert any(m.startswith("KEEP") for m in messages), messages
+
+
+def test_a_copy_stranded_aside_is_pruned_like_any_withdrawn_projection(tmp_path):
+    """Spec LSI-A4 d. A crash between taking a copy aside and deleting it leaves
+    a hidden sibling that still carries its marker. The next run must treat it as
+    the withdrawn projection it is: removed if it still equals its baseline,
+    kept and reported if it changed."""
+    module = load_module()
+    workspace = tmp_path / "workspace"
+    root = tmp_path / "skills"
+    unchanged = root / (module.REMOVING_PREFIX + "aa11aa11aa11aa11-retired-skill")
+    changed = root / (module.REMOVING_PREFIX + "bb22bb22bb22bb22-other-skill")
+    for directory, name in ((unchanged, "retired-skill"), (changed, "other-skill")):
+        directory.mkdir(parents=True)
+        (directory / "SKILL.md").write_text("as installed\n", encoding="utf-8")
+        (directory / module.MANAGED_MARKER).write_text(
+            _owned_marker(workspace, name, installed=directory), encoding="utf-8"
+        )
+    (changed / "SKILL.md").write_text("as installed\nplus a lesson\n", encoding="utf-8")
+
+    messages, drift = module.prune_stale_projections(
+        "codex", root, set(), check=False, dry_run=False, owner_root=workspace
+    )
+
+    assert not unchanged.exists()
+    assert changed.is_dir()
+    assert drift is True
+    assert any("removed" in m and unchanged.name in m for m in messages), messages
+    assert any(m.startswith("KEEP") and changed.name in m for m in messages), messages

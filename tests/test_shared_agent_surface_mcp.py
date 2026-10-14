@@ -776,6 +776,107 @@ def test_materialize_writes_repo_scope_codex_target(tmp_path, monkeypatch):
     assert any(msg.startswith("WROTE") and "codex" in msg for msg in results)
 
 
+def test_a_repo_scoped_target_may_not_resolve_outside_the_workspace(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A1 (PR41 review, P2): `scope: "repo"` plus an external `config_path` was
+    authorised by target_in_scope() and written by a run that never passed
+    --include-user-scope. The hook and skill materializers already refuse this.
+    """
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "elsewhere" / "config.toml"
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": str(outside),
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    with pytest.raises(mas.SharedSurfaceError) as raised:
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert not outside.exists()
+    assert "outside" in str(raised.value)
+    assert "codex" in str(raised.value)
+
+
+def test_a_repo_scoped_antigravity_target_may_not_resolve_outside_the_workspace(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A1 applies to every target that names a path, not only codex."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "elsewhere" / "mcp_config.json"
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {"antigravity": {"scope": "repo", "config_path": str(outside)}},
+    )
+
+    with pytest.raises(mas.SharedSurfaceError) as raised:
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert not outside.exists()
+    assert "antigravity" in str(raised.value)
+
+
+def test_a_repo_scoped_hermes_target_may_not_resolve_outside_the_workspace(
+    tmp_path, monkeypatch
+):
+    """Spec LSI-A1: the Hermes block resolves its own path, so it needs its own
+    check. A user-scope Hermes target is unaffected (it is gated by the flag)."""
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "elsewhere" / "config.yaml"
+    outside.parent.mkdir()
+    outside.write_text("model: x\n", encoding="utf-8")
+    before = outside.read_text(encoding="utf-8")
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {"hermes_workspace": {"scope": "repo", "config_path": str(outside)}},
+    )
+
+    with pytest.raises(mas.SharedSurfaceError) as raised:
+        mas.materialize(workspace, manifest_path, check=False, dry_run=False)
+
+    assert outside.read_text(encoding="utf-8") == before
+    assert "hermes_workspace" in str(raised.value)
+
+
+def test_a_repo_scoped_target_inside_the_workspace_is_still_written(
+    tmp_path, monkeypatch
+):
+    _stub_downstream_materializers(monkeypatch, tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manifest_path = _write_synthetic_manifest(
+        workspace,
+        {
+            "codex": {
+                "scope": "repo",
+                "config_path": ".codex/config.toml",
+                "name_map": {},
+                "overrides": {},
+            }
+        },
+    )
+
+    results, _drift = mas.materialize(
+        workspace, manifest_path, check=False, dry_run=False
+    )
+
+    assert (workspace / ".codex" / "config.toml").exists()
+    assert any(msg.startswith("WROTE") for msg in results)
+
+
 def test_materialize_skips_user_scope_codex_target_without_flag(tmp_path, monkeypatch):
     _stub_downstream_materializers(monkeypatch, tmp_path)
     manifest_path = _write_synthetic_manifest(

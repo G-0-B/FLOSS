@@ -550,6 +550,45 @@ def test_event_map_omits_event_absent_from_map():
     assert "SessionStart" not in mapped
 
 
+def test_two_events_mapped_to_one_native_name_are_refused_not_overwritten():
+    """Spec LSI-A2 (PR41 review, P2): the second event silently replaced the first.
+
+    Materialization succeeded and one set of hooks was simply absent from the
+    generated configuration, with nothing saying so. A collision is a manifest
+    error, and both source events are named so it can be fixed.
+    """
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "event_map": {"PreToolUse": "tool_call", "PostToolUse": "tool_call"},
+        "hooks": {
+            "PreToolUse": [{"matcher": "*", "hooks": []}],
+            "PostToolUse": [{"matcher": "*", "hooks": []}],
+        },
+    }
+
+    with pytest.raises(surface.HookSurfaceError) as raised:
+        surface.resolve_target_hooks(target_cfg)
+
+    message = str(raised.value)
+    assert "tool_call" in message
+    assert "PreToolUse" in message and "PostToolUse" in message
+
+
+def test_a_collision_among_events_the_target_does_not_declare_is_not_an_error():
+    """Spec LSI-A2: only events that carry hooks can collide; an unused mapping is inert."""
+    surface = load_hook_surface_module()
+
+    target_cfg = {
+        "event_map": {"PreToolUse": "tool_call", "PostToolUse": "tool_call"},
+        "hooks": {"PreToolUse": [{"matcher": "*", "hooks": []}]},
+    }
+
+    mapped = surface.resolve_target_hooks(target_cfg)
+
+    assert set(mapped) == {"tool_call"}
+
+
 def test_no_event_map_preserves_events_unchanged():
     surface = load_hook_surface_module()
 
