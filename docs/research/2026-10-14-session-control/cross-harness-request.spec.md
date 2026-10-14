@@ -2,11 +2,11 @@
 
 ```yaml
 id: "cross-harness-request-spec"
-version: "0.1.0-draft"
+version: "0.1.1-draft"
 kind: "spec"
 status: "Draft"
 created: "2026-10-14"
-truth_status: "Specified. Codex interface facts verified from its generated protocol schema (codex-cli 0.162.0-alpha.17.2); behaviour unprobed; nothing built."
+truth_status: "Specified. Codex interface facts verified from its generated protocol schema and, for Q1 to Q5, by probes against throwaway threads (codex-cli 0.162.0-alpha.17.2, 2026-10-14); nothing built."
 schema: "cross-harness-request.schema.json"
 decision: "ADR-21 (draft) in this folder"
 approval: "none yet; lives in docs/research until promoted"
@@ -47,7 +47,7 @@ requested ──► delivered ──► completed
     └──────────────────────► undeliverable (no route to the recipient; nothing delivered)
 ```
 
-Two room rows record it: a request row before delivery, and a result row with the outcome. `busy` and `undeliverable` mean nothing reached the recipient, and the result row says so.
+Two room rows record it: a request row before delivery, and a result row with the outcome. In mode `existing` version 0.1 writes only the request row and marks it delivered (see Delivery to Codex). `busy` and `undeliverable` mean nothing reached the recipient, and the result row says so.
 
 ## Room records
 
@@ -60,52 +60,65 @@ Both rows go to the v0.2 room through its ordinary tools; nothing in the room ch
 
 ## Delivery to Codex
 
-Through Codex's app-server protocol, JSON-RPC, reached with `codex app-server proxy` (standard input and output to the running daemon's control socket). Method and field names are those of the protocol schema that `codex app-server generate-json-schema` produced on 2026-10-14.
+Revised 2026-10-14 after the probes in `probes-2026-10-14/`. Method and field names are those of the protocol schema that `codex app-server generate-json-schema` produced that day (desktop CLI `codex-cli 0.162.0-alpha.17.2`).
 
-1. **Connect.** If the daemon is not running: for an existing session the outcome is `undeliverable`; the requester does not start the operator's daemon. For a new session it may run a private `codex app-server --listen stdio://`.
-2. **Check the target.** `thread/read` for the thread. Deliver only if its status is `idle`. `active` gives `busy`; `notLoaded` gives `undeliverable` for version 0.1; `systemError` gives `failed`. Nothing is delivered in those cases.
-3. **Deliver.** `turn/start` with:
-   - `threadId`;
-   - `input`: the review instructions as text;
-   - `sandboxPolicy` read-only;
-   - `approvalPolicy: "never"` and `approvalsReviewer: "user"`;
-   - `clientUserMessageId` set to the `request_id`.
+What the probes showed, and why the first draft's plan had to change:
 
-   Not `review/start` in version 0.1: it takes no sandbox or approval settings, so the review would run with whatever the session already allows.
-4. **Wait.** For the `turn/completed` notification whose turn id matches. Turn status `completed` gives `completed`, with the final agent message as the answer. `failed` gives `failed`; `interrupted` gives `cancelled` or `timed_out`, as the requester caused.
-5. **Refuse every approval request.** If the server asks the requester to approve anything (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `mcpServer/elicitation/request`, or any other), the requester answers with that request's refusal (`decline`, `deny` or `cancel`) and counts it. Its approval handler has no code path that can accept.
-6. **Time out.** On `timeout_seconds` without an outcome: `turn/interrupt`, then outcome `timed_out`.
-7. **Never redeliver blind.** If the connection drops after `turn/start` was sent and before an outcome, the outcome is `failed` with the error "delivery state unknown". The requester does not retry; the operator decides.
-8. **No duplicates.** Before delivering, the requester reads the room's `inquiries` topic. If a request row with this `request_id` already exists, it does not deliver again.
+- Another process sees every saved session as `notLoaded`, whether or not the desktop app is running it (Q1).
+- `turn/start`'s sandbox and approval settings stay on the thread afterwards, silently (Q2).
+- `review/start` with `detached` is refused for new threads; `inline` adds turns to the target's history (Q3).
+- `codex queue` puts a message into a session that another process holds, and that process runs it (Q4).
+
+So there are two modes, and they use different routes.
+
+### Mode `new`: a session the requester creates (the first proof)
+
+The requester runs its own `codex app-server` (standard input and output), with the room's checkout or the target worktree as `cwd`.
+
+1. `thread/start` with `sandbox: "read-only"`, `approvalPolicy: "never"`, `approvalsReviewer: "user"`; name the thread after the `request_id` with `thread/name/set`.
+2. `turn/start` with the review instructions as text input and `clientUserMessageId` set to the `request_id`. The settings are the thread's own from step 1, so changing them changes nobody else's session.
+3. Wait for `turn/completed` with the matching turn id. Turn status `completed` gives `completed`, with the final agent message as the answer. `failed` gives `failed`; `interrupted` gives `cancelled` or `timed_out`, as the requester caused.
+4. Refuse every approval or input request: `decline`, `deny` or `cancel` as the request accepts, or a JSON-RPC error for any other kind. Count them. The handler has no path that accepts.
+5. Time out with `turn/interrupt`. Never redeliver when the outcome is unknown.
+6. Archive the thread when the result row is written. Nothing is deleted.
+
+### Mode `existing`: a session the operator already has
+
+Only through `codex queue --thread <id> --message <text>`. The requester never calls `thread/resume`, `turn/start` or `review/start` on a session it did not create: the first makes a second host for it (Q1), the second rewrites its settings (Q2), the third adds review turns to its history (Q3).
+
+- The session's own host runs the queued message, with the session's own settings. Any approval prompt goes to that session's own window, so approval stays with the operator (ADR-21 D3).
+- The requester cannot make the work read-only. The request text says what is asked ("review only, do not edit") and the session decides.
+- Whether the session is busy cannot be seen from outside (Q1). A queued message waits its turn by design, so there is no `busy` outcome in this mode.
+- Getting the answer back is not solved yet. `codex queue` prints only the queued message id. Reading the result means reading that session's saved history for the turn that answered the message, which reads the operator's session. Version 0.1 therefore records `existing` requests as `delivered` with no result row until the operator chooses how results may be read.
+- The operator names the sessions that may receive requests. Nothing is queued into a session that was not named.
 
 ## Continuity
 
-ADR-21 D5, applied to Codex: the request goes into the existing thread, by `turn/start`, only while the thread is idle. History is never copied into a new session. Apart from the per-turn sandbox and approval settings above, the requester changes nothing about the session.
-
-Whether those per-turn settings stay on the thread afterwards is not known; see Q2. Until that is answered, the requester records the thread's settings before and after, and the result row reports any difference.
+ADR-21 D5, applied to Codex: a request reaches an existing session only by `codex queue`, never by resuming it elsewhere or by copying its history into a new session, and the requester changes none of its settings. In mode `new` there is no prior session to preserve.
 
 ## Acceptance for the proof
 
 Each is shown by a recorded run or a test, with the room rows to match.
 
-1. **Happy path.** From a running Claude session, a review request to an idle Codex session returns `completed` with an answer. Two room rows share the `request_id` and are linked by `reply_to`. The Codex session's history shows the turn, and its settings afterwards equal those before, or the difference is recorded.
-2. **Busy.** A target whose status is `active` gives `busy`, and its turn count does not change.
-3. **No route.** With the daemon unreachable, the outcome is `undeliverable` and nothing is delivered.
+1. **Happy path, mode `new`.** From a running Claude session, a review request goes to a Codex thread the requester creates (read-only, approvals never) and returns `completed` with an answer. Two room rows share the `request_id` and are linked by `reply_to`. The thread is archived afterwards.
+2. **Mode `existing`.** A request queued into a session the operator named appears in that session and is recorded as delivered. The requester's transcript shows no `thread/resume`, `turn/start` or `review/start` call for that session.
+3. **No route.** If the Codex app-server cannot be started (mode `new`) or `codex queue` fails (mode `existing`), the outcome is `undeliverable` and nothing is delivered. `busy` does not arise for Codex in version 0.1: mode `new` uses a fresh thread, and a queued message waits by design.
 4. **Duplicate.** Running the same `request_id` twice delivers once.
 5. **Refused approval.** Against a stand-in server that raises each kind of approval request, the requester refuses every one and the result row counts them. Covered by tests; no real session is asked to request approval.
 6. **Timeout.** A short timeout sends `turn/interrupt`, the turn ends `interrupted`, and the outcome is `timed_out`.
 7. **No approval path.** No requester code path accepts an approval, and no tool offered to any agent can approve for another agent's session. Shown by test and by review.
 
-## Open questions to probe before building
+## Probe results and what is still open
 
-All of these touch real Codex sessions. Probe them on a new throwaway session first, never on one of the operator's sessions without asking.
+Q1 to Q5 were answered on 2026-10-14 against two throwaway threads, both archived: see `probes-2026-10-14/README.md`. Two facts beyond the questions:
 
-- **Q1.** Does a session open in the Codex desktop app live on the shared app-server daemon, so that `thread/loaded/list` and `thread/read` see it?
-- **Q2.** Do `turn/start`'s sandbox and approval settings apply only to that turn, or stay on the thread?
-- **Q3.** What do `review/start`'s `delivery: "detached"` and `"inline"` do to the target thread?
-- **Q4.** How does `codex queue` relate to `turn/start`: does a queued message wait until the thread is idle, and should version 0.2 prefer it?
-- **Q5.** Who may connect to the daemon's control socket, and with what authentication? Any process that connects is offered the approval requests.
-- **Q6.** What does the operator see in the Codex app while another client runs a turn in an open session?
+- Q5: nothing authenticates a connecting process beyond its Windows user. Any process running as this user can list every Codex session, load any of them, and queue messages into any of them. That channel exists today, whatever FLOSS builds.
+- Every new thread here was `paginated`.
+
+Still open:
+
+- **Q6.** What does the operator see in the Codex app while another client runs a turn in a session it has open? Needs the operator watching the app while it happens.
+- **Q7.** How may the requester read the answer to a queued message in mode `existing` without reading more of the operator's session than that answer?
 
 ## Falsifiers
 

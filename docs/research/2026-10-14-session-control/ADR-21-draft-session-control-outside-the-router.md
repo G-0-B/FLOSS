@@ -6,7 +6,7 @@
 
 ## Truth status
 
-⚠️ Specified. Facts about Codex's interface are ✅ verified from its help text and its generated protocol schema; its behaviour is unprobed. Nothing here has been built.
+⚠️ Specified. Facts about Codex's interface are ✅ verified from its help text and its generated protocol schema, and for five behaviours by probes against throwaway threads (`probes-2026-10-14/`). Nothing here has been built.
 
 ## Context
 
@@ -25,9 +25,9 @@ On 2026-10-14 Codex proposed Microsoft's Agent Host Protocol (AHP) as the sessio
 
 **D1. The room and the consensus gateway stay routers.** Neither gains a tool that submits a turn to an agent, wakes one, or answers an approval request. This was implicit; it is now explicit.
 
-**D2. Cross-harness requests go through a separate requester, using each harness's own session interface.** The requesting agent runs the requester. It delivers a request through the recipient harness's native interface: Codex's app-server protocol first, then (by later decisions) Hermes A2A, Grok ACP over stdio, and Claude's local session messaging. No shared session host is adopted.
+**D2. Cross-harness requests go through a separate requester, using each harness's own session interface.** The requesting agent runs the requester. It delivers a request through the recipient harness's native interface. For Codex that is its app-server protocol for sessions the requester creates, and `codex queue` for the operator's own sessions; the probes of 2026-10-14 showed that resuming or starting turns in someone else's session from outside rewrites its settings or makes a second host for it. Hermes A2A, Grok ACP over stdio and Claude's local session messaging follow by later decisions. No shared session host is adopted.
 
-**D3. A delivered request is a proposal, and approval authority never travels with it.**
+**D3. A delivered request is a proposal, and approval authority never travels with it.** A message is information, never authority, whoever or whatever sends it. Taking part in an inquiry is not consent to execution, and permission to act is not agreement or truth (`reading-notes.md`).
 
 - The recipient decides whether and how to act.
 - The requester never approves anything on the recipient's behalf. If the recipient's harness sends it an approval request, the requester refuses it (`decline`, `deny` or `cancel`, whichever the request accepts) and records the refusal.
@@ -57,6 +57,7 @@ Otherwise the requester starts a new session and records that it did. What conti
 - The first proof needs no new host. It is a small requester for one harness (Codex), plus room rows. Its spec is `cross-harness-request.spec.md` in this folder.
 - Each further harness costs one adapter. If that cost ever exceeds adopting a common host, D7's question reopens with evidence.
 - Push-style wake-up (a room post that makes an agent act) is out of scope. Delivery is always an explicit act by the requester.
+- Records carry claim ceilings. A request row supports "the requester asked". A result row the requester writes supports "the requester observed this answer", not "the recipient said it", unless the recipient signs a receipt. Signing waits for a working provenance identity model; the consensus gate's current failures point at that model (`reading-notes.md`).
 - Approval prompts that a recipient raises reach the operator through the recipient's own interface, or are refused. They never reach another agent.
 
 ## Alternatives considered

@@ -1,0 +1,139 @@
+{
+  "started": "2026-10-14T02:35:12-0400",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "initialize_keys": [
+    "codexHome",
+    "platformFamily",
+    "platformOs",
+    "userAgent"
+  ],
+  "q1": {
+    "thread_list_count_first_page": 50,
+    "more_pages": true,
+    "statuses": {
+      "notLoaded": 50
+    },
+    "sources": {
+      "vscode": 50
+    },
+    "originators": {
+      "Codex Desktop": 48,
+      "codex_work_desktop": 2
+    },
+    "loaded_in_this_server_before": 0,
+    "loaded_in_this_server_after_start": 1
+  },
+  "throwaway": {
+    "thread_id": "01a1391f-480e-74b3-bcda-399a6a199ea5",
+    "start_response_settings": {
+      "approvalPolicy": "on-request",
+      "approvalsReviewer": "user",
+      "sandbox": {
+        "type": "workspaceWrite",
+        "writableRoots": [],
+        "networkAccess": true,
+        "excludeTmpdirEnvVar": false,
+        "excludeSlashTmp": false
+      },
+      "model": "gpt-6.1-sol"
+    },
+    "history_mode": "paginated"
+  },
+  "q3": {
+    "detached": {
+      "error": "RuntimeError: review/start: {\"code\": -32600, \"message\": \"paginated threads do not support detached review\"}"
+    },
+    "inline": {
+      "review_thread_is_separate": false,
+      "review_status": "completed",
+      "original_thread_turns_before": 0,
+      "original_thread_turns_after": 2,
+      "review_output_preview": "Blocked",
+      "thread_started_notifications": 0,
+      "methods_seen": [
+        [
+          "item/completed",
+          5
+        ],
+        [
+          "item/started",
+          6
+        ],
+        [
+          "mcpServer/startupStatus/updated",
+          5
+        ],
+        [
+          "thread/status/changed",
+          2
+        ],
+        [
+          "turn/completed",
+          1
+        ],
+        [
+          "turn/started",
+          1
+        ],
+        [
+          "warning",
+          1
+        ]
+      ]
+    }
+  },
+  "q4": {
+    "cli_exit": 0,
+    "cli_stdout_tail": "Queued message 01a1391f-710e-7952-8ee9-701b90ac09ae for thread 01a1391f-480e-74b3-bcda-399a6a199ea5.\n",
+    "cli_stderr_tail": "",
+    "queue_changed_seen_by_loading_server": false,
+    "turn_started_by_queue": true,
+    "queued_turn_status": "completed",
+    "queued_answer": "QUEUED",
+    "methods_seen": [
+      [
+        "account/rateLimits/updated",
+        1
+      ],
+      [
+        "item/agentMessage/delta",
+        3
+      ],
+      [
+        "item/completed",
+        3
+      ],
+      [
+        "item/started",
+        3
+      ],
+      [
+        "mcpServer/startupStatus/updated",
+        20
+      ],
+      [
+        "thread/status/changed",
+        2
+      ],
+      [
+        "thread/tokenUsage/updated",
+        1
+      ],
+      [
+        "turn/completed",
+        1
+      ],
+      [
+        "turn/started",
+        1
+      ]
+    ]
+  },
+  "cleanup": {
+    "archived": {
+      "01a1391f-480e-74b3-bcda-399a6a199ea5": "archived"
+    },
+    "approval_or_input_requests_refused": []
+  },
+  "finished": "2026-10-14T02:36:24-0400"
+}

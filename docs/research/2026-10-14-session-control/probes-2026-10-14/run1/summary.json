@@ -1,0 +1,104 @@
+{
+  "started": "2026-10-14T02:34:04-0400",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "initialize_keys": [
+    "codexHome",
+    "platformFamily",
+    "platformOs",
+    "userAgent"
+  ],
+  "q1": {
+    "thread_list_count_first_page": 50,
+    "more_pages": true,
+    "statuses": {
+      "notLoaded": 50
+    },
+    "sources": {
+      "vscode": 50
+    },
+    "originators": {
+      "Codex Desktop": 48,
+      "codex_work_desktop": 2
+    },
+    "loaded_in_this_server_before": 0,
+    "loaded_in_this_server_after_start": 1
+  },
+  "throwaway": {
+    "thread_id": "01a1391e-4007-71a3-af98-f32315923856",
+    "start_response_settings": {
+      "approvalPolicy": "on-request",
+      "approvalsReviewer": "user",
+      "sandbox": {
+        "type": "workspaceWrite",
+        "writableRoots": [],
+        "networkAccess": true,
+        "excludeTmpdirEnvVar": false,
+        "excludeSlashTmp": false
+      },
+      "model": "gpt-6.1-sol"
+    }
+  },
+  "q2": {
+    "turn": {
+      "label": "q2-turn",
+      "turn_id": "01a1391e-4a88-70a3-8283-668a490c518a",
+      "status": "completed",
+      "answer": "PONG",
+      "settings_notifications": [],
+      "methods_seen": [
+        [
+          "account/rateLimits/updated",
+          1
+        ],
+        [
+          "item/agentMessage/delta",
+          2
+        ],
+        [
+          "item/completed",
+          3
+        ],
+        [
+          "item/started",
+          3
+        ],
+        [
+          "mcpServer/startupStatus/updated",
+          8
+        ],
+        [
+          "thread/status/changed",
+          2
+        ],
+        [
+          "thread/tokenUsage/updated",
+          1
+        ],
+        [
+          "turn/completed",
+          1
+        ],
+        [
+          "turn/started",
+          1
+        ]
+      ]
+    },
+    "settings_after_turn_via_resume": {
+      "approvalPolicy": "never",
+      "approvalsReviewer": "user",
+      "sandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    }
+  },
+  "error": "RuntimeError: review/start: {\"code\": -32600, \"message\": \"paginated threads do not support detached review\"}",
+  "cleanup": {
+    "archived": {
+      "01a1391e-4007-71a3-af98-f32315923856": "archived"
+    },
+    "approval_or_input_requests_refused": []
+  },
+  "finished": "2026-10-14T02:34:13-0400"
+}
