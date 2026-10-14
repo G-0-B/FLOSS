@@ -410,8 +410,7 @@
       "grandfathered": true
     },
     "FLOSS/docs/specs/reasoning-ensemble-synthesizer.spec.md": {
-      "spec": "GRANDFATHERED 2026-06-12 (Reasoning-Ensemble Synthesizer Spec)",
-      "grandfathered": true
+      "spec": "Synthesizer contract: voter pool, clustering, tier classification, coherence guard and degenerate-voter flagging"
     },
     "FLOSS/docs/specs/reuse-gate.schema.json": {
       "spec": "JSON Schema for ADR-18 reuse blocks in spec-registry entries",
