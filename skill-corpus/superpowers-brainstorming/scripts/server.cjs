@@ -186,7 +186,17 @@ h1 { color: #333; } p { color: #666; } code { background: #f0f0f0; padding: 0.1e
 <code>?key=&hellip;</code> part. Copy the complete URL and open it again.</p></body></html>`;
 
 function bootstrapPage(key) {
-  const jsonKey = JSON.stringify(String(key));
+  // Embedded in a <script> element, so the JSON is escaped for HTML as well as
+  // for JavaScript. JSON.stringify leaves `</script>`, `<!--` and the U+2028 and
+  // U+2029 line separators intact, and any of them can end the element or the
+  // string literal (spec LSI-C1 b). Kept inline: the test evaluates this
+  // function on its own.
+  const jsonKey = JSON.stringify(String(key))
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Opening Brainstorm Companion</title></head>
@@ -409,7 +419,11 @@ function handleRequest(req, res) {
   const keyFromQuery = queryKey(req.url);
   if (req.method === 'GET' && pathname === '/' && keyFromQuery && timingSafeEqualStr(keyFromQuery, TOKEN)) {
     res.writeHead(200, securityHeaders({ 'Content-Type': 'text/html; charset=utf-8' }));
-    res.end(bootstrapPage(keyFromQuery));
+    // The page embeds the server's own token, not the query value. They are
+    // equal once the comparison above has passed, so nothing changes for a
+    // legitimate caller, and no string taken from the request reaches the
+    // response (spec LSI-C1 a).
+    res.end(bootstrapPage(TOKEN));
   } else if (req.method === 'GET' && pathname === '/') {
     const screenFile = getNewestScreen();
     let html = screenFile
