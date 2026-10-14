@@ -272,3 +272,60 @@ def _run():
 
 if __name__ == "__main__":
     raise SystemExit(_run())
+
+
+def test_an_unknown_transport_is_refused_not_routed_to_litellm(monkeypatch):
+    """Spec SYN-T1. The catch-all sent any unrecognised value to LiteLLM, so a
+    misspelled `ollama` could send a prompt meant to stay local to a cloud
+    provider."""
+    import pytest
+
+
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("an unknown transport reached a backend")
+
+    monkeypatch.setattr(transport, "_litellm_generate", must_not_run)
+    monkeypatch.setattr(transport, "_flowith_generate", must_not_run)
+
+    with pytest.raises(ValueError) as raised:
+        transport.generate(
+            {"model": "llama3.2:3b", "transport": "ollamma"}, "p", 10, must_not_run
+        )
+
+    assert "ollamma" in str(raised.value)
+
+
+def test_a_pool_with_an_unknown_transport_is_refused_before_any_dispatch(
+    monkeypatch,
+):
+    """Spec SYN-T1: configuration errors surface before a prompt is sent
+    anywhere, and name the voter."""
+    import pytest
+
+
+    def dispatched(*args, **kwargs):
+        raise AssertionError("a voter was dispatched with an invalid pool")
+
+    monkeypatch.setattr(synthesizer, "dispatch_parallel", dispatched)
+    pool = [
+        {"voter_id": "v0", "model": "m", "family": "f", "transport": "litelm"},
+        {"voter_id": "v1", "model": "m", "family": "f", "transport": "litellm"},
+        {"voter_id": "v2", "model": "m", "family": "f", "transport": "flowith"},
+    ]
+
+    with pytest.raises(ValueError) as raised:
+        synthesizer.synthesize("prompt", voter_pool=pool, stage_artifact=False)
+
+    assert "v0" in str(raised.value)
+    assert "litelm" in str(raised.value)
+
+
+def test_every_supported_transport_is_accepted_and_case_is_normalized():
+    """Spec SYN-T1. A guard: the three real values, a missing one, and the
+    case and whitespace that should not be an error."""
+    for value in ("ollama", "flowith", "litellm", " LiteLLM ", "OLLAMA"):
+        transport.validate_pool_transports([{"transport": value}])
+    transport.validate_pool_transports([{}])
+
+    assert transport.transport_name({"transport": " LiteLLM "}) == "litellm"
+    assert transport.transport_name({}) == "ollama"

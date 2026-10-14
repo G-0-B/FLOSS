@@ -616,3 +616,63 @@ def test_a_dispatched_response_routes_exactly_as_its_voter_was_admitted(monkeypa
         )
         admitted = transport._independence_route(voter)
         assert survived == admitted, (voter["voter_id"], survived, admitted)
+
+
+def test_the_mode_of_an_override_comes_from_its_transports():
+    """Spec SYN-P1. A caller-supplied pool used to be labelled `local`
+    unconditionally, whatever it contained."""
+    mode = synthesizer._override_mode
+
+    assert mode([{"transport": "ollama"}, {}]) == "local"
+    assert mode([{"transport": "litellm"}, {"transport": "flowith"}]) == "online"
+    assert mode([{"transport": "ollama"}, {"transport": "litellm"}]) == "mixed"
+
+
+def test_a_correlated_online_override_does_not_get_a_consensus_tier(
+    tmp_path, monkeypatch
+):
+    """Spec SYN-P1. Three voters on one provider, supplied as an explicit
+    litellm pool, were exempted from the survivor check because an override was
+    labelled `local`, and went on to be tiered as if they were independent."""
+    monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+    monkeypatch.setattr(synthesizer, "ENSEMBLE_STAGING", tmp_path / "staging")
+    monkeypatch.setattr(synthesizer, "WORKSPACE_ROOT", tmp_path)
+    monkeypatch.setattr(synthesizer, "_log_synthesis_action", lambda *a, **k: None)
+    monkeypatch.setattr(
+        synthesizer.transport,
+        "resolve_embedder",
+        lambda *a, **k: ("mxbai-embed-large", lambda text: [0.1]),
+    )
+    survivors = [
+        synthesizer.VoterResponse(
+            voter_id=name,
+            model=model,
+            family=family,
+            response="a whole answer. it has two sentences.",
+            response_hash=name,
+            response_embedding=[0.1],
+            duration_seconds=0.1,
+            transport_name="litellm",
+        )
+        for name, model, family in (
+            ("a", "groq/llama-3.1-8b-instant", "llama"),
+            ("b", "groq/llama-3.3-70b-versatile", "llama"),
+            ("c", "groq/gemma2-9b-it", "gemma"),
+        )
+    ]
+    monkeypatch.setattr(synthesizer, "dispatch_parallel", lambda *a, **k: survivors)
+
+    result = synthesizer.synthesize(
+        "prompt",
+        voter_pool=[
+            {
+                "voter_id": s.voter_id,
+                "model": s.model,
+                "family": s.family,
+                "transport": "litellm",
+            }
+            for s in survivors
+        ],
+    )
+
+    assert result.tier_classification.tier == "degraded"
