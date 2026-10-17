@@ -1,0 +1,26 @@
+{
+  "dataset": "SciFact",
+  "license": "CC-BY-NC-2.0",
+  "upstream_source_url": "https://scifact.s3-us-west-2.amazonaws.com/release/latest/data.tar.gz",
+  "archive_sha256": "11c621288d41ac144d29b13b0f8503b3820b7d6e8b1f6ff24dff335c196d76be",
+  "files": {
+    "claims_dev.jsonl": {
+      "path": "evals\\entailment\\scifact_native\\claims_dev.jsonl",
+      "sha256": "86f0435d08fdb65d1aa41d1472684f57e6e71930626497bdf4d7a9ec1a632217",
+      "size_bytes": 65007,
+      "record_count": 300
+    },
+    "claims_train.jsonl": {
+      "path": "evals\\entailment\\scifact_native\\claims_train.jsonl",
+      "sha256": "f4c8fa82d8bd0653a9cc8d61a6ea48c25eacea64e90af5dbf390ebb1b74372f0",
+      "size_bytes": 175616,
+      "record_count": 809
+    },
+    "corpus.jsonl": {
+      "path": "evals\\entailment\\scifact_native\\corpus.jsonl",
+      "sha256": "b8d6c89624cb2ed74dee8938effc4f5d8bd2086887880af8110d64be4ceade62",
+      "size_bytes": 8307875,
+      "record_count": 5183
+    }
+  }
+}

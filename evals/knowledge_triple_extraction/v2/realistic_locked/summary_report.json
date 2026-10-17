@@ -1,0 +1,28 @@
+{
+  "corpus": "Layer 3 Locked Realistic Acceptance Set",
+  "version": "2.0.0",
+  "status": "STRICTLY_LOCKED",
+  "lock_policy": "Never exposed to model tuning, prompt optimizers, or training loops. Evaluation eyes only.",
+  "metrics": {
+    "total_documents": 100,
+    "domain_breakdown": {
+      "biomedical": 40,
+      "computer_science": 30,
+      "governance_commons": 30
+    },
+    "total_passages": 200,
+    "informative_passages": 100,
+    "null_passages": 100,
+    "total_eligible_claims": 100,
+    "total_evidence_atoms": 100,
+    "mean_claims_per_doc": 1.0,
+    "mean_agreement_score": 0.94,
+    "adjudication_status": "100% APPROVED_GOLD",
+    "rights_verification": "100% open license receipts verified"
+  },
+  "artifacts": {
+    "dataset_file": "evals\\knowledge_triple_extraction\\v2\\realistic_locked\\layer_3_acceptance.jsonl",
+    "sha256": "40927bd05f68037e5952d3b90671fcb1cd28ea09a2aa9d0038aa138de589a298",
+    "size_bytes": 248916
+  }
+}

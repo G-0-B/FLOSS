@@ -1,0 +1,11 @@
+{
+  "dataset": "Re-DocRED",
+  "license": "CC-BY-SA-4.0",
+  "upstream_source_url": "https://raw.githubusercontent.com/tonytan48/Re-DocRED/master/data/dev_revised.json",
+  "file": {
+    "path": "evals\\document_relation\\redocred_native\\dev_revised.json",
+    "sha256": "051ee1d057204a5d08ef5502beacdadf191245b5eaf0e29ec2c607cf002c016f",
+    "size_bytes": 3245588,
+    "document_count": 500
+  }
+}

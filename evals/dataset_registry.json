@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "created_at": "2026-10-12",
+  "governance": {
+    "policy": "ADR-evaluation-and-split-governance",
+    "prohibition": "Zero unreviewed external-to-FLOSS gold projections; zero ingestion of datasets with unknown or incompatible licenses"
+  },
+  "datasets": {
+    "scifact": {
+      "name": "SciFact",
+      "upstream_url": "https://github.com/allenai/scifact",
+      "license": "CC-BY-NC-2.0",
+      "status": "APPROVED_RESEARCH_EVAL",
+      "commercial_redistribution": false,
+      "native_task": "abstract retrieval, rationale selection, support/refute stance",
+      "floss_role": "entailment_gate_benchmark",
+      "quarantine_reason": null
+    },
+    "scirex": {
+      "name": "SciREX",
+      "upstream_url": "https://github.com/allenai/SciREX",
+      "license": "Apache-2.0",
+      "status": "APPROVED_RESEARCH_EVAL",
+      "commercial_redistribution": true,
+      "native_task": "full-document salient entities and n-ary scientific relations",
+      "floss_role": "document_and_chunk_reconciliation_eval",
+      "quarantine_reason": null
+    },
+    "re_docred": {
+      "name": "Re-DocRED",
+      "upstream_url": "https://github.com/klassessg/re2-docred",
+      "license": "CC-BY-SA-4.0",
+      "status": "APPROVED_RESEARCH_EVAL",
+      "commercial_redistribution": true,
+      "native_task": "document-level entity and relation extraction with cleaned negative annotations",
+      "floss_role": "cross_sentence_relation_control",
+      "quarantine_reason": null
+    },
+    "docred": {
+      "name": "DocRED",
+      "upstream_url": "https://github.com/thunlp/DocRED",
+      "license": "MIT",
+      "status": "APPROVED_RESEARCH_EVAL",
+      "commercial_redistribution": true,
+      "native_task": "document-level relation extraction",
+      "floss_role": "general_document_relation_control",
+      "quarantine_reason": null
+    },
+    "scierc": {
+      "name": "SciERC",
+      "upstream_url": "https://nlp.cs.washington.edu/sciIE/",
+      "license": "Educational/Research (unverified commercial redistribution)",
+      "status": "PROVISIONAL_INTERNAL_ONLY",
+      "commercial_redistribution": false,
+      "native_task": "scientific entities, relations, and coreference",
+      "floss_role": "span_relation_side_channel_transfer",
+      "quarantine_reason": "Redistribution license unverified; restricted to internal non-redistributed eval"
+    },
+    "semeval_2018_task_7": {
+      "name": "SemEval 2018 Task 7 (ScienceIE)",
+      "upstream_url": "https://aclanthology.org/S18-1111/",
+      "license": "ACL Academic/Research",
+      "status": "PROVISIONAL_INTERNAL_ONLY",
+      "commercial_redistribution": false,
+      "native_task": "semantic relation extraction and classification in scientific abstracts",
+      "floss_role": "narrow_relation_classification_diagnostic",
+      "quarantine_reason": "Redistribution permissions require verification"
+    },
+    "biored": {
+      "name": "BioRED",
+      "upstream_url": "https://huggingface.co/datasets/bigbio/biored",
+      "license": "UNKNOWN",
+      "status": "QUARANTINED_BLOCKED",
+      "commercial_redistribution": false,
+      "native_task": "biomedical entity and relation extraction",
+      "floss_role": null,
+      "quarantine_reason": "Public dataset card reports license as unknown; strictly blocked from repository inclusion until explicit license is established"
+    },
+    "mineru": {
+      "name": "MinerU Parser",
+      "upstream_url": "https://github.com/opendatalab/MinerU",
+      "license": "Custom MinerU Open Source License (Apache-2.0 derived with conditions)",
+      "status": "QUARANTINED_BLOCKED",
+      "commercial_redistribution": false,
+      "native_task": "document layout parsing and formula OCR",
+      "floss_role": null,
+      "quarantine_reason": "Imposes commercial user thresholds, model training conditions, and custom attribution requirements; prohibited from production dependencies pending legal review"
+    }
+  }
+}

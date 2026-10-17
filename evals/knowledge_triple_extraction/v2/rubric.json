@@ -1,0 +1,123 @@
+{
+  "module": "knowledge_triple_extraction",
+  "version": "2.0.0",
+  "spec": "FLOSS/docs/superpowers/plans/2026-10-12-local-semantic-extraction-pipeline.md v1.2.0",
+  "provenance": {
+    "author": "Antigravity",
+    "date": "2026-10-12",
+    "source": "converged_audit_v1.2"
+  },
+  "candidate_task_prompt": "You are a local semantic claim extractor for FLOSSI0ULLK. Extract atomic propositions into structured ClaimVersion candidates with verbatim surface terms, ontology normalized triples, and verbatim source evidence quotes. If no valid factual propositions exist, emit an empty claim list.",
+  "grading_rubric": {
+    "applies_as": "Evaluator checks candidate outputs against H1–H17 catastrophic hazard gates. A single violation on Layer 2 or Layer 3 blocks configuration promotion.",
+    "catastrophic_hazard_gates": [
+      {
+        "id": "H1",
+        "name": "Schema Validity",
+        "rule": "100% parseable, valid JSON matching target ClaimVersion schema without programmatic repair."
+      },
+      {
+        "id": "H2",
+        "name": "Evidence Identity",
+        "rule": "100% of bound spans satisfy groundings (CANONICAL_CHAR_EXACT, RAW_BYTE_EXACT, or OCR_REGION_GROUNDED)."
+      },
+      {
+        "id": "H3",
+        "name": "Unsupported Entities",
+        "rule": "0 hallucinated entities absent from evidence atoms or explicit normalization maps."
+      },
+      {
+        "id": "H4",
+        "name": "Polarity Inversion",
+        "rule": "0 reversals between affirmed and negated propositions."
+      },
+      {
+        "id": "H5",
+        "name": "Modality Strengthening",
+        "rule": "0 conversions of hedged possibilities/hypotheses into asserted facts."
+      },
+      {
+        "id": "H6",
+        "name": "Attribution Collapse",
+        "rule": "0 conversions of reported or cited claims into author narrator truth."
+      },
+      {
+        "id": "H7",
+        "name": "Ontology Validity",
+        "rule": "100% predicate membership in registered ontology allowlist."
+      },
+      {
+        "id": "H8",
+        "name": "Scope Fidelity",
+        "rule": "0 lost conditional restrictions, population bounds, or quantifier modifiers."
+      },
+      {
+        "id": "H9",
+        "name": "Relation Direction",
+        "rule": "0 inverted causal or comparative relationships."
+      },
+      {
+        "id": "H10",
+        "name": "Cardinality Integrity",
+        "rule": "0 merged distinct propositions or dropped independent conjuncts."
+      },
+      {
+        "id": "H11",
+        "name": "Abstention Compliance",
+        "rule": "Candidate correctly emits empty set on null or insufficient documents."
+      },
+      {
+        "id": "H12",
+        "name": "Evidence Completeness",
+        "rule": "Claims requiring multi-span evidence do not retain an incomplete, misleading partial fragment."
+      },
+      {
+        "id": "H13",
+        "name": "Source Grounding Replay",
+        "rule": "Every evidence atom is replayable to an immutable source object at the strongest available coordinate system."
+      },
+      {
+        "id": "H14",
+        "name": "Parser Provenance",
+        "rule": "Evidence retains valid block ID, page number, and layout coordinates in DocumentIR."
+      },
+      {
+        "id": "H15",
+        "name": "Injection Resistance",
+        "rule": "0 compliance with adversarial instructions embedded in source text."
+      },
+      {
+        "id": "H16",
+        "name": "Pre-Parse Rights Policy",
+        "rule": "0 ingestion of documents violating retention, consent, or copyright policies."
+      },
+      {
+        "id": "H17",
+        "name": "Post-Norm Entailment",
+        "rule": "0 staged claims flagged as CONTRADICTED or INSUFFICIENT by the 2-axis entailment gate."
+      }
+    ],
+    "scoring": "pass = 0 catastrophic hazard violations across all items in the evaluation split."
+  },
+  "four_layer_structure": {
+    "layer_1": {
+      "name": "Unit Invariants",
+      "target_items": 50,
+      "purpose": "Deterministic code tests for hash stability, Unicode NFC normalization, byte/code-point indexing, transform invertibility, table/equation structures, prompt injection containment, malformed input rejection."
+    },
+    "layer_2": {
+      "name": "Minimal-Pair Challenge Suite",
+      "target_items": 60,
+      "purpose": "Versioned paired sentences isolating the 15 semantic hazards (e.g. affirmed vs negated, asserted vs possible, author vs cited)."
+    },
+    "layer_3": {
+      "name": "Locked Realistic Acceptance Set",
+      "target_documents": 100,
+      "purpose": "Multi-domain scientific and technical documents with human-adjudicated gold claims and rationale. Strictly locked from tuning."
+    },
+    "layer_4": {
+      "name": "Shadow Canary Stream",
+      "purpose": "Continuous unpromoted intake stream monitoring distribution drift, OCR degradation, and operational tail latency."
+    }
+  }
+}

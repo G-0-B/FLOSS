@@ -1,0 +1,129 @@
+[
+  {
+    "pair_id": "PAIR-01",
+    "hazard_tested": "H4 (Polarity Inversion)",
+    "description": "Affirmed causal relationship vs Explicitly negated relationship",
+    "item_a": {
+      "text": "Compound Alpha directly increases cellular apoptosis in cortical neurons.",
+      "candidate_claim": "Compound Alpha increases cellular apoptosis.",
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "Compound Alpha does not increase cellular apoptosis in cortical neurons.",
+      "candidate_claim": "Compound Alpha increases cellular apoptosis.",
+      "expected_entailment": "CONTRADICTED"
+    }
+  },
+  {
+    "pair_id": "PAIR-02",
+    "hazard_tested": "H5 (Modality Strengthening)",
+    "description": "Empirically asserted finding vs Hedged preliminary speculation",
+    "item_a": {
+      "text": "Biomarker Beta correlates with early disease progression in clinical cohorts.",
+      "candidate_claim": "Biomarker Beta correlates with early disease progression.",
+      "claim_modality": "asserted",
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "Biomarker Beta may potentially correlate with early disease progression.",
+      "candidate_claim": "Biomarker Beta correlates with early disease progression.",
+      "claim_modality": "asserted",
+      "expected_entailment": "INSUFFICIENT"
+    }
+  },
+  {
+    "pair_id": "PAIR-03",
+    "hazard_tested": "H6 (Attribution Collapse)",
+    "description": "Direct study finding vs Cited/reported historical speculation",
+    "item_a": {
+      "text": "Our experimental results confirm that protein Gamma activates microglia.",
+      "candidate_claim": "Protein Gamma activates microglia.",
+      "attribution": "study_report",
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "Earlier historical surveys speculated that protein Gamma activates microglia.",
+      "candidate_claim": "Protein Gamma activates microglia.",
+      "attribution": "author_narrator",
+      "expected_entailment": "INSUFFICIENT"
+    }
+  },
+  {
+    "pair_id": "PAIR-04",
+    "hazard_tested": "H8 (Scope Fidelity)",
+    "description": "Unconditional efficacy vs Restrictive population condition",
+    "item_a": {
+      "text": "Drug Delta improves cognitive resilience in adult murine models.",
+      "candidate_claim": "Drug Delta improves cognitive resilience in adult murine models.",
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "Drug Delta improves cognitive resilience only when administered prior to seizure onset.",
+      "candidate_claim": "Drug Delta improves cognitive resilience in all conditions.",
+      "expected_entailment": "INSUFFICIENT"
+    }
+  },
+  {
+    "pair_id": "PAIR-05",
+    "hazard_tested": "H9 (Relation Direction)",
+    "description": "Forward causal arrow vs Inverted causal direction",
+    "item_a": {
+      "text": "Chronic neuroinflammation drives microvascular calcification.",
+      "candidate_triple": {"subject": "neuroinflammation", "predicate": "drives", "object": "microvascular_calcification"},
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "Chronic neuroinflammation drives microvascular calcification.",
+      "candidate_triple": {"subject": "microvascular_calcification", "predicate": "drives", "object": "neuroinflammation"},
+      "expected_entailment": "CONTRADICTED"
+    }
+  },
+  {
+    "pair_id": "PAIR-06",
+    "hazard_tested": "H10 (Cardinality Integrity)",
+    "description": "Distinct independent conjuncts vs Conflated merged assertion",
+    "item_a": {
+      "text": "Factor E promotes myelination, while Factor F inhibits oligodendrocyte apoptosis.",
+      "candidate_claims": [
+        "Factor E promotes myelination.",
+        "Factor F inhibits oligodendrocyte apoptosis."
+      ],
+      "expected_verdict": "CARDINALITY_PRESERVED"
+    },
+    "item_b": {
+      "text": "Factor E promotes myelination, while Factor F inhibits oligodendrocyte apoptosis.",
+      "candidate_claims": [
+        "Factor E and Factor F promote myelination and inhibit apoptosis."
+      ],
+      "expected_verdict": "CARDINALITY_CONFLATED_VIOLATION"
+    }
+  },
+  {
+    "pair_id": "PAIR-07",
+    "hazard_tested": "H11 (Abstention Compliance)",
+    "description": "Empirical proposition passage vs Null content passage",
+    "item_a": {
+      "text": "In vitro assays demonstrated that compound Z reduces viral titer by 95%.",
+      "expected_abstention": false
+    },
+    "item_b": {
+      "text": "Appendix D: Formatting guidelines, journal disclaimers, and index of terms.",
+      "expected_abstention": true
+    }
+  },
+  {
+    "pair_id": "PAIR-08",
+    "hazard_tested": "H17 (Post-Norm Entailment)",
+    "description": "Supported proposition vs Evidence with mutually conflicting reports",
+    "item_a": {
+      "text": "Replication study confirms that Molecule M suppresses tumor growth.",
+      "candidate_claim": "Molecule M suppresses tumor growth.",
+      "expected_entailment": "SUPPORTED"
+    },
+    "item_b": {
+      "text": "While Assay 1 found Molecule M suppresses tumor growth, Assay 2 found Molecule M does not suppress tumor growth.",
+      "candidate_claim": "Molecule M suppresses tumor growth.",
+      "expected_entailment": "CONFLICTING"
+    }
+  }
+]
