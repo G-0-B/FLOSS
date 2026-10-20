@@ -10,10 +10,10 @@
 # left out on purpose so CI matches the environment the green baseline was
 # measured in. If a hard dependency on it ever lands, add it here.
 
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
+pytest>=9.1.1
+pytest-asyncio>=1.4.0
 
-blake3>=1.0.8
+blake3>=1.0.9
 jcs>=0.2.1
 # The `format-nongpl` extra is load-bearing, not cosmetic. jsonschema's
 # FormatChecker only validates `date-time` if an RFC-3339 backend is
@@ -23,11 +23,11 @@ jcs>=0.2.1
 # The test is right: without this extra, capability `issued_at` validation
 # accepts anything. `format-nongpl` rather than `format` avoids pulling the
 # GPL-licensed rfc3987 while still providing the RFC-3339 backend.
-jsonschema[format-nongpl]>=4.23.0
+jsonschema[format-nongpl]>=4.26.0
 litellm
 mcp
-pynacl>=1.6.0
+pynacl>=1.6.2
 python-dotenv
-requests>=2.32.0
-websockets>=10.0
-PyYAML>=6.0
+requests>=2.34.2
+websockets>=17.0.1
+PyYAML>=6.0.3
