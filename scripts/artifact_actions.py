@@ -37,9 +37,14 @@ def _run(cmd: list[str], timeout: int = 90) -> dict:
     out = proc.stdout.strip()
     try:
         data = json.loads(out)
-    except (json.JSONDecodeError, ValueError):
+    # Deep nesting raises RecursionError, which is not a ValueError.
+    except (ValueError, RecursionError):
         data = {"raw": out[-4000:]}
     if proc.returncode != 0:
+        # A list, `null` or string is legitimate output (context_router prints
+        # a list), but the failure detail below is added by key.
+        if not isinstance(data, dict):
+            data = {"output": data}
         data["stderr"] = proc.stderr.strip()[-2000:]
         data["returncode"] = proc.returncode
     return data
@@ -69,12 +74,20 @@ def act_activity_tail(arg: str = "40") -> dict:
         n = 40
     if not ACTIVITY.exists():
         return {"lines": [], "note": "activity.jsonl absent"}
-    lines = ACTIVITY.read_text(encoding="utf-8", errors="replace").splitlines()
+    # Split on "\n" only: rows are written with ensure_ascii=False, so U+2028,
+    # U+2029 and U+0085 appear raw inside them, and splitlines() would cut such
+    # a row in two. The newline after the last row ends the file; it does not
+    # start an empty line.
+    lines = ACTIVITY.read_text(encoding="utf-8", errors="replace").split("\n")
+    if lines[-1] == "":
+        lines.pop()
     records = []
     for line in lines[-n:]:
         try:
             records.append(json.loads(line))
-        except json.JSONDecodeError:
+        # ValueError covers JSONDecodeError and an integer past the digit
+        # limit; deep nesting raises RecursionError.
+        except (ValueError, RecursionError):
             records.append({"unparsed": line[:300]})
     return {"total_lines": len(lines), "returned": len(records), "records": records}
 
