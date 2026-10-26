@@ -33,21 +33,25 @@
   ],
   "targets": {
     "codex": {
+      "scope": "user",
       "enabled": true,
       "mode": "materialized-copy",
       "install_path": "~/.codex/skills"
     },
     "claude": {
+      "scope": "repo",
       "enabled": true,
       "mode": "materialized-copy",
       "install_path": ".claude/skills"
     },
     "gemini": {
+      "scope": "repo",
       "enabled": true,
       "mode": "materialized-copy",
       "install_path": ".gemini/skills"
     },
     "opencode": {
+      "scope": "repo",
       "enabled": true,
       "mode": "materialized-copy",
       "install_path": "opworkers/.opencode/skills"
