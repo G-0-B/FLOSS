@@ -183,7 +183,7 @@ def test_audit_packets_classifies_older_packet_covered_by_newer_valid_packet_as_
         ],
         identity_dir=identity_dir,
         output_root=output_root,
-        prior_digest=None,
+        prior_digest=older_packet["d"],
     )
 
     invalid_count, records, lines = audit_packets(output_root, workspace_root=tmp_path)
