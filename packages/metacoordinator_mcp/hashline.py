@@ -68,9 +68,15 @@ def _string_value(value: Any) -> str:
 
 def _canonical_edit(edit: dict[str, Any]) -> dict[str, str]:
     """Normalize a replace-style edit payload into plain string fields."""
+    old_val = edit.get("old_string")
+    if old_val is None:
+        old_val = edit.get("TargetContent", "")
+    new_val = edit.get("new_string")
+    if new_val is None:
+        new_val = edit.get("ReplacementContent", "")
     return {
-        "old_string": _string_value(edit.get("old_string", "")),
-        "new_string": _string_value(edit.get("new_string", "")),
+        "old_string": _string_value(old_val),
+        "new_string": _string_value(new_val),
     }
 
 
@@ -80,14 +86,17 @@ def _canonical_tool_intent(
 ) -> dict[str, Any]:
     """Reduce tool input to the deterministic fields relevant for verification."""
     tool = _canonical_tool_name(tool_name)
-    if tool in {"edit", "replace"}:
+    if tool in {"edit", "replace", "replace_file_content"}:
         return _canonical_edit(tool_input)
-    if tool in {"write", "write_file"}:
+    if tool in {"write", "write_file", "write_to_file"}:
+        content_val = tool_input.get("content")
+        if content_val is None:
+            content_val = tool_input.get("CodeContent", "")
         return {
-            "content": _string_value(tool_input.get("content", "")),
+            "content": _string_value(content_val),
         }
-    if tool == "multiedit":
-        edits = tool_input.get("edits") or []
+    if tool in {"multiedit", "multi_replace_file_content"}:
+        edits = tool_input.get("edits") or tool_input.get("replacements") or []
         if not isinstance(edits, list):
             edits = []
         return {
@@ -135,7 +144,7 @@ def _render_exact_expected_post(
     """Derive the exact expected post-image when the tool payload makes it possible."""
     tool = _canonical_tool_name(tool_name)
 
-    if tool in {"write", "write_file"}:
+    if tool in {"write", "write_file", "write_to_file"}:
         return (
             _string_value(intent.get("content", "")),
             "Exact post-image derived from full file content payload.",
@@ -147,7 +156,7 @@ def _render_exact_expected_post(
             "Pre-write file text unavailable; exact post-image could not be derived.",
         )
 
-    if tool in {"edit", "replace"}:
+    if tool in {"edit", "replace", "replace_file_content"}:
         old_string = _string_value(intent.get("old_string", ""))
         new_string = _string_value(intent.get("new_string", ""))
         if not old_string:
@@ -168,7 +177,7 @@ def _render_exact_expected_post(
             "payload.",
         )
 
-    if tool == "multiedit":
+    if tool in {"multiedit", "multi_replace_file_content"}:
         edits = intent.get("edits") or []
         if not isinstance(edits, list) or not edits:
             return (
@@ -625,37 +634,56 @@ def verify_tool_edit(
         }
 
     tool = (tool_name or "").strip().lower()
-    if tool in {"edit", "replace"}:
+    if tool in {"edit", "replace", "replace_file_content"}:
+        old_val = (
+            tool_input.get("old_string")
+            if tool_input.get("old_string") is not None
+            else tool_input.get("TargetContent", "")
+        )
+        new_val = (
+            tool_input.get("new_string")
+            if tool_input.get("new_string") is not None
+            else tool_input.get("ReplacementContent", "")
+        )
         check = _verify_replace_like(
             file_text,
-            old_string=(tool_input.get("old_string", "") or ""),
-            new_string=(tool_input.get("new_string", "") or ""),
+            old_string=_string_value(old_val),
+            new_string=_string_value(new_val),
         )
         status = check["status"]
         reason = check["reason"]
         checks = [check]
-    elif tool in {"write", "write_file"}:
+    elif tool in {"write", "write_file", "write_to_file"}:
+        content_val = (
+            tool_input.get("content")
+            if tool_input.get("content") is not None
+            else tool_input.get("CodeContent", "")
+        )
         check = _verify_write_like(
             file_text,
-            expected_content=(tool_input.get("content", "") or ""),
+            expected_content=_string_value(content_val),
         )
         status = check["status"]
         reason = check["reason"]
         checks = [check]
-    elif tool == "multiedit":
-        edits = tool_input.get("edits") or []
+    elif tool in {"multiedit", "multi_replace_file_content"}:
+        edits = tool_input.get("edits") or tool_input.get("replacements") or []
         if not isinstance(edits, list):
             return {
                 "status": "ERROR",
                 "reason": (
-                    "MultiEdit payload did not contain a list-valued `edits` " "field."
+                    f"{tool_name} payload did not contain a list-valued `edits` or `replacements` field."
                 ),
                 "tool_name": tool_name,
                 "file_path": str(path),
                 "checks": [],
                 "file_sha256": _sha256_text(file_text),
             }
-        check = _verify_multiedit(file_text, edits=edits)
+        normalized_edits = [
+            _canonical_edit(edit) if isinstance(edit, dict) else edit
+            for edit in edits
+        ]
+        check = _verify_multiedit(file_text, edits=normalized_edits)
         status = check["status"]
         reason = check["reason"]
         checks = [check]

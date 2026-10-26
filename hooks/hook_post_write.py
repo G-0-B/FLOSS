@@ -119,6 +119,10 @@ MUTATING_TOOL_NAMES = {
     # Claim, while `hermes hooks list` reported the hook installed and allowed.
     # An installed hook that silently does nothing is worse than an absent one.
     "patch",
+    # Antigravity (AGY)
+    "write_to_file",
+    "replace_file_content",
+    "multi_replace_file_content",
 }
 
 
@@ -369,6 +373,8 @@ def infer_surface(tool_name: str, hook_event_name: str) -> str:
 
     tn = (tool_name or "").strip().lower()
     event_name = (hook_event_name or "").strip()
+    if tn in {"write_to_file", "replace_file_content", "multi_replace_file_content"}:
+        return "antigravity"
     if tn in {"write", "edit", "multiedit"}:
         return "claude-code"
     # HERMES BEFORE GEMINI, BECAUSE THEY SHARE A TOOL NAME.
@@ -431,6 +437,44 @@ def _render_change_section(tool_name: str, tool_input: dict) -> str:
             f"{new}"
         )
 
+    if tn == "replace_file_content":
+        old = _trim(tool_input.get("TargetContent", "") or "")
+        new = _trim(tool_input.get("ReplacementContent", "") or "")
+        instr = tool_input.get("Instruction", "")
+        return (
+            f"CHANGE (replace_file_content - {instr}):\n"
+            "--- target ---\n"
+            f"{old}\n"
+            "--- replacement ---\n"
+            f"{new}"
+        )
+
+    if tn == "multi_replace_file_content":
+        edits = tool_input.get("replacements") or tool_input.get("edits") or []
+        if not isinstance(edits, list) or not edits:
+            return "CHANGE (multi_replace_file_content): <no edits>"
+        parts = [f"CHANGE (multi_replace_file_content, {len(edits)} sub-edits):"]
+        for idx, e in enumerate(edits[:5], start=1):
+            old = _trim(
+                e.get("TargetContent", "") or e.get("old_string", "") or "",
+                limit=600,
+            )
+            new = _trim(
+                e.get("ReplacementContent", "") or e.get("new_string", "") or "",
+                limit=600,
+            )
+            instr = e.get("Instruction", "")
+            header = (
+                f"-- sub-edit {idx} target ({instr}) --"
+                if instr
+                else f"-- sub-edit {idx} target --"
+            )
+            parts.append(f"{header}\n{old}")
+            parts.append(f"-- sub-edit {idx} replacement --\n{new}")
+        if len(edits) > 5:
+            parts.append(f"... [{len(edits) - 5} more sub-edits omitted]")
+        return "\n".join(parts)
+
     if tn == "multiedit":
         edits = tool_input.get("edits") or []
         if not isinstance(edits, list) or not edits:
@@ -447,8 +491,10 @@ def _render_change_section(tool_name: str, tool_input: dict) -> str:
             parts.append(f"... [{len(edits) - 5} more sub-edits omitted]")
         return "\n".join(parts)
 
-    if tn in {"write", "write_file"}:
-        content = _trim(tool_input.get("content", "") or "")
+    if tn in {"write", "write_file", "write_to_file"}:
+        content = _trim(
+            tool_input.get("content", "") or tool_input.get("CodeContent", "") or ""
+        )
         return f"CHANGE ({tool_name} — full new file content):\n" + content
 
     # Unknown tool — fall back to a serialized tool_input so voters at

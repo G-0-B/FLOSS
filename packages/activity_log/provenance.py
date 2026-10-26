@@ -1006,9 +1006,9 @@ def validate_packet(
         # mistake twice.
         chain_index: dict[str, list[Path]] = {}
         for entries in (_position_index or {}).values():
-            for path, digest in entries:
-                if isinstance(digest, str):
-                    chain_index.setdefault(digest, []).append(path)
+            for path, cand_digest in entries:
+                if isinstance(cand_digest, str):
+                    chain_index.setdefault(cand_digest, []).append(path)
 
         # The prior chain is walked ITERATIVELY, not recursively.
         #

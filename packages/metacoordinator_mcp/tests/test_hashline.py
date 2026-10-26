@@ -283,6 +283,81 @@ def test_render_verification_section_includes_hashlined_evidence():
         assert "Matched new locations:" in rendered
 
 
+def test_verify_replace_file_content_antigravity_shape():
+    """Antigravity replace_file_content should verify TargetContent/ReplacementContent."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        pre_text = "def answer():\n    return 42\n"
+        post_text = "def answer():\n    return 43\n"
+        path.write_text(post_text, encoding="utf-8")
+        checkpoint = build_pre_write_checkpoint(
+            str(path),
+            "replace_file_content",
+            {"TargetContent": "return 42", "ReplacementContent": "return 43"},
+            pre_text=pre_text,
+            source_exists=True,
+        )
+        result = verify_tool_edit(
+            str(path),
+            "replace_file_content",
+            {"TargetContent": "return 42", "ReplacementContent": "return 43"},
+            pre_checkpoint=checkpoint,
+        )
+        assert result["status"] == "VERIFIED"
+        assert result["checkpoint"]["status"] == "MATCHED_EXACT_POST"
+
+
+def test_verify_write_to_file_antigravity_shape():
+    """Antigravity write_to_file should verify CodeContent payload."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        content = "def answer():\n    return 42\n"
+        path.write_text(content, encoding="utf-8")
+        checkpoint = build_pre_write_checkpoint(
+            str(path),
+            "write_to_file",
+            {"CodeContent": content},
+            pre_text=None,
+            source_exists=False,
+        )
+        result = verify_tool_edit(
+            str(path),
+            "write_to_file",
+            {"CodeContent": content},
+            pre_checkpoint=checkpoint,
+        )
+        assert result["status"] == "VERIFIED"
+        assert result["checkpoint"]["status"] == "MATCHED_EXACT_POST"
+
+
+def test_verify_multi_replace_file_content_antigravity_shape():
+    """Antigravity multi_replace_file_content should verify replacements list."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sample.py"
+        pre_text = "def alpha():\n    return 10\n\ndef beta():\n    return 20\n"
+        post_text = "def alpha():\n    return 11\n\ndef beta():\n    return 21\n"
+        path.write_text(post_text, encoding="utf-8")
+        edits = [
+            {"TargetContent": "return 10", "ReplacementContent": "return 11"},
+            {"TargetContent": "return 20", "ReplacementContent": "return 21"},
+        ]
+        checkpoint = build_pre_write_checkpoint(
+            str(path),
+            "multi_replace_file_content",
+            {"replacements": edits},
+            pre_text=pre_text,
+            source_exists=True,
+        )
+        result = verify_tool_edit(
+            str(path),
+            "multi_replace_file_content",
+            {"replacements": edits},
+            pre_checkpoint=checkpoint,
+        )
+        assert result["status"] == "VERIFIED"
+        assert result["checkpoint"]["status"] == "MATCHED_EXACT_POST"
+
+
 def _run_all() -> int:
     """Run the lightweight standalone test bundle without pytest."""
     tests = [
@@ -300,6 +375,9 @@ def _run_all() -> int:
         test_verify_replace_uses_exact_pre_write_checkpoint_when_post_image_matches,
         test_verify_replace_reports_mismatch_when_exact_post_image_diverges,
         test_render_verification_section_includes_hashlined_evidence,
+        test_verify_replace_file_content_antigravity_shape,
+        test_verify_write_to_file_antigravity_shape,
+        test_verify_multi_replace_file_content_antigravity_shape,
     ]
     passed = failed = 0
     for test in tests:
