@@ -138,9 +138,10 @@ def test_the_final_newline_does_not_count_as_a_line(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("returncode", [0, 2], ids=["success", "failure"])
-def test_real_child_list_output_preserves_exit_details(returncode):
+def test_real_child_list_output_preserves_exit_details(returncode, tmp_path, monkeypatch):
     """Exercise the actual subprocess text/exit boundary, not a fake runner."""
     actions = load_actions_module()
+    monkeypatch.setattr(actions, "ROOT", tmp_path)
     child = (
         "import sys; print('[1, 2]'); "
         "print('child detail', file=sys.stderr); "
