@@ -246,12 +246,13 @@ def test_the_declaration_survives_materialization_for_every_target():
 
 
 def test_antigravity_write_tools_are_attributed_to_antigravity():
-    """Antigravity (AGY) writes through `write_to_file` and
-    `replace_file_content`; neither name is used by another harness here."""
+    """Antigravity (AGY) writes through `write_to_file`, `replace_file_content`,
+    and `multi_replace_file_content`; none of these names is used by another harness."""
     hook = load_hook()
 
     assert hook.infer_surface("write_to_file", "") == "antigravity"
     assert hook.infer_surface("replace_file_content", "") == "antigravity"
+    assert hook.infer_surface("multi_replace_file_content", "") == "antigravity"
 
 
 def test_antigravity_write_tools_are_gated_by_both_hooks():
@@ -264,13 +265,13 @@ def test_antigravity_write_tools_are_gated_by_both_hooks():
     assert spec.loader is not None
     spec.loader.exec_module(pre)
 
-    for name in ("write_to_file", "replace_file_content"):
+    for name in ("write_to_file", "replace_file_content", "multi_replace_file_content"):
         assert name in post.MUTATING_TOOL_NAMES
         assert name in pre.MUTATING_TOOL_NAMES
 
 
 def test_antigravity_change_sections_carry_the_edit():
-    """The voters see the replacement and the full new file, not a JSON dump."""
+    """The voters see the replacement, multi-replace, and full new file, not a JSON dump."""
     hook = load_hook()
 
     replaced = hook._render_change_section(
@@ -282,3 +283,27 @@ def test_antigravity_change_sections_carry_the_edit():
 
     written = hook._render_change_section("write_to_file", {"CodeContent": "print(1)"})
     assert "full new file content):\nprint(1)" in written
+
+    multi = hook._render_change_section(
+        "multi_replace_file_content",
+        {
+            "replacements": [
+                {
+                    "TargetContent": "old snippet 1",
+                    "ReplacementContent": "new snippet 1",
+                    "Instruction": "refactor a",
+                },
+                {
+                    "TargetContent": "old snippet 2",
+                    "ReplacementContent": "new snippet 2",
+                },
+            ]
+        },
+    )
+    assert "CHANGE (multi_replace_file_content, 2 sub-edits):" in multi
+    assert "-- sub-edit 1 target (refactor a) --" in multi
+    assert "old snippet 1" in multi
+    assert "-- sub-edit 1 replacement --\nnew snippet 1" in multi
+    assert "-- sub-edit 2 target --" in multi
+    assert "old snippet 2" in multi
+    assert "-- sub-edit 2 replacement --\nnew snippet 2" in multi

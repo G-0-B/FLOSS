@@ -62,6 +62,7 @@ MUTATING_TOOL_NAMES = {
     # Antigravity (AGY)
     "write_to_file",
     "replace_file_content",
+    "multi_replace_file_content",
 }
 
 
