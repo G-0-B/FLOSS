@@ -79,6 +79,12 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    # vitest 5 breaks the peer range of @cloudflare/vitest-pool-workers
+    # (^4.1.0 as of 0.23.0); #69 merged it and broke npm ci. Lift this once
+    # pool-workers accepts vitest 5.
+    ignore:
+      - dependency-name: "vitest"
+        versions: [">=5.0.0"]
     groups:
       commons-gateway:
         patterns: ["*"]
