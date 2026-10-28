@@ -1,0 +1,1230 @@
+FFF.FFFFFFFFFFFFFFFFFF.F                                                 [100%]
+================================== FAILURES ===================================
+_____________ test_local_survivors_of_a_mixed_run_are_one_surface _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002775D081940>
+
+    def test_local_survivors_of_a_mixed_run_are_one_surface(monkeypatch):
+        """External audit F1. Admission counts the local pool as ONE surface by
+        rebuilding `ollama/<tag>` from the transport; the survivor check passed the
+        raw model id, so `phi4-mini:latest`, `llama3.2:...`, `granite-code:...`
+        and `hf.co` read as four providers and cleared the surface bar. Un-exempting
+        mixed mode switched this check on without making its inputs match."""
+        monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+        monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+    
+        problem = synthesizer._survivor_independence_problem(_local_survivors(), "mixed")
+    
+>       assert problem is not None, "four local voters on one surface were accepted"
+E       AssertionError: four local voters on one surface were accepted
+E       assert None is not None
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:434: AssertionError
+---------------------------- Captured stderr call -----------------------------
+[voters] independence check: 4 model(s) absent from the registry probe index: granite-code:3b-instruct-128k-q4_K_S, hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, llama3.2:3b-instruct-q4_K_S, phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest, unverified:unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+___________ test_admission_and_survival_agree_about_the_same_roster ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002775D127CE0>
+
+    def test_admission_and_survival_agree_about_the_same_roster(monkeypatch):
+        """The property, not the instance: one roster, two views, one verdict."""
+        from packages.metacoordinator_mcp import voters
+        from packages.reasoning_ensemble import transport
+    
+        monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+        monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+    
+        admitted = voters.roster_independence_problem(
+            "diverse",
+            {
+                v["voter_id"]: transport._independence_route(v)
+                for v in transport.LOCAL_VOTER_POOL
+            },
+        )
+        survived = synthesizer._survivor_independence_problem(_local_survivors(), "mixed")
+    
+>       assert (admitted is None) == (survived is None), (admitted, survived)
+E       AssertionError: ("Profile 'diverse' resolved to a roster below its own independence rule: 1 provider surface(s) ['ollama'] and 4 model...e, or set FLOSS_ALLOW_DEGRADED_ROSTER=1 to poll anyway and accept that the result is not independent consensus.", None)
+E       assert ("Profile 'diverse' resolved to a roster below its own independence rule: 1 provider surface(s) ['ollama'] and 4 model ... profile, or set FLOSS_ALLOW_DEGRADED_ROSTER=1 to poll anyway and accept that the result is not independent consensus." is None) == (None is None)
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:455: AssertionError
+---------------------------- Captured stderr call -----------------------------
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+[voters] independence check: 4 model(s) absent from the registry probe index: granite-code:3b-instruct-128k-q4_K_S, hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, llama3.2:3b-instruct-q4_K_S, phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest, unverified:unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+___________ test_a_mixed_run_that_loses_its_online_half_is_degraded ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002775D37BBF0>
+
+    def test_a_mixed_run_that_loses_its_online_half_is_degraded(monkeypatch):
+        """End to end, through synthesize(), as the audit reproduced it: two online
+        voters admitted with the local pool, both fail, four local survivors with
+        distinct embeddings remain. That is one surface, and the run must say so --
+        degraded, with an unsuccessful audit record -- rather than reporting a
+        normal consensus tier over a correlated subset."""
+        from unittest.mock import patch
+    
+        from packages.reasoning_ensemble import transport
+    
+        monkeypatch.delenv("FLOSS_ALLOW_DEGRADED_ROSTER", raising=False)
+        monkeypatch.setenv("FLOSS_ENSEMBLE_ONLINE_PROFILE", "diverse")
+        monkeypatch.setenv("FLOSS_ENSEMBLE_VOTER_MODE", "mixed")
+    
+        survivors = _local_survivors()
+        for response, vector in zip(
+            survivors, ([1, 0], [0.99, 0.01], [0.97, 0.03], [-1, 0])
+        ):
+            response.response_embedding = vector
+        online = {
+            "audit-groq": "groq/openai/gpt-oss-120b",
+            "audit-mistral": "mistral/mistral-large-latest",
+        }
+        failed = [
+            synthesizer.VoterResponse(
+                voter_id=name,
+                model=model,
+                family=transport.family_from_model(model),
+                response="",
+                response_hash="",
+                response_embedding=None,
+                duration_seconds=0.1,
+                error="simulated outage",
+                transport_name="litellm",
+            )
+            for name, model in online.items()
+        ]
+    
+        with patch.object(
+            transport, "resolve_default_voter_specs", return_value=online
+        ), patch.object(
+            transport, "resolve_embedder", return_value=("t", lambda _: [1, 0])
+        ), patch.object(
+            synthesizer, "dispatch_parallel", return_value=failed + survivors
+        ), patch.object(
+            synthesizer, "_log_synthesis_action"
+        ) as log:
+            result = synthesizer.synthesize("mixed outage", stage_artifact=False)
+    
+>       assert result.tier_classification.tier == "degraded"
+E       AssertionError: assert 'tier2' == 'degraded'
+E         
+E         - degraded
+E         + tier2
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:507: AssertionError
+---------------------------- Captured stderr call -----------------------------
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+[voters] independence check: 4 model(s) absent from the registry probe index: granite-code:3b-instruct-128k-q4_K_S, hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, llama3.2:3b-instruct-q4_K_S, phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest, unverified:unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+________ test_a_projection_owned_by_another_workspace_is_never_removed ________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_projection_owned_by_ano0')
+
+    def test_a_projection_owned_by_another_workspace_is_never_removed(tmp_path):
+        """External audit residual. The pruner checked that a marker EXISTED, not
+        whose it was. On a shared user-scope root such as ~/.codex/skills, two
+        checkouts install side by side, and a skill absent from THIS manifest was
+        selected for removal even when another workspace had installed it -- so
+        refreshing one workspace could delete another's live instructions.
+    
+        The marker already records `source_path`, resolved under the installing
+        workspace. That is the ownership predicate: a projection is ours to remove
+        only if its source lives under our root."""
+        module = load_module()
+    
+        root = tmp_path / "skills"
+        theirs = root / "their-skill"
+        theirs.mkdir(parents=True)
+        (theirs / module.MANAGED_MARKER).write_text(
+            _owned_marker(tmp_path / "other-workspace", "their-skill"), encoding="utf-8"
+        )
+    
+        for check, dry_run in ((True, False), (False, True), (False, False)):
+>           messages, drift = module.prune_stale_projections(
+                "codex",
+                root,
+                set(),
+                check=check,
+                dry_run=dry_run,
+                owner_root=tmp_path / "this-workspace",
+            )
+E           TypeError: prune_stale_projections() got an unexpected keyword argument 'owner_root'
+
+scripts\tests\test_shared_skill_surface_scope.py:337: TypeError
+___________ test_a_marker_that_cannot_prove_ownership_is_left_alone ___________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_marker_that_cannot_prov0')
+
+    def test_a_marker_that_cannot_prove_ownership_is_left_alone(tmp_path):
+        """Unparseable, empty, or missing source_path: none of those prove the
+        projection is ours, and deleting on an unproven claim is the failure this
+        guards. Leaving a stale directory is recoverable; deleting a live one is
+        not."""
+        module = load_module()
+    
+        root = tmp_path / "skills"
+        for name, marker in (
+            ("unparseable", "not json{"),
+            ("empty-object", "{}"),
+            ("no-source", json.dumps({"managed_by": "FLOSSI0ULLK shared skill surface"})),
+            (
+                "wrong-owner",
+                json.dumps({"managed_by": "someone else", "source_path": str(tmp_path)}),
+            ),
+        ):
+            victim = root / name
+            victim.mkdir(parents=True)
+            (victim / module.MANAGED_MARKER).write_text(marker, encoding="utf-8")
+    
+>       messages, drift = module.prune_stale_projections(
+            "codex", root, set(), check=False, dry_run=False, owner_root=tmp_path
+        )
+E       TypeError: prune_stale_projections() got an unexpected keyword argument 'owner_root'
+
+scripts\tests\test_shared_skill_surface_scope.py:375: TypeError
+___________ test_the_materializer_passes_its_own_workspace_as_owner ___________
+
+    def test_the_materializer_passes_its_own_workspace_as_owner():
+        """A pruner that requires an owner is only as good as the owner it is
+        given. The one production caller must pass the workspace it materializes,
+        not a constant and not the target root."""
+        import inspect
+    
+        module = load_module()
+        source = inspect.getsource(module.materialize)
+        call = source.split("prune_stale_projections(", 1)[1].split(")", 1)[0]
+>       assert "owner_root=workspace_root" in call, call
+E       AssertionError: 
+E                     target_name, target_root, expected_names, check=check, dry_run=dry_run
+E                 
+E       assert 'owner_root=workspace_root' in '\n            target_name, target_root, expected_names, check=check, dry_run=dry_run\n        '
+
+scripts\tests\test_shared_skill_surface_scope.py:394: AssertionError
+____ test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned _____
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_marker_this_materialize0')
+
+    def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_path):
+        """The join between the writer and the reader of the ownership claim.
+    
+        Three defects on this PR were a manifest and its reader disagreeing about
+        what one end wrote. If serialize_marker and projection_owned_by ever
+        diverge -- a renamed key, a changed managed_by string, an unresolved path
+        -- every projection this workspace installed would silently become
+        unprunable, and the withdrawal fix would stop working without a failure.
+        """
+        module = load_module()
+    
+        workspace = tmp_path / "workspace"
+        source = workspace / "skills" / "real-skill"
+        source.mkdir(parents=True)
+        projection = tmp_path / "installed" / "real-skill"
+        projection.mkdir(parents=True)
+        (projection / module.MANAGED_MARKER).write_text(
+            module.serialize_marker(
+                {"skill_name": "real-skill", "resolved_path": str(source.resolve())},
+                "test",
+            ),
+            encoding="utf-8",
+        )
+    
+>       assert module.projection_owned_by(projection, workspace)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'shared_skill_surface_under_test' has no attribute 'projection_owned_by'
+
+scripts\tests\test_shared_skill_surface_scope.py:421: AttributeError
+___________ test_the_yaml_hook_target_reports_a_corrupt_gateway_pid ___________
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_the_yaml_hook_target_repo0/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+>           payload = json.loads(raw)
+                      ^^^^^^^^^^^^^^^
+
+scripts\materialize_shared_agent_surface.py:754: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.decoder.JSONDecoder object at 0x000002775C29C2F0>, s = 'not json{'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+C:\Python313\Lib\json\decoder.py:363: JSONDecodeError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_the_yaml_hook_target_repo0')
+
+    def test_the_yaml_hook_target_reports_a_corrupt_gateway_pid(tmp_path):
+        """hermes_gateway_alive now raises for an unreadable gateway.pid, and the
+        MCP materializer was adapted -- but the hook materializer reaches the same
+        helper through hermes_gateway_alive_for, and apply_yaml_target was not. So
+        the refusal escaped as an exception there instead of a REFUSED line."""
+        import materialize_shared_hook_surface as mhs
+    
+        home = _corrupt_hermes_home(tmp_path)
+        before = (home / "config.yaml").read_bytes()
+    
+>       message, drift = mhs.apply_yaml_target(
+            home / "config.yaml", {"format": "yaml", "hooks": {}}, check=True, dry_run=False
+        )
+
+tests\test_shared_agent_surface_mcp.py:1380: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_hook_surface.py:726: in apply_yaml_target
+    live_pid = hermes_gateway_alive_for(target_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts\materialize_shared_hook_surface.py:628: in hermes_gateway_alive_for
+    return hermes_gateway_alive(target_path.parent)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_the_yaml_hook_target_repo0/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+>           raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+E           materialize_shared_agent_surface.SharedSurfaceError: Hermes C:\~shit\_audit\pr41-response-20260927\pytest-delta-baseline\test_the_yaml_hook_target_repo0\hermes\gateway.pid exists but is not valid JSON (Expecting value: line 1 column 1 (char 0)); refusing to write under a gateway whose state is unknown. Stop the gateway, or remove the file if you know it is stale.
+
+scripts\materialize_shared_agent_surface.py:756: SharedSurfaceError
+_______ test_a_corrupt_gateway_pid_does_not_abort_the_hook_materializer _______
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe0/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+>           payload = json.loads(raw)
+                      ^^^^^^^^^^^^^^^
+
+scripts\materialize_shared_agent_surface.py:754: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.decoder.JSONDecoder object at 0x000002775C29C2F0>, s = 'not json{'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+C:\Python313\Lib\json\decoder.py:363: JSONDecodeError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe0')
+
+    def test_a_corrupt_gateway_pid_does_not_abort_the_hook_materializer(tmp_path):
+        """The audit's reproduction: the standalone hook materializer, --check, two
+        targets. It raised, returned nothing, and never reached the later target."""
+        import materialize_shared_hook_surface as mhs
+    
+        _corrupt_hermes_home(tmp_path)
+        manifest = _two_target_hook_manifest(tmp_path)
+    
+>       results, drift = mhs.materialize(
+            tmp_path, manifest, tmp_path / "output", check=True, dry_run=False
+        )
+
+tests\test_shared_agent_surface_mcp.py:1397: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_hook_surface.py:1033: in materialize
+    message, changed = apply_yaml_target(
+scripts\materialize_shared_hook_surface.py:726: in apply_yaml_target
+    live_pid = hermes_gateway_alive_for(target_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts\materialize_shared_hook_surface.py:628: in hermes_gateway_alive_for
+    return hermes_gateway_alive(target_path.parent)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe0/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+>           raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+E           materialize_shared_agent_surface.SharedSurfaceError: Hermes C:\~shit\_audit\pr41-response-20260927\pytest-delta-baseline\test_a_corrupt_gateway_pid_doe0\hermes\gateway.pid exists but is not valid JSON (Expecting value: line 1 column 1 (char 0)); refusing to write under a gateway whose state is unknown. Stop the gateway, or remove the file if you know it is stale.
+
+scripts\materialize_shared_agent_surface.py:756: SharedSurfaceError
+______ test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer ______
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe1/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+>           payload = json.loads(raw)
+                      ^^^^^^^^^^^^^^^
+
+scripts\materialize_shared_agent_surface.py:754: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.decoder.JSONDecoder object at 0x000002775C29C2F0>, s = 'not json{'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+            obj, end = self.scan_once(s, idx)
+        except StopIteration as err:
+>           raise JSONDecodeError("Expecting value", s, err.value) from None
+E           json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+C:\Python313\Lib\json\decoder.py:363: JSONDecodeError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002775D2A6690>
+
+    def test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer(
+        tmp_path, monkeypatch
+    ):
+        """Replaces a test that only grepped this file for a `try` and an `except`
+        around one call site. It could not see the SECOND caller -- the hook
+        sub-materializer the parent invokes later -- which is where the audit
+        reproduced the abort. Every downstream manifest is stubbed except the hook
+        one, so the parent genuinely runs the chain that failed."""
+        _stub_downstream_materializers(monkeypatch, tmp_path)
+        _corrupt_hermes_home(tmp_path)
+        monkeypatch.setattr(
+            mas, "DEFAULT_HOOK_MANIFEST_PATH", _two_target_hook_manifest(tmp_path)
+        )
+        manifest_path = _write_synthetic_manifest(
+            tmp_path,
+            {
+                "hermes_workspace": {
+                    "scope": "repo",
+                    "config_path": "hermes/config.yaml",
+                    "name_map": {},
+                    "overrides": {},
+                }
+            },
+        )
+    
+>       results, drift = mas.materialize(tmp_path, manifest_path, check=True, dry_run=False)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1433: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:2057: in materialize
+    hook_results, hook_drift = materialize_hook_surface(
+scripts\materialize_shared_hook_surface.py:1033: in materialize
+    message, changed = apply_yaml_target(
+scripts\materialize_shared_hook_surface.py:726: in apply_yaml_target
+    live_pid = hermes_gateway_alive_for(target_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+scripts\materialize_shared_hook_surface.py:628: in hermes_gateway_alive_for
+    return hermes_gateway_alive(target_path.parent)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_a_corrupt_gateway_pid_doe1/hermes')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+>           raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+E           materialize_shared_agent_surface.SharedSurfaceError: Hermes C:\~shit\_audit\pr41-response-20260927\pytest-delta-baseline\test_a_corrupt_gateway_pid_doe1\hermes\gateway.pid exists but is not valid JSON (Expecting value: line 1 column 1 (char 0)); refusing to write under a gateway whose state is unknown. Stop the gateway, or remove the file if you know it is stale.
+
+scripts\materialize_shared_agent_surface.py:756: SharedSurfaceError
+______ test_every_malformed_gateway_pid_shape_is_a_handled_refusal[list] ______
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p0')
+payload = b'[]'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+        ids=["list", "null", "string", "number", "invalid-utf8"],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+>           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p0')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+>       pid = payload.get("pid")
+              ^^^^^^^^^^^
+E       AttributeError: 'list' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:761: AttributeError
+______ test_every_malformed_gateway_pid_shape_is_a_handled_refusal[null] ______
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p1')
+payload = b'null'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+        ids=["list", "null", "string", "number", "invalid-utf8"],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+>           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p1')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+>       pid = payload.get("pid")
+              ^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:761: AttributeError
+_____ test_every_malformed_gateway_pid_shape_is_a_handled_refusal[string] _____
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p2')
+payload = b'"a string"'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+        ids=["list", "null", "string", "number", "invalid-utf8"],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+>           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p2')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+>       pid = payload.get("pid")
+              ^^^^^^^^^^^
+E       AttributeError: 'str' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:761: AttributeError
+_____ test_every_malformed_gateway_pid_shape_is_a_handled_refusal[number] _____
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p3')
+payload = b'42'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+        ids=["list", "null", "string", "number", "invalid-utf8"],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+>           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+home = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p3')
+
+    def hermes_gateway_alive(home: Path) -> int | None:
+        """Return the PID of a live Hermes gateway for `home`, else None.
+    
+        A running gateway rewrites its own config.yaml on shutdown and would
+        clobber anything written underneath it, so writes must be refused while
+        it is alive.
+        """
+        pid_file = home / "gateway.pid"
+        if not pid_file.exists():
+            return None
+    
+        # INDETERMINATE IS NOT ABSENT.
+        #
+        # An unreadable or malformed gateway.pid returned None, and every caller
+        # reads None as "no live gateway" and rewrites config.yaml -- which a
+        # gateway that IS running then overwrites from memory on shutdown, losing
+        # exactly the MCP and hook changes this guard exists to protect. A
+        # PermissionError or a half-written file is the likeliest state during a
+        # gateway's own startup, so the failure mode is worst when it matters most.
+        #
+        # `_pid_alive` already fails closed the same way for the same reason: it
+        # returns True when liveness cannot be determined. The reader was the half
+        # that did not.
+        try:
+            raw = pid_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but could not be read "
+                f"({type(exc).__name__}); refusing to write under a gateway whose "
+                "state is unknown. Stop the gateway, or remove the file if you "
+                "know it is stale."
+            ) from exc
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SharedSurfaceError(
+                f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
+                "to write under a gateway whose state is unknown. Stop the "
+                "gateway, or remove the file if you know it is stale."
+            ) from exc
+>       pid = payload.get("pid")
+              ^^^^^^^^^^^
+E       AttributeError: 'int' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:761: AttributeError
+__ test_every_malformed_gateway_pid_shape_is_a_handled_refusal[invalid-utf8] __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_every_malformed_gateway_p4')
+payload = b'\xff\xfe not utf-8'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [b"[]", b"null", b'"a string"', b"42", b"\xff\xfe not utf-8"],
+        ids=["list", "null", "string", "number", "invalid-utf8"],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+>           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1456: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:745: in hermes_gateway_alive
+    raw = pid_file.read_text(encoding="utf-8")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_abc.py:633: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <encodings.utf_8.IncrementalDecoder object at 0x000002775EE010D0>
+input = b'\xff\xfe not utf-8', final = True
+
+>   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+<frozen codecs>:325: UnicodeDecodeError
+__ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[zero] __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo0')
+pid = 0
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+_ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[minus-one] _
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo1')
+pid = -1
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+_ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[negative] _
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo2')
+pid = -12345
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+__ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^31] __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo3')
+pid = 2147483648
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+__ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^32] __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo4')
+pid = 4294967296
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+__ test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^40] __
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-response-20260927/pytest-delta-baseline/test_an_impossible_pid_is_repo5')
+pid = 1099511627776
+
+    @pytest.mark.parametrize(
+        "pid",
+        [0, -1, -12345, 2**31, 2**32, 2**40],
+        ids=["zero", "minus-one", "negative", "2^31", "2^32", "2^40"],
+    )
+    def test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway(tmp_path, pid):
+        """Safe, but untrue. _pid_alive fails closed, so every one of these already
+        refused the write -- the reviewer who found them was right about that. But
+        each produced "gateway PID <n> is live; stop it and re-run", which is
+        false, and for 0 (and 4 on Windows, the System process) it directs an
+        operator to kill a system process. No process has one of these ids, so the
+        honest verdict is that the gateway's state is unknown.
+    
+        Surfaced by an internal reviewer and then dropped, because the prompt asked
+        only for defects the commit had introduced. It had not introduced this one.
+        """
+        (tmp_path / "gateway.pid").write_text(json.dumps({"pid": pid}), encoding="utf-8")
+    
+>       with pytest.raises(mas.SharedSurfaceError, match="not a possible process id"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE SharedSurfaceError
+
+tests\test_shared_agent_surface_mcp.py:1477: Failed
+___________ test_pid_alive_fails_closed_when_the_os_rejects_the_id ____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002775D29F050>
+
+    def test_pid_alive_fails_closed_when_the_os_rejects_the_id(monkeypatch):
+        """The POSIX branch caught ProcessLookupError and OSError. os.kill raises
+        OverflowError for an id past pid_t -- signed 32-bit -- and that is neither,
+        so it escaped _pid_alive, then hermes_gateway_alive, then the wrapper that
+        only translates SharedSurfaceError, and aborted the materializer. The
+        0 < pid < 2**32 bound in 26c4ff8 let 2**31..2**32-1 through to exactly this
+        call: it was set for Windows' unsigned DWORD and forgot POSIX's signed type.
+    
+        Simulated rather than run: on Windows os.kill(pid, 0) is TerminateProcess.
+        """
+    
+        def _overflow(pid, sig):
+            raise OverflowError("signed integer is greater than maximum")
+    
+        monkeypatch.setattr(mas.os, "name", "posix")
+        monkeypatch.setattr(mas.os, "kill", _overflow)
+    
+>       assert mas._pid_alive(3_000_000_000) is True, "an unjudgeable id must fail closed"
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\~shit\_audit\pr41-response-20260927\baseline-aee4745\tests\test_shared_agent_surface_mcp.py:1508: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\~shit\_audit\pr41-response-20260927\baseline-aee4745\scripts\materialize_shared_agent_surface.py:713: in _pid_alive
+    os.kill(pid, 0)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+pid = 3000000000, sig = 0
+
+    def _overflow(pid, sig):
+>       raise OverflowError("signed integer is greater than maximum")
+E       OverflowError: signed integer is greater than maximum
+
+C:\~shit\_audit\pr41-response-20260927\baseline-aee4745\tests\test_shared_agent_surface_mcp.py:1503: OverflowError
+=========================== short test summary info ===========================
+FAILED packages/reasoning_ensemble/tests/test_survivor_independence.py::test_local_survivors_of_a_mixed_run_are_one_surface
+FAILED packages/reasoning_ensemble/tests/test_survivor_independence.py::test_admission_and_survival_agree_about_the_same_roster
+FAILED packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_mixed_run_that_loses_its_online_half_is_degraded
+FAILED scripts/tests/test_shared_skill_surface_scope.py::test_a_projection_owned_by_another_workspace_is_never_removed
+FAILED scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_that_cannot_prove_ownership_is_left_alone
+FAILED scripts/tests/test_shared_skill_surface_scope.py::test_the_materializer_passes_its_own_workspace_as_owner
+FAILED scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned
+FAILED tests/test_shared_agent_surface_mcp.py::test_the_yaml_hook_target_reports_a_corrupt_gateway_pid
+FAILED tests/test_shared_agent_surface_mcp.py::test_a_corrupt_gateway_pid_does_not_abort_the_hook_materializer
+FAILED tests/test_shared_agent_surface_mcp.py::test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer
+FAILED tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[list]
+FAILED tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[null]
+FAILED tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[string]
+FAILED tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[number]
+FAILED tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal[invalid-utf8]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[zero]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[minus-one]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[negative]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^31]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^32]
+FAILED tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway[2^40]
+FAILED tests/test_shared_agent_surface_mcp.py::test_pid_alive_fails_closed_when_the_os_rejects_the_id
+22 failed, 2 passed in 1.82s

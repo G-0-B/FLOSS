@@ -1,0 +1,337 @@
+=== COMMIT 65d040e: fix: a survivor check that cannot run no longer vouches for the roster
+
+
+diff --git a/packages/reasoning_ensemble/synthesizer.py b/packages/reasoning_ensemble/synthesizer.py
+index 3a0ee65..a533039 100644
+--- a/packages/reasoning_ensemble/synthesizer.py
++++ b/packages/reasoning_ensemble/synthesizer.py
+@@ -485,7 +485,12 @@ def _degraded_reason(
+             f"Fewer than {MIN_VOTERS} voters produced embeddings "
+             f"({len(embedded)}/{len(responses)})."
+         )
+-    if independence is not None:
++    if isinstance(independence, IndependenceUnknown):
++        reasons.append(
++            f"Whether the voters that survived are independent is unknown: "
++            f"{independence}"
++        )
++    elif independence is not None:
+         reasons.append(
+             f"The voters that survived do not meet the independence bar: "
+             f"{independence}"
+@@ -493,6 +498,18 @@ def _degraded_reason(
+     return " ".join(reasons) or "Degraded run."
+ 
+ 
++class IndependenceUnknown(str):
++    """The survivor check could not run: no verdict in either direction.
++
++    A str, so a caller that only asks `is not None` treats it as a problem and
++    degrades the run. One that has not learned this third state therefore
++    withholds the tier rather than vouching for the roster. Callers that word
++    the outcome check for it and say "unknown" instead of "not independent",
++    because an operator told the roster failed goes to fix a roster that may be
++    fine.
++    """
++
++
+ def _survivor_independence_problem(
+     embedded: list["VoterResponse"], resolved_mode: str | None
+ ) -> Optional[str]:
+@@ -501,8 +518,11 @@ def _survivor_independence_problem(
+     Reuses `voters.roster_independence_problem` rather than counting families
+     here: a second implementation of "is this roster independent" is how the
+     pool-side and poll-side answers drift apart, which is the defect this
+-    guards against. Local and mixed runs are exempt the same way the pool-side
+-    check exempts them, through the same DEGRADED_OK_PROFILES list.
++    guards against. Local runs are exempt (see below); profile exemptions
++    through DEGRADED_OK_PROFILES apply inside that shared function.
++
++    Returns None when the survivors are independent or exempt, a description
++    when they are not, and an IndependenceUnknown when the check could not run.
+     """
+ 
+     if not embedded:
+@@ -544,8 +564,15 @@ def _survivor_independence_problem(
+                 for r in embedded
+             },
+         )
+-    except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
+-        return None
++    except Exception as exc:  # noqa: BLE001 -- a check that cannot run must not abort a run
++        # ...nor vouch for it. This returned None, the value a PASSING check
++        # returns, so a crash was recorded as an independent roster. Not
++        # aborting and not vouching are separate decisions: the degraded path
++        # already returns every response, so the only thing a check that never
++        # ran costs the run is a consensus tier nobody verified.
++        return IndependenceUnknown(
++            f"the survivor check could not run ({type(exc).__name__}: {exc})"
++        )
+ 
+ 
+ def _provider_label(response: "VoterResponse") -> str:
+@@ -1359,17 +1386,19 @@ def synthesize(
+                 embedded,
+                 result.final_synthesis,
+             )
++        if independence is None:
++            error = f"insufficient_voters: {len(embedded)}/{len(responses)}"
++        elif isinstance(independence, IndependenceUnknown):
++            error = f"independence_unknown: {independence}"
++        else:
++            error = f"roster_not_independent: {independence}"
+         _log_synthesis_action(
+             result,
+             prompt,
+             p_hash,
+             started_iso,
+             success=False,
+-            error=(
+-                f"insufficient_voters: {len(embedded)}/{len(responses)}"
+-                if independence is None
+-                else f"roster_not_independent: {independence}"
+-            ),
++            error=error,
+             embed_fn=embed_fn,
+             embed_name=embed_name,
+         )
+
+=== COMMIT 1f42f7d: fix: two gateway.pid shapes that are valid JSON still escaped as unhandled
+
+
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index 4ea77a1..a57274a 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -762,9 +762,13 @@ def hermes_gateway_alive(home: Path) -> int | None:
+         ) from exc
+     try:
+         payload = json.loads(raw)
+-    except json.JSONDecodeError as exc:
++    # Not just JSONDecodeError. Syntactically valid JSON can still fail inside
++    # json.loads: an integer past CPython's digit limit raises a plain
++    # ValueError, and nesting past the recursion limit raises RecursionError.
++    # Both escaped every caller as unhandled types.
++    except (ValueError, RecursionError) as exc:
+         raise SharedSurfaceError(
+-            f"Hermes {pid_file} exists but is not valid JSON ({exc}); refusing "
++            f"Hermes {pid_file} exists but is not readable JSON ({exc}); refusing "
+             "to write under a gateway whose state is unknown. Stop the "
+             "gateway, or remove the file if you know it is stale."
+         ) from exc
+
+=== COMMIT 0980176: fix: skill ownership is who installed a projection, not where its source lives
+
+
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index b0df925..3a76e8e 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -18,6 +18,7 @@ from __future__ import annotations
+ 
+ import argparse
+ import json
++import os
+ import shutil
+ import sys
+ from pathlib import Path
+@@ -394,12 +395,18 @@ def check_or_write_json(
+     return check_or_write(path, content, check=check, dry_run=dry_run)
+ 
+ 
+-def serialize_marker(skill: dict[str, Any], manifest_version: str) -> str:
++def serialize_marker(
++    skill: dict[str, Any], manifest_version: str, workspace_root: Path
++) -> str:
+     payload = {
+         "managed_by": MANAGED_BY,
+         "manifest_version": manifest_version,
+         "source_path": skill["resolved_path"],
+         "skill_name": skill["skill_name"],
++        # WHO INSTALLED THIS, recorded rather than inferred. See
++        # projection_owned_by: source ancestry cannot tell a workspace from one
++        # nested inside it.
++        "workspace_root": str(workspace_root.resolve()),
+     }
+     return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+ 
+@@ -413,34 +420,51 @@ def remove_path(path: Path) -> None:
+     path.unlink()
+ 
+ 
++def read_managed_marker(child: Path) -> dict[str, Any] | None:
++    """The marker, if it is one this materializer wrote; otherwise None."""
++
++    try:
++        marker = json.loads((child / MANAGED_MARKER).read_text(encoding="utf-8"))
++    except (OSError, ValueError, RecursionError):
++        return None
++    if not isinstance(marker, dict) or marker.get("managed_by") != MANAGED_BY:
++        return None
++    return marker
++
++
+ def projection_owned_by(child: Path, owner_root: Path) -> bool:
+-    """True only if this managed projection provably belongs to `owner_root`.
++    """True only if the marker names `owner_root` as the installing workspace.
++
++    Ownership has to be CHECKED, not assumed from the marker's existence:
++    user-scope roots such as ~/.codex/skills are shared by every checkout on
++    the machine, so a skill absent from THIS manifest may be a live skill
++    another workspace installed.
+ 
+-    The marker records `source_path`, resolved under the workspace that
+-    installed it. That is the ownership predicate, and it has to be CHECKED,
+-    not assumed from the marker's existence: user-scope roots such as
+-    ~/.codex/skills are shared by every checkout on the machine, so a skill
+-    absent from THIS manifest may be a live skill another workspace installed.
++    It used to be checked by source ANCESTRY -- ours if `source_path` resolved
++    under `owner_root`. That separates sibling workspaces and nothing else: a
++    checkout nested inside another workspace has every source under the outer
++    root, so refreshing the outer workspace claimed and pruned the nested one's
++    live projections. Containment is not installation. The marker now records
++    the installing workspace's root, and only an exact match is ours.
+ 
+     Anything that cannot prove ownership -- unreadable, not an object, wrong
+-    `managed_by`, no `source_path`, or a source outside `owner_root` -- is not
+-    ours. Leaving a stale directory is recoverable; deleting a live one is not.
++    `managed_by`, no `workspace_root`, or a relative one, which would resolve
++    against whatever directory the run started in -- is not ours. Leaving a
++    stale directory is recoverable; deleting a live one is not.
+     """
+ 
+-    try:
+-        marker = json.loads((child / MANAGED_MARKER).read_text(encoding="utf-8"))
+-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+-        return False
+-    if not isinstance(marker, dict) or marker.get("managed_by") != MANAGED_BY:
++    marker = read_managed_marker(child)
++    if marker is None:
+         return False
+-    source = marker.get("source_path")
+-    if not isinstance(source, str) or not source.strip():
++    recorded = marker.get("workspace_root")
++    if not isinstance(recorded, str) or not Path(recorded).is_absolute():
+         return False
+     try:
+-        Path(source).resolve().relative_to(owner_root.resolve())
+-    except (ValueError, OSError):
++        return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(
++            str(owner_root.resolve())
++        )
++    except OSError:
+         return False
+-    return True
+ 
+ 
+ def prune_stale_projections(
+@@ -484,6 +508,18 @@ def prune_stale_projections(
+             # existence, so on a shared user-scope root it planned to remove
+             # another workspace's live projection whenever this manifest
+             # happened not to list that skill. Found by the external audit.
++            marker = read_managed_marker(child)
++            if marker is not None and "workspace_root" not in marker:
++                # Written before markers recorded who installed them, so no
++                # workspace can prove it owns this. Never removed -- but said
++                # out loud, because a withdrawn skill lingering in silence is
++                # the defect this pruner exists for, and one of these may be
++                # this workspace's own.
++                results.append(
++                    f"KEEP  {target_name}: {child.name} has a managed marker with "
++                    f"no installing-workspace identity; ownership unknown, not "
++                    f"removed (delete it by hand if it is stale)"
++                )
+             continue
+         drift_found = True
+         if check:
+@@ -507,13 +543,16 @@ def install_skill_projection(
+     *,
+     check: bool,
+     dry_run: bool,
++    workspace_root: Path,
+ ) -> tuple[list[str], bool]:
+     target_dir = target_root / skill["skill_name"]
+     source_dir = Path(skill["resolved_path"])
+     results: list[str] = []
+     drift_found = False
+     expected_snapshot = dict(skill["files"])
+-    expected_snapshot[MANAGED_MARKER] = serialize_marker(skill, manifest_version)
++    expected_snapshot[MANAGED_MARKER] = serialize_marker(
++        skill, manifest_version, workspace_root
++    )
+ 
+     actual_snapshot: dict[str, str] = {}
+     if target_dir.exists():
+@@ -605,6 +644,7 @@ def materialize(
+                 registry["manifest_version"],
+                 check=check,
+                 dry_run=dry_run,
++                workspace_root=workspace_root,
+             )
+             results.extend(messages)
+             drift_found = drift_found or changed
+
+=== COMMIT 5df214c: fix: the gateway.pid JSON gap was at every loader in both materializers
+
+
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index a57274a..04f2233 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -97,7 +97,10 @@ def load_json(path: Path) -> dict[str, Any]:
+         data = json.loads(path.read_text(encoding="utf-8"))
+     except FileNotFoundError as exc:
+         raise SharedSurfaceError(f"Missing file: {path}") from exc
+-    except json.JSONDecodeError as exc:
++    # ValueError, not only JSONDecodeError: invalid UTF-8 and an integer past
++    # the digit limit raise other ValueErrors, and deep nesting raises
++    # RecursionError. The same gap as hermes_gateway_alive's, at every loader.
++    except (ValueError, RecursionError) as exc:
+         raise SharedSurfaceError(f"Invalid JSON in {path}: {exc}") from exc
+     if not isinstance(data, dict):
+         raise SharedSurfaceError(f"Expected JSON object in {path}")
+@@ -155,9 +158,11 @@ def load_jsonc(path: Path) -> dict[str, Any]:
+         text = path.read_text(encoding="utf-8")
+     except FileNotFoundError as exc:
+         raise SharedSurfaceError(f"Missing file: {path}") from exc
++    except UnicodeDecodeError as exc:
++        raise SharedSurfaceError(f"Invalid JSONC in {path}: {exc}") from exc
+     try:
+         data = json.loads(strip_jsonc_comments(text))
+-    except json.JSONDecodeError as exc:
++    except (ValueError, RecursionError) as exc:
+         raise SharedSurfaceError(f"Invalid JSONC in {path}: {exc}") from exc
+     if not isinstance(data, dict):
+         raise SharedSurfaceError(f"Expected JSON object in {path}")
+@@ -1597,8 +1602,14 @@ def fetch_agentmemory_status(
+     try:
+         with request.urlopen(url, timeout=2) as response:
+             payload = json.loads(response.read().decode("utf-8"))
+-    except (OSError, error.URLError, TimeoutError, json.JSONDecodeError) as exc:
++    # A local service's reply, not a repo file: invalid UTF-8, an oversized
++    # integer and deep nesting all fail with something other than
++    # JSONDecodeError, and a probe must report a bad reply, not raise.
++    except (OSError, error.URLError, TimeoutError, ValueError, RecursionError) as exc:
+         return f"error:{type(exc).__name__}"
++    if not isinstance(payload, dict):
++        # `[]` and `null` parse, then have no `.get`.
++        return f"error:{type(payload).__name__}-reply"
+     status = payload.get("status")
+     if isinstance(status, str) and status.strip():
+         return status
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index 3a76e8e..49536ce 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -46,7 +46,9 @@ def load_manifest(path: Path) -> dict[str, Any]:
+         payload = json.loads(path.read_text(encoding="utf-8"))
+     except FileNotFoundError as exc:
+         raise SkillSurfaceError(f"Missing manifest: {path}") from exc
+-    except json.JSONDecodeError as exc:
++    # ValueError covers JSONDecodeError, invalid UTF-8 and an integer past the
++    # digit limit; deep nesting raises RecursionError.
++    except (ValueError, RecursionError) as exc:
+         raise SkillSurfaceError(f"Invalid JSON in {path}: {exc}") from exc
+ 
+     if not isinstance(payload, dict):
+

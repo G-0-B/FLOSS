@@ -1,0 +1,19 @@
+{
+  "name": "audit_pr41_header_probe",
+  "enabled": true,
+  "disabled_reason": null,
+  "transport": {
+    "type": "streamable_http",
+    "url": "https://example.invalid/mcp",
+    "bearer_token_env_var": null,
+    "http_headers": {
+      "X-Audit": "nonsecret"
+    },
+    "env_http_headers": null,
+    "http_headers_helper": null
+  },
+  "enabled_tools": null,
+  "disabled_tools": null,
+  "startup_timeout_sec": null,
+  "tool_timeout_sec": null
+}

@@ -1,0 +1,134 @@
+........................................................................ [  6%]
+........................................................................ [ 13%]
+.....................................F.................ss...ss.......... [ 19%]
+........................................................................ [ 26%]
+.....F.................................................................. [ 32%]
+........................................................................ [ 39%]
+........................................................................ [ 45%]
+........................................................................ [ 52%]
+........................................................................ [ 58%]
+................................................................sss..... [ 65%]
+........................................................................ [ 71%]
+........................................................................ [ 78%]
+........................................................................ [ 84%]
+........................................................................ [ 91%]
+........................................................................ [ 97%]
+..................F.......                                               [100%]
+================================== FAILURES ===================================
+________ test_prior_chain_longer_than_recursion_limit_still_validates _________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-full/test_prior_chain_longer_than_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001BFA17322E0>
+
+    def test_prior_chain_longer_than_recursion_limit_still_validates(tmp_path, monkeypatch):
+        """A chain longer than Python's recursion limit must validate, not crash.
+    
+        The prior walk deliberately does not increment `_depth` (max_depth bounds
+        the evidence DAG, not a linear chain), which left the chain bounded only by
+        the interpreter stack: measured ~1.1 frames per link, so a ~900-link chain
+        exhausted the default 1000 limit and a 1000-link honest chain raised
+        RecursionError instead of returning a PacketValidation. Provenance
+        validation gates substrate claims, so past that length the gate stopped
+        producing verdicts at all rather than producing a negative one.
+        """
+        from packages.activity_log import provenance
+    
+        monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+        limit = sys.getrecursionlimit()
+>       packet_path = _build_chain(provenance, tmp_path, limit + 200)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages\activity_log\tests\test_provenance.py:1254: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+packages\activity_log\tests\test_provenance.py:1216: in _build_chain
+    _packet, packet_path = provenance.create_packet(
+packages\activity_log\provenance.py:343: in create_packet
+    _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
+packages\activity_log\provenance.py:234: in _commit_sequence_head_locked
+    _write_state(path, state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-full/test_prior_chain_longer_than_r0/identity/DQZkUcYnbyp42YQhUQfylgwV3SKExwcIYAuF1QB3zdoQ.chain.json')
+state = {'next_sequence': 880, 'head': 'ElaALwAhtWBVFRz1h_UgeNh_FZnl_rnSqiW0N7VJonKU'}
+
+    def _write_state(path: Path, state: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
+        )
+>       os.replace(tmp, path)
+E       PermissionError: [WinError 5] Access is denied: 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-full\\test_prior_chain_longer_than_r0\\identity\\DQZkUcYnbyp42YQhUQfylgwV3SKExwcIYAuF1QB3zdoQ.chain.json.tmp' -> 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-full\\test_prior_chain_longer_than_r0\\identity\\DQZkUcYnbyp42YQhUQfylgwV3SKExwcIYAuF1QB3zdoQ.chain.json'
+
+packages\activity_log\provenance.py:192: PermissionError
+___ test_render_voter_context_fails_closed_when_packet_headers_exceed_bound ___
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-full/test_render_voter_context_fail0')
+
+    def test_render_voter_context_fails_closed_when_packet_headers_exceed_bound(tmp_path):
+        """Unbounded top-level packet lists cannot imply partial metadata coverage."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = tmp_path / ".agent-surface" / "provenance"
+            packet_refs: list[dict] = []
+            for packet_index in range(17):
+                consent_hash = f"consent-{packet_index:02d}-" + ("c" * 149)
+>               _packet, packet_path = provenance.create_packet(
+                    [
+                        _packet_entry(
+                            tmp_path,
+                            evidence_refs=[
+                                {"type": "spec", "ref": f"packet-{packet_index}.md"}
+                            ],
+                            consent_hash=consent_hash,
+                        )
+                    ],
+                    identity_dir=tmp_path / f"overflow-identity-{packet_index}",
+                    output_root=output_root,
+                    prior_digest=None,
+                )
+
+packages\metacoordinator_mcp\tests\test_voter_context_rendering.py:581: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+packages\activity_log\provenance.py:343: in create_packet
+    _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
+packages\activity_log\provenance.py:234: in _commit_sequence_head_locked
+    _write_state(path, state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-full/test_render_voter_context_fail0/overflow-identity-10/DYcq7OtTRdKCEFFQ5IjyYVpfvbClCrTYBPi4jYk8VUzc.chain.json')
+state = {'next_sequence': 1, 'head': 'E8IdlDueiXcH4hEBp3mnZ0KHzSb_xfr6zM-Q00zSF09A'}
+
+    def _write_state(path: Path, state: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
+        )
+>       os.replace(tmp, path)
+E       PermissionError: [WinError 5] Access is denied: 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-full\\test_render_voter_context_fail0\\overflow-identity-10\\DYcq7OtTRdKCEFFQ5IjyYVpfvbClCrTYBPi4jYk8VUzc.chain.json.tmp' -> 'C:\\~shit\\_audit\\pr41-round3-20260929\\pytest-full\\test_render_voter_context_fail0\\overflow-identity-10\\DYcq7OtTRdKCEFFQ5IjyYVpfvbClCrTYBPi4jYk8VUzc.chain.json'
+
+packages\activity_log\provenance.py:192: PermissionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/metacoordinator_mcp/tests/test_server_bootstrap.py::test_server_bootstrap_loads_repo_env_when_process_env_missing
+  C:\~shit\_audit\pr41-fix-sweep-20260918\venv\Lib\site-packages\pydantic_settings\sources\utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED packages/activity_log/tests/test_provenance.py::test_prior_chain_longer_than_recursion_limit_still_validates
+FAILED packages/metacoordinator_mcp/tests/test_voter_context_rendering.py::test_render_voter_context_fails_closed_when_packet_headers_exceed_bound
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+3 failed, 1096 passed, 7 skipped, 1 deselected, 2 warnings in 86.88s (0:01:26)

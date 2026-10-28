@@ -1,0 +1,949 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="24" skipped="0" tests="25" time="1.991" timestamp="2026-09-29T13:06:36.603608-04:00" hostname="MSI"><testcase classname="packages.reasoning_ensemble.tests.test_survivor_independence" name="test_a_check_that_cannot_run_does_not_abort_the_deliberation" time="0.003"><failure message="AssertionError: a check that never ran vouched for the roster&#10;assert None is not None">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002774FF39BA0&gt;
+
+    def test_a_check_that_cannot_run_does_not_abort_the_deliberation(monkeypatch):
+        """A broken checker must not abort the run -- and must not vouch for it.
+    
+        This returned None, the value a PASSING check returns, so a crash was
+        recorded as an independent roster. Not aborting the run and not vouching
+        for its roster are two separate decisions; returning None made both at
+        once. The deferral that kept it framed the choice as availability against
+        correctness, but the degraded path already keeps every response: the only
+        thing a crashed check should cost the run is a claim it never earned.
+        """
+        _break_the_checker(monkeypatch)
+        survivors = [_r("a", "groq/llama-3.1-8b-instant", "llama")]
+    
+        problem = synthesizer._survivor_independence_problem(survivors, "online")
+    
+&gt;       assert problem is not None, "a check that never ran vouched for the roster"
+E       AssertionError: a check that never ran vouched for the roster
+E       assert None is not None
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:147: AssertionError</failure></testcase><testcase classname="packages.reasoning_ensemble.tests.test_survivor_independence" name="test_a_run_whose_check_crashed_is_degraded_and_keeps_its_responses" time="0.006"><failure message="AssertionError: assert 'unmeasured' == 'degraded'&#10;  &#10;  - degraded&#10;  + unmeasured">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002774FF39CD0&gt;
+
+    def test_a_run_whose_check_crashed_is_degraded_and_keeps_its_responses(monkeypatch):
+        """Availability survives: every response comes back, in the result and in
+        the writeup. What does not survive is a consensus tier nobody verified."""
+        result, log = _synthesize_with_a_broken_checker(monkeypatch)
+    
+&gt;       assert result.tier_classification.tier == "degraded"
+E       AssertionError: assert 'unmeasured' == 'degraded'
+E         
+E         - degraded
+E         + unmeasured
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:193: AssertionError</failure></testcase><testcase classname="packages.reasoning_ensemble.tests.test_survivor_independence" name="test_a_crashed_check_reports_independence_unknown_not_failed" time="0.002"><failure message="KeyError: 'error'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277511E5EB0&gt;
+
+    def test_a_crashed_check_reports_independence_unknown_not_failed(monkeypatch):
+        """The checker did not find the roster dependent either. 'Do not meet the
+        independence bar' would send an operator to fix a roster that may be fine;
+        the record has to say the question went unanswered, and why."""
+        result, log = _synthesize_with_a_broken_checker(monkeypatch)
+    
+&gt;       error = log.call_args.kwargs["error"]
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'error'
+
+packages\reasoning_ensemble\tests\test_survivor_independence.py:206: KeyError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_malformed_gateway_pid_shape_is_a_handled_refusal[integer-past-the-digit-limit]" time="0.005"><failure message="ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_malformed_gateway_p0')
+payload = b'{"pid": 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            b"[]",
+            b"null",
+            b'"a string"',
+            b"42",
+            b"\xff\xfe not utf-8",
+            b'{"pid": ' + b"9" * 5000 + b"}",
+            b"[" * 100_000 + b"]" * 100_000,
+        ],
+        ids=[
+            "list",
+            "null",
+            "string",
+            "number",
+            "invalid-utf8",
+            "integer-past-the-digit-limit",
+            "nesting-past-the-recursion-limit",
+        ],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller.
+    
+        The second audit found two more that are valid JSON syntax but still fail
+        inside json.loads with something other than JSONDecodeError: an integer
+        longer than CPython's digit limit raises a plain ValueError, and nesting
+        deeper than the interpreter's recursion limit raises RecursionError."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1477: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:764: in hermes_gateway_alive
+    payload = json.loads(raw)
+              ^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '{"pid": 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+
+C:\Python313\Lib\json\decoder.py:361: ValueError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_malformed_gateway_pid_shape_is_a_handled_refusal[nesting-past-the-recursion-limit]" time="0.006"><failure message="RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_malformed_gateway_p1')
+payload = b'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            b"[]",
+            b"null",
+            b'"a string"',
+            b"42",
+            b"\xff\xfe not utf-8",
+            b'{"pid": ' + b"9" * 5000 + b"}",
+            b"[" * 100_000 + b"]" * 100_000,
+        ],
+        ids=[
+            "list",
+            "null",
+            "string",
+            "number",
+            "invalid-utf8",
+            "integer-past-the-digit-limit",
+            "nesting-past-the-recursion-limit",
+        ],
+    )
+    def test_every_malformed_gateway_pid_shape_is_a_handled_refusal(tmp_path, payload):
+        """The commit that introduced this refusal claimed --check survives
+        anything on disk. The audit showed it does not: `[]` and `null` raised
+        AttributeError from `.get`, and invalid UTF-8 raised UnicodeDecodeError --
+        neither is the handled type, so both still escaped every caller.
+    
+        The second audit found two more that are valid JSON syntax but still fail
+        inside json.loads with something other than JSONDecodeError: an integer
+        longer than CPython's digit limit raises a plain ValueError, and nesting
+        deeper than the interpreter's recursion limit raises RecursionError."""
+        (tmp_path / "gateway.pid").write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           mas.hermes_gateway_alive(tmp_path)
+
+tests\test_shared_agent_surface_mcp.py:1477: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:764: in hermes_gateway_alive
+    payload = json.loads(raw)
+              ^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string
+
+C:\Python313\Lib\json\decoder.py:361: RecursionError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_refreshing_either_of_two_nested_workspaces_keeps_the_others_projections" time="0.059"><failure message="AssertionError: outer refresh removed a nested one's&#10;assert False&#10; +  where False = is_dir()&#10; +    where is_dir = (WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_refreshing_either_of_two_0/shared-user-skills') / 'nested-skill').is_dir">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_refreshing_either_of_two_0')
+
+    def test_refreshing_either_of_two_nested_workspaces_keeps_the_others_projections(
+        tmp_path,
+    ):
+        """Second external audit, F3. Ownership was source ANCESTRY: a projection
+        was ours if its source lived anywhere under our root. That protects
+        sibling workspaces but not nested ones -- a checkout inside another
+        workspace has every source under the outer root, so refreshing the outer
+        workspace selected the nested one's live projections for removal whenever
+        its own manifest did not list them.
+    
+        Driven through materialize(), with markers written by the real
+        serializer, into one shared user-scope root."""
+        module = load_module()
+        outer = _workspace_with_skills(tmp_path / "outer", ["outer-skill"])
+        nested = _workspace_with_skills(outer / "checkouts" / "nested", ["nested-skill"])
+        shared = tmp_path / "shared-user-skills"
+    
+        _refresh(module, outer, ["outer-skill"], shared)
+        _refresh(module, nested, ["nested-skill"], shared)
+        assert (shared / "outer-skill").is_dir()
+        assert (shared / "nested-skill").is_dir()
+    
+        _refresh(module, nested, ["nested-skill"], shared)
+        assert (shared / "outer-skill").is_dir(), "nested refresh removed its parent's"
+    
+        _refresh(module, outer, ["outer-skill"], shared)
+&gt;       assert (shared / "nested-skill").is_dir(), "outer refresh removed a nested one's"
+E       AssertionError: outer refresh removed a nested one's
+E       assert False
+E        +  where False = is_dir()
+E        +    where is_dir = (WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_refreshing_either_of_two_0/shared-user-skills') / 'nested-skill').is_dir
+
+scripts\tests\test_shared_skill_surface_scope.py:452: AssertionError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_a_relative_workspace_identity_proves_nothing" time="0.011"><failure message="AssertionError: assert not True&#10; +  where True = &lt;function projection_owned_by at 0x00000277510ADE40&gt;(WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_relative_workspace_iden0/installed/relative-marker'), WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_relative_workspace_iden0/workspace'))&#10; +    where &lt;function projection_owned_by at 0x00000277510ADE40&gt; = &lt;module 'shared_skill_surface_under_test' from 'C:\\~shit\\_audit\\pr41-round3-20260929\\baseline-code\\scripts\\materialize_shared_skill_surface.py'&gt;.projection_owned_by">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_relative_workspace_iden0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277513E2360&gt;
+
+    def test_a_relative_workspace_identity_proves_nothing(tmp_path, monkeypatch):
+        """A relative path resolves against the current directory, so ownership
+        would depend on where the materializer happened to be run from. The audit
+        showed `source_path: "."` claimed by any owner containing the cwd."""
+        module = load_module()
+        owner = tmp_path / "workspace"
+        owner.mkdir()
+        projection = tmp_path / "installed" / "relative-marker"
+        projection.mkdir(parents=True)
+        (projection / module.MANAGED_MARKER).write_text(
+            json.dumps(
+                {
+                    "managed_by": module.MANAGED_BY,
+                    "source_path": ".",
+                    "workspace_root": ".",
+                    "skill_name": "relative-marker",
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(owner)
+    
+&gt;       assert not module.projection_owned_by(projection, owner)
+E       AssertionError: assert not True
+E        +  where True = &lt;function projection_owned_by at 0x00000277510ADE40&gt;(WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_relative_workspace_iden0/installed/relative-marker'), WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_relative_workspace_iden0/workspace'))
+E        +    where &lt;function projection_owned_by at 0x00000277510ADE40&gt; = &lt;module 'shared_skill_surface_under_test' from 'C:\\~shit\\_audit\\pr41-round3-20260929\\baseline-code\\scripts\\materialize_shared_skill_surface.py'&gt;.projection_owned_by
+
+C:\~shit\_audit\pr41-round3-20260929\baseline-code\scripts\tests\test_shared_skill_surface_scope.py:494: AssertionError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_a_marker_without_workspace_identity_is_kept_and_reported" time="0.012"><failure message="assert True is False">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_marker_without_workspac0')
+
+    def test_a_marker_without_workspace_identity_is_kept_and_reported(tmp_path):
+        """Markers written before the identity field existed cannot say who
+        installed them, so they are never removed. They ARE reported: the defect
+        this pruner exists for was a withdrawn skill lingering silently, and a
+        legacy marker from this workspace's own withdrawn skill is exactly that.
+        Not drift, because this workspace cannot resolve it without a human."""
+        module = load_module()
+        workspace = tmp_path / "workspace"
+        root = tmp_path / "skills"
+        legacy = root / "legacy-skill"
+        legacy.mkdir(parents=True)
+        (legacy / module.MANAGED_MARKER).write_text(
+            json.dumps(
+                {
+                    "managed_by": module.MANAGED_BY,
+                    "manifest_version": "old",
+                    "source_path": str((workspace / "skills" / "legacy-skill").resolve()),
+                    "skill_name": "legacy-skill",
+                }
+            ),
+            encoding="utf-8",
+        )
+    
+        for check, dry_run in ((True, False), (False, True), (False, False)):
+            messages, drift = module.prune_stale_projections(
+                "codex",
+                root,
+                set(),
+                check=check,
+                dry_run=dry_run,
+                owner_root=workspace,
+            )
+            assert legacy.exists(), f"a legacy marker was removed ({check=}, {dry_run=})"
+&gt;           assert drift is False
+E           assert True is False
+
+scripts\tests\test_shared_skill_surface_scope.py:530: AssertionError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned" time="0.011"><failure message="TypeError: serialize_marker() takes 2 positional arguments but 3 were given">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_a_marker_this_materialize0')
+
+    def test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned(tmp_path):
+        """The join between the writer and the reader of the ownership claim.
+    
+        Three defects on this PR were a manifest and its reader disagreeing about
+        what one end wrote. If serialize_marker and projection_owned_by ever
+        diverge -- a renamed key, a changed managed_by string, an unresolved path
+        -- every projection this workspace installed would silently become
+        unprunable, and the withdrawal fix would stop working without a failure.
+        """
+        module = load_module()
+    
+        workspace = tmp_path / "workspace"
+        source = workspace / "skills" / "real-skill"
+        source.mkdir(parents=True)
+        projection = tmp_path / "installed" / "real-skill"
+        projection.mkdir(parents=True)
+        (projection / module.MANAGED_MARKER).write_text(
+&gt;           module.serialize_marker(
+                {"skill_name": "real-skill", "resolved_path": str(source.resolve())},
+                "test",
+                workspace,
+            ),
+            encoding="utf-8",
+        )
+E       TypeError: serialize_marker() takes 2 positional arguments but 3 were given
+
+scripts\tests\test_shared_skill_surface_scope.py:553: TypeError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_a_workspace_still_prunes_its_own_withdrawn_projection" time="0.027" /><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[invalid-utf8-load_json]" time="0.004"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports0')
+loader = 'load_json', payload = b'\xff\xfe not utf-8'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:97: in load_json
+    data = json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_abc.py:633: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;encodings.utf_8.IncrementalDecoder object at 0x000002775109DA30&gt;
+input = b'\xff\xfe not utf-8', final = True
+
+&gt;   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+&lt;frozen codecs&gt;:325: UnicodeDecodeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[invalid-utf8-load_jsonc]" time="0.004"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports1')
+loader = 'load_jsonc', payload = b'\xff\xfe not utf-8'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:155: in load_jsonc
+    text = path.read_text(encoding="utf-8")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_abc.py:633: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;encodings.utf_8.IncrementalDecoder object at 0x00000277513FA3F0&gt;
+input = b'\xff\xfe not utf-8', final = True
+
+&gt;   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+&lt;frozen codecs&gt;:325: UnicodeDecodeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[integer-past-the-digit-limit-load_json]" time="0.004"><failure message="ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports2')
+loader = 'load_json'
+payload = b'{"n": 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:97: in load_json
+    data = json.loads(path.read_text(encoding="utf-8"))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '{"n": 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+
+C:\Python313\Lib\json\decoder.py:361: ValueError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[integer-past-the-digit-limit-load_jsonc]" time="0.005"><failure message="ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports3')
+loader = 'load_jsonc'
+payload = b'{"n": 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:159: in load_jsonc
+    data = json.loads(strip_jsonc_comments(text))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '{"n": 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+
+C:\Python313\Lib\json\decoder.py:361: ValueError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[nesting-past-the-recursion-limit-load_json]" time="0.004"><failure message="RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports4')
+loader = 'load_json'
+payload = b'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:97: in load_json
+    data = json.loads(path.read_text(encoding="utf-8"))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string
+
+C:\Python313\Lib\json\decoder.py:361: RecursionError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_every_json_loader_reports_unreadable_input_as_its_own_error[nesting-past-the-recursion-limit-load_jsonc]" time="0.055"><failure message="RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_every_json_loader_reports5')
+loader = 'load_jsonc'
+payload = b'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+
+    @pytest.mark.parametrize("loader", ["load_json", "load_jsonc"])
+    @pytest.mark.parametrize("payload", _UNREADABLE_JSON, ids=_UNREADABLE_IDS)
+    def test_every_json_loader_reports_unreadable_input_as_its_own_error(
+        tmp_path, loader, payload
+    ):
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(mas.SharedSurfaceError):
+&gt;           getattr(mas, loader)(path)
+
+tests\test_shared_agent_surface_mcp.py:1560: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:159: in load_jsonc
+    data = json.loads(strip_jsonc_comments(text))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string
+
+C:\Python313\Lib\json\decoder.py:361: RecursionError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_an_unreadable_roster_does_not_crash_the_doctor_summary" time="0.004"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_an_unreadable_roster_does0')
+
+    def test_an_unreadable_roster_does_not_crash_the_doctor_summary(tmp_path):
+        """The consequence, not just the type: read_roster_summary exists to
+        swallow a bad roster and catches SharedSurfaceError to do it, so a raw
+        UnicodeDecodeError from load_json went straight through the doctor."""
+        roster = tmp_path / ".agent-surface" / "harness" / "ai-roster.json"
+        roster.parent.mkdir(parents=True)
+        roster.write_bytes(b"\xff\xfe not utf-8")
+    
+&gt;       assert mas.read_roster_summary(tmp_path) == {}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1571: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:1583: in read_roster_summary
+    roster = load_json(roster_path)
+             ^^^^^^^^^^^^^^^^^^^^^^
+scripts\materialize_shared_agent_surface.py:97: in load_json
+    data = json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_abc.py:633: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;encodings.utf_8.IncrementalDecoder object at 0x00000277513C9190&gt;
+input = b'\xff\xfe not utf-8', final = True
+
+&gt;   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+&lt;frozen codecs&gt;:325: UnicodeDecodeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_a_malformed_agentmemory_reply_is_reported_not_raised[list]" time="0.001"><failure message="AttributeError: 'list' object has no attribute 'get'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277513E2140&gt;
+body = b'[]'
+
+    @pytest.mark.parametrize(
+        "body",
+        [b"[]", b"null", *_UNREADABLE_JSON],
+        ids=["list", "null", *_UNREADABLE_IDS],
+    )
+    def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+        """This one parses a local HTTP service's reply, so its input is not even
+        repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+        shape the gateway.pid fix closed -- and the other three escaped json.loads.
+        The status probe must report a bad reply, not take the doctor down."""
+        monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+    
+&gt;       status = mas.fetch_agentmemory_status()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3111/agentmemory/health'
+
+    def fetch_agentmemory_status(
+        url: str = "http://localhost:3111/agentmemory/health",
+    ) -&gt; str:
+        try:
+            with request.urlopen(url, timeout=2) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (OSError, error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            return f"error:{type(exc).__name__}"
+&gt;       status = payload.get("status")
+                 ^^^^^^^^^^^
+E       AttributeError: 'list' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:1598: AttributeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_a_malformed_agentmemory_reply_is_reported_not_raised[null]" time="0.001"><failure message="AttributeError: 'NoneType' object has no attribute 'get'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277510D6F50&gt;
+body = b'null'
+
+    @pytest.mark.parametrize(
+        "body",
+        [b"[]", b"null", *_UNREADABLE_JSON],
+        ids=["list", "null", *_UNREADABLE_IDS],
+    )
+    def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+        """This one parses a local HTTP service's reply, so its input is not even
+        repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+        shape the gateway.pid fix closed -- and the other three escaped json.loads.
+        The status probe must report a bad reply, not take the doctor down."""
+        monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+    
+&gt;       status = mas.fetch_agentmemory_status()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3111/agentmemory/health'
+
+    def fetch_agentmemory_status(
+        url: str = "http://localhost:3111/agentmemory/health",
+    ) -&gt; str:
+        try:
+            with request.urlopen(url, timeout=2) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (OSError, error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            return f"error:{type(exc).__name__}"
+&gt;       status = payload.get("status")
+                 ^^^^^^^^^^^
+E       AttributeError: 'NoneType' object has no attribute 'get'
+
+scripts\materialize_shared_agent_surface.py:1598: AttributeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_a_malformed_agentmemory_reply_is_reported_not_raised[invalid-utf8]" time="0.001"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277510D7050&gt;
+body = b'\xff\xfe not utf-8'
+
+    @pytest.mark.parametrize(
+        "body",
+        [b"[]", b"null", *_UNREADABLE_JSON],
+        ids=["list", "null", *_UNREADABLE_IDS],
+    )
+    def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+        """This one parses a local HTTP service's reply, so its input is not even
+        repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+        shape the gateway.pid fix closed -- and the other three escaped json.loads.
+        The status probe must report a bad reply, not take the doctor down."""
+        monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+    
+&gt;       status = mas.fetch_agentmemory_status()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+url = 'http://localhost:3111/agentmemory/health'
+
+    def fetch_agentmemory_status(
+        url: str = "http://localhost:3111/agentmemory/health",
+    ) -&gt; str:
+        try:
+            with request.urlopen(url, timeout=2) as response:
+&gt;               payload = json.loads(response.read().decode("utf-8"))
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+scripts\materialize_shared_agent_surface.py:1595: UnicodeDecodeError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_a_malformed_agentmemory_reply_is_reported_not_raised[integer-past-the-digit-limit]" time="0.001"><failure message="ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002775139C230&gt;
+body = b'{"n": 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+
+    @pytest.mark.parametrize(
+        "body",
+        [b"[]", b"null", *_UNREADABLE_JSON],
+        ids=["list", "null", *_UNREADABLE_IDS],
+    )
+    def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+        """This one parses a local HTTP service's reply, so its input is not even
+        repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+        shape the gateway.pid fix closed -- and the other three escaped json.loads.
+        The status probe must report a bad reply, not take the doctor down."""
+        monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+    
+&gt;       status = mas.fetch_agentmemory_status()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:1595: in fetch_agentmemory_status
+    payload = json.loads(response.read().decode("utf-8"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '{"n": 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+
+C:\Python313\Lib\json\decoder.py:361: ValueError</failure></testcase><testcase classname="tests.test_shared_agent_surface_mcp" name="test_a_malformed_agentmemory_reply_is_reported_not_raised[nesting-past-the-recursion-limit]" time="0.001"><failure message="RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000277511816D0&gt;
+body = b'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+
+    @pytest.mark.parametrize(
+        "body",
+        [b"[]", b"null", *_UNREADABLE_JSON],
+        ids=["list", "null", *_UNREADABLE_IDS],
+    )
+    def test_a_malformed_agentmemory_reply_is_reported_not_raised(monkeypatch, body):
+        """This one parses a local HTTP service's reply, so its input is not even
+        repo-controlled. `[]` and `null` parsed and then had no `.get` -- the same
+        shape the gateway.pid fix closed -- and the other three escaped json.loads.
+        The status probe must report a bad reply, not take the doctor down."""
+        monkeypatch.setattr(mas.request, "urlopen", lambda *a, **k: _Reply(body))
+    
+&gt;       status = mas.fetch_agentmemory_status()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_shared_agent_surface_mcp.py:1600: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_agent_surface.py:1595: in fetch_agentmemory_status
+    payload = json.loads(response.read().decode("utf-8"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string
+
+C:\Python313\Lib\json\decoder.py:361: RecursionError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_an_unreadable_manifest_is_a_skill_surface_error[invalid-utf8]" time="0.011"><failure message="UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_an_unreadable_manifest_is0')
+payload = b'\xff\xfe not utf-8'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            b"\xff\xfe not utf-8",
+            b'{"skills": ' + b"9" * 5000 + b"}",
+            b"[" * 100_000 + b"]" * 100_000,
+        ],
+        ids=["invalid-utf8", "integer-past-the-digit-limit", "nesting-past-the-recursion-limit"],
+    )
+    def test_an_unreadable_manifest_is_a_skill_surface_error(tmp_path, payload):
+        """The same narrow `except json.JSONDecodeError` the gateway.pid fix
+        widened, in this module's own manifest loader."""
+        module = load_module()
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(module.SkillSurfaceError):
+&gt;           module.load_manifest(path)
+
+scripts\tests\test_shared_skill_surface_scope.py:584: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_skill_surface.py:45: in load_manifest
+    payload = json.loads(path.read_text(encoding="utf-8"))
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\pathlib\_abc.py:633: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;encodings.utf_8.IncrementalDecoder object at 0x00000277513CAE70&gt;
+input = b'\xff\xfe not utf-8', final = True
+
+&gt;   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+
+&lt;frozen codecs&gt;:325: UnicodeDecodeError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_an_unreadable_manifest_is_a_skill_surface_error[integer-past-the-digit-limit]" time="0.010"><failure message="ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_an_unreadable_manifest_is1')
+payload = b'{"skills": 999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            b"\xff\xfe not utf-8",
+            b'{"skills": ' + b"9" * 5000 + b"}",
+            b"[" * 100_000 + b"]" * 100_000,
+        ],
+        ids=["invalid-utf8", "integer-past-the-digit-limit", "nesting-past-the-recursion-limit"],
+    )
+    def test_an_unreadable_manifest_is_a_skill_surface_error(tmp_path, payload):
+        """The same narrow `except json.JSONDecodeError` the gateway.pid fix
+        widened, in this module's own manifest loader."""
+        module = load_module()
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(module.SkillSurfaceError):
+&gt;           module.load_manifest(path)
+
+scripts\tests\test_shared_skill_surface_scope.py:584: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_skill_surface.py:45: in load_manifest
+    payload = json.loads(path.read_text(encoding="utf-8"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '{"skills": 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999...999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: Exceeds the limit (4300 digits) for integer string conversion: value has 5000 digits; use sys.set_int_max_str_digits() to increase the limit
+
+C:\Python313\Lib\json\decoder.py:361: ValueError</failure></testcase><testcase classname="scripts.tests.test_shared_skill_surface_scope" name="test_an_unreadable_manifest_is_a_skill_surface_error[nesting-past-the-recursion-limit]" time="0.024"><failure message="RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string">tmp_path = WindowsPath('C:/~shit/_audit/pr41-round3-20260929/pytest-baseline/test_an_unreadable_manifest_is2')
+payload = b'[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            b"\xff\xfe not utf-8",
+            b'{"skills": ' + b"9" * 5000 + b"}",
+            b"[" * 100_000 + b"]" * 100_000,
+        ],
+        ids=["invalid-utf8", "integer-past-the-digit-limit", "nesting-past-the-recursion-limit"],
+    )
+    def test_an_unreadable_manifest_is_a_skill_surface_error(tmp_path, payload):
+        """The same narrow `except json.JSONDecodeError` the gateway.pid fix
+        widened, in this module's own manifest loader."""
+        module = load_module()
+        path = tmp_path / "manifest.json"
+        path.write_bytes(payload)
+    
+        with pytest.raises(module.SkillSurfaceError):
+&gt;           module.load_manifest(path)
+
+scripts\tests\test_shared_skill_surface_scope.py:584: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+scripts\materialize_shared_skill_surface.py:45: in load_manifest
+    payload = json.loads(path.read_text(encoding="utf-8"))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\json\decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;json.decoder.JSONDecoder object at 0x000002774D4CC2F0&gt;
+s = '[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[...]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+&gt;           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           RecursionError: maximum recursion depth exceeded while decoding a JSON array from a unicode string
+
+C:\Python313\Lib\json\decoder.py:361: RecursionError</failure></testcase></testsuite></testsuites>

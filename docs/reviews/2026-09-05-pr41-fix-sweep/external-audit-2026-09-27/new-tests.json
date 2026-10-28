@@ -1,0 +1,17 @@
+[
+  "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_local_survivors_of_a_mixed_run_are_one_surface",
+  "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_admission_and_survival_agree_about_the_same_roster",
+  "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_mixed_run_that_loses_its_online_half_is_degraded",
+  "packages/reasoning_ensemble/tests/test_survivor_independence.py::test_a_dispatched_response_routes_exactly_as_its_voter_was_admitted",
+  "scripts/tests/test_shared_skill_surface_scope.py::test_a_projection_owned_by_another_workspace_is_never_removed",
+  "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_that_cannot_prove_ownership_is_left_alone",
+  "scripts/tests/test_shared_skill_surface_scope.py::test_the_materializer_passes_its_own_workspace_as_owner",
+  "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_this_materializer_writes_is_one_it_recognises_as_owned",
+  "tests/test_shared_agent_surface_mcp.py::test_the_yaml_hook_target_reports_a_corrupt_gateway_pid",
+  "tests/test_shared_agent_surface_mcp.py::test_a_corrupt_gateway_pid_does_not_abort_the_hook_materializer",
+  "tests/test_shared_agent_surface_mcp.py::test_a_corrupt_gateway_pid_does_not_abort_the_parent_materializer",
+  "tests/test_shared_agent_surface_mcp.py::test_every_malformed_gateway_pid_shape_is_a_handled_refusal",
+  "tests/test_shared_agent_surface_mcp.py::test_an_impossible_pid_is_reported_as_unknown_not_as_a_live_gateway",
+  "tests/test_shared_agent_surface_mcp.py::test_a_plausible_pid_still_reaches_the_liveness_check",
+  "tests/test_shared_agent_surface_mcp.py::test_pid_alive_fails_closed_when_the_os_rejects_the_id"
+]

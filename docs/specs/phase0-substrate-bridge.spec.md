@@ -46,7 +46,7 @@ The substrate bridge is validated when ALL of the following pass:
 ### 3.1 Prerequisites
 
 - Holochain conductor running (holonix main-0.4)
-- Rose Forest hApp installed with 2 agents (Tryorama handles this)
+- Rose Forest hApp installed with 2 agents (Rust Sweettest handles this)
 - Entry types: `KnowledgeTriple` (integrity zome)
 - Extern functions: `assert_triple`, `query_triples`, `get_triple_record` (coordinator zome)
 
@@ -127,12 +127,12 @@ ASSERT: Neither agent's entries are prioritized in query results by authority
 - `assert_triple` extern with ontology validation + budget check (coordinator zome)
 - `query_triples` extern with subject/predicate query (coordinator zome)
 - `TriplesBySubject` and `TriplesByPredicate` link types for DHT discovery
-- Tryorama test scaffold (`ARF/tests/tryorama/`)
+- Rust Sweettest scaffold (`ARF/tests/`)
 - Budget system tracking RU consumption per agent
 
 ### What Needs To Be Written
 
-1. **Tryorama 2-agent test file** — `ARF/tests/tryorama/substrate_bridge.test.ts`
+1. **Rust Sweettest 2-agent test file** — `ARF/tests/substrate_bridge_test.rs`
    - Spawns 2 agents in same DNA
    - Runs tests 3.2 through 3.6 sequentially
    - Reports pass/fail for each criterion
@@ -169,7 +169,7 @@ ASSERT: Neither agent's entries are prioritized in query results by authority
 ## 6. Definition of Done
 
 - [ ] Provenance retrieval implemented: `TripleResult` extended with `author` and `created_at` fields (option b from §4) — prerequisite for Criteria 3, 4, and 5, and for ADR-2 acceptance evidence in HARVEST_LOG.md
-- [ ] `substrate_bridge.test.ts` written with all 6 criteria as test cases
+- [ ] `substrate_bridge_test.rs` written with all 6 criteria as test cases
 - [ ] All 6 tests pass against running Holochain conductor
 - [ ] Results logged in `docs/governance/HARVEST_LOG.md` as substrate bridge validation
 - [ ] ADR-2 (Holochain Substrate) updated from Proposed to Accepted (evidence: this test passing)

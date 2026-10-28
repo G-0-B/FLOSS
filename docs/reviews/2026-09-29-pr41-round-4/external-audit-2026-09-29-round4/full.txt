@@ -1,0 +1,138 @@
+........................................................................ [  6%]
+........................................................................ [ 12%]
+.....................................FF................ss...ss.......... [ 19%]
+........................................................................ [ 25%]
+........................................................................ [ 32%]
+........................................................................ [ 38%]
+........................................................................ [ 45%]
+........................................................................ [ 51%]
+........................................................................ [ 58%]
+................................................................sss..... [ 64%]
+........................................................................ [ 71%]
+........................................................................ [ 77%]
+........................................................................ [ 84%]
+........................................................................ [ 90%]
+........................................................................ [ 96%]
+..........................F.......                                       [100%]
+================================== FAILURES ===================================
+________ test_prior_chain_longer_than_recursion_limit_still_validates _________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round4-20260929/temp/full/test_prior_chain_longer_than_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001C3B45CDFD0>
+
+    def test_prior_chain_longer_than_recursion_limit_still_validates(tmp_path, monkeypatch):
+        """A chain longer than Python's recursion limit must validate, not crash.
+    
+        The prior walk deliberately does not increment `_depth` (max_depth bounds
+        the evidence DAG, not a linear chain), which left the chain bounded only by
+        the interpreter stack: measured ~1.1 frames per link, so a ~900-link chain
+        exhausted the default 1000 limit and a 1000-link honest chain raised
+        RecursionError instead of returning a PacketValidation. Provenance
+        validation gates substrate claims, so past that length the gate stopped
+        producing verdicts at all rather than producing a negative one.
+        """
+        from packages.activity_log import provenance
+    
+        monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+        limit = sys.getrecursionlimit()
+>       packet_path = _build_chain(provenance, tmp_path, limit + 200)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages\activity_log\tests\test_provenance.py:1254: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+packages\activity_log\tests\test_provenance.py:1216: in _build_chain
+    _packet, packet_path = provenance.create_packet(
+packages\activity_log\provenance.py:343: in create_packet
+    _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
+packages\activity_log\provenance.py:234: in _commit_sequence_head_locked
+    _write_state(path, state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/~shit/_audit/pr41-round4-20260929/temp/full/test_prior_chain_longer_than_r0/identity/Drhz5Gu433BVGR8wCaaEchrddu2tNku9F5sRbxCa_wao.chain.json')
+state = {'next_sequence': 46, 'head': 'EjqGCQ-Vbl8Jkp71jIJBdCd8V0Bs61vKuyhWfS3G8Vro'}
+
+    def _write_state(path: Path, state: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
+        )
+>       os.replace(tmp, path)
+E       PermissionError: [WinError 5] Access is denied: 'C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\full\\test_prior_chain_longer_than_r0\\identity\\Drhz5Gu433BVGR8wCaaEchrddu2tNku9F5sRbxCa_wao.chain.json.tmp' -> 'C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\full\\test_prior_chain_longer_than_r0\\identity\\Drhz5Gu433BVGR8wCaaEchrddu2tNku9F5sRbxCa_wao.chain.json'
+
+packages\activity_log\provenance.py:192: PermissionError
+_______________ test_chain_validation_cost_stays_roughly_linear _______________
+
+tmp_path = WindowsPath('C:/~shit/_audit/pr41-round4-20260929/temp/full/test_chain_validation_cost_sta0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001C3B472B9A0>
+
+    def test_chain_validation_cost_stays_roughly_linear(tmp_path, monkeypatch):
+        """Guard the fork check against going quadratic again.
+    
+        _has_valid_same_position_competitor used to read EVERY packet on EVERY
+        validated packet, so an n-link walk performed n^2 file reads: profiling a
+        300-link chain showed 90k reads and 97% of runtime there, and wall time went
+        10s -> 90s -> 365s for 200 -> 600 -> 1200 links. Sharing one chain-position
+        index across the walk made it linear. Asserting a generous ratio rather than
+        absolute timings so this does not turn into a flaky benchmark.
+        """
+        from packages.activity_log import provenance
+    
+        monkeypatch.setattr(provenance, "WORKSPACE_ROOT", tmp_path)
+    
+        short_dir = tmp_path / "short"
+        short_dir.mkdir()
+        long_dir = tmp_path / "long"
+        long_dir.mkdir()
+    
+        short_tip = _build_chain(provenance, short_dir, 60)
+>       long_tip = _build_chain(provenance, long_dir, 240)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages\activity_log\tests\test_provenance.py:1282: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+packages\activity_log\tests\test_provenance.py:1216: in _build_chain
+    _packet, packet_path = provenance.create_packet(
+packages\activity_log\provenance.py:343: in create_packet
+    _commit_sequence_head_locked(identity_path, identity.aid, packet["d"])
+packages\activity_log\provenance.py:234: in _commit_sequence_head_locked
+    _write_state(path, state)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/~shit/_audit/pr41-round4-20260929/temp/full/test_chain_validation_cost_sta0/long/identity/DaA9VYLSo5n9cY_d26_yYORMop7wixshrSotezr_Idkg.chain.json')
+state = {'next_sequence': 1, 'head': 'EiHSU8TeTGsfaoNEvC-ZWYjQ42CVVagD21W-ExBJvyQk'}
+
+    def _write_state(path: Path, state: dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
+            json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
+        )
+>       os.replace(tmp, path)
+E       PermissionError: [WinError 5] Access is denied: 'C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\full\\test_chain_validation_cost_sta0\\long\\identity\\DaA9VYLSo5n9cY_d26_yYORMop7wixshrSotezr_Idkg.chain.json.tmp' -> 'C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\full\\test_chain_validation_cost_sta0\\long\\identity\\DaA9VYLSo5n9cY_d26_yYORMop7wixshrSotezr_Idkg.chain.json'
+
+packages\activity_log\provenance.py:192: PermissionError
+________________ test_no_tracked_text_file_contains_a_nul_byte ________________
+
+    def test_no_tracked_text_file_contains_a_nul_byte():
+        files = _tracked_text_files()
+>       assert files, "git ls-files returned nothing; this guard would pass vacuously"
+E       AssertionError: git ls-files returned nothing; this guard would pass vacuously
+E       assert []
+
+scripts\tests\test_text_sources_are_text.py:59: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\Python313\Lib\site-packages\websockets\legacy\__init__.py:6
+  C:\Python313\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+packages/metacoordinator_mcp/tests/test_server_bootstrap.py::test_server_bootstrap_loads_repo_env_when_process_env_missing
+  C:\~shit\_audit\pr41-fix-sweep-20260918\venv\Lib\site-packages\pydantic_settings\sources\utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED packages/activity_log/tests/test_provenance.py::test_prior_chain_longer_than_recursion_limit_still_validates
+FAILED packages/activity_log/tests/test_provenance.py::test_chain_validation_cost_stays_roughly_linear
+FAILED scripts/tests/test_text_sources_are_text.py::test_no_tracked_text_file_contains_a_nul_byte
+3 failed, 1104 passed, 7 skipped, 1 deselected, 2 warnings in 73.80s (0:01:13)

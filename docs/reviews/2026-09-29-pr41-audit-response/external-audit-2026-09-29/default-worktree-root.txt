@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "C:\~shit\FLOSS\.worktrees\pr41-salvage\scripts\materialize_shared_skill_surface.py", line 695, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "C:\~shit\FLOSS\.worktrees\pr41-salvage\scripts\materialize_shared_skill_surface.py", line 679, in main
+    results, drift_found = materialize(
+                           ~~~~~~~~~~~^
+        workspace_root=args.workspace_root.resolve(),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        include_user_scope=args.include_user_scope,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\~shit\FLOSS\.worktrees\pr41-salvage\scripts\materialize_shared_skill_surface.py", line 601, in materialize
+    registry = build_registry(manifest, workspace_root, target_roots)
+  File "C:\~shit\FLOSS\.worktrees\pr41-salvage\scripts\materialize_shared_skill_surface.py", line 288, in build_registry
+    resolved = resolve_skill_entry(workspace_root, entry)
+  File "C:\~shit\FLOSS\.worktrees\pr41-salvage\scripts\materialize_shared_skill_surface.py", line 111, in resolve_skill_entry
+    raise SkillSurfaceError(f"Skill path is not a directory: {skill_dir}")
+SkillSurfaceError: Skill path is not a directory: C:\~shit\FLOSS\.worktrees\FLOSS\skill-corpus\flossi0ullk-orient

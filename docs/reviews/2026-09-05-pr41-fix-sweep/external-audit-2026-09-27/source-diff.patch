@@ -1,0 +1,315 @@
+diff --git a/packages/reasoning_ensemble/synthesizer.py b/packages/reasoning_ensemble/synthesizer.py
+index e3725f1..3a0ee65 100644
+--- a/packages/reasoning_ensemble/synthesizer.py
++++ b/packages/reasoning_ensemble/synthesizer.py
+@@ -523,9 +523,26 @@ def _survivor_independence_problem(
+     try:
+         from packages.metacoordinator_mcp.voters import roster_independence_problem
+ 
++        # THE SAME ROUTES ADMISSION JUDGED, NOT THE RAW MODEL IDS.
++        #
++        # Admission builds its roster through transport._independence_route,
++        # which puts `ollama/` back on a local voter's bare tag so the surface
++        # is read from the TRANSPORT. This passed `r.model` instead, so the
++        # shipped local pool -- `phi4-mini:latest`, `llama3.2:...`,
++        # `granite-code:...` and the slashed `hf.co/...` tag -- read as four
++        # provider surfaces, and a mixed run that lost its whole online half
++        # still cleared the bar. Removing the mixed-mode exemption switched
++        # this check on without making its inputs match admission's: two views
++        # of one roster, disagreeing about the roster itself. The response
++        # already carries transport_name; this is the one place it was unread.
+         return roster_independence_problem(
+             transport.active_online_profile(),
+-            {r.voter_id: r.model for r in embedded},
++            {
++                r.voter_id: transport._independence_route(
++                    {"model": r.model, "transport": r.transport_name}
++                )
++                for r in embedded
++            },
+         )
+     except Exception:  # noqa: BLE001 -- a check that cannot run must not abort a run
+         return None
+diff --git a/scripts/materialize_shared_agent_surface.py b/scripts/materialize_shared_agent_surface.py
+index ea93d0b..4ea77a1 100644
+--- a/scripts/materialize_shared_agent_surface.py
++++ b/scripts/materialize_shared_agent_surface.py
+@@ -715,6 +715,13 @@ def _pid_alive(pid: int) -> bool:
+         return False
+     except OSError:
+         return True  # e.g. PermissionError -- process exists, fail closed
++    except (OverflowError, ValueError):
++        # The OS could not even represent this id. Not "no such process" --
++        # "cannot judge" -- so fail closed like every other unjudgeable case
++        # here, rather than escaping as a type no caller handles. Callers
++        # bound the id first; this is the guard for the next caller that
++        # does not.
++        return True
+     return True
+ 
+ 
+@@ -743,7 +750,10 @@ def hermes_gateway_alive(home: Path) -> int | None:
+     # that did not.
+     try:
+         raw = pid_file.read_text(encoding="utf-8")
+-    except OSError as exc:
++    # UnicodeDecodeError is a ValueError, not an OSError, so invalid UTF-8
++    # used to escape as an unhandled type -- one of the shapes the external
++    # audit reproduced against the claim that --check survives anything.
++    except (OSError, UnicodeDecodeError) as exc:
+         raise SharedSurfaceError(
+             f"Hermes {pid_file} exists but could not be read "
+             f"({type(exc).__name__}); refusing to write under a gateway whose "
+@@ -758,14 +768,43 @@ def hermes_gateway_alive(home: Path) -> int | None:
+             "to write under a gateway whose state is unknown. Stop the "
+             "gateway, or remove the file if you know it is stale."
+         ) from exc
++    # `[]`, `null`, a bare string or a number all parse as JSON and then have
++    # no `.get` -- they raised AttributeError, again not the handled type.
++    if not isinstance(payload, dict):
++        raise SharedSurfaceError(
++            f"Hermes {pid_file} is JSON but not an object (got "
++            f"{type(payload).__name__}); refusing to write under a gateway "
++            "whose state is unknown. Stop the gateway, or remove the file if "
++            "you know it is stale."
++        )
+     pid = payload.get("pid")
+-    if not isinstance(pid, int):
++    # bool is an int subclass, and `true` is not a PID.
++    if not isinstance(pid, int) or isinstance(pid, bool):
+         raise SharedSurfaceError(
+             f"Hermes {pid_file} carries no integer `pid` (got "
+             f"{type(pid).__name__}); refusing to write under a gateway whose "
+             "state is unknown. Stop the gateway, or remove the file if you "
+             "know it is stale."
+         )
++    # NO PROCESS HAS THIS ID. Zero, negatives and anything past 32 bits all
++    # reached _pid_alive, which fails closed -- so the write was already
++    # refused, safely. But the caller then reported "gateway PID <n> is live;
++    # stop it and re-run", which is false for every one of them, and for 0
++    # (or 4 on Windows, the System process) directs an operator to kill a
++    # system process. The state is unknown, and the refusal should say so.
++    #
++    # 2**31, not 2**32. The first version of this bound was set for Windows'
++    # unsigned DWORD and forgot that POSIX pid_t is SIGNED 32-bit: ids from
++    # 2**31 to 2**32-1 passed the bound and reached os.kill, which raises
++    # OverflowError for them -- not an OSError, so it escaped every handler
++    # above it. No real Windows process id reaches 2**31 either.
++    if not 0 < pid < 2**31:
++        raise SharedSurfaceError(
++            f"Hermes {pid_file} names pid {pid}, which is not a possible "
++            "process id; refusing to write under a gateway whose state is "
++            "unknown. Stop the gateway, or remove the file if you know it is "
++            "stale."
++        )
+     return pid if _pid_alive(pid) else None
+ 
+ 
+diff --git a/scripts/materialize_shared_hook_surface.py b/scripts/materialize_shared_hook_surface.py
+index c327d8f..9c29199 100644
+--- a/scripts/materialize_shared_hook_surface.py
++++ b/scripts/materialize_shared_hook_surface.py
+@@ -31,6 +31,17 @@ class HookSurfaceError(Exception):
+     """Raised for manifest, target, or projection errors."""
+ 
+ 
++class GatewayStateUnknown(HookSurfaceError):
++    """A Hermes gateway.pid exists but cannot tell us whether a gateway is live.
++
++    Raised by hermes_gateway_alive_for so apply_yaml_target can catch a LOCAL
++    type. The underlying helper raises the agent-surface module's
++    SharedSurfaceError, which this module only imports lazily -- so without a
++    translation here the refusal had no type the caller could name, and it
++    escaped as an exception instead of becoming a REFUSED line.
++    """
++
++
+ def require_module(module_name: str, target: str) -> Any:
+     """Import a round-trip serializer, failing loudly for one target only.
+ 
+@@ -234,7 +245,9 @@ def resolve_variables(
+     workspace_token = str(workspace_root) if workspace_root is not None else None
+     raw = manifest.get("variables", {})
+     if not isinstance(raw, dict):
+-        raise HookSurfaceError("Manifest `variables` field must be an object if present")
++        raise HookSurfaceError(
++            "Manifest `variables` field must be an object if present"
++        )
+ 
+     resolved: dict[str, str] = {}
+     for name, spec in raw.items():
+@@ -293,6 +306,7 @@ def expand_template(value: str, variables: dict[str, str], context: str) -> str:
+     literal `${AGENTMEMORY_PLUGIN_ROOT}` would be written into a real harness
+     config and fail at hook-fire time, far from the edit that caused it.
+     """
++
+     def replace(match: re.Match[str]) -> str:
+         name = match.group(1)
+         if name not in variables:
+@@ -334,7 +348,9 @@ def expand_hook_commands(
+             if isinstance(inner_hooks, list):
+                 new_inner: list[Any] = []
+                 for inner in inner_hooks:
+-                    if isinstance(inner, dict) and isinstance(inner.get("command"), str):
++                    if isinstance(inner, dict) and isinstance(
++                        inner.get("command"), str
++                    ):
+                         inner = dict(inner)
+                         inner["command"] = expand_template(
+                             inner["command"],
+@@ -623,9 +639,15 @@ def hermes_gateway_alive_for(target_path: Path) -> int | None:
+         sys.path.insert(0, str(scripts_dir))
+     # Same deliberate cycle-break as resolve_target_path above; additionally
+     # keeps a JSON-only run from importing the much larger agent-surface module.
+-    from materialize_shared_agent_surface import hermes_gateway_alive
++    from materialize_shared_agent_surface import (
++        SharedSurfaceError,
++        hermes_gateway_alive,
++    )
+ 
+-    return hermes_gateway_alive(target_path.parent)
++    try:
++        return hermes_gateway_alive(target_path.parent)
++    except SharedSurfaceError as exc:
++        raise GatewayStateUnknown(str(exc)) from exc
+ 
+ 
+ def merge_hook_payload_into_yaml_doc(
+@@ -723,7 +745,20 @@ def apply_yaml_target(
+     if not target_path.exists():
+         return (f"SKIP  {target_path} (no config at {target_path})", False)
+ 
+-    live_pid = hermes_gateway_alive_for(target_path)
++    # A PARTIAL FUNCTION'S CONTRACT HAS TO REACH EVERY CALLER.
++    #
++    # hermes_gateway_alive began raising for an unreadable gateway.pid instead
++    # of reporting it as "no gateway", and the MCP materializer was adapted --
++    # but this module reaches the same helper through hermes_gateway_alive_for,
++    # and this call site was not. The parent materializer runs this one AFTER
++    # the MCP block, so handling the first caller did not protect the run:
++    # --check still aborted here, discarding every result and skipping every
++    # later target. Found by an external audit, not by the review that shipped
++    # the first half.
++    try:
++        live_pid = hermes_gateway_alive_for(target_path)
++    except GatewayStateUnknown as exc:
++        return (f"REFUSED {target_path} ({exc})", True)
+     if live_pid is not None:
+         return (
+             f"REFUSED {target_path} (gateway PID {live_pid} is live; "
+@@ -799,7 +834,7 @@ def assert_repo_scope_stays_inside(
+         f"Target {target_name!r} declares scope 'repo' but its settings_path "
+         f"resolves to {resolved_target}, outside the workspace "
+         f"{resolved_root}. Writing outside the repository is user scope: "
+-        "declare `\"scope\": \"user\"` and pass --include-user-scope."
++        'declare `"scope": "user"` and pass --include-user-scope.'
+     )
+ 
+ 
+@@ -1020,7 +1055,9 @@ def materialize(
+                 f"Enabled target {target_name!r} must define `settings_path`"
+             )
+         target_path = resolve_target_path(workspace_root, settings_path)
+-        assert_repo_scope_stays_inside(target_name, target_cfg, target_path, workspace_root)
++        assert_repo_scope_stays_inside(
++            target_name, target_cfg, target_path, workspace_root
++        )
+ 
+         target_format = target_cfg.get("format", "json")
+         if target_format not in ("json", "yaml"):
+diff --git a/scripts/materialize_shared_skill_surface.py b/scripts/materialize_shared_skill_surface.py
+index dc6254c..b0df925 100644
+--- a/scripts/materialize_shared_skill_surface.py
++++ b/scripts/materialize_shared_skill_surface.py
+@@ -30,6 +30,10 @@ WORKSPACE_ROOT = REPO_ROOT.parent
+ DEFAULT_MANIFEST_PATH = REPO_ROOT / "shared-skill-surface.json"
+ DEFAULT_OUTPUT_DIR = WORKSPACE_ROOT / ".agent-surface" / "skills"
+ MANAGED_MARKER = ".flossi0ullk-managed.json"
++# Written into every marker and checked before any removal. One constant for
++# both, because the pruner deciding ownership by comparing against a second
++# copy of this string is how the two would drift apart.
++MANAGED_BY = "FLOSSI0ULLK shared skill surface"
+ 
+ 
+ class SkillSurfaceError(Exception):
+@@ -392,7 +396,7 @@ def check_or_write_json(
+ 
+ def serialize_marker(skill: dict[str, Any], manifest_version: str) -> str:
+     payload = {
+-        "managed_by": "FLOSSI0ULLK shared skill surface",
++        "managed_by": MANAGED_BY,
+         "manifest_version": manifest_version,
+         "source_path": skill["resolved_path"],
+         "skill_name": skill["skill_name"],
+@@ -409,6 +413,36 @@ def remove_path(path: Path) -> None:
+     path.unlink()
+ 
+ 
++def projection_owned_by(child: Path, owner_root: Path) -> bool:
++    """True only if this managed projection provably belongs to `owner_root`.
++
++    The marker records `source_path`, resolved under the workspace that
++    installed it. That is the ownership predicate, and it has to be CHECKED,
++    not assumed from the marker's existence: user-scope roots such as
++    ~/.codex/skills are shared by every checkout on the machine, so a skill
++    absent from THIS manifest may be a live skill another workspace installed.
++
++    Anything that cannot prove ownership -- unreadable, not an object, wrong
++    `managed_by`, no `source_path`, or a source outside `owner_root` -- is not
++    ours. Leaving a stale directory is recoverable; deleting a live one is not.
++    """
++
++    try:
++        marker = json.loads((child / MANAGED_MARKER).read_text(encoding="utf-8"))
++    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
++        return False
++    if not isinstance(marker, dict) or marker.get("managed_by") != MANAGED_BY:
++        return False
++    source = marker.get("source_path")
++    if not isinstance(source, str) or not source.strip():
++        return False
++    try:
++        Path(source).resolve().relative_to(owner_root.resolve())
++    except (ValueError, OSError):
++        return False
++    return True
++
++
+ def prune_stale_projections(
+     target_name: str,
+     target_root: Path,
+@@ -416,6 +450,7 @@ def prune_stale_projections(
+     *,
+     check: bool,
+     dry_run: bool,
++    owner_root: Path,
+ ) -> tuple[list[str], bool]:
+     """Remove managed projections whose skill has left the manifest.
+ 
+@@ -444,6 +479,12 @@ def prune_stale_projections(
+         if not (child / MANAGED_MARKER).is_file():
+             # Unmanaged. Not ours, and silence is the correct behaviour.
+             continue
++        if not projection_owned_by(child, owner_root):
++            # MANAGED, BUT NOT BY US. The first version stopped at the marker's
++            # existence, so on a shared user-scope root it planned to remove
++            # another workspace's live projection whenever this manifest
++            # happened not to list that skill. Found by the external audit.
++            continue
+         drift_found = True
+         if check:
+             results.append(
+@@ -547,7 +588,12 @@ def materialize(
+         # one in the same manifest edit, and pruning afterwards would be racing
+         # a directory this run has just written.
+         messages, changed = prune_stale_projections(
+-            target_name, target_root, expected_names, check=check, dry_run=dry_run
++            target_name,
++            target_root,
++            expected_names,
++            check=check,
++            dry_run=dry_run,
++            owner_root=workspace_root,
+         )
+         results.extend(messages)
+         drift_found = drift_found or changed

@@ -1,0 +1,20 @@
+[voters] independence check: 4 model(s) absent from the registry probe index: ollama/granite-code:3b-instruct-128k-q4_K_S, ollama/hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-128K-GGUF:F16, ollama/llama3.2:3b-instruct-q4_K_S, ollama/phi4-mini:latest. Counted as 4 unverified lineage(s) keyed on the route minus its provider (unverified:granite-code:3b-instruct-128k-q4_k_s, unverified:hf.co/unsloth/qwen2.5-coder-3b-instruct-128k-gguf:f16, unverified:llama3.2:3b-instruct-q4_k_s, unverified:phi4-mini:latest); routes to the same model through different providers are ONE family. Probe them into voter_registry.json to have their real families counted.
+NESTED_REFRESH outer foreign_marker_unchanged=True drift= False
+NESTED_REFRESH nested foreign_marker_unchanged=True drift= False
+IDENTITY relative owned= False
+IDENTITY null owned= False
+IDENTITY empty owned= False
+IDENTITY NUL owned= False
+IDENTITY surrogate owned= False
+IDENTITY missing owned= False
+IDENTITY wrong-type owned= False
+IDENTITY case-alias owned= True
+IDENTITY dot-alias owned= True
+LEGACY_KEEP ['KEEP  shared: malformed-identity has a managed marker with no installing-workspace identity; ownership unknown, not removed (delete it by hand if it is stale)']
+MIGRATION_BASELINE ['OK    C:\\~shit\\_audit\\pr41-round3-20260929\\migration\\shared\\unchanged'] drift= False
+MIGRATION_FAILURE audit simulated copy failure order= ['remove', 'copy'] installed_exists= False old_bytes_preserved= True
+MIGRATION_RERUN restored= True
+SAME_NAME_FOREIGN_INSTALL selected_for_removal= True current_owner_still_first= True
+PID_CHAIN large-int refused_and_continued= True
+PID_CHAIN deep-json refused_and_continued= True
+SYNTHESIS_REAL_DISPATCH_AND_STAGE {"tier": "degraded", "success": false, "error": "independence_unknown: the survivor check could not run (RuntimeError: audit checker unreadable)", "responses": 6, "staged_responses": 6, "staged_tier": "degraded"}

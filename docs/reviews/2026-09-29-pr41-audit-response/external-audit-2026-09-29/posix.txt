@@ -1,0 +1,4 @@
+PLATFORM posix
+EXECUTION unaltered AST of three pinned production functions; no third-party imports needed
+POSIX_BAD_IDENTITY_PRUNE ValueError embedded null byte
+FIXTURE_UNMODIFIED True

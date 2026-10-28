@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py", line 695, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py", line 679, in main
+    results, drift_found = materialize(
+                           ^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py", line 631, in materialize
+    messages, changed = prune_stale_projections(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py", line 508, in prune_stale_projections
+    if not projection_owned_by(child, owner_root):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/~shit/_audit/pr41-round3-20260929/snapshot-42e4d05/scripts/materialize_shared_skill_surface.py", line 465, in projection_owned_by
+    return os.path.normcase(str(Path(recorded).resolve())) == os.path.normcase(
+                                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/pathlib.py", line 1242, in resolve
+    s = self._flavour.realpath(self, strict=strict)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen posixpath>", line 432, in realpath
+  File "<frozen posixpath>", line 476, in _joinrealpath
+ValueError: embedded null byte

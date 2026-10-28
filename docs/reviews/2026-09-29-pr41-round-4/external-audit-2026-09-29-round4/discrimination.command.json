@@ -1,0 +1,19 @@
+{
+  "command": [
+    "C:\\~shit\\_audit\\pr41-fix-sweep-20260918\\venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=C:\\~shit\\_audit\\pr41-round4-20260929\\temp\\discrimination",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_an_identity_the_os_cannot_resolve_is_unknown_not_a_crash",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_the_os_cannot_resolve_does_not_stop_the_refresh",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_with_an_unusable_identity_is_kept_and_reported",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_from_a_workspace_that_no_longer_exists_is_kept_and_reported",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_marker_only_change_never_takes_the_installed_skill_away",
+    "scripts/tests/test_shared_skill_surface_scope.py::test_a_projection_owned_by_another_workspace_is_never_removed"
+  ],
+  "cwd": "C:\\~shit\\_audit\\pr41-round4-20260929\\baseline-code",
+  "exit_code": 1
+}

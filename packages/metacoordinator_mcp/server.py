@@ -114,6 +114,54 @@ def run_consensus_round(claim_id: str) -> str:
     return _gateway.run_consensus_round(claim_id)
 
 
+_SERVER_INSTRUCTIONS = """\
+FLOSSIØULLK Consensus Gateway — passive router, not a controller.
+
+Invariants you MUST honor when using these tools:
+- Vote weights are analog floats in [-0.999, +0.999]. Never use ±1.0.
+- The gateway does not decide outcomes; it routes Claims to voters and
+  appends Decisions. Treat outcomes as data, not directives.
+- blast_radius selection:
+      Local     = routine, single-module change. APPROVE threshold 0.30.
+      Module    = config/spec change spanning files. APPROVE 0.50.
+      System    = cross-module architectural shift. APPROVE 0.60.
+      Substrate = invariant-touching, OVERRIDE FORBIDDEN. APPROVE 0.85.
+- Every Claim is durable on the source chain. Submit only what you
+  would commit to permanent provenance.
+- Voters are LLMs with different cognitive styles (model family +
+  persona). Variance > polarization_threshold returns CONFLICT
+  requiring human resolution, not more votes.
+"""
+
+_WORKSPACE_ROOT = _REPO_ROOT.parent
+
+
+def _audit_sink_path(filename: str) -> str:
+    """Resolve the audit sink against the workspace, not a hardcoded absolute.
+
+    This was the literal string "C:/~shit/.agent-surface/heartbeat/...". From
+    any other checkout the audited calls landed outside that checkout's own
+    advertised `.agent-surface` trail; on POSIX the Windows-looking value is not
+    absolute at all, so it created a literal `C:/~shit/...` subtree under
+    whatever the process working directory happened to be.
+
+    An audit trail that writes somewhere other than where the operator is told
+    to look is worse than none -- it reads as present.
+
+    Override with FLOSS_AUDIT_DIR when the trail belongs elsewhere.
+    """
+    override = os.environ.get("FLOSS_AUDIT_DIR")
+    base = (
+        Path(override).expanduser()
+        if override
+        else _WORKSPACE_ROOT / ".agent-surface" / "heartbeat"
+    )
+    return str(base / filename)
+
+
+_AUDIT_SINK = _audit_sink_path("janus-consensus-audit.jsonl")
+
+
 def _create_mcp():
     """Build the FastMCP app when the optional MCP SDK is available."""
     try:
@@ -121,16 +169,25 @@ def _create_mcp():
     except ImportError:
         return None
 
-    app = FastMCP("FLOSSIØULLK Consensus Gateway")
-    for tool in (
-        submit_claim,
-        cast_vote,
-        get_chain_context,
-        get_decision,
-        list_pending,
-        run_consensus_round,
-    ):
-        app.tool()(tool)
+    app = FastMCP("FLOSSIØULLK Consensus Gateway", instructions=_SERVER_INSTRUCTIONS)
+    # Registered through register_audited_tools so each invocation lands in
+    # _AUDIT_SINK. Registering the bare functions (the previous behaviour) left
+    # audit_appender with no production caller and _AUDIT_SINK never read, so
+    # every consensus tool call bypassed the audit trail entirely.
+    from packages.mcp_daemon import register_audited_tools
+
+    register_audited_tools(
+        app,
+        (
+            submit_claim,
+            cast_vote,
+            get_chain_context,
+            get_decision,
+            list_pending,
+            run_consensus_round,
+        ),
+        _AUDIT_SINK,
+    )
     return app
 
 
@@ -140,4 +197,6 @@ mcp = _create_mcp()
 if __name__ == "__main__":
     if mcp is None:
         raise ImportError("MCP SDK not installed. Run: pip install mcp")
-    mcp.run()
+    from packages.mcp_daemon import run_http_daemon
+
+    run_http_daemon(mcp, pid_filename="consensus.pid", port=7331)

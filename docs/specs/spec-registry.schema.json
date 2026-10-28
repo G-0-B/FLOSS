@@ -4,23 +4,41 @@
   "title": "Spec-Gate Registry",
   "description": "Registry of one-line spec stubs for artifacts on gated canon surfaces (decision D7, adopted 2026-06-12). Checked fail-closed by FLOSS/scripts/spec_gate.py --check and advisorily by hook_post_write.py.",
   "type": "object",
-  "required": ["version", "updated", "gated_surfaces", "entries"],
+  "required": [
+    "version",
+    "updated",
+    "gated_surfaces",
+    "entries"
+  ],
   "properties": {
-    "version": { "type": "string" },
-    "updated": { "type": "string", "format": "date" },
-    "decision": { "type": "string" },
+    "version": {
+      "type": "string"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "decision": {
+      "type": "string"
+    },
     "gated_surfaces": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Workspace-relative directory prefixes whose files require registration."
     },
-    "exempt_note": { "type": "string" },
+    "exempt_note": {
+      "type": "string"
+    },
     "entries": {
       "type": "object",
       "description": "Workspace-relative forward-slash path -> spec stub entry.",
       "additionalProperties": {
         "type": "object",
-        "required": ["spec"],
+        "required": [
+          "spec"
+        ],
         "properties": {
           "spec": {
             "type": "string",
@@ -34,6 +52,21 @@
           "grandfathered": {
             "type": "boolean",
             "description": "True when registered en masse at gate introduction (2026-06-12) without a deliberate spec pass. Backfill on next touch."
+          },
+          "tier": {
+            "enum": [
+              1,
+              2
+            ],
+            "description": "ADR-18 Prior-Art & Reuse Gate tier. 1 = evidence record; 2 = evidence record plus an independent reuse review. An entry carrying a tier MUST also carry `reuse` unless `emergency` is true. Omitting the tier is an exemption, not a default, and `spec_gate.py --add` refuses it."
+          },
+          "reuse": {
+            "$ref": "floss://specs/reuse-gate.schema.json",
+            "description": "Prior-art evidence for this artifact. Shape is defined by docs/specs/reuse-gate.schema.json and enforced by scripts/spec_gate.py:_reuse_problems; do not restate it here."
+          },
+          "emergency": {
+            "type": "boolean",
+            "description": "Downgrades a missing reuse block to a warning until promotion. Retrospective reuse audit required before the artifact is generalized."
           }
         },
         "additionalProperties": false

@@ -155,6 +155,22 @@ def source_id(source: str | dict[str, Any], fallback: str) -> str:
     return fallback
 
 
+def source_optional(source: str | dict[str, Any]) -> bool:
+    """Whether a manifest source may be absent without failing the run.
+
+    Provider configs owned by third-party tools (openwork, opencode) get wiped
+    and re-created out of band — 2026-08-17, the operator cleared every
+    openwork config deliberately because the integration needed rebuilding
+    from scratch. Before this flag a single absent provider import raised
+    AIRosterError and took the agent-surface and ai-roster steps down with it,
+    which turns someone else's routine cleanup into a broken toolchain.
+
+    Absent-and-optional is skipped and reported. Present-but-malformed still
+    fails loudly: this tolerates missing files, never bad ones.
+    """
+    return isinstance(source, dict) and bool(source.get("optional"))
+
+
 def source_kind(source: str | dict[str, Any], default: str) -> str:
     if isinstance(source, str):
         return default
@@ -282,6 +298,9 @@ def collect_provider_sources(
         path = source_path(workspace_root, source)
         kind = source_kind(source, "opencode")
         name = source_id(source, f"provider-source-{index + 1}")
+        if source_optional(source) and not path.exists():
+            print(f"SKIP  optional provider source absent: {path}")
+            continue
         payload = load_jsonc(path) if path.suffix == ".jsonc" else load_json(path)
         if kind == "opencode":
             providers.extend(collect_opencode_providers(name, path, payload))
@@ -373,6 +392,9 @@ def collect_agent_sources(
         paths: list[Path]
         if isinstance(raw_path, str) and raw_path.strip():
             paths = [resolve_path(workspace_root, raw_path)]
+            if source_optional(source) and not paths[0].exists():
+                print(f"SKIP  optional agent source absent: {paths[0]}")
+                continue
         elif isinstance(raw_glob, str) and raw_glob.strip():
             paths = sorted(workspace_root.glob(raw_glob))
         else:
