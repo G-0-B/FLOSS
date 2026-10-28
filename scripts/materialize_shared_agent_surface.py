@@ -33,7 +33,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import re
 import textwrap
 from typing import Any
 from urllib import error, request
@@ -400,8 +402,39 @@ def build_opencode_agent_instruction(opencode_cfg: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+_UNRESOLVED_ENV_VAR_RE = re.compile(
+    r"%[A-Za-z_][A-Za-z0-9_]*%|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?"
+)
+
+
 def resolve_manifest_path(workspace_root: Path, raw_path: str) -> Path:
-    path = Path(raw_path).expanduser()
+    """Resolve a manifest-declared path against the workspace root.
+
+    Expands both `~` (user home, e.g. `~/.codex/config.toml`) and
+    environment-variable references such as `%LOCALAPPDATA%` on Windows or
+    `$HOME` on POSIX (e.g. `%LOCALAPPDATA%/hermes/config.yaml`). This is the
+    single path resolver every target should route through -- do not
+    hand-roll a second one for a new writer.
+
+    An undefined variable is a loud `SharedSurfaceError`, not a silent
+    pass-through: `os.path.expandvars` leaves an undefined `%VAR%`/`$VAR` as
+    a literal string instead of raising, which would otherwise resolve to a
+    bogus path nested inside the workspace tree (e.g.
+    `<workspace_root>/%LOCALAPPDATA%/hermes/config.yaml`). A caller checking
+    `.exists()` on that path sees the same "no config there" result as a
+    legitimately-absent config, which would make a stripped-environment run
+    (a scheduled task, a minimal CI shell, ...) silently skip a target
+    instead of failing loudly.
+    """
+    expanded = os.path.expandvars(raw_path)
+    unresolved = _UNRESOLVED_ENV_VAR_RE.search(expanded)
+    if unresolved is not None:
+        raise SharedSurfaceError(
+            f"Manifest path {raw_path!r} references undefined environment "
+            f"variable {unresolved.group()!r} (expands to {expanded!r}); "
+            "set the variable or fix the manifest"
+        )
+    path = Path(expanded).expanduser()
     if path.is_absolute():
         return path
     return (workspace_root / path).resolve()
