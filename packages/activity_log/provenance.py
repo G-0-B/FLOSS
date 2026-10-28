@@ -24,6 +24,8 @@ import jcs
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
 
+from packages.activity_log.atomic_replace import replace_with_retry
+
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 
 VERSION_PREFIX = "FLOSSI10JSON"
@@ -177,7 +179,7 @@ def _write_state(path: Path, state: dict[str, Any]) -> None:
     tmp.write_text(
         json.dumps(state, separators=(",", ":"), sort_keys=True), encoding="utf-8"
     )
-    os.replace(tmp, path)
+    replace_with_retry(tmp, path)
 
 
 @contextmanager
