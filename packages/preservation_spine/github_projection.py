@@ -296,14 +296,14 @@ def _prepare_evidence(evidence: Evidence) -> _PreparedEvidence:
         evidence.absolute_core_status,
         evidence.regression_core_status,
     )
+    if evidence.checkpoint.verification_digest is None:
+        blockers.add("verification-digest-unbound")
     if preservation_status in {ResultStatus.FAIL, ResultStatus.BLOCKED}:
         blockers.add(
             "restore-check-failed"
             if preservation_status is ResultStatus.FAIL
             else "restore-check-blocked"
         )
-    elif evidence.checkpoint.verification_digest is None:
-        blockers.add("verification-digest-unbound")
 
     return _PreparedEvidence(
         verification=evidence.verification,

@@ -665,7 +665,20 @@ def _load_verification(state_dir: Path) -> VerificationRecord:
     path = state_dir / _CAPSULE_DIRNAME / _VERIFICATION_FILE
     if not path.is_file():
         raise ValueError("verification record is missing")
-    data = _load_json_object(path)
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise ValueError("required local JSON artifact is unreadable") from exc
+    return _verification_record_from_bytes(content)
+
+
+def _verification_record_from_bytes(content: bytes) -> VerificationRecord:
+    try:
+        data = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("required local JSON artifact is unreadable") from exc
+    if not isinstance(data, dict):
+        raise ValueError("required local JSON artifact must be an object")
     # Reject unbound fields: anything not in the dataclass schema was not
     # present when verification_digest was computed, so accepting it would
     # let inventory attest to a record render-github copies verbatim —
@@ -677,7 +690,7 @@ def _load_verification(state_dir: Path) -> VerificationRecord:
             "verification record carries unbound fields: " + ",".join(sorted(unknown))
         )
     try:
-        return VerificationRecord(
+        record = VerificationRecord(
             schema_version=str(data["schema_version"]),
             authentication=str(data["authentication"]),
             provenance_root=str(data["provenance_root"]),
@@ -691,6 +704,9 @@ def _load_verification(state_dir: Path) -> VerificationRecord:
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("verification record is malformed") from exc
+    if content != canonical_json_bytes(record):
+        raise ValueError("verification record is not canonical JSON")
+    return record
 
 
 def _plane_restore_result(value: object) -> PlaneRestoreResult:
@@ -753,7 +769,13 @@ def _optional_int(value: object) -> int | None:
 
 
 def _verification_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Restore writes verification.json as canonical_json_bytes(record); hash that form.
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise ValueError("required local JSON artifact is unreadable") from exc
+    record = _verification_record_from_bytes(content)
+    return hashlib.sha256(canonical_json_bytes(record)).hexdigest()
 
 
 def _verification_authenticated(verification: VerificationRecord) -> bool:

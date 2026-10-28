@@ -581,7 +581,7 @@ def _decode_git_path(value: bytes) -> str:
                 # error type instead of bytearray's bare ValueError.
                 if code > 255:
                     raise CapsuleVerificationError(
-                        "quoted diff path escape is out of range"
+                        "quoted diff path octal escape is malformed"
                     )
                 encoded.append(code)
                 continue
