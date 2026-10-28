@@ -95,7 +95,7 @@ jobs:
     outputs:
       rust: ${{ steps.detect.outputs.rust }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -162,7 +162,7 @@ jobs:
           echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain (stable + rustfmt)
         if: needs.changes.outputs.rust == 'true'
@@ -197,11 +197,11 @@ jobs:
           echo "::error::Detect Rust changes concluded '${{ needs.changes.result }}'. Nothing proves this ref leaves Rust untouched, so this gate fails closed."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache cargo registry + build
         if: needs.changes.outputs.rust == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -263,7 +263,7 @@ jobs:
       # commands in the job, so a manually dispatched run from an untrusted
       # branch could read it from the code it is running. The job needs no git
       # authentication after checkout. Raised by CodeRabbit on this PR, CWE-522.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -273,7 +273,7 @@ jobs:
       # second target directory measures 21 GB, so omitting it would leave the
       # dominant cost uncached.
       - name: Cache cargo registry + both build trees
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -284,7 +284,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sweettest-
 
       - name: Install Nix
-        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31 tag target, resolved 2026-09-01
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31 tag target, resolved 2026-09-01
 
       - name: Run freshly built four-zome Sweettest suite
         working-directory: ARF
@@ -296,10 +296,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache cargo registry + build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -343,10 +343,10 @@ jobs:
     timeout-minutes: 90
     needs: clippy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache cargo registry + build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -375,10 +375,10 @@ jobs:
       actions: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache cargo registry + build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
