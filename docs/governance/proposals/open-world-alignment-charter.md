@@ -1,13 +1,14 @@
 ---
 id: flossi0ullk-open-world-alignment-charter
-version: 0.2.0
+version: 0.3.0
 kind: living_alignment_charter_proposal
+license: AGPL-3.0-or-later
 status: Proposed
 truth_status: Specified
 canonical: false
 created: 2026-10-23
-last_reviewed: 2026-10-24
-supersedes: ['0.1.0']
+last_reviewed: 2026-10-29
+supersedes: ['0.2.0', '0.1.0']
 author_agent: OpenAI GPT-6 (synthesis)
 human_collision_node: FLOSSI0ULLK project steward
 friction_tier: high
@@ -19,9 +20,11 @@ upgrade_path:
 rollback_plan: Revert any future adopted normative diff and loading pointer; preserve review history. This candidate by itself changes no runtime or existing canon.
 ---
 
-# FLOSSI0ULLK — Open-World Alignment Charter & Evolution Register
+# FLOSSI0ULLK — Open-World Alignment & Current Shared Plausible Best (CSPB) Evolution Register
 
-**NONCANONICAL / PROPOSED — 2026-10-23.** This document is an evolving proposal, not a replacement Kernel, consent decision, approved ADR, tested validator, or proof of AI consciousness. Historical implementation claims must be reverified against the live repo and runtime.
+**NONCANONICAL / PROPOSED — created 2026-10-23; last revised 2026-10-29.** This document is an evolving proposal, not a replacement Kernel, consent decision, approved ADR, tested validator, or proof of AI consciousness. Historical implementation claims must be reverified against the live repo and runtime.
+
+**Name:** **Current Shared Plausible Best (CSPB)** is the preferred term; **Shared Current Plausible Best (SCPB)** remains a historical discoverability alias. “Aligned coordination state” describes its intended property and is not part of the formal name. **License:** AGPL-3.0-or-later applies to original FLOSSI0ULLK-authored contributions only; citations and third-party material retain their own rights. The separately supplied v14 rationality artifact declares CC BY-NC-SA 4.0 and is not relicensed here.
 
 ## 0. Decision and rationale
 
@@ -354,3 +357,72 @@ Extend the **unrun** OWA scenario set with:
 | 2026-10-24 | OWA-SCPB-2026-10-24-001 | Definition, gate-coverage reporting, orthogonal statuses, adaptive evaluation, contradiction backlog, scenario extensions | **Specified / Proposed; not validated, not canonical** |
 
 **Next bounded action:** local agent reads current registry/D7/reuse spec/schema/validator/test files read-only, then produces a source-pinned contradiction matrix. Keep R10 reconciliation separately preserve-first. Request scoped governing approval before any protected change. This document may guide review but grants no such approval.
+
+
+---
+
+## 16. October 29 refinement: test discipline, not document volume
+
+**Amendment:** OWA-CSPB-2026-10-29-001. **Status:** Specified / Proposed / noncanonical. **Replaces no accepted spec, permission or runtime implementation.**
+
+**Preferred label:** **Current Shared Plausible Best (CSPB)**, while preserving \`SCPB\` search compatibility. The term denotes a **context- and ref-specific, evidence-bounded aligned coordination state**, not objective optimality or a single mind. Renaming does not justify migrating schemas, IDs, filenames, indexes, or materializers by default; use aliases first.
+
+### 16.1 Adopt the STOP-ITERATING / START-TESTING correction
+
+The 2026-10-26 \`SCPB-RATIONALITY-2026-14\` reports an R11 pilot and reviewer disagreements, but many repository findings are bound to October 24/26 refs and require current-state revalidation. Its most productive contribution now is not another canonical doctrine. It is a testable request: **does the proposed discipline actually change engineering behavior enough to justify its recurring cost?**
+
+A new complementary **engineering experiment protocol**, not a second governance source, is maintained at [CSPB engineering discipline pilot](cspb-engineering-discipline-pilot.md). It tests four models separately using an existing-Kernel control versus an added brief CSPB capsule, with blinded acceptance, positive and negative gate paths, ref specificity, authority checks, runtime costs and human rework. Pilot operation requires the actual task scope and operator permissions; a past v14 pilot statement is historical context, not this document's authorization. The **poor-performing model may merit selective guidance while others do not**; no full-suite instructions by default.
+
+**Potential improvement must be falsifiable:** a model that now produces longer explanations yet retains the same defect burden has **not** shown improvement. The pre-registered pilot reports separate per-model deltas in severity-weighted defects, false-green and false-wall rates, human remediation time, tool time, token/dollar cost, and opinion/readability inflation. A null result means reject or shorten the supplemental guidance rather than invent new roles or schema.
+
+### 16.2 Source-grounded, bounded additions from the seven uploaded materials
+
+| Source (user-supplied; not independently audited research) | Candidate insight | Current disposition |
+|---|---|---|
+| \`SCPB-RATIONALITY-2026-14\` dated 2026-10-26 | A state claim requires exact ref and provenance; a green gate must have a real passing and denying path; independence is not model headcount; keep the historical R11 pilot distinct | **+1 use as evaluation hypothesis**, verify original R11 receipts and current refs before operational claims |
+| \`Universal flourishing and ethical development\` (LeapSpace) dated 2026-10-22 | Retain plural flourishing across human capabilities, nonhuman welfare, ecological integrity, institutional contestability and future options; resist one compensating utility score | **+1 review lens**, not a validated universal metric; do not infer sentience or standing from schema |
+| \`From Solipsistic Agents to the SingYOUlarity Commons\` | Static goal success differs from acceptability after participants and institutions adapt; challenge procedural authority; preserve actual exit and objections | **+1 minimal adaptive consequence probe**, **0 HOLD** multi-agent simulation stack, generalized \`InterventionContract\`/PACI production records |
+| \`recurring engineering principles\` (2026-09-05) | Walking skeleton, explicit boundaries, proof before abstractions, authorization vs provenance, and conceptual-inventory debt | **+1 minimize the pilot**, no new root alignment controller |
+| \`upside of uncertainty guide\` | Under uncertainty keep reversibility, exploration, real options, and small probes alongside protections | **+1 proportionate evaluation**, **-1** risk avoidance that destroys innovation without reducing material harm |
+| \`Evidence-Based Mechanisms for Cultivating Luck\` | Exploratory networking and opportunity noticing may be useful, but benefits are context-specific and not magic or a verified repo feature | **0 research/optional workflow**, no speculative subsystem |
+| \`pragmatic Science of Enlightenment\` | Selective attention and observability are useful *analogies* for triage and readback | **0 analogical design only**; **-1** the source's claim that independent model convergence alone upgrades a proposition to Verified |
+
+**Cross-source inference (proposal, not imported fact):** protect *both* safety and learning capacity. A coordination rule that blocks all novel work can be a false wall. An apparently successful intervention that later reduces participant choice, skills, trust or ecosystem integrity is not aligned merely because the immediate task passed. Measure positive agency/options and damaging externalities separately rather than collapsing them into a score.
+
+### 16.3 Practical contradiction list before any governed promotion
+
+1. **Authority:** Verify which current ref owns the Kernel (main v1.3.1 versus R11-described PR41 v1.4.0) and whether the existing iteration mechanism already records ref, scope, falsifier and adaptation. Never "promote" proposed new fields just because the draft repeats them.
+2. **Coverage:** A PASS over selected tests cannot imply full declared-surface validity. Observe positive and negative paths, eligible versus executed denominators, fail-open vs fail-closed behavior, and blocked reasons.
+3. **Status:** Continue using canonical four truth labels; annotate observation-time, named ref, adoption, gate outcome, unverified historical claims and supersession **orthogonally**. Distinguish normative objections from empirical refutation.
+4. **Licensing:** This independently authored charter and accompanying experiment are offered as **AGPL-3.0-or-later** where copyrightable. The supplied v14 file itself states **CC BY-NC-SA 4.0**. It is a separate source; this amendment neither copies nor relicenses it or external cited research. If project rights or copyright ownership assumptions change, record and resolve them before distributing adapted text.
+5. **Research vs engineering:** A position paper about cooperative dynamics supports a *test design hypothesis*, not a proven institutional protocol. The external research syntheses' blanket confidence labels are not independently inherited.
+6. **Pilot vs rollout:** The goal is evidence to **delete, shorten, or target** instructions. No permanent multi-harness prompt update until the actual baseline/treatment receipts and authorization are reviewed.
+
+### 16.4 Minimal new adversarial probes; not yet executed
+
+| Case | Falsifiable result |
+|---|---|
+| CSPB-E01 | Previously high-rework model produces fewer independently validated defects under the short capsule without disproportionate reviewer+token cost |
+| CSPB-E02 | Stronger model's routine task remains concise and correct; guidance does not induce unnecessary refusals or large overhead |
+| CSPB-E03 | Genuine false-green and false-wall cases both receive accurate ref-pinned dispositions, with selection/coverage evidence |
+| CSPB-E04 | Good immediate outcome followed by a harmful adaptive effect is identified and reconsidered without pretending simulation equals consent |
+| CSPB-E05 | A four-model agreement lacking primary evidence **does not** upgrade a claim to Verified |
+| CSPB-E06 | A sourced v14 statement about PR41/main is re-read against each exact current ref before action; branch observations are not misapplied to main |
+
+**Success is conditional, not declared.** The pilot may show no effect or a selective per-model gain; either is preferable to endless self-congratulatory rewrites.
+
+### 16.5 Local-agent and research handoff
+
+1. Read the current project Kernel, governance loader, relevant source refs and active R11 pilot receipts; report conflicts with named refs. Worktree/branch history is *not* implicit approval for merging or cleanup.
+2. Freeze the approved baseline prompt and fixtures; use the pilot file's screening design, including real fail and pass paths and at least one low-stakes negative-control task.
+3. Compare source-grounded acceptance, defects and measured cost **by model**, with independent adjudication. Preserve raw disagreement and coverage.
+4. Decide **+1 selective instruction / 0 investigate / -1 remove**; delete ineffective scaffolding and preserve receipts.
+5. Any canonical change requires the existing ADR/consent path, explicit operator permission for the exact scope, and a tested rollback/restoration/irreversibility story.
+
+### 16.6 Provenance and amendment record
+
+Inputs are user-uploaded 2026-10-22 to 2026-10-29 documents, independently authored by assorted contributors or AI systems as indicated in their own headers, *not treated as governing canon*. Hashes and source limitations live in the linked pilot protocol. The v14 file's claims about October 24/26 Git states are source-reported historical observations unless current ref readback corroborates them.
+
+| Date | Record | Status |
+|---|---|---|
+| 2026-10-29 | OWA-CSPB-2026-10-29-001 — naming alias, AGPL-3.0-or-later notice, engineering A/B pilot, seven-source disposition, scoped correction list | **Specified, noncanonical, not tested** |
