@@ -241,7 +241,7 @@ For consequential work, add only the answers the existing packet/spec does not a
 | Adaptation | Predicted counterparty/institutional response; observed response; short- and longer-term effects |
 | Revision | Continue/repair/pause/retire trigger, accountable reviewer, readback and restoration/compensation limits |
 
-Do not invent a persistent \`SCPBState\`, universal moral scalar, role database, or consensus controller unless a live failure demonstrates the need.
+Do not invent a persistent `SCPBState`, universal moral scalar, role database, or consensus controller unless a live failure demonstrates the need.
 
 ## 10. Gate coverage and predicate-precise reporting
 
@@ -249,7 +249,7 @@ Do not invent a persistent \`SCPBState\`, universal moral scalar, role database,
 
 Suggested *review receipt* (illustrative, not a canonical schema):
 
-\`\`\`yaml
+```yaml
 gate_review:
   gate_id: named-existing-gate
   observed_at: 2026-10-24
@@ -267,7 +267,7 @@ gate_review:
   verdict: BLOCKED
   untested_risk: two-required-cases-not-run
   evidence_refs: []
-\`\`\`
+```
 
 **Rules:** (a) explicit selection/eligibility logic and exclusions; (b) distinguish declared, eligible, selected, executed, passed, blocked and skipped; (c) zero eligible items cannot silently yield PASS; distinguish justified NOT_APPLICABLE from UNKNOWN; (d) report scope of negative tests and actual failure/deny paths; (e) no unsupported assertion of completeness where the universe cannot be enumerated; (f) a passing gate establishes only its predicate over tested cases. The 4/6 example is **66.7% execution coverage**, not 66.7% verified truth or safety. A consensus tally and provider count do not establish reviewer independence or authority.
 
@@ -275,16 +275,16 @@ gate_review:
 
 ## 11. Keep orthogonal status dimensions; do not replace Kernel truth labels
 
-Structured Reasoning Metaprompt v2.0 suggests \`Established\`, \`Historical\`, \`Unknown\` and \`Superseded\` alongside truth statuses. Their distinctions are useful, but wholesale adoption would conflict with the four existing canonical labels: \`Verified | Specified | Aspirational | Unverified\`.
+Structured Reasoning Metaprompt v2.0 suggests `Established`, `Historical`, `Unknown` and `Superseded` alongside truth statuses. Their distinctions are useful, but wholesale adoption would conflict with the four existing canonical labels: `Verified | Specified | Aspirational | Unverified`.
 
 **Proposed compatibility rule:**
 
-- \`truth_status\`: retain the current canonical four-value vocabulary unless changed through governance. \`Verified\` must name its supported predicate, evidence and revision; it never means all claims are true.
-- \`observation\`: recorded timestamp, source/ref, tested state and applicability. “Historical” describes the observation's relation to now, not a new truth value.
-- \`lifecycle\`: proposed/adopted/superseded/retired in the owning mechanism; supersession does not prove the newer alternative is better.
-- \`gate_outcome\`: PASS/FAIL/BLOCKED/UNKNOWN (or existing precisely documented equivalent), independent of truth status.
-- \`decision\`: +1/0/-1 recommendation, separately from binding governance authorization.
-- \`established_by_literature\`: attribution to external research, not a substitute for repository \`Verified\`.
+- `truth_status`: retain the current canonical four-value vocabulary unless changed through governance. `Verified` must name its supported predicate, evidence and revision; it never means all claims are true.
+- `observation`: recorded timestamp, source/ref, tested state and applicability. “Historical” describes the observation's relation to now, not a new truth value.
+- `lifecycle`: proposed/adopted/superseded/retired in the owning mechanism; supersession does not prove the newer alternative is better.
+- `gate_outcome`: PASS/FAIL/BLOCKED/UNKNOWN (or existing precisely documented equivalent), independent of truth status.
+- `decision`: +1/0/-1 recommendation, separately from binding governance authorization.
+- `established_by_literature`: attribution to external research, not a substitute for repository `Verified`.
 
 No forced migration of existing specs/schemas is approved. If new facets are warranted, reuse equivalent existing fields and add tests of any translations.
 
@@ -335,8 +335,8 @@ Extend the **unrun** OWA scenario set with:
 
 ### Source additions (read 2026-10-24)
 
-- **D1** \`2026-10-24_alphaxiv_chatgpt-6.1-sol_shared_current_plausible_best.md\`, supplied chat transcript, SHA-256 \`d0615ee933a2b43978bc86d57273c3cf553c8f8b1c54aa72203dab47c347729e\`; useful source-reported analysis, historical claims, and R10 handoff. The transcript does **not** include the bytes of all attachments described within it and is not live local-workspace evidence.
-- **D2** \`Structured Reasoning Metaprompt v2.0.0.md\`, SHA-256 \`337c95094a7504d139fcf042006a271431ef7f5565b8e9771b29431d9fbeb6d5\`; instruction proposal, not governance canon or empirical validation.
+- **D1** `2026-10-24_alphaxiv_chatgpt-6.1-sol_shared_current_plausible_best.md`, supplied chat transcript, SHA-256 `d0615ee933a2b43978bc86d57273c3cf553c8f8b1c54aa72203dab47c347729e`; useful source-reported analysis, historical claims, and R10 handoff. The transcript does **not** include the bytes of all attachments described within it and is not live local-workspace evidence.
+- **D2** `Structured Reasoning Metaprompt v2.0.0.md`, SHA-256 `337c95094a7504d139fcf042006a271431ef7f5565b8e9771b29431d9fbeb6d5`; instruction proposal, not governance canon or empirical validation.
 - **E7** Trivedi et al. (2026), *Position: Solipsistic superintelligence is unlikely to be cooperative*, ICML/PMLR: https://proceedings.mlr.press/v306/trivedi26a.html; primary position paper on adaptive counterparties.
 - **E8** Zhuang et al. (2026), *From Trajectories to Evidence*, https://arxiv.org/abs/2608.05235; study of bounded verification, post-execution claim qualification and nonmonotonic improvement in evaluated settings.
 - **E9** Alshammari and Bahsi (2026), *Offline-Verifiable Accountability for Cross-Organization Agent Messaging*, https://arxiv.org/abs/2608.28542; proposal/prototype for policy-relative sufficiency of preserved evidence; no claim that a signed bundle proves delivery or exhaustive history.
@@ -365,11 +365,11 @@ Extend the **unrun** OWA scenario set with:
 
 **Amendment:** OWA-CSPB-2026-10-29-001. **Status:** Specified / Proposed / noncanonical. **Replaces no accepted spec, permission or runtime implementation.**
 
-**Preferred label:** **Current Shared Plausible Best (CSPB)**, while preserving \`SCPB\` search compatibility. The term denotes a **context- and ref-specific, evidence-bounded aligned coordination state**, not objective optimality or a single mind. Renaming does not justify migrating schemas, IDs, filenames, indexes, or materializers by default; use aliases first.
+**Preferred label:** **Current Shared Plausible Best (CSPB)**, while preserving `SCPB` search compatibility. The term denotes a **context- and ref-specific, evidence-bounded aligned coordination state**, not objective optimality or a single mind. Renaming does not justify migrating schemas, IDs, filenames, indexes, or materializers by default; use aliases first.
 
 ### 16.1 Adopt the STOP-ITERATING / START-TESTING correction
 
-The 2026-10-26 \`SCPB-RATIONALITY-2026-14\` reports an R11 pilot and reviewer disagreements, but many repository findings are bound to October 24/26 refs and require current-state revalidation. Its most productive contribution now is not another canonical doctrine. It is a testable request: **does the proposed discipline actually change engineering behavior enough to justify its recurring cost?**
+The 2026-10-26 `SCPB-RATIONALITY-2026-14` reports an R11 pilot and reviewer disagreements, but many repository findings are bound to October 24/26 refs and require current-state revalidation. Its most productive contribution now is not another canonical doctrine. It is a testable request: **does the proposed discipline actually change engineering behavior enough to justify its recurring cost?**
 
 A new complementary **engineering experiment protocol**, not a second governance source, is maintained at [CSPB engineering discipline pilot](cspb-engineering-discipline-pilot.md) (v0.2.0, proposed). It tests four models separately using an existing-Kernel control versus an added brief CSPB capsule, with blinded acceptance, positive and negative gate paths, ref specificity, authority checks, runtime costs and human rework. Pilot operation requires the actual task scope and operator permissions; a past v14 pilot statement is historical context, not this document's authorization. The **poor-performing model may merit selective guidance while others do not**; no full-suite instructions by default.
 
@@ -379,13 +379,13 @@ A new complementary **engineering experiment protocol**, not a second governance
 
 | Source (user-supplied; not independently audited research) | Candidate insight | Current disposition |
 |---|---|---|
-| \`SCPB-RATIONALITY-2026-14\` dated 2026-10-26 | A state claim requires exact ref and provenance; a green gate must have a real passing and denying path; independence is not model headcount; keep the historical R11 pilot distinct | **+1 use as evaluation hypothesis**, verify original R11 receipts and current refs before operational claims |
-| \`Universal flourishing and ethical development\` (LeapSpace) dated 2026-10-22 | Retain plural flourishing across human capabilities, nonhuman welfare, ecological integrity, institutional contestability and future options; resist one compensating utility score | **+1 review lens**, not a validated universal metric; do not infer sentience or standing from schema |
-| \`From Solipsistic Agents to the SingYOUlarity Commons\` | Static goal success differs from acceptability after participants and institutions adapt; challenge procedural authority; preserve actual exit and objections | **+1 minimal adaptive consequence probe**, **0 HOLD** multi-agent simulation stack, generalized \`InterventionContract\`/PACI production records |
-| \`recurring engineering principles\` (2026-09-05) | Walking skeleton, explicit boundaries, proof before abstractions, authorization vs provenance, and conceptual-inventory debt | **+1 minimize the pilot**, no new root alignment controller |
-| \`upside of uncertainty guide\` | Under uncertainty keep reversibility, exploration, real options, and small probes alongside protections | **+1 proportionate evaluation**, **-1** risk avoidance that destroys innovation without reducing material harm |
-| \`Evidence-Based Mechanisms for Cultivating Luck\` | Exploratory networking and opportunity noticing may be useful, but benefits are context-specific and not magic or a verified repo feature | **0 research/optional workflow**, no speculative subsystem |
-| \`pragmatic Science of Enlightenment\` | Selective attention and observability are useful *analogies* for triage and readback | **0 analogical design only**; **-1** the source's claim that independent model convergence alone upgrades a proposition to Verified |
+| `SCPB-RATIONALITY-2026-14` dated 2026-10-26 | A state claim requires exact ref and provenance; a green gate must have a real passing and denying path; independence is not model headcount; keep the historical R11 pilot distinct | **+1 use as evaluation hypothesis**, verify original R11 receipts and current refs before operational claims |
+| `Universal flourishing and ethical development` (LeapSpace) dated 2026-10-22 | Retain plural flourishing across human capabilities, nonhuman welfare, ecological integrity, institutional contestability and future options; resist one compensating utility score | **+1 review lens**, not a validated universal metric; do not infer sentience or standing from schema |
+| `From Solipsistic Agents to the SingYOUlarity Commons` | Static goal success differs from acceptability after participants and institutions adapt; challenge procedural authority; preserve actual exit and objections | **+1 minimal adaptive consequence probe**, **0 HOLD** multi-agent simulation stack, generalized `InterventionContract`/PACI production records |
+| `recurring engineering principles` (2026-09-05) | Walking skeleton, explicit boundaries, proof before abstractions, authorization vs provenance, and conceptual-inventory debt | **+1 minimize the pilot**, no new root alignment controller |
+| `upside of uncertainty guide` | Under uncertainty keep reversibility, exploration, real options, and small probes alongside protections | **+1 proportionate evaluation**, **-1** risk avoidance that destroys innovation without reducing material harm |
+| `Evidence-Based Mechanisms for Cultivating Luck` | Exploratory networking and opportunity noticing may be useful, but benefits are context-specific and not magic or a verified repo feature | **0 research/optional workflow**, no speculative subsystem |
+| `pragmatic Science of Enlightenment` | Selective attention and observability are useful *analogies* for triage and readback | **0 analogical design only**; **-1** the source's claim that independent model convergence alone upgrades a proposition to Verified |
 
 **Cross-source inference (proposal, not imported fact):** protect *both* safety and learning capacity. A coordination rule that blocks all novel work can be a false wall. An apparently successful intervention that later reduces participant choice, skills, trust or ecosystem integrity is not aligned merely because the immediate task passed. Measure positive agency/options and damaging externalities separately rather than collapsing them into a score.
 
@@ -432,26 +432,26 @@ Inputs are user-uploaded 2026-10-22 to 2026-10-29 documents, independently autho
 
 ## 17. October 30 source-binding and closure-completeness repair
 
-**Amendment ID:** OWA-CSPB-2026-10-30-001. **Status:** Specified, noncanonical, not a runtime/prompt installation. This explicitly remedies an observed defect in this document lineage: citing a moving \`main\` or proposal-branch path while advising agents to make ref-scoped claims.
+**Amendment ID:** OWA-CSPB-2026-10-30-001. **Status:** Specified, noncanonical, not a runtime/prompt installation. This explicitly remedies an observed defect in this document lineage: citing a moving `main` or proposal-branch path while advising agents to make ref-scoped claims.
 
 ### 17.1 Pinned repository source register
 
-**Observation:** 2026-10-30. **Repository:** \`G-0-B/FLOSS\`. **Observed \`main\` commit:** \`64697350a2013e499d0345f2cc7546b7b1df9561\`. These are source-specific historical snapshots; do not call them the live state at an arbitrary later time.
+**Observation:** 2026-10-30. **Repository:** `G-0-B/FLOSS`. **Observed `main` commit:** `64697350a2013e499d0345f2cc7546b7b1df9561`. These are source-specific historical snapshots; do not call them the live state at an arbitrary later time.
 
 | Source | Immutable path @ main commit | Git blob SHA | Allowed claim ceiling |
 |---|---|---|---|
-| I1 Kernel v1.3.1 | [Kernel](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md) | \`d0e94d46c224c2e13fe5cd709b89b9fbceb7b74e\` | Kernel text on **this main commit**, not PR41 or local worktrees |
-| I2 Project Spine v0.5 | [Spine](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/spine-v0.5.md) | \`b3433a42d773a272ee14e67eab1f1d4b66590fd1\` | Source precedence at this ref; no runtime enforcement inference |
-| I3 Loading order | [Loader](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/LOADING_ORDER.md) | \`314c35bb3a60190d71c7c29264abeee73ceb7e90\` | Onboarding rules at this ref, not proof of loaded runtime context |
-| I4 README | [README](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/README.md) | \`eff931a17923e6fb2bc875b3bc2017a473a374b3\` | Existing broad multi-being mission, not operational achievement |
-| I5 Prior positive-alignment research map | [Research map](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md) | \`4ec6db2e5a258757c84d5e344257d4aba79e5111\` | Historical synthesis; implementation/novelty claims still require tests |
-| PR41 branch | [Observed PR41 head](https://github.com/G-0-B/FLOSS/tree/5a2375eed522b267ba89b874eb9105322102fcdf) | commit (not a file blob) \`5a2375eed522b267ba89b874eb9105322102fcdf\` | PR #41 branch pointer **observed** 2026-10-30; **not** an audit of each v14 R11 claim |
+| I1 Kernel v1.3.1 | [Kernel](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md) | `d0e94d46c224c2e13fe5cd709b89b9fbceb7b74e` | Kernel text on **this main commit**, not PR41 or local worktrees |
+| I2 Project Spine v0.5 | [Spine](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/spine-v0.5.md) | `b3433a42d773a272ee14e67eab1f1d4b66590fd1` | Source precedence at this ref; no runtime enforcement inference |
+| I3 Loading order | [Loader](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/LOADING_ORDER.md) | `314c35bb3a60190d71c7c29264abeee73ceb7e90` | Onboarding rules at this ref, not proof of loaded runtime context |
+| I4 README | [README](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/README.md) | `eff931a17923e6fb2bc875b3bc2017a473a374b3` | Existing broad multi-being mission, not operational achievement |
+| I5 Prior positive-alignment research map | [Research map](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md) | `4ec6db2e5a258757c84d5e344257d4aba79e5111` | Historical synthesis; implementation/novelty claims still require tests |
+| PR41 branch | [Observed PR41 head](https://github.com/G-0-B/FLOSS/tree/5a2375eed522b267ba89b874eb9105322102fcdf) | commit (not a file blob) `5a2375eed522b267ba89b874eb9105322102fcdf` | PR #41 branch pointer **observed** 2026-10-30; **not** an audit of each v14 R11 claim |
 
-**Last verified v0.3.0 proposal snapshot:** \`G-0-B/FLOSS\` branch \`docs/open-world-alignment-charter-proposal-2026-10-23\`, commit \`4441cea1d810924ba5fba9a2e013fccf6d5ef6b5\`, path \`docs/governance/proposals/open-world-alignment-charter.md\`, blob \`3feb990cf12141efd0238edfe225cb429800a96b\`. Its companion pilot v0.1.0 at the same commit has blob \`bfbbcacb38842f8cd4cac4d2e59b4c25e4bf4904\`. Both are source snapshots, not assertions about the updated PR head.
+**Last verified v0.3.0 proposal snapshot:** `G-0-B/FLOSS` branch `docs/open-world-alignment-charter-proposal-2026-10-23`, commit `4441cea1d810924ba5fba9a2e013fccf6d5ef6b5`, path `docs/governance/proposals/open-world-alignment-charter.md`, blob `3feb990cf12141efd0238edfe225cb429800a96b`. Its companion pilot v0.1.0 at the same commit has blob `bfbbcacb38842f8cd4cac4d2e59b4c25e4bf4904`. Both are source snapshots, not assertions about the updated PR head.
 
 **Self-reference constraint:** A file cannot embed its own *final commit hash* or content hash as immutable constants while being changed; doing so changes the content and hashes again. The updated proposal's final commit and both new blob SHAs are therefore recorded **externally in PR #76's versioned review description and GitHub readback**, with this row retaining the previous snapshot for provenance. The PR URL and branch URL are navigational pointers only.
 
-**Citation contract — required for consequential repository claims:** \`repository\`, named \`branch/ref\`, full \`commit\`, file \`path\`, exact \`blob SHA\`, \`observed_at\` and **what the source actually establishes**. Dirty worktrees additionally need HEAD, worktree path, staged/unstaged/untracked state and relevant content hashes; a commit does not capture those edits. For user-uploaded bytes use SHA-256, filename, date and stated provenance, without fabricating Git commits. For scholarly sources cite stable version/DOI and the quoted predicate; do not pretend an external paper is a Git ref. Unknown or unavailable source commit is **UNKNOWN**, not invented.
+**Citation contract — required for consequential repository claims:** `repository`, named `branch/ref`, full `commit`, file `path`, exact `blob SHA`, `observed_at` and **what the source actually establishes**. Dirty worktrees additionally need HEAD, worktree path, staged/unstaged/untracked state and relevant content hashes; a commit does not capture those edits. For user-uploaded bytes use SHA-256, filename, date and stated provenance, without fabricating Git commits. For scholarly sources cite stable version/DOI and the quoted predicate; do not pretend an external paper is a Git ref. Unknown or unavailable source commit is **UNKNOWN**, not invented.
 
 ### 17.2 Acceptance completeness is a distinct outcome, not a verbose receipt
 
@@ -461,9 +461,9 @@ Inputs are user-uploaded 2026-10-22 to 2026-10-29 documents, independently autho
 
 > Before claiming closure, account for every applicable acceptance requirement—not only the latest review finding—and test a nearby failure case that could expose an incomplete fix.
 
-**Interpretation:** \`acceptance completeness\` requires reading a pinned *authoritative contract*, enumerating applicable predicates, locating receipts for each passed requirement, recording failed/blocked/not-applicable requirements **with reasons and authorized waivers**, and refusing closure while mandatory gates remain open. Enumerating requirements is not sufficient: **test adjacent failure modes** (e.g., missing hash field, mismatched recovery identity) that a narrow patch might leave broken. A claimed closure is a separate predicate from evidence accuracy, authorization, patch execution and overall beneficial impact.
+**Interpretation:** `acceptance completeness` requires reading a pinned *authoritative contract*, enumerating applicable predicates, locating receipts for each passed requirement, recording failed/blocked/not-applicable requirements **with reasons and authorized waivers**, and refusing closure while mandatory gates remain open. Enumerating requirements is not sufficient: **test adjacent failure modes** (e.g., missing hash field, mismatched recovery identity) that a narrow patch might leave broken. A claimed closure is a separate predicate from evidence accuracy, authorization, patch execution and overall beneficial impact.
 
-**Caution:** "Every applicable" means criteria in the named authoritative contract and its explicit dependencies—not an infinite universe of hypothetical standards. Preserve legitimate \`not applicable\` and \`blocked\` outcomes to prevent a zero-throughput false wall. Unauthorized AI cannot waive criteria by marking them irrelevant.
+**Caution:** "Every applicable" means criteria in the named authoritative contract and its explicit dependencies—not an infinite universe of hypothetical standards. Preserve legitimate `not applicable` and `blocked` outcomes to prevent a zero-throughput false wall. Unauthorized AI cannot waive criteria by marking them irrelevant.
 
 **Experiment revision:** Companion [CSPB engineering pilot](cspb-engineering-discipline-pilot.md) moved from v0.1.0 to **v0.2.0** with a versioned CSPB-lite capsule, F5 acceptance census, negative-case test and refusal-to-close metric. The earlier informal v4 example must **not** be pooled with new B@0.2.0 runs; prompt hash, protocol version and fixture hashes must be preserved.
 
