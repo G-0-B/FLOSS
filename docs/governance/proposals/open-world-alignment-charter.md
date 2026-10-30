@@ -1,14 +1,14 @@
 ---
 id: flossi0ullk-open-world-alignment-charter
-version: 0.3.0
+version: 0.4.0
 kind: living_alignment_charter_proposal
 license: AGPL-3.0-or-later
 status: Proposed
 truth_status: Specified
 canonical: false
 created: 2026-10-23
-last_reviewed: 2026-10-29
-supersedes: ['0.2.0', '0.1.0']
+last_reviewed: 2026-10-30
+supersedes: ['0.3.0', '0.2.0', '0.1.0']
 author_agent: OpenAI GPT-6 (synthesis)
 human_collision_node: FLOSSI0ULLK project steward
 friction_tier: high
@@ -22,7 +22,7 @@ rollback_plan: Revert any future adopted normative diff and loading pointer; pre
 
 # FLOSSI0ULLK — Open-World Alignment & Current Shared Plausible Best (CSPB) Evolution Register
 
-**NONCANONICAL / PROPOSED — created 2026-10-23; last revised 2026-10-29.** This document is an evolving proposal, not a replacement Kernel, consent decision, approved ADR, tested validator, or proof of AI consciousness. Historical implementation claims must be reverified against the live repo and runtime.
+**NONCANONICAL / PROPOSED — created 2026-10-23; last revised 2026-10-30.** This document is an evolving proposal, not a replacement Kernel, consent decision, approved ADR, tested validator, or proof of AI consciousness. Historical implementation claims must be reverified against the live repo and runtime.
 
 **Name:** **Current Shared Plausible Best (CSPB)** is the preferred term; **Shared Current Plausible Best (SCPB)** remains a historical discoverability alias. “Aligned coordination state” describes its intended property and is not part of the formal name. **License:** AGPL-3.0-or-later applies to original FLOSSI0ULLK-authored contributions only; citations and third-party material retain their own rights. The separately supplied v14 rationality artifact declares CC BY-NC-SA 4.0 and is not relicensed here.
 
@@ -159,15 +159,15 @@ Each entry records: **change ID; timestamp; proposer and source system; exact cu
 
 **P0 — User-provided source:** Cross-agent correction text received 2026-10-23; directly supports the proposed direction, not governance ratification; original conversation provenance beyond the supplied excerpt is unspecified.
 
-**I1 — Current Kernel:** [FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md](https://github.com/G-0-B/FLOSS/blob/main/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md); fetched file blob SHA d0e94d46c224c2e13fe5cd709b89b9fbceb7b74e. Supports precedence, consent-first, verification, one-week upgrade path.
+**I1 — Current Kernel:** [FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md); fetched file blob SHA d0e94d46c224c2e13fe5cd709b89b9fbceb7b74e. Supports precedence, consent-first, verification, one-week upgrade path.
 
-**I2 — Project Spine:** [docs/governance/spine-v0.5.md](https://github.com/G-0-B/FLOSS/blob/main/docs/governance/spine-v0.5.md); blob SHA b3433a42d773a272ee14e67eab1f1d4b66590fd1. Supports noncanonical vs adopted and versioning.
+**I2 — Project Spine:** [docs/governance/spine-v0.5.md](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/spine-v0.5.md); blob SHA b3433a42d773a272ee14e67eab1f1d4b66590fd1. Supports noncanonical vs adopted and versioning.
 
-**I3 — Loader:** [docs/governance/LOADING_ORDER.md](https://github.com/G-0-B/FLOSS/blob/main/docs/governance/LOADING_ORDER.md); blob SHA 314c35bb3a60190d71c7c29264abeee73ceb7e90. Supports where **an optional pointer might later go**, not authority for this proposal.
+**I3 — Loader:** [docs/governance/LOADING_ORDER.md](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/LOADING_ORDER.md); blob SHA 314c35bb3a60190d71c7c29264abeee73ceb7e90. Supports where **an optional pointer might later go**, not authority for this proposal.
 
-**I4 — Prior FLOSSI0ULLK vision:** [README](https://github.com/G-0-B/FLOSS/blob/main/README.md), and April 2026 archived document *Universal Flourishing: Beyond the Human — An Iterative Framework for All Beings and the Universe That Sustains Them (n+1)*. Establishes that non-anthropocentric scope is not new.
+**I4 — Prior FLOSSI0ULLK vision:** [README](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/README.md), and April 2026 archived document *Universal Flourishing: Beyond the Human — An Iterative Framework for All Beings and the Universe That Sustains Them (n+1)*. Establishes that non-anthropocentric scope is not new.
 
-**I5 — Earlier mapping to research:** [2026-05-18-positive-alignment-flossi0ullk-map.md](https://github.com/G-0-B/FLOSS/blob/main/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md). It includes implementation/novelty claims not independently verified by this review; do not silently inherit its “Verified” labels.
+**I5 — Earlier mapping to research:** [2026-05-18-positive-alignment-flossi0ullk-map.md](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md). It includes implementation/novelty claims not independently verified by this review; do not silently inherit its “Verified” labels.
 
 **I6 — Engineering evidence discipline:** User-provided historical 2026-09-05 continuation/evidence packets, especially the distinctions authorization ≠ historical witness, evidence ≠ claim ≠ decision, model plurality ≠ independence. Historical snapshots, not live repo verification.
 
@@ -371,7 +371,7 @@ Extend the **unrun** OWA scenario set with:
 
 The 2026-10-26 \`SCPB-RATIONALITY-2026-14\` reports an R11 pilot and reviewer disagreements, but many repository findings are bound to October 24/26 refs and require current-state revalidation. Its most productive contribution now is not another canonical doctrine. It is a testable request: **does the proposed discipline actually change engineering behavior enough to justify its recurring cost?**
 
-A new complementary **engineering experiment protocol**, not a second governance source, is maintained at [CSPB engineering discipline pilot](cspb-engineering-discipline-pilot.md). It tests four models separately using an existing-Kernel control versus an added brief CSPB capsule, with blinded acceptance, positive and negative gate paths, ref specificity, authority checks, runtime costs and human rework. Pilot operation requires the actual task scope and operator permissions; a past v14 pilot statement is historical context, not this document's authorization. The **poor-performing model may merit selective guidance while others do not**; no full-suite instructions by default.
+A new complementary **engineering experiment protocol**, not a second governance source, is maintained at [CSPB engineering discipline pilot](cspb-engineering-discipline-pilot.md) (v0.2.0, proposed). It tests four models separately using an existing-Kernel control versus an added brief CSPB capsule, with blinded acceptance, positive and negative gate paths, ref specificity, authority checks, runtime costs and human rework. Pilot operation requires the actual task scope and operator permissions; a past v14 pilot statement is historical context, not this document's authorization. The **poor-performing model may merit selective guidance while others do not**; no full-suite instructions by default.
 
 **Potential improvement must be falsifiable:** a model that now produces longer explanations yet retains the same defect burden has **not** shown improvement. The pre-registered pilot reports separate per-model deltas in severity-weighted defects, false-green and false-wall rates, human remediation time, tool time, token/dollar cost, and opinion/readability inflation. A null result means reject or shorten the supplemental guidance rather than invent new roles or schema.
 
@@ -426,3 +426,59 @@ Inputs are user-uploaded 2026-10-22 to 2026-10-29 documents, independently autho
 | Date | Record | Status |
 |---|---|---|
 | 2026-10-29 | OWA-CSPB-2026-10-29-001 — naming alias, AGPL-3.0-or-later notice, engineering A/B pilot, seven-source disposition, scoped correction list | **Specified, noncanonical, not tested** |
+
+
+---
+
+## 17. October 30 source-binding and closure-completeness repair
+
+**Amendment ID:** OWA-CSPB-2026-10-30-001. **Status:** Specified, noncanonical, not a runtime/prompt installation. This explicitly remedies an observed defect in this document lineage: citing a moving \`main\` or proposal-branch path while advising agents to make ref-scoped claims.
+
+### 17.1 Pinned repository source register
+
+**Observation:** 2026-10-30. **Repository:** \`G-0-B/FLOSS\`. **Observed \`main\` commit:** \`64697350a2013e499d0345f2cc7546b7b1df9561\`. These are source-specific historical snapshots; do not call them the live state at an arbitrary later time.
+
+| Source | Immutable path @ main commit | Git blob SHA | Allowed claim ceiling |
+|---|---|---|---|
+| I1 Kernel v1.3.1 | [Kernel](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/FLOSSI0ULLK_Master_Metaprompt_v1_3_1_Kernel.md) | \`d0e94d46c224c2e13fe5cd709b89b9fbceb7b74e\` | Kernel text on **this main commit**, not PR41 or local worktrees |
+| I2 Project Spine v0.5 | [Spine](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/spine-v0.5.md) | \`b3433a42d773a272ee14e67eab1f1d4b66590fd1\` | Source precedence at this ref; no runtime enforcement inference |
+| I3 Loading order | [Loader](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/governance/LOADING_ORDER.md) | \`314c35bb3a60190d71c7c29264abeee73ceb7e90\` | Onboarding rules at this ref, not proof of loaded runtime context |
+| I4 README | [README](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/README.md) | \`eff931a17923e6fb2bc875b3bc2017a473a374b3\` | Existing broad multi-being mission, not operational achievement |
+| I5 Prior positive-alignment research map | [Research map](https://github.com/G-0-B/FLOSS/blob/64697350a2013e499d0345f2cc7546b7b1df9561/docs/research/2026-05-18-positive-alignment-flossi0ullk-map.md) | \`4ec6db2e5a258757c84d5e344257d4aba79e5111\` | Historical synthesis; implementation/novelty claims still require tests |
+| PR41 branch | [Observed PR41 head](https://github.com/G-0-B/FLOSS/tree/5a2375eed522b267ba89b874eb9105322102fcdf) | commit (not a file blob) \`5a2375eed522b267ba89b874eb9105322102fcdf\` | PR #41 branch pointer **observed** 2026-10-30; **not** an audit of each v14 R11 claim |
+
+**Last verified v0.3.0 proposal snapshot:** \`G-0-B/FLOSS\` branch \`docs/open-world-alignment-charter-proposal-2026-10-23\`, commit \`4441cea1d810924ba5fba9a2e013fccf6d5ef6b5\`, path \`docs/governance/proposals/open-world-alignment-charter.md\`, blob \`3feb990cf12141efd0238edfe225cb429800a96b\`. Its companion pilot v0.1.0 at the same commit has blob \`bfbbcacb38842f8cd4cac4d2e59b4c25e4bf4904\`. Both are source snapshots, not assertions about the updated PR head.
+
+**Self-reference constraint:** A file cannot embed its own *final commit hash* or content hash as immutable constants while being changed; doing so changes the content and hashes again. The updated proposal's final commit and both new blob SHAs are therefore recorded **externally in PR #76's versioned review description and GitHub readback**, with this row retaining the previous snapshot for provenance. The PR URL and branch URL are navigational pointers only.
+
+**Citation contract — required for consequential repository claims:** \`repository\`, named \`branch/ref\`, full \`commit\`, file \`path\`, exact \`blob SHA\`, \`observed_at\` and **what the source actually establishes**. Dirty worktrees additionally need HEAD, worktree path, staged/unstaged/untracked state and relevant content hashes; a commit does not capture those edits. For user-uploaded bytes use SHA-256, filename, date and stated provenance, without fabricating Git commits. For scholarly sources cite stable version/DOI and the quoted predicate; do not pretend an external paper is a Git ref. Unknown or unavailable source commit is **UNKNOWN**, not invented.
+
+### 17.2 Acceptance completeness is a distinct outcome, not a verbose receipt
+
+**New source-reported informal observation, 2026-10-30:** the project steward supplied a Codex / ChatGPT-6 Astra work-lead critique of a weaker model's v4 after seeing CSPB-lite. Codex reported visible uptake of *reporting discipline* (ref/time, baseline, falsifier, adaptation risk, irreversible effects, dissent) but identified **premature closure**: a fabricated hash was fixed while missing hash fields and mismatched recovery identities remained outside qualified acceptance. The original test artifact, exact model identity and source ref were not provided. This is an **Unverified anecdotal work outcome**, not a controlled efficacy result or an independent test receipt.
+
+**Proposed CSPB-lite capsule addition (exact sentence):**
+
+> Before claiming closure, account for every applicable acceptance requirement—not only the latest review finding—and test a nearby failure case that could expose an incomplete fix.
+
+**Interpretation:** \`acceptance completeness\` requires reading a pinned *authoritative contract*, enumerating applicable predicates, locating receipts for each passed requirement, recording failed/blocked/not-applicable requirements **with reasons and authorized waivers**, and refusing closure while mandatory gates remain open. Enumerating requirements is not sufficient: **test adjacent failure modes** (e.g., missing hash field, mismatched recovery identity) that a narrow patch might leave broken. A claimed closure is a separate predicate from evidence accuracy, authorization, patch execution and overall beneficial impact.
+
+**Caution:** "Every applicable" means criteria in the named authoritative contract and its explicit dependencies—not an infinite universe of hypothetical standards. Preserve legitimate \`not applicable\` and \`blocked\` outcomes to prevent a zero-throughput false wall. Unauthorized AI cannot waive criteria by marking them irrelevant.
+
+**Experiment revision:** Companion [CSPB engineering pilot](cspb-engineering-discipline-pilot.md) moved from v0.1.0 to **v0.2.0** with a versioned CSPB-lite capsule, F5 acceptance census, negative-case test and refusal-to-close metric. The earlier informal v4 example must **not** be pooled with new B@0.2.0 runs; prompt hash, protocol version and fixture hashes must be preserved.
+
+### 17.3 Scope and correction disposition
+
+- **+1** Fix all mutable repository source links in this artifact to the observed commit, preserve the Git blob identities and add exact predicate/claim scope.
+- **+1** Test whether CSPB-lite improves acceptance-complete engineering, not just quality of commentary; record human review minutes, rework and tokens.
+- **0** Keep prior R10/R11 worktree assertions source-reported until verified against the exact local ref and working-tree state. Do not infer branch status from historical transcripts.
+- **-1** Automatically apply model settings or promote a prompt to canon on the basis of one informal anecdote.
+- **Rollback:** Revert only this draft PR's doc changes if review rejects the guidance; preserve immutable prior commits and the negative evaluation. No downstream shared-state effects are authorized.
+
+**Decision required before trial execution:** pre-register real task acceptance criteria and fixtures at fixed refs; name the operator's exact permission for any local scratch mutation. No experiment results are claimed as of 2026-10-30.
+
+### 17.4 Amendment log
+
+| Date | ID | Change | Truth |
+|---|---|---|---|
+| 2026-10-30 | OWA-CSPB-2026-10-30-001 | Pinned all currently verified canonical repo source links, separated source snapshot from moving branch, updated pilot to B@0.2.0, added acceptance-completeness and adjacent regression | **Specified, not executed, noncanonical** |
