@@ -445,7 +445,7 @@
           },
           {
             "name": "documentation checklist only",
-            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "probe": "not_probed: a design argument, not a candidate rejection. ADR-18 records that principles without enforcement did not prevent PR38. Does not support the verdict as a probed rejection",
             "truth_status": "Specified"
           },
           {
@@ -454,7 +454,7 @@
             "license": "Apache-2.0",
             "maintenance": "CNCF active",
             "platform_fit": "adds runtime deps",
-            "probe": "not_probed: heavier than needed for registry-level gating; adopted conceptually for PR38 attestations instead",
+            "probe": "not_probed: not evaluated as a gate mechanism. Evidence is docs dated 2024-12 and a register check of 2026-07-16, both outside the 120-day window on 2026-11-16 and not refreshed. Not rejected; does not support the verdict",
             "truth_status": "Specified"
           },
           {
@@ -489,15 +489,24 @@
               "detail": "Run against the real registry (docs/reviews/2026-11-16-reuse-gate-review/conftest-probe/PROBE.md). Shape rules R1 (string reviewer) and R2 (120-day window) work in Rego. R3 (record file exists, sha256 matches) is impossible: conftest cannot read or hash an arbitrary file. R4 (unregistered file on a gated surface) works only when a wrapper lists the tree and passes it in. Fails as a replacement; a compose design is declined on dependency cost, not capability."
             },
             "truth_status": "Verified"
+          },
+          {
+            "name": "CUE (cue-lang/cue)",
+            "probe": "not_probed: named by a round-2 reviewer 2026-11-16 from recall, as a data-constraint language that could carry JSON-shape rules. Not read. Same class as conftest by the reviewer's account: would not remove file hashing or the tree walk",
+            "truth_status": "Unverified"
+          },
+          {
+            "name": "check-jsonschema (PyPI)",
+            "probe": "not_probed: named by a round-2 reviewer 2026-11-16 from recall, as a Python CLI validating JSON against JSON Schema. Not read. By the reviewer's account it cannot hash record bytes or walk the tree",
+            "truth_status": "Unverified"
           }
         ],
         "verdict": "extend",
         "irreducible_delta": "Behaviour, not size: a registry entry at tier 1 or 2 fails `spec_gate.py --check` unless it carries a reuse block with dated candidates inside the evidence window and a verdict on the ladder, and at tier 2 a structured reviewer record that resolves to a file in the repository. Falsifiable as observed 2026-11-16: exit 1 on evidence 123 days old, exit 0 after refresh; the contract is pinned by scripts/tests/test_spec_gate_reuse_contract.py. Custom surface: those checks inside an existing script, plus one voter-registry profile. The checks have grown past the ~90 lines stated at landing.",
         "rejected_because": [
-          "OPA/conftest (Verified, probed 2026-11-16): cannot read or hash files and cannot walk the tree, so a wrapper script is still required; adopting it adds a Go binary without removing the custom script",
-          "checklist-only: gameable (Specified, not probed)",
-          "in-toto-as-gate: dependency weight for registry-level need (Specified, not probed)",
-          "archgate, build-vs-clone skill: not evaluated (Unverified); they do not support this verdict and are not rejected by it"
+          "OPA/conftest as a replacement (Verified, probed 2026-11-16): fails on capability. It cannot read or hash a file (record check) and cannot walk the tree (unregistered-file check), so the custom script cannot be removed",
+          "OPA/conftest in a compose design: NOT a stated-requirement failure. Declined as a preference on dependency cost. The nearest stated requirement is ADR-18's 'adding no new machinery'; whether a Go binary in CI breaks it is for the operator to state and has not been stated. The verdict does not rest on this: under compose the record resolution, hashing, tree walk and single fail-closed command stay custom, so the delta is the same",
+          "Not rejected, not evaluated, and not supporting this verdict: in-toto as gate mechanism, checklist-only, archgate, build-vs-clone skill, CUE, check-jsonschema. None was probed"
         ],
         "reviewer": "pending first reuse-review poll (profile: reuse-review)",
         "expiry_or_retest_date": "2027-03-16"
