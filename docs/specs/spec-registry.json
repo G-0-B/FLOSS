@@ -459,8 +459,12 @@
           },
           {
             "name": "CI gates (SDD constitutional)",
-            "probe": "not_probed on this branch: CI now exists (python-ci, rust-ci, codeql); a workflow running spec_gate.py --check was opened against main as PR 91 on 2026-11-16 and passed there. Adopted as the consumer of this gate, not as a replacement for it",
-            "truth_status": "Specified"
+            "probe": {
+              "status": "passed",
+              "date": "2026-11-16",
+              "detail": "A workflow running `spec_gate.py --check` on every pull request (PR 91 against main) ran on GitHub Actions and passed. It ran main's older gate, which has no reuse checks, and the job is not a required check. Evidence that CI can be the gate's consumer; not evidence that CI replaces the checks."
+            },
+            "truth_status": "Verified"
           },
           {
             "name": "archgate (PyPI)",
@@ -488,7 +492,7 @@
           }
         ],
         "verdict": "extend",
-        "irreducible_delta": "Reuse-evidence validation (~90 lines) added to existing spec_gate; one voter-registry profile. No other custom surface.",
+        "irreducible_delta": "Behaviour, not size: a registry entry at tier 1 or 2 fails `spec_gate.py --check` unless it carries a reuse block with dated candidates inside the evidence window and a verdict on the ladder, and at tier 2 a structured reviewer record that resolves to a file in the repository. Falsifiable as observed 2026-11-16: exit 1 on evidence 123 days old, exit 0 after refresh; the contract is pinned by scripts/tests/test_spec_gate_reuse_contract.py. Custom surface: those checks inside an existing script, plus one voter-registry profile. The checks have grown past the ~90 lines stated at landing.",
         "rejected_because": [
           "OPA/conftest (Verified, probed 2026-11-16): cannot read or hash files and cannot walk the tree, so a wrapper script is still required; adopting it adds a Go binary without removing the custom script",
           "checklist-only: gameable (Specified, not probed)",
