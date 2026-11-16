@@ -472,12 +472,28 @@
             "name": "build-vs-clone agent skill",
             "probe": "not_probed: found by web search 2026-11-16. Advisory adopt/borrow/build guidance for an agent; nothing in the result says it runs as a check",
             "truth_status": "Unverified"
+          },
+          {
+            "name": "Open Policy Agent / conftest",
+            "version": "conftest 0.71.1 (OPA 1.21.1), release 2026-10-06",
+            "license": "Apache-2.0",
+            "maintenance": "active (release 2026-10-06)",
+            "platform_fit": "Go binary; not present on CI runners or workstations",
+            "probe": {
+              "status": "failed",
+              "date": "2026-11-16",
+              "detail": "Run against the real registry (docs/reviews/2026-11-16-reuse-gate-review/conftest-probe/PROBE.md). Shape rules R1 (string reviewer) and R2 (120-day window) work in Rego. R3 (record file exists, sha256 matches) is impossible: conftest cannot read or hash an arbitrary file. R4 (unregistered file on a gated surface) works only when a wrapper lists the tree and passes it in. Fails as a replacement; a compose design is declined on dependency cost, not capability."
+            },
+            "truth_status": "Verified"
           }
         ],
         "verdict": "extend",
         "irreducible_delta": "Reuse-evidence validation (~90 lines) added to existing spec_gate; one voter-registry profile. No other custom surface.",
         "rejected_because": [
-          "checklist-only: gameable (Specified); in-toto-as-gate: dependency weight for registry-level need (Specified)"
+          "OPA/conftest (Verified, probed 2026-11-16): cannot read or hash files and cannot walk the tree, so a wrapper script is still required; adopting it adds a Go binary without removing the custom script",
+          "checklist-only: gameable (Specified, not probed)",
+          "in-toto-as-gate: dependency weight for registry-level need (Specified, not probed)",
+          "archgate, build-vs-clone skill: not evaluated (Unverified); they do not support this verdict and are not rejected by it"
         ],
         "reviewer": "pending first reuse-review poll (profile: reuse-review)",
         "expiry_or_retest_date": "2027-03-16"
