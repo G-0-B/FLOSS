@@ -744,3 +744,48 @@ def test_an_unreadable_record_cannot_satisfy_a_pin(gate):
     }
     problems = gate._reviewer_problems("x.md", reviewer)
     assert any("could not be read" in p or "does not exist" in p for p in problems)
+
+
+# --- surface grandfathering: touch rule and deadline (operator 2026-11-16) ---
+
+import datetime as _dt_for_tests
+
+GF = {"spec": "GRANDFATHERED 2026-11-16 (x)", "grandfathered": True}
+
+
+def test_a_grandfathered_entry_is_exempt_only_while_it_has_no_tier(gate):
+    rel = "FLOSS/packages/a.py"
+    assert gate._is_surface_grandfathered(rel, GF)
+    assert not gate._is_surface_grandfathered(rel, {**GF, "tier": 1})
+    assert not gate._is_surface_grandfathered(rel, {"spec": "plain"})
+    # Truthiness must not open the exemption: only the boolean counts.
+    assert not gate._is_surface_grandfathered(rel, {"spec": "x", "grandfathered": "true"})
+    # Older D7 stubs outside the 2026-11-16 surfaces are not under these limits.
+    assert not gate._is_surface_grandfathered("FLOSS/docs/adr/ADR-0.md", GF)
+
+
+def test_touching_a_grandfathered_file_demands_a_tier(gate):
+    entries = {"FLOSS/packages/a.py": GF, "FLOSS/packages/b.py": {**GF, "tier": 1}}
+    problems = gate._touched_grandfathered(
+        entries, ["FLOSS/packages/a.py", "FLOSS/packages/b.py", "FLOSS/README.md"]
+    )
+    assert len(problems) == 1 and "FLOSS/packages/a.py" in problems[0]
+
+
+def test_an_untouched_grandfathered_file_passes_before_the_deadline(gate):
+    deadline = _dt_for_tests.date.fromisoformat(gate.GRANDFATHER_DEADLINE)
+    before = deadline - _dt_for_tests.timedelta(days=1)
+    assert gate._grandfather_deadline_problems({"FLOSS/packages/a.py": GF}, before) == []
+
+
+def test_every_grandfathered_file_fails_from_the_deadline_on(gate):
+    deadline = _dt_for_tests.date.fromisoformat(gate.GRANDFATHER_DEADLINE)
+    entries = {"FLOSS/packages/a.py": GF, "FLOSS/packages/b.py": {**GF, "tier": 1}}
+    problems = gate._grandfather_deadline_problems(entries, deadline)
+    assert len(problems) == 1 and "FLOSS/packages/a.py" in problems[0]
+
+
+def test_an_unreadable_diff_fails_the_check_instead_of_passing(gate, capsys):
+    assert gate._changed_paths("no-such-ref-for-spec-gate-test") is None
+    assert gate.run_check("no-such-ref-for-spec-gate-test") == 1
+    assert "touch rule cannot be checked" in capsys.readouterr().out
