@@ -1,0 +1,54 @@
+name: Spec gate
+
+# ---------------------------------------------------------------------------
+# Runs `scripts/spec_gate.py --check` so that the gate has a consumer.
+#
+# The gate (decision D7, adopted 2026-06-12) fails closed when an artifact on a
+# gated surface has no registry entry. Until this workflow existed, nothing ran
+# it: the script's own docstring lists CI as a "candidate". A gate whose exit
+# code nobody reads does not gate anything. On 2026-11-16 the check was found
+# failing on a working branch, with no one aware of it.
+#
+# The script uses the standard library only, so there is no install step.
+#
+# This job is intended to become a required check. Making it required is a
+# repository setting and an operator decision; this file does not do it.
+#
+# Later versions of the script add the ADR-18 reuse checks (stale evidence
+# window, missing reuse blocks). Those run under this same command, so a
+# branch that brings them in is checked by them from its first push.
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [ "main" ]
+  # Not path-filtered, for the reason given in python-ci.yml: a required check
+  # whose workflow is skipped by a path filter stays PENDING and blocks the PR.
+  # The check runs in a few seconds.
+  pull_request:
+    branches: [ "main" ]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+concurrency:
+  group: spec-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  spec-gate:
+    name: Spec gate (--check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run the gate
+        run: python scripts/spec_gate.py --check
