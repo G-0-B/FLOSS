@@ -67,9 +67,9 @@ This spec's search protocol and the risk register below are **optimizable guidel
 | Adversarial review mechanism | Omnigent Polly pattern; this gate's reuse-review profile | Verified (roster live) |
 | Research/provenance metadata interchange | RO-Crate 1.2 | Unverified — refresh before reliance |
 | Large-data + Git provenance | DataLad + git-annex | Unverified — refresh before reliance |
-| Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. Guards run only on the proposer and flow actions are not executed, so a consumer at the effect is still ours |
+| Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — upstream docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. What the read found, and what it leaves ours, belongs in the audit record and is not asserted here |
 | Agent identity, keys and signing | AD4M agent DID; Holochain agent keys | Specified — source read 2026-11-16, not run |
-| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Verified in repo for the active zomes; a file-based or custom chain needs a stated reason |
+| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Specified — the active integrity zomes were read on 2026-11-16 in a checkout that was not `main`. Field ranges and author binding are validated there. Links are not validated in either integrity zome, and the ontology check runs in the coordinator. A file-based or custom chain needs a stated reason |
 | Turning Accepted ADRs into executable checks | archgate (PyPI) | Unverified — found by search 2026-11-16, not read |
 
 ## Retrospective audit #1 — PR38 preservation capsule (gate-miss trace #1)
@@ -99,9 +99,9 @@ Changes made with this trace:
 - `packages/`, `ARF/dnas/`, `.github/workflows/` and the six `shared-*-surface.json` manifests are now gated surfaces. Existing files are grandfathered with a one-line statement of what each is. A new file there needs an entry and a tier.
 - A CI workflow that runs `--check` on every pull request was opened against main separately.
 
-Miss lesson → protocol: any capability statement containing *claim, vote, receipt, attestation, identity, signature, source chain, ledger, or status* must hit the register before design. A design written in an intake folder is still exempt from registration, but if it proposes a new record type, store, identity scheme or protocol, its header names the register rows it checked.
+Miss lesson → protocol: a design that proposes a new record type, store, identity scheme or protocol names, in its header, the register rows it checked. This applies in intake folders too, where registration itself is still exempt. Nothing enforces this rule yet; it is a convention until a check reads those headers. The other two findings above (no consumer, not on main) are answered by the CI workflow and by merging this branch, not by this rule.
 
-Not done here: no reuse block was written for the grandfathered packages, so the gate still does not judge them. That happens when each is next touched, or when the AD4M audit decides which are kept.
+Not done here: the grandfathered files carry no reuse block, so the gate does not judge them. They are registered, not reviewed. The gate's summary counts them apart from judged entries, so "0 reuse violations" covers only tiered entries. A grandfathered file owes a tier and, at tier 1 or 2, a reuse block in the change that next modifies it (`--check --changed-from <ref>`), and in any case by 2027-03-16, after which `--check` fails on it (operator decision 2026-11-16: both limits). No CI workflow passes `--changed-from` yet, so until one does the touch rule runs only when someone invokes it.
 
 ## Falsifiers (the gate retires to a plain checklist if…)
 
