@@ -2,11 +2,11 @@
 
 ```yaml
 id: "reuse-gate-spec"
-version: "1.0.0"
+version: "1.1.0"
 kind: "spec"
 status: "Active"
 created: "2026-07-16"
-truth_status: "Specified; --check enforcement Verified on landing"
+truth_status: "Specified; --check enforcement Verified when run. No workflow ran it between landing and 2026-11-16 (Retrospective audit #2)"
 schema: "reuse-gate.schema.json"
 adr: "docs/adr/ADR-18-prior-art-reuse-gate.md"
 design: "docs/research/intake_raw/2026-08-10-root/reports/2026-07-16-prior-art-reuse-gate-design-proposal.md (non-canonical; relocated from workspace root 2026-08-10)"
