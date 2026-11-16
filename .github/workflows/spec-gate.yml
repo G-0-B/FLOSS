@@ -47,8 +47,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # Full history: the touch rule diffs against the merge base.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Run the gate
-        run: python scripts/spec_gate.py --check
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        # On a pull request, also apply the touch rule: a change that modifies
+        # a grandfathered file must give its entry a tier. The flag arrives with
+        # the ADR-18 version of the script, so it is used only when the script
+        # on this ref has it; until then this is the plain check.
+        run: |
+          if [ -n "$BASE_REF" ] && python scripts/spec_gate.py --help | grep -q -- "--changed-from"; then
+            python scripts/spec_gate.py --check --changed-from "origin/$BASE_REF"
+          else
+            python scripts/spec_gate.py --check
+          fi
