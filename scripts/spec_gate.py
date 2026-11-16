@@ -732,7 +732,89 @@ def _is_reviewer_grandfathered(rel: str) -> bool:
     return digest == expected
 
 
-def run_check() -> int:
+# Surface grandfathering (2026-11-16). When packages/, ARF/dnas/, the workflows
+# and the shared manifests became gated surfaces, the files already there were
+# registered with `"grandfathered": true` and no tier, so `_reuse_problems`
+# never judges them. Three independent reviewers refused that as open-ended.
+# Operator decision 2026-11-16: both limits apply.
+#   1. Touch rule: a change that modifies a grandfathered file must give its
+#      entry a tier in the same change (`--changed-from <ref>`).
+#   2. Deadline: from GRANDFATHER_DEADLINE on, any entry still grandfathered
+#      fails `--check` whether or not it was touched.
+# The deadline date was chosen by the agent that wrote this (120 days from the
+# decision, the same length as the evidence window); the operator asked for a
+# date and did not name one. Moving it is an operator decision.
+GRANDFATHER_DEADLINE = "2027-03-16"
+# Both limits apply only to the surfaces gated on 2026-11-16. The registry also
+# holds older `grandfathered: true` stubs (ADRs, specs, scripts) from the D7
+# ratchet; the operator's decision was not about those and they are unchanged.
+GRANDFATHER_LIMITED_SURFACES = (
+    "FLOSS/packages/",
+    "FLOSS/ARF/dnas/",
+    "FLOSS/.github/workflows/",
+    "FLOSS/shared-",
+)
+
+
+def _is_surface_grandfathered(rel: str, entry: Any) -> bool:
+    """True while an entry is exempt only because it predates its surface."""
+    return (
+        isinstance(entry, dict)
+        and entry.get("grandfathered") is True
+        and "tier" not in entry
+        and rel.startswith(GRANDFATHER_LIMITED_SURFACES)
+    )
+
+
+def _grandfather_deadline_problems(
+    entries: dict, today: _dt.date | None = None
+) -> list[str]:
+    today = today or _dt.date.today()
+    if today < _dt.date.fromisoformat(GRANDFATHER_DEADLINE):
+        return []
+    return [
+        f"{rel}: grandfathered without a tier past {GRANDFATHER_DEADLINE}; "
+        "give it a tier (and a reuse block), or remove the file"
+        for rel, entry in entries.items()
+        if _is_surface_grandfathered(rel, entry)
+    ]
+
+
+def _touched_grandfathered(entries: dict, changed: list[str]) -> list[str]:
+    return [
+        f"{rel}: modified while still grandfathered; the change that touches "
+        "it must give its entry a tier (and a reuse block)"
+        for rel in changed
+        if _is_surface_grandfathered(rel, entries.get(rel))
+    ]
+
+
+def _changed_paths(ref: str) -> list[str] | None:
+    """Canonical paths added or modified since the merge base with `ref`.
+
+    None means git could not answer, which the caller treats as a failure: a
+    touch rule that passes when it cannot see the change is not a rule.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "diff", "--name-only",
+             "--diff-filter=AM", f"{ref}...HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return [
+        f"{CANONICAL_REPO_PREFIX}/{line.strip()}"
+        for line in result.stdout.splitlines()
+        if line.strip()
+    ]
+
+
+def run_check(changed_from: str | None = None) -> int:
     registry = load_registry()
     if "load_error" in registry:
         print(f"SPEC-GATE FAIL: registry unreadable: {registry['load_error']}")
@@ -752,6 +834,16 @@ def run_check() -> int:
         fails, warns = _reuse_problems(rel, entry)
         reuse_fails.extend(fails)
         reuse_warns.extend(warns)
+    reuse_fails.extend(_grandfather_deadline_problems(entries))
+    if changed_from:
+        changed = _changed_paths(changed_from)
+        if changed is None:
+            reuse_fails.append(
+                f"--changed-from {changed_from}: git could not list the changed "
+                "paths, so the touch rule cannot be checked"
+            )
+        else:
+            reuse_fails.extend(_touched_grandfathered(entries, changed))
     for rel in missing:
         print(f"SPEC-GATE MISSING {rel}")
     for rel in stale:
@@ -777,8 +869,22 @@ def run_check() -> int:
             )
         print("\nSPEC-GATE FAIL: " + "; ".join(parts))
         return 1
+    # "0 reuse violations" used to read as every entry being compliant. Only
+    # tiered entries are judged; say how many that is, and how many are not.
+    judged = sum(1 for e in entries.values() if isinstance(e, dict) and "tier" in e)
+    grandfathered = sum(
+        1 for rel, e in entries.items() if _is_surface_grandfathered(rel, e)
+    )
+    untiered = len(entries) - judged
     print(
-        f"SPEC-GATE OK: {len(entries)} registered, 0 missing, 0 reuse violations"
+        f"SPEC-GATE OK: {len(entries)} registered, 0 missing, 0 reuse violations "
+        f"among {judged} judged (tiered); {untiered} untiered and NOT judged"
+        + (
+            f", of which {grandfathered} owe a tier when next modified or by "
+            f"{GRANDFATHER_DEADLINE}"
+            if grandfathered
+            else ""
+        )
         + (f", {len(stale)} stale (non-fatal)" if stale else "")
         + (f", {len(reuse_warns)} emergency reuse warning(s)" if reuse_warns else "")
     )
@@ -844,6 +950,12 @@ def main() -> int:
         help="Reuse-gate tier for --add (ADR-18): 1 = evidence record, 2 = + review",
     )
     parser.add_argument("--list", action="store_true", help="Dump registry entries")
+    parser.add_argument(
+        "--changed-from",
+        metavar="REF",
+        help="With --check: also fail when a file changed since the merge base "
+        "with REF is still grandfathered (touch rule)",
+    )
     args = parser.parse_args()
 
     if args.path:
@@ -862,7 +974,7 @@ def main() -> int:
             ref = f"  [{entry['spec_ref']}]" if "spec_ref" in entry else ""
             print(f"{rel}: {entry.get('spec', '?')}{ref}")
         return 0
-    return run_check()
+    return run_check(args.changed_from)
 
 
 if __name__ == "__main__":
