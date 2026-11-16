@@ -67,6 +67,10 @@ This spec's search protocol and the risk register below are **optimizable guidel
 | Adversarial review mechanism | Omnigent Polly pattern; this gate's reuse-review profile | Verified (roster live) |
 | Research/provenance metadata interchange | RO-Crate 1.2 | Unverified — refresh before reliance |
 | Large-data + Git provenance | DataLad + git-annex | Unverified — refresh before reliance |
+| Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. Guards run only on the proposer and flow actions are not executed, so a consumer at the effect is still ours |
+| Agent identity, keys and signing | AD4M agent DID; Holochain agent keys | Specified — source read 2026-11-16, not run |
+| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Verified in repo for the active zomes; a file-based or custom chain needs a stated reason |
+| Turning Accepted ADRs into executable checks | archgate (PyPI) | Unverified — found by search 2026-11-16, not read |
 
 ## Retrospective audit #1 — PR38 preservation capsule (gate-miss trace #1)
 
@@ -79,6 +83,25 @@ Recorded per operator direction 2026-07-16. The capsule run itself was legitimat
 - Blocking probe: **restic on Windows — RUN AND PASSED 2026-07-16** (repo: `C:\~shit\_reuse_probes\restic-repo`; run 1: 8.969 GiB / 24,000 files in 27s; run 2 dedup: 0 B added in 7s; restore of ADR-18 file SHA-256-verified; integrity check clean). The `compose` verdict's restic leg is now ✅ Verified; candidates list updated accordingly.
 - `expiry_or_retest_date`: 2026-11-13 (120 days).
 - Miss lesson → protocol: "preservation/packaging" now has five register rows; any capability statement containing *manifest, fixity, snapshot, or capsule* must hit the register before design.
+
+## Retrospective audit #2 — AD4M and the local claim/vote stack (gate-miss trace #2)
+
+Recorded 2026-11-16. Between May and November 2026 a file-based source chain, three vote tallies, three identity schemes and a set of proposed record types were built or designed while an audit of AD4M, the intended second foundation layer, sat in `docs/research` from 2026-05-09. This gate did not fire. What a check on 2026-11-16 found:
+
+- **The work was outside the gated surfaces.** `packages/` and `ARF/dnas/` were not gated, and design work in intake folders is exempt by definition.
+- **The register had no AD4M or Holochain row.**
+- **The gate had no consumer.** No workflow ran `--check`. Its own evidence went stale on 2026-11-13 and nothing reported it.
+- **The gate was not on the main branch.** It existed only on this unmerged branch.
+
+Changes made with this trace:
+
+- Register rows for AD4M (records, identity), Holochain (storage and validation) and archgate (ADR enforcement).
+- `packages/`, `ARF/dnas/`, `.github/workflows/` and the six `shared-*-surface.json` manifests are now gated surfaces. Existing files are grandfathered with a one-line statement of what each is. A new file there needs an entry and a tier.
+- A CI workflow that runs `--check` on every pull request was opened against main separately.
+
+Miss lesson → protocol: any capability statement containing *claim, vote, receipt, attestation, identity, signature, source chain, ledger, or status* must hit the register before design. A design written in an intake folder is still exempt from registration, but if it proposes a new record type, store, identity scheme or protocol, its header names the register rows it checked.
+
+Not done here: no reuse block was written for the grandfathered packages, so the gate still does not judge them. That happens when each is next touched, or when the AD4M audit decides which are kept.
 
 ## Falsifiers (the gate retires to a plain checklist if…)
 
