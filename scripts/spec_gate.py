@@ -6,7 +6,11 @@ that visible: every artifact on a GATED surface must carry a one-line spec
 stub in the registry, or `--check` fails closed.
 
 Scope (v0.1) — friction lands ONLY where canon status is claimed:
-    GATED:  FLOSS/scripts/*, FLOSS/hooks/*, FLOSS/docs/specs/*, FLOSS/docs/adr/*
+    GATED:  FLOSS/scripts/*, FLOSS/hooks/*, FLOSS/docs/specs/*, FLOSS/docs/adr/*,
+            FLOSS/packages/*, FLOSS/ARF/dnas/*, FLOSS/.github/workflows/*, and
+            the six FLOSS/shared-*-surface.json manifests (added 2026-11-16:
+            these are where runtime code and cross-harness policy live, and
+            where parallel implementations accumulated outside the gate)
     EXEMPT: workspace root, docs/research/ (incl. intake_raw), docs/agent-memory/,
             .agent-surface/, tests/, caches — intake mouths and continuation/seed
             artifacts are definitionally pre-spec and NEVER gated.
@@ -57,15 +61,30 @@ GATED_SURFACES = (
     "FLOSS/hooks",
     "FLOSS/docs/specs",
     "FLOSS/docs/adr",
+    # Added 2026-11-16 (gate-miss trace #2 in reuse-gate.spec.md). A surface may
+    # be a single file; `_gated_artifacts` handles both.
+    "FLOSS/packages",
+    "FLOSS/ARF/dnas",
+    "FLOSS/.github/workflows",
+    "FLOSS/shared-agent-surface.json",
+    "FLOSS/shared-agent-memory-surface.json",
+    "FLOSS/shared-ai-roster-surface.json",
+    "FLOSS/shared-context-surface.json",
+    "FLOSS/shared-hook-surface.json",
+    "FLOSS/shared-skill-surface.json",
 )
 EXEMPT_SEGMENTS = (
     "/__pycache__/",
     "/scripts/tests/",
+    # Tests are never gated (see the docstring). The new surfaces keep theirs in
+    # `tests/` directories; build output lands in `target/`.
+    "/tests/",
+    "/target/",
     "/.venv/",
     "/venv/",
     "/archive/",
 )
-EXEMPT_NAMES = ("INDEX.md", ".gitignore", "__init__.py")
+EXEMPT_NAMES = ("INDEX.md", ".gitignore", "__init__.py", "Cargo.lock")
 
 # ADR-18 Prior-Art & Reuse Gate (shape B+C, operator-approved 2026-07-16).
 # Schema: docs/specs/reuse-gate.schema.json · Spec: docs/specs/reuse-gate.spec.md
@@ -231,7 +250,8 @@ def _gated_artifacts() -> list[str]:
             continue
         if not root.exists():
             continue
-        for path in sorted(root.rglob("*")):
+        candidates = [root] if root.is_file() else sorted(root.rglob("*"))
+        for path in candidates:
             if path.is_file() and is_gated(path):
                 rel = _normalize(path)
                 if rel:

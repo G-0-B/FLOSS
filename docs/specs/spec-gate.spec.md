@@ -34,6 +34,9 @@ Every artifact on a **gated surface** must have a one-line spec stub in
 ## Scope discipline (the friction answer)
 
 Gated (v0.1): `FLOSS/scripts/`, `FLOSS/docs/specs/`, `FLOSS/docs/adr/`.
+Added since: `FLOSS/hooks/` (2026-07-26); `FLOSS/packages/`, `FLOSS/ARF/dnas/`,
+`FLOSS/.github/workflows/` and the six `FLOSS/shared-*-surface.json` manifests
+(2026-11-16). The tuple `GATED_SURFACES` in `spec_gate.py` is what is enforced.
 
 **Never gated:** the workspace root, `FLOSS/docs/research/` (including all
 `intake_raw/` buckets), `docs/agent-memory/`, `.agent-surface/`, tests, caches.
