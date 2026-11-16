@@ -69,8 +69,9 @@ This spec's search protocol and the risk register below are **optimizable guidel
 | Large-data + Git provenance | DataLad + git-annex | Unverified — refresh before reliance |
 | Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — upstream docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. What the read found, and what it leaves ours, belongs in the audit record and is not asserted here |
 | Agent identity, keys and signing | AD4M agent DID; Holochain agent keys | Specified — source read 2026-11-16, not run |
-| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Specified — the active integrity zomes were read on 2026-11-16 in a checkout that was not `main`. Field ranges and author binding are validated there. Links are not validated in either integrity zome, and the ontology check runs in the coordinator. A file-based or custom chain needs a stated reason |
+| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Specified — the active integrity zomes were read on 2026-11-16 in a checkout that was not `main`; not run. What the read found is in Retrospective audit #2 as the reader's unverified account and is not asserted here. A file-based or custom chain needs a stated reason |
 | Turning Accepted ADRs into executable checks | archgate (PyPI) | Unverified — found by search 2026-11-16, not read |
+| Signed claims and their revocation, as a standard rather than an implementation | W3C Verifiable Credentials Data Model and status lists | Unverified — named by a reviewer 2026-11-16 from recall, not read |
 
 ## Retrospective audit #1 — PR38 preservation capsule (gate-miss trace #1)
 
@@ -93,6 +94,8 @@ Recorded 2026-11-16. Between May and November 2026 a file-based source chain, th
 - **The gate had no consumer.** No workflow ran `--check`. Its own evidence went stale on 2026-11-13 and nothing reported it.
 - **The gate was not on the main branch.** It existed only on this unmerged branch.
 
+Reader's account of the integrity zomes, unverified and from a checkout that was not `main`: field ranges and author binding are validated; links are not validated in either integrity zome; the ontology check runs in the coordinator. Repeat the read on `main` and cite functions by path and line before relying on it.
+
 Changes made with this trace:
 
 - Register rows for AD4M (records, identity), Holochain (storage and validation) and archgate (ADR enforcement).
@@ -101,7 +104,9 @@ Changes made with this trace:
 
 Miss lesson → protocol: a design that proposes a new record type, store, identity scheme or protocol names, in its header, the register rows it checked. This applies in intake folders too, where registration itself is still exempt. Nothing enforces this rule yet; it is a convention until a check reads those headers. The other two findings above (no consumer, not on main) are answered by the CI workflow and by merging this branch, not by this rule.
 
-Not done here: the grandfathered files carry no reuse block, so the gate does not judge them. They are registered, not reviewed. The gate's summary counts them apart from judged entries, so "0 reuse violations" covers only tiered entries. A grandfathered file owes a tier and, at tier 1 or 2, a reuse block in the change that next modifies it (`--check --changed-from <ref>`), and in any case by 2027-03-16, after which `--check` fails on it (operator decision 2026-11-16: both limits). No CI workflow passes `--changed-from` yet, so until one does the touch rule runs only when someone invokes it.
+Not done here: the grandfathered files carry no reuse block, so the gate does not judge them. They are registered, not reviewed. The gate's summary counts them apart from judged entries, so "0 reuse violations" covers only tiered entries. A grandfathered file owes a tier and, at tier 1 or 2, a reuse block in the change that next modifies it (`--check --changed-from <ref>`), and in any case by 2027-03-16, after which `--check` fails on it (operator decision 2026-11-16: both limits). The touch rule is inert on this branch: the workflow that runs the gate (opened against `main` as PR 91) passes `--changed-from` only when the script on the checked-out ref has the flag, and that script is not on `main` yet. The rule starts running on pull requests when this gate reaches `main`; until then it runs only when someone invokes it. That workflow's job is not a required check; making it one is a repository setting.
+
+Also not done, and larger: the registry holds 101 older entries with no tier (42 marked `grandfathered` from the D7 ratchet, 59 unmarked). They have no touch rule and no deadline, and the reuse gate judges none of them; it judges 7 of 180 entries. Whether they get the same two limits is an operator decision that has not been made.
 
 ## Falsifiers (the gate retires to a plain checklist if…)
 
