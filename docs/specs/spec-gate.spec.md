@@ -34,6 +34,17 @@ Every artifact on a **gated surface** must have a one-line spec stub in
 ## Scope discipline (the friction answer)
 
 Gated (v0.1): `FLOSS/scripts/`, `FLOSS/docs/specs/`, `FLOSS/docs/adr/`.
+Added since: `FLOSS/hooks/` (2026-07-26); `FLOSS/packages/`, `FLOSS/ARF/dnas/`,
+`FLOSS/.github/workflows/` and the six `FLOSS/shared-*-surface.json` manifests
+(2026-11-16). The tuple `GATED_SURFACES` in `spec_gate.py` is what is enforced.
+
+Files already on the 2026-11-16 surfaces are registered `grandfathered: true`
+with no tier, so the reuse gate does not judge them. That exemption has two
+limits (operator decision 2026-11-16): a change that modifies such a file must
+give its entry a tier in the same change (`--check --changed-from <ref>`), and
+from `GRANDFATHER_DEADLINE` (2027-03-16) any entry still grandfathered fails
+`--check`. The `--changed-from` flag is not yet passed by any CI workflow. The
+gate's summary line counts judged and unjudged entries separately.
 
 **Never gated:** the workspace root, `FLOSS/docs/research/` (including all
 `intake_raw/` buckets), `docs/agent-memory/`, `.agent-surface/`, tests, caches.

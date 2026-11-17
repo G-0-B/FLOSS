@@ -1,12 +1,21 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-17",
+  "updated": "2026-11-16",
   "decision": "D7 spec-gate, adopted by Anthony 2026-06-12 (both wirings: --check audit + post-write hook advisory)",
   "gated_surfaces": [
     "FLOSS/scripts",
     "FLOSS/hooks",
     "FLOSS/docs/specs",
-    "FLOSS/docs/adr"
+    "FLOSS/docs/adr",
+    "FLOSS/packages",
+    "FLOSS/ARF/dnas",
+    "FLOSS/.github/workflows",
+    "FLOSS/shared-agent-surface.json",
+    "FLOSS/shared-agent-memory-surface.json",
+    "FLOSS/shared-ai-roster-surface.json",
+    "FLOSS/shared-context-surface.json",
+    "FLOSS/shared-hook-surface.json",
+    "FLOSS/shared-skill-surface.json"
   ],
   "exempt_note": "Intake mouths (workspace root, docs/research incl. intake_raw), docs/agent-memory, .agent-surface, tests, caches are NEVER gated — continuation/seed artifacts are pre-spec by definition.",
   "entries": {
@@ -422,21 +431,21 @@
       "tier": 2,
       "reuse": {
         "capability": "Enforceable prior-art/reuse evidence (adopt/extend/compose/build) before infrastructure implementation",
-        "search_date": "2026-07-16",
+        "search_date": "2026-11-16",
         "evidence_window_days": 120,
         "candidates": [
           {
             "name": "spec_gate.py (D7) + spec-registry",
-            "version": "repo 2026-06-12",
+            "version": "repo 2026-11-16",
             "license": "project",
             "maintenance": "active",
             "platform_fit": "native",
-            "probe": "spec_gate.py --check executed live 2026-07-16; fail-closed path verified",
+            "probe": "spec_gate.py --check executed 2026-11-16 on this branch: exit 1 on stale evidence (123d > 120d), then exit 0 after refresh; fail-closed path verified",
             "truth_status": "Verified"
           },
           {
             "name": "documentation checklist only",
-            "probe": "not_probed: rejected by design analysis — trivially gameable, repo history shows principles without enforcement failed (PR38)",
+            "probe": "not_probed: a design argument, not a candidate rejection. ADR-18 records that principles without enforcement did not prevent PR38. Does not support the verdict as a probed rejection",
             "truth_status": "Specified"
           },
           {
@@ -445,22 +454,69 @@
             "license": "Apache-2.0",
             "maintenance": "CNCF active",
             "platform_fit": "adds runtime deps",
-            "probe": "not_probed: heavier than needed for registry-level gating; adopted conceptually for PR38 attestations instead",
+            "probe": "not_probed: not evaluated as a gate mechanism. Evidence is docs dated 2024-12 and a register check of 2026-07-16, both outside the 120-day window on 2026-11-16 and not refreshed. Not rejected; does not support the verdict",
             "truth_status": "Specified"
           },
           {
             "name": "CI gates (SDD constitutional)",
-            "probe": "not_probed: no CI substrate running yet; deferred, not rejected",
-            "truth_status": "Specified"
+            "probe": {
+              "status": "passed",
+              "date": "2026-11-16",
+              "detail": "A workflow running `spec_gate.py --check` on every pull request (PR 91 against main) ran on GitHub Actions and passed. It ran main's older gate, which has no reuse checks, and the job is not a required check. Evidence that CI can be the gate's consumer; not evidence that CI replaces the checks."
+            },
+            "truth_status": "Verified"
+          },
+          {
+            "name": "archgate (PyPI)",
+            "version": "0.50.0 listed on PyPI, seen 2026-11-16",
+            "probe": {
+              "status": "passed",
+              "date": "2026-11-16",
+              "detail": "Ran against the real registry and tree (docs/reviews/2026-11-16-reuse-gate-review/archgate-probe/PROBE.md). Five ported rule groups reproduce spec_gate.py: surface walk with exemptions (179 files, 0 unregistered), tier-2 reviewer rule, 120-day window, LF-normalised record digest, both grandfathering limits. Differences: skips gitignored files; a malformed ADR header gives exit 0 with zero rules run; the touch rule needs --base. archgate is a host; it ships no reuse rule, so each check is still custom code. As a host it is NOT rejected on capability."
+            },
+            "truth_status": "Verified",
+            "license": "Apache-2.0 (package metadata)",
+            "platform_fit": "106 MB binary fetched by a PyPI launcher at first run; rules are TypeScript"
+          },
+          {
+            "name": "build-vs-clone agent skill",
+            "probe": "not_probed: found by web search 2026-11-16. Advisory adopt/borrow/build guidance for an agent; nothing in the result says it runs as a check",
+            "truth_status": "Unverified"
+          },
+          {
+            "name": "Open Policy Agent / conftest",
+            "version": "conftest 0.71.1 (OPA 1.21.1), release 2026-10-06",
+            "license": "Apache-2.0",
+            "maintenance": "active (release 2026-10-06)",
+            "platform_fit": "Go binary; not present on CI runners or workstations",
+            "probe": {
+              "status": "failed",
+              "date": "2026-11-16",
+              "detail": "Run against the real registry (docs/reviews/2026-11-16-reuse-gate-review/conftest-probe/PROBE.md). Shape rules R1 (string reviewer) and R2 (120-day window) work in Rego. R3 (record file exists, sha256 matches) is impossible: conftest cannot read or hash an arbitrary file. R4 (unregistered file on a gated surface) works only when a wrapper lists the tree and passes it in. Fails as a replacement; a compose design is declined on dependency cost, not capability."
+            },
+            "truth_status": "Verified"
+          },
+          {
+            "name": "CUE (cue-lang/cue)",
+            "probe": "not_probed: named by a round-2 reviewer 2026-11-16 from recall, as a data-constraint language that could carry JSON-shape rules. Not read. Same class as conftest by the reviewer's account: would not remove file hashing or the tree walk",
+            "truth_status": "Unverified"
+          },
+          {
+            "name": "check-jsonschema (PyPI)",
+            "probe": "not_probed: named by a round-2 reviewer 2026-11-16 from recall, as a Python CLI validating JSON against JSON Schema. Not read. By the reviewer's account it cannot hash record bytes or walk the tree",
+            "truth_status": "Unverified"
           }
         ],
         "verdict": "extend",
-        "irreducible_delta": "Reuse-evidence validation (~90 lines) added to existing spec_gate; one voter-registry profile. No other custom surface.",
+        "irreducible_delta": "Behaviour, not size: a registry entry at tier 1 or 2 fails `spec_gate.py --check` unless it carries a reuse block with dated candidates inside the evidence window and a verdict on the ladder, and at tier 2 a structured reviewer record that resolves to a file in the repository. Falsifiable as observed 2026-11-16: exit 1 on evidence 123 days old, exit 0 after refresh; the contract is pinned by scripts/tests/test_spec_gate_reuse_contract.py. Custom surface: those checks inside an existing script, plus one voter-registry profile. The checks have grown past the ~90 lines stated at landing.",
         "rejected_because": [
-          "checklist-only: gameable (Specified); in-toto-as-gate: dependency weight for registry-level need (Specified)"
+          "OPA/conftest as a replacement (Verified, probed 2026-11-16): fails on capability. It cannot read or hash a file and cannot walk the tree",
+          "archgate (Verified, probed 2026-11-16): NOT rejected on capability. It can host every check that was ported. It supplies a runner, not the rules, so the reuse checks remain custom under it. The choice between extending the in-repo script and extending archgate is open and is the operator's: no stated requirement decides it. ADR-18's 'adding no new machinery' is the nearest. Until that is stated, this `extend` verdict means 'custom rules are needed', not 'this host is the right one'",
+          "OPA/conftest in a compose design: declined as a preference on dependency cost, not a stated-requirement failure",
+          "Not rejected, not evaluated, and not supporting this verdict: in-toto as gate mechanism, checklist-only, build-vs-clone skill, CUE, check-jsonschema. None was probed"
         ],
         "reviewer": "pending first reuse-review poll (profile: reuse-review)",
-        "expiry_or_retest_date": "2026-11-13"
+        "expiry_or_retest_date": "2027-03-16"
       }
     },
     "FLOSS/docs/specs/rose-node.schema.json": {
@@ -662,9 +718,6 @@
     "FLOSS/scripts/refresh_agent_surfaces.py": {
       "spec": "Orchestrates all six shared-surface materializers; --check is the pre/post invariant for surface work"
     },
-    "FLOSS/scripts/research_log.py": {
-      "spec": "Appends dated research-log entries to the shared research register"
-    },
     "FLOSS/scripts/review_independence.py": {
       "spec": "Kish n_eff over reviewer findings-overlap; measures panel redundancy without gold labels",
       "tier": 1,
@@ -726,6 +779,297 @@
     },
     "FLOSS/scripts/yumeichan_watch_capabilities.py": {
       "spec": "Semantic validation for Yumeichan Watch capability-token bounds"
+    },
+    "FLOSS/packages/activity_log/anchor.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (Merkle anchor over provenance packets)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/activity_log/filelock.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (file lock helper for the activity log)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/activity_log/provenance.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (signed provenance packets and packet validation)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/activity_log/schema.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (activity-log record schema)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/activity_log/witness.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (OpenTimestamps witness for anchors)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/mcp_daemon.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (shared HTTP daemon runner and audited tool registration for the MCP servers)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/DESIGN.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (design notes for the consensus gateway)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/hashline.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (pre-write checkpoint and post-write verification that an edit landed as intended)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/server.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (MCP server entry point for the consensus gateway)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/tools.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (gateway tools: submit_claim, cast_vote, chain reads, run_consensus_round)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/voter_registry.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (voter roster and model identifiers)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/metacoordinator_mcp/voters.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (voter roster resolution, independence check and model voter calls)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/omniroute_client.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (client for the OmniRoute model-routing backend)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/claim_schema.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (Claim, Vote, Decision and EvidenceRef types with per-blast-radius thresholds)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/consensus_gate.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (analog-vote tally, decide and human override)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/holochain_connector.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (websocket client for rose_forest zome calls)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/serialization.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical serialization and entry hash)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/test_connector_offline.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (offline tests for the Holochain connector)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/orchestrator/test_consensus_gate.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (tests for the consensus gate)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/reasoning_ensemble/mcp_server.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (MCP server for the inline reasoning ensemble)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/reasoning_ensemble/router.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (reasoning ensemble router: mode classification)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/reasoning_ensemble/synthesizer.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (reasoning ensemble synthesizer: multi-lens deliberation)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/reasoning_ensemble/transport.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (model transport for the reasoning ensemble)",
+      "grandfathered": true
+    },
+    "FLOSS/packages/source_chain/cell.py": {
+      "spec": "GRANDFATHERED 2026-11-16 (file-based hash-linked source chain (entries are unsigned))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/patterns/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge patterns zome: mixing-pattern checks (Cargo.toml; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/patterns/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge patterns zome: mixing-pattern checks (README.md; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/patterns/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge patterns zome: mixing-pattern checks (src/lib.rs; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/patterns/VERIFICATION.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge patterns zome: mixing-pattern checks (VERIFICATION.md; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/registry/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge registry zome: bridge registry (Cargo.toml; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/infinity_bridge/zomes/registry/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (infinity_bridge registry zome: bridge registry (src/lib.rs; excluded from the ARF workspace, on an older hdk pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/BUDGET_SYSTEM.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (description of the rose_forest budget system)",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/workdir/dna.yaml": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest DNA manifest: which zomes are packed)",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_coordinator/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent coordinator zome (Cargo.toml; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_coordinator/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent coordinator zome (README.md; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_coordinator/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent coordinator zome (src/lib.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_integrity/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent integrity zome: append-only payload and decision rules (ADR-12) (Cargo.toml; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_integrity/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent integrity zome: append-only payload and decision rules (ADR-12) (README.md; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/consent_integrity/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (consent integrity zome: append-only payload and decision rules (ADR-12) (src/lib.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (Cargo.toml; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (README.md; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/src/budget.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (src/budget.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (src/lib.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/src/ontology.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (src/ontology.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/coordinator/src/vector_ops.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest coordinator zome: knowledge, triples, vector search, budget (src/vector_ops.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/hrea_coordinator/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (hREA-style economic event coordinator (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/hrea_coordinator/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (hREA-style economic event coordinator (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/hrea_coordinator/src/vector_bridge.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (hREA-style economic event coordinator (src/vector_bridge.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/hrea_integrity/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (hREA-style economic event types (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/hrea_integrity/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (hREA-style economic event types (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/identity_coordinator/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (identifier registration and key rotation coordinator (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/identity_coordinator/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (identifier registration and key rotation coordinator (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/identity_integrity/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (identifier, key event log and seal entry types (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/identity_integrity/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (identifier, key event log and seal entry types (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/integrity/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest integrity zome: entry types and validation rules (Cargo.toml; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/integrity/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest integrity zome: entry types and validation rules (README.md; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/integrity/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (rose_forest integrity zome: entry types and validation rules (src/lib.rs; in the ARF workspace))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/memory_coordinator/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (understanding transmit/recall coordinator (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/memory_coordinator/src/budget.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (understanding transmit/recall coordinator (src/budget.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/memory_coordinator/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (understanding transmit/recall coordinator (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/ontology_integrity/Cargo.toml": {
+      "spec": "GRANDFATHERED 2026-11-16 (ontology types, relations and triple validation rules (Cargo.toml; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/ontology_integrity/src/inference.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (ontology types, relations and triple validation rules (src/inference.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/ontology_integrity/src/lib.rs": {
+      "spec": "GRANDFATHERED 2026-11-16 (ontology types, relations and triple validation rules (src/lib.rs; excluded from the ARF workspace, on an older hdk/hdi pin))",
+      "grandfathered": true
+    },
+    "FLOSS/ARF/dnas/rose_forest/zomes/README.md": {
+      "spec": "GRANDFATHERED 2026-11-16 (overview of the rose_forest zomes)",
+      "grandfathered": true
+    },
+    "FLOSS/.github/workflows/codeql.yml": {
+      "spec": "GRANDFATHERED 2026-11-16 (CodeQL analysis workflow)",
+      "grandfathered": true
+    },
+    "FLOSS/.github/workflows/python-ci.yml": {
+      "spec": "GRANDFATHERED 2026-11-16 (Python CI: required green set and advisory full suite)",
+      "grandfathered": true
+    },
+    "FLOSS/.github/workflows/rust-ci.yml": {
+      "spec": "GRANDFATHERED 2026-11-16 (Rust CI: format, wasm compile check, held lint and test jobs)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-agent-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for agent and MCP projections)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-agent-memory-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for agent-memory projections)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-ai-roster-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for the provider and agent roster)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-context-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for context views)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-hook-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for hook projections)",
+      "grandfathered": true
+    },
+    "FLOSS/shared-skill-surface.json": {
+      "spec": "GRANDFATHERED 2026-11-16 (canonical manifest for skill projections)",
+      "grandfathered": true
+    },
+    "FLOSS/.github/workflows/spec-gate.yml": {
+      "spec": "Runs spec_gate.py --check on every pull request so the gate has a consumer (added on main by PR 91)"
     }
   }
 }
