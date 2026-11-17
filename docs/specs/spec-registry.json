@@ -469,8 +469,14 @@
           {
             "name": "archgate (PyPI)",
             "version": "0.50.0 listed on PyPI, seen 2026-11-16",
-            "probe": "not_probed: found by web search 2026-11-16. Described as ADR rules files with a check command that exits 1 on violation. The search result names no built-in prior-art rule. License, maintenance and source not read",
-            "truth_status": "Unverified"
+            "probe": {
+              "status": "passed",
+              "date": "2026-11-16",
+              "detail": "Ran against the real registry and tree (docs/reviews/2026-11-16-reuse-gate-review/archgate-probe/PROBE.md). Five ported rule groups reproduce spec_gate.py: surface walk with exemptions (179 files, 0 unregistered), tier-2 reviewer rule, 120-day window, LF-normalised record digest, both grandfathering limits. Differences: skips gitignored files; a malformed ADR header gives exit 0 with zero rules run; the touch rule needs --base. archgate is a host; it ships no reuse rule, so each check is still custom code. As a host it is NOT rejected on capability."
+            },
+            "truth_status": "Verified",
+            "license": "Apache-2.0 (package metadata)",
+            "platform_fit": "106 MB binary fetched by a PyPI launcher at first run; rules are TypeScript"
           },
           {
             "name": "build-vs-clone agent skill",
@@ -504,9 +510,10 @@
         "verdict": "extend",
         "irreducible_delta": "Behaviour, not size: a registry entry at tier 1 or 2 fails `spec_gate.py --check` unless it carries a reuse block with dated candidates inside the evidence window and a verdict on the ladder, and at tier 2 a structured reviewer record that resolves to a file in the repository. Falsifiable as observed 2026-11-16: exit 1 on evidence 123 days old, exit 0 after refresh; the contract is pinned by scripts/tests/test_spec_gate_reuse_contract.py. Custom surface: those checks inside an existing script, plus one voter-registry profile. The checks have grown past the ~90 lines stated at landing.",
         "rejected_because": [
-          "OPA/conftest as a replacement (Verified, probed 2026-11-16): fails on capability. It cannot read or hash a file (record check) and cannot walk the tree (unregistered-file check), so the custom script cannot be removed",
-          "OPA/conftest in a compose design: NOT a stated-requirement failure. Declined as a preference on dependency cost. The nearest stated requirement is ADR-18's 'adding no new machinery'; whether a Go binary in CI breaks it is for the operator to state and has not been stated. The verdict does not rest on this: under compose the record resolution, hashing, tree walk and single fail-closed command stay custom, so the delta is the same",
-          "Not rejected, not evaluated, and not supporting this verdict: in-toto as gate mechanism, checklist-only, archgate, build-vs-clone skill, CUE, check-jsonschema. None was probed"
+          "OPA/conftest as a replacement (Verified, probed 2026-11-16): fails on capability. It cannot read or hash a file and cannot walk the tree",
+          "archgate (Verified, probed 2026-11-16): NOT rejected on capability. It can host every check that was ported. It supplies a runner, not the rules, so the reuse checks remain custom under it. The choice between extending the in-repo script and extending archgate is open and is the operator's: no stated requirement decides it. ADR-18's 'adding no new machinery' is the nearest. Until that is stated, this `extend` verdict means 'custom rules are needed', not 'this host is the right one'",
+          "OPA/conftest in a compose design: declined as a preference on dependency cost, not a stated-requirement failure",
+          "Not rejected, not evaluated, and not supporting this verdict: in-toto as gate mechanism, checklist-only, build-vs-clone skill, CUE, check-jsonschema. None was probed"
         ],
         "reviewer": "pending first reuse-review poll (profile: reuse-review)",
         "expiry_or_retest_date": "2027-03-16"
