@@ -2,11 +2,11 @@
 
 ```yaml
 id: "reuse-gate-spec"
-version: "1.0.0"
+version: "1.1.0"
 kind: "spec"
 status: "Active"
 created: "2026-07-16"
-truth_status: "Specified; --check enforcement Verified on landing"
+truth_status: "Specified; --check enforcement Verified when run. No workflow ran it between landing and 2026-11-16 (Retrospective audit #2)"
 schema: "reuse-gate.schema.json"
 adr: "docs/adr/ADR-18-prior-art-reuse-gate.md"
 design: "docs/research/intake_raw/2026-08-10-root/reports/2026-07-16-prior-art-reuse-gate-design-proposal.md (non-canonical; relocated from workspace root 2026-08-10)"
@@ -67,6 +67,11 @@ This spec's search protocol and the risk register below are **optimizable guidel
 | Adversarial review mechanism | Omnigent Polly pattern; this gate's reuse-review profile | Verified (roster live) |
 | Research/provenance metadata interchange | RO-Crate 1.2 | Unverified — refresh before reliance |
 | Large-data + Git provenance | DataLad + git-annex | Unverified — refresh before reliance |
+| Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — upstream docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. What the read found, and what it leaves ours, belongs in the audit record and is not asserted here |
+| Agent identity, keys and signing | AD4M agent DID; Holochain agent keys | Specified — source read 2026-11-16, not run |
+| Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Specified — the active integrity zomes were read on 2026-11-16 in a checkout that was not `main`; not run. What the read found is in Retrospective audit #2 as the reader's unverified account and is not asserted here. A file-based or custom chain needs a stated reason |
+| Turning Accepted ADRs into executable checks | archgate (PyPI) | Verified as a host — probed 2026-11-16 against this repository's registry and tree (`docs/reviews/2026-11-16-reuse-gate-review/archgate-probe/PROBE.md`). Runs custom rules; ships none for prior art. A malformed ADR header exits 0 with no rules run |
+| Signed claims and their revocation, as a standard rather than an implementation | W3C Verifiable Credentials Data Model and status lists | Unverified — named by a reviewer 2026-11-16 from recall, not read |
 
 ## Retrospective audit #1 — PR38 preservation capsule (gate-miss trace #1)
 
@@ -79,6 +84,29 @@ Recorded per operator direction 2026-07-16. The capsule run itself was legitimat
 - Blocking probe: **restic on Windows — RUN AND PASSED 2026-07-16** (repo: `C:\~shit\_reuse_probes\restic-repo`; run 1: 8.969 GiB / 24,000 files in 27s; run 2 dedup: 0 B added in 7s; restore of ADR-18 file SHA-256-verified; integrity check clean). The `compose` verdict's restic leg is now ✅ Verified; candidates list updated accordingly.
 - `expiry_or_retest_date`: 2026-11-13 (120 days).
 - Miss lesson → protocol: "preservation/packaging" now has five register rows; any capability statement containing *manifest, fixity, snapshot, or capsule* must hit the register before design.
+
+## Retrospective audit #2 — AD4M and the local claim/vote stack (gate-miss trace #2)
+
+Recorded 2026-11-16. Between May and November 2026 a file-based source chain, three vote tallies, three identity schemes and a set of proposed record types were built or designed while an audit of AD4M, the intended second foundation layer, sat in `docs/research` from 2026-05-09. This gate did not fire. What a check on 2026-11-16 found:
+
+- **The work was outside the gated surfaces.** `packages/` and `ARF/dnas/` were not gated, and design work in intake folders is exempt by definition.
+- **The register had no AD4M or Holochain row.**
+- **The gate had no consumer.** No workflow ran `--check`. Its own evidence went stale on 2026-11-13 and nothing reported it.
+- **The gate was not on the main branch.** It existed only on this unmerged branch.
+
+Reader's account of the integrity zomes, unverified and from a checkout that was not `main`: field ranges and author binding are validated; links are not validated in either integrity zome; the ontology check runs in the coordinator. Repeat the read on `main` and cite functions by path and line before relying on it.
+
+Changes made with this trace:
+
+- Register rows for AD4M (records, identity), Holochain (storage and validation) and archgate (ADR enforcement).
+- `packages/`, `ARF/dnas/`, `.github/workflows/` and the six `shared-*-surface.json` manifests are now gated surfaces. Existing files are grandfathered with a one-line statement of what each is. A new file there needs an entry and a tier.
+- A CI workflow that runs `--check` on every pull request was opened against main separately.
+
+Miss lesson → protocol: a design that proposes a new record type, store, identity scheme or protocol names, in its header, the register rows it checked. This applies in intake folders too, where registration itself is still exempt. Nothing enforces this rule yet; it is a convention until a check reads those headers. The other two findings above (no consumer, not on main) are answered by the CI workflow and by merging this branch, not by this rule.
+
+Not done here: the grandfathered files carry no reuse block, so the gate does not judge them. They are registered, not reviewed. The gate's summary counts them apart from judged entries, so "0 reuse violations" covers only tiered entries. A grandfathered file owes a tier and, at tier 1 or 2, a reuse block in the change that next modifies it (`--check --changed-from <ref>`), and in any case by 2027-03-16, after which `--check` fails on it (operator decision 2026-11-16: both limits). The touch rule is inert on this branch: the workflow that runs the gate (opened against `main` as PR 91) passes `--changed-from` only when the script on the checked-out ref has the flag, and that script is not on `main` yet. The rule starts running on pull requests when this gate reaches `main`; until then it runs only when someone invokes it. That workflow's job is not a required check; making it one is a repository setting.
+
+Also not done, and larger: the registry holds 101 older entries with no tier (42 marked `grandfathered` from the D7 ratchet, 59 unmarked). They have no touch rule and no deadline, and the reuse gate judges none of them; it judges 7 of 180 entries. Whether they get the same two limits is an operator decision that has not been made.
 
 ## Falsifiers (the gate retires to a plain checklist if…)
 
