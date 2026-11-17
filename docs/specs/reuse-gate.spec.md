@@ -70,7 +70,7 @@ This spec's search protocol and the risk register below are **optimizable guidel
 | Signed claims, votes, receipts, role grants and revocation, status derived from signed records | AD4M link expressions and Flows (coasys/ad4m) | Specified — upstream docs and source read at commit `0b833087` on 2026-11-16; nothing built or run. What the read found, and what it leaves ours, belongs in the audit record and is not asserted here |
 | Agent identity, keys and signing | AD4M agent DID; Holochain agent keys | Specified — source read 2026-11-16, not run |
 | Peer-validated storage, source chains, validation rules | Holochain integrity zomes (already the stated substrate) | Specified — the active integrity zomes were read on 2026-11-16 in a checkout that was not `main`; not run. What the read found is in Retrospective audit #2 as the reader's unverified account and is not asserted here. A file-based or custom chain needs a stated reason |
-| Turning Accepted ADRs into executable checks | archgate (PyPI) | Unverified — found by search 2026-11-16, not read |
+| Turning Accepted ADRs into executable checks | archgate (PyPI) | Verified as a host — probed 2026-11-16 against this repository's registry and tree (`docs/reviews/2026-11-16-reuse-gate-review/archgate-probe/PROBE.md`). Runs custom rules; ships none for prior art. A malformed ADR header exits 0 with no rules run |
 | Signed claims and their revocation, as a standard rather than an implementation | W3C Verifiable Credentials Data Model and status lists | Unverified — named by a reviewer 2026-11-16 from recall, not read |
 
 ## Retrospective audit #1 — PR38 preservation capsule (gate-miss trace #1)
